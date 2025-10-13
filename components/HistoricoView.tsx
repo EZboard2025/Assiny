@@ -243,6 +243,148 @@ export default function HistoricoView() {
                       )}
                     </div>
 
+                    {/* Avaliação de Performance */}
+                    {(selectedSession as any).evaluation && (
+                      <div className="mb-6">
+                        <h4 className="font-semibold mb-3 text-purple-400 text-lg">
+                          📊 Avaliação de Performance
+                        </h4>
+
+                        {/* Score Geral */}
+                        <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-xl p-4 text-center mb-4">
+                          <div className="text-4xl font-bold text-white mb-1">
+                            {(selectedSession as any).evaluation.overall_score}
+                          </div>
+                          <div className="text-sm text-purple-300 uppercase tracking-wider">
+                            {(selectedSession as any).evaluation.performance_level === 'legendary' && '🏆 Lendário'}
+                            {(selectedSession as any).evaluation.performance_level === 'excellent' && '⭐ Excelente'}
+                            {(selectedSession as any).evaluation.performance_level === 'very_good' && '✨ Muito Bom'}
+                            {(selectedSession as any).evaluation.performance_level === 'good' && '👍 Bom'}
+                            {(selectedSession as any).evaluation.performance_level === 'needs_improvement' && '📈 Precisa Melhorar'}
+                            {(selectedSession as any).evaluation.performance_level === 'poor' && '📚 Em Desenvolvimento'}
+                          </div>
+                        </div>
+
+                        {/* Resumo Executivo */}
+                        <div className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
+                          <h5 className="font-semibold text-white mb-2">Resumo Executivo</h5>
+                          <p className="text-sm text-gray-300 leading-relaxed">
+                            {(selectedSession as any).evaluation.executive_summary}
+                          </p>
+                        </div>
+
+                        {/* Avaliação SPIN */}
+                        <div className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
+                          <h5 className="font-semibold text-white mb-3">Metodologia SPIN</h5>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-gray-900/50 rounded-lg p-3">
+                              <div className="text-xs text-gray-500 mb-1">Situação</div>
+                              <div className="text-2xl font-bold text-purple-400">
+                                {(selectedSession as any).evaluation.spin_evaluation.S.final_score.toFixed(1)}
+                              </div>
+                            </div>
+                            <div className="bg-gray-900/50 rounded-lg p-3">
+                              <div className="text-xs text-gray-500 mb-1">Problema</div>
+                              <div className="text-2xl font-bold text-purple-400">
+                                {(selectedSession as any).evaluation.spin_evaluation.P.final_score.toFixed(1)}
+                              </div>
+                            </div>
+                            <div className="bg-gray-900/50 rounded-lg p-3">
+                              <div className="text-xs text-gray-500 mb-1">Implicação</div>
+                              <div className="text-2xl font-bold text-purple-400">
+                                {(selectedSession as any).evaluation.spin_evaluation.I.final_score.toFixed(1)}
+                              </div>
+                            </div>
+                            <div className="bg-gray-900/50 rounded-lg p-3">
+                              <div className="text-xs text-gray-500 mb-1">Necessidade</div>
+                              <div className="text-2xl font-bold text-purple-400">
+                                {(selectedSession as any).evaluation.spin_evaluation.N.final_score.toFixed(1)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Feedback Detalhado */}
+                        <details className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
+                          <summary className="font-semibold text-white cursor-pointer hover:text-purple-400 transition-colors">
+                            Ver Feedback Detalhado SPIN
+                          </summary>
+                          <div className="mt-4 space-y-4 text-sm">
+                            <div>
+                              <h6 className="font-semibold text-purple-400 mb-2">Situação (S)</h6>
+                              <p className="text-gray-300 whitespace-pre-wrap">
+                                {(selectedSession as any).evaluation.spin_evaluation.S.technical_feedback}
+                              </p>
+                            </div>
+                            <div>
+                              <h6 className="font-semibold text-purple-400 mb-2">Problema (P)</h6>
+                              <p className="text-gray-300 whitespace-pre-wrap">
+                                {(selectedSession as any).evaluation.spin_evaluation.P.technical_feedback}
+                              </p>
+                            </div>
+                            <div>
+                              <h6 className="font-semibold text-purple-400 mb-2">Implicação (I)</h6>
+                              <p className="text-gray-300 whitespace-pre-wrap">
+                                {(selectedSession as any).evaluation.spin_evaluation.I.technical_feedback}
+                              </p>
+                            </div>
+                            <div>
+                              <h6 className="font-semibold text-purple-400 mb-2">Necessidade (N)</h6>
+                              <p className="text-gray-300 whitespace-pre-wrap">
+                                {(selectedSession as any).evaluation.spin_evaluation.N.technical_feedback}
+                              </p>
+                            </div>
+                          </div>
+                        </details>
+
+                        {/* Análise de Objeções */}
+                        {(selectedSession as any).evaluation.objections_analysis?.length > 0 && (
+                          <details className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
+                            <summary className="font-semibold text-white cursor-pointer hover:text-purple-400 transition-colors">
+                              Análise de Objeções ({(selectedSession as any).evaluation.objections_analysis.length})
+                            </summary>
+                            <div className="mt-4 space-y-4">
+                              {(selectedSession as any).evaluation.objections_analysis.map((obj: any, idx: number) => (
+                                <div key={idx} className="bg-gray-900/50 rounded-lg p-3 border border-purple-500/10">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-semibold text-purple-400 uppercase">{obj.objection_type}</span>
+                                    <span className="text-lg font-bold text-white">{obj.score}/10</span>
+                                  </div>
+                                  <p className="text-sm text-gray-300 mb-2 italic">"{obj.objection_text}"</p>
+                                  <p className="text-xs text-gray-400">{obj.detailed_analysis}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+
+                        {/* Plano de Melhorias */}
+                        {(selectedSession as any).evaluation.priority_improvements?.length > 0 && (
+                          <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
+                            <h5 className="font-semibold text-orange-400 mb-3">🎯 Prioridades de Melhoria</h5>
+                            <div className="space-y-3">
+                              {(selectedSession as any).evaluation.priority_improvements.map((imp: any, idx: number) => (
+                                <div key={idx} className="bg-gray-900/50 rounded-lg p-3">
+                                  <div className="flex items-start gap-2 mb-2">
+                                    <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                                      imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                      imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                      'bg-yellow-500/20 text-yellow-400'
+                                    }`}>
+                                      {imp.priority.toUpperCase()}
+                                    </span>
+                                    <span className="text-sm font-semibold text-white">{imp.area}</span>
+                                  </div>
+                                  <p className="text-xs text-gray-400 mb-2">{imp.current_gap}</p>
+                                  <p className="text-xs text-gray-300">{imp.action_plan}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Transcrição */}
                     <div>
                       <h4 className="font-semibold mb-3 text-purple-400">

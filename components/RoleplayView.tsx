@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, type Persona, type PersonaB2B, type PersonaB2C, type Objection } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 
@@ -37,6 +37,9 @@ export default function RoleplayView() {
   const [isProcessingTranscription, setIsProcessingTranscription] = useState(false) // Para mostrar que está processando
   const [lastUserMessage, setLastUserMessage] = useState<string>('') // Para destacar última mensagem do usuário
   const [sessionId, setSessionId] = useState<string | null>(null) // ID da sessão no Supabase
+  const [isEvaluating, setIsEvaluating] = useState(false) // Loading durante avaliação
+  const [showEvaluationSummary, setShowEvaluationSummary] = useState(false) // Modal de resumo
+  const [evaluation, setEvaluation] = useState<any>(null) // Avaliação recebida
 
   useEffect(() => {
     setMounted(true)
@@ -590,7 +593,7 @@ export default function RoleplayView() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       console.log('🛑 Encerrando simulação...')
 
                       // Parar gravação imediatamente se estiver ativa
@@ -635,7 +638,37 @@ export default function RoleplayView() {
 
                       // Finalizar sessão no Supabase
                       if (sessionId) {
-                        endRoleplaySession(sessionId, 'completed');
+                        await endRoleplaySession(sessionId, 'completed');
+
+                        // Iniciar avaliação
+                        setIsEvaluating(true);
+
+                        try {
+                          console.log('📊 Solicitando avaliação da sessão:', sessionId);
+
+                          const evalResponse = await fetch('/api/roleplay/evaluate', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ sessionId })
+                          });
+
+                          if (evalResponse.ok) {
+                            const { evaluation } = await evalResponse.json();
+                            console.log('✅ Avaliação recebida!', evaluation);
+                            setEvaluation(evaluation);
+                            setShowEvaluationSummary(true);
+                          } else {
+                            console.error('❌ Erro ao avaliar sessão');
+                            alert('Não foi possível gerar a avaliação. A sessão foi salva no histórico.');
+                          }
+                        } catch (error) {
+                          console.error('❌ Erro na avaliação:', error);
+                          alert('Erro ao processar avaliação. A sessão foi salva no histórico.');
+                        } finally {
+                          setIsEvaluating(false);
+                        }
                       }
 
                       // Resetar TODOS os estados
@@ -1034,6 +1067,112 @@ export default function RoleplayView() {
                     Iniciar Roleplay
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Loading - Avaliação */}
+        {isEvaluating && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-purple-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
+              <Loader2 className="w-16 h-16 text-purple-400 animate-spin mx-auto" />
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-2">Analisando sua performance...</h3>
+                <p className="text-gray-400">Nosso agente está avaliando sua conversa com base em metodologia SPIN Selling</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Resumo Rápido */}
+        {showEvaluationSummary && evaluation && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-purple-500/30 rounded-2xl p-8 max-w-2xl w-full space-y-6">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-white">Avaliação Completa ✨</h3>
+                <button
+                  onClick={() => setShowEvaluationSummary(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Score */}
+              <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-xl p-6 text-center">
+                <div className="text-6xl font-bold text-white mb-2">{evaluation.overall_score}</div>
+                <div className="text-lg text-purple-300 uppercase tracking-wider">
+                  {evaluation.performance_level === 'legendary' && '🏆 Lendário'}
+                  {evaluation.performance_level === 'excellent' && '⭐ Excelente'}
+                  {evaluation.performance_level === 'very_good' && '✨ Muito Bom'}
+                  {evaluation.performance_level === 'good' && '👍 Bom'}
+                  {evaluation.performance_level === 'needs_improvement' && '📈 Precisa Melhorar'}
+                  {evaluation.performance_level === 'poor' && '📚 Em Desenvolvimento'}
+                </div>
+              </div>
+
+              {/* Resumo Executivo */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-white text-lg">Resumo da Performance</h4>
+                <p className="text-gray-300 leading-relaxed">{evaluation.executive_summary}</p>
+              </div>
+
+              {/* Pontos Fortes */}
+              {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-bold text-green-400 text-lg flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" />
+                    Pontos Fortes
+                  </h4>
+                  <ul className="space-y-2">
+                    {evaluation.top_strengths.map((strength: string, idx: number) => (
+                      <li key={idx} className="text-gray-300 flex items-start gap-2">
+                        <span className="text-green-400 mt-1">•</span>
+                        <span>{strength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Áreas de Melhoria */}
+              {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-bold text-orange-400 text-lg flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    Principais Gaps
+                  </h4>
+                  <ul className="space-y-2">
+                    {evaluation.critical_gaps.map((gap: string, idx: number) => (
+                      <li key={idx} className="text-gray-300 flex items-start gap-2">
+                        <span className="text-orange-400 mt-1">•</span>
+                        <span>{gap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowEvaluationSummary(false)}
+                  className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEvaluationSummary(false);
+                    // Navegar para histórico (você pode implementar navegação aqui)
+                    window.location.href = '/?view=historico';
+                  }}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
+                >
+                  Ver Análise Completa no Histórico
+                </button>
               </div>
             </div>
           </div>
