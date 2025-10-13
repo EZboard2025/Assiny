@@ -16,9 +16,11 @@ const N8N_WEBHOOK_URL = 'https://ezboard.app.n8n.cloud/webhook/f058c533-a72d-45c
 
 export async function POST(request: Request) {
   try {
-    const { sessionId } = await request.json()
+    const body = await request.json()
+    const { sessionId } = body
 
     if (!sessionId) {
+      console.error('❌ sessionId não fornecido no body:', body)
       return NextResponse.json({ error: 'sessionId é obrigatório' }, { status: 400 })
     }
 
@@ -46,11 +48,12 @@ export async function POST(request: Request) {
       .join('\n')
 
     // Preparar contexto
+    const config = session.config as any
     const context = {
-      age: session.config.age,
-      temperament: session.config.temperament,
-      persona: session.config.segment, // Contém descrição da persona
-      objections: session.config.objections || []
+      age: config.age,
+      temperament: config.temperament,
+      persona: config.segment || config.persona || '', // Suporta ambos os campos
+      objections: config.objections || []
     }
 
     console.log('📤 Enviando para N8N...')
@@ -58,22 +61,27 @@ export async function POST(request: Request) {
     console.log('Transcrição:', transcription.substring(0, 200) + '...')
 
     // Enviar para N8N
+    const n8nPayload = {
+      transcription,
+      context
+    }
+
+    console.log('📡 Enviando payload para N8N:', JSON.stringify(n8nPayload, null, 2))
+
     const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        transcription,
-        context
-      })
+      body: JSON.stringify(n8nPayload)
     })
 
     if (!n8nResponse.ok) {
       const errorText = await n8nResponse.text()
-      console.error('❌ Erro do N8N:', errorText)
+      console.error('❌ Erro do N8N - Status:', n8nResponse.status)
+      console.error('❌ Erro do N8N - Response:', errorText)
       return NextResponse.json(
-        { error: 'Erro ao processar avaliação no N8N' },
+        { error: `Erro ao processar avaliação no N8N: ${errorText}` },
         { status: 500 }
       )
     }
@@ -104,8 +112,9 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('❌ Erro geral:', error)
+    console.error('❌ Stack:', error.stack)
     return NextResponse.json(
-      { error: error.message || 'Erro interno' },
+      { error: error.message || 'Erro interno do servidor' },
       { status: 500 }
     )
   }

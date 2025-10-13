@@ -273,6 +273,8 @@ export default function RoleplayView() {
       let isCheckingRef = { current: true }
       let hasSpoken = false  // Flag para saber se o usuário já falou algo
       let volumeHistory: number[] = []  // Histórico de volumes para análise
+      let consecutiveLowVolume = 0  // Contador de frames consecutivos com volume baixo
+      let consecutiveHighVolume = 0  // Contador de frames consecutivos com volume alto
 
       // Detectar silêncio
       const checkSilence = () => {
@@ -284,41 +286,54 @@ export default function RoleplayView() {
         analyser.getByteFrequencyData(dataArray)
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
 
-        // Manter histórico dos últimos 10 volumes
+        // Manter histórico dos últimos 20 volumes para análise mais precisa
         volumeHistory.push(average)
-        if (volumeHistory.length > 10) volumeHistory.shift()
+        if (volumeHistory.length > 20) volumeHistory.shift()
 
         // Log do volume para debug (apenas a cada 60 frames = ~1 segundo)
         if (Math.random() < 0.016) {
           console.log('🎤 Volume médio:', average.toFixed(2), '| Histórico:', volumeHistory.map(v => v.toFixed(0)).join(','))
         }
 
-        // Detectar se começou a falar (volume acima de 25)
-        if (average > 25 && !hasSpoken) {
-          hasSpoken = true
-          console.log('🗣️ Usuário começou a falar!')
+        // NOVO: Detectar fala real (não ruído) - precisa de volume consistente
+        if (average > 35) {  // Aumentado threshold para detectar fala real
+          consecutiveHighVolume++
+          consecutiveLowVolume = 0  // Reset contador de silêncio
+
+          // Só considera como fala após 5 frames consecutivos com volume alto (evita ruídos pontuais)
+          if (consecutiveHighVolume >= 5 && !hasSpoken) {
+            hasSpoken = true
+            console.log('🗣️ Fala real detectada! Volume consistente acima de 35')
+          }
+        } else if (average < 20) {  // Threshold para silêncio
+          consecutiveLowVolume++
+          consecutiveHighVolume = 0  // Reset contador de fala
+        } else {
+          // Volume médio - reset ambos contadores
+          consecutiveLowVolume = 0
+          consecutiveHighVolume = 0
         }
 
-        // THRESHOLD AJUSTADO: Só detecta silêncio se já falou algo
-        // Se o volume está baixo (silêncio) E já falou algo
-        if (average < 15 && hasSpoken) {  // Aumentado de 5 para 15
+        // NOVO: Só detecta fim da fala se teve volume baixo consistente
+        // Precisa de 30 frames consecutivos de silêncio (cerca de 0.5 segundos)
+        if (consecutiveLowVolume >= 30 && hasSpoken) {
           if (!silenceTimerRef.current) {
-            console.log('🤫 Silêncio detectado (volume < 15), iniciando timer de 1.5s...')
-            // Iniciar timer de 1.5 segundos de silêncio (reduzido de 2s para resposta mais rápida)
+            console.log('🤫 Silêncio consistente detectado, iniciando timer de 1s...')
+            // Timer de 1 segundo após detectar silêncio consistente
             silenceTimerRef.current = setTimeout(() => {
-              console.log('🔇 1.5 segundos de silêncio! Parando gravação...')
+              console.log('🔇 Finalizando gravação após silêncio prolongado')
               if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
                 console.log('📝 Chamando stopRecording()...')
                 stopRecording()
               } else {
                 console.log('⚠️ MediaRecorder não está gravando')
               }
-            }, 1500)  // Reduzido de 2000ms para 1500ms
+            }, 1000)  // Reduzido para 1 segundo
           }
-        } else {
-          // Se tem som, cancelar o timer
+        } else if (average > 25) {  // Se detectar qualquer som significativo, cancelar timer
+          // Cancelar o timer se detectar som
           if (silenceTimerRef.current) {
-            console.log('🔊 Som detectado (volume >= 15), cancelando timer de silêncio')
+            console.log('🔊 Som detectado, cancelando timer de silêncio')
             clearTimeout(silenceTimerRef.current)
             silenceTimerRef.current = null
           }
@@ -637,10 +652,15 @@ export default function RoleplayView() {
                       }
 
                       // Finalizar sessão no Supabase
+                      console.log('🔍 Verificando sessionId:', sessionId);
                       if (sessionId) {
+                        console.log('✅ SessionId encontrado:', sessionId);
+                        console.log('📝 Finalizando sessão no Supabase...');
                         await endRoleplaySession(sessionId, 'completed');
+                        console.log('✅ Sessão finalizada no Supabase');
 
                         // Iniciar avaliação
+                        console.log('🎯 Iniciando processo de avaliação...');
                         setIsEvaluating(true);
 
                         try {
@@ -654,13 +674,19 @@ export default function RoleplayView() {
                             body: JSON.stringify({ sessionId })
                           });
 
+                          console.log('📨 Resposta da API:', evalResponse.status, evalResponse.statusText);
+
                           if (evalResponse.ok) {
-                            const { evaluation } = await evalResponse.json();
+                            const result = await evalResponse.json();
+                            console.log('✅ Resposta completa:', result);
+                            const { evaluation } = result;
                             console.log('✅ Avaliação recebida!', evaluation);
                             setEvaluation(evaluation);
                             setShowEvaluationSummary(true);
                           } else {
-                            console.error('❌ Erro ao avaliar sessão');
+                            const errorText = await evalResponse.text();
+                            console.error('❌ Erro ao avaliar sessão - Status:', evalResponse.status);
+                            console.error('❌ Erro detalhado:', errorText);
                             alert('Não foi possível gerar a avaliação. A sessão foi salva no histórico.');
                           }
                         } catch (error) {
@@ -669,6 +695,8 @@ export default function RoleplayView() {
                         } finally {
                           setIsEvaluating(false);
                         }
+                      } else {
+                        console.warn('⚠️ Nenhum sessionId encontrado - avaliação não será executada');
                       }
 
                       // Resetar TODOS os estados
