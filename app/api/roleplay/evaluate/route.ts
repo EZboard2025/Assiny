@@ -87,18 +87,22 @@ export async function POST(request: Request) {
     }
 
     let rawResponse = await n8nResponse.json()
-    console.log('✅ Resposta recebida do N8N:', JSON.stringify(rawResponse).substring(0, 200))
+    console.log('✅ Resposta recebida do N8N (completa):', JSON.stringify(rawResponse, null, 2))
 
     // N8N retorna array com objeto {output: "json_string"}
     let evaluation
     if (Array.isArray(rawResponse) && rawResponse[0]?.output) {
       console.log('📦 Detectado formato N8N com output - fazendo parse...')
-      evaluation = JSON.parse(rawResponse[0].output)
+      const outputString = rawResponse[0].output
+      console.log('📦 Output string:', outputString.substring(0, 300))
+      evaluation = JSON.parse(outputString)
     } else {
       evaluation = rawResponse
     }
 
-    console.log('✅ Avaliação parseada:', JSON.stringify(evaluation).substring(0, 200))
+    console.log('✅ Avaliação parseada (completa):', JSON.stringify(evaluation, null, 2))
+    console.log('🔍 overall_score:', evaluation.overall_score)
+    console.log('🔍 performance_level:', evaluation.performance_level)
 
     // Salvar avaliação no Supabase
     const { error: updateError } = await supabase

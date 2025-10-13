@@ -671,9 +671,19 @@ export default function RoleplayView() {
 
                           if (evalResponse.ok) {
                             const result = await evalResponse.json();
-                            console.log('✅ Resposta completa:', result);
-                            const { evaluation } = result;
-                            console.log('✅ Avaliação recebida!', evaluation);
+                            console.log('✅ Resposta completa da API:', JSON.stringify(result, null, 2));
+                            let { evaluation } = result;
+
+                            // Se evaluation ainda tem estrutura N8N {output: "..."}, fazer parse
+                            if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+                              console.log('🔄 Detectado evaluation com output, fazendo parse...');
+                              evaluation = JSON.parse(evaluation.output);
+                            }
+
+                            console.log('✅ Avaliação extraída:', JSON.stringify(evaluation, null, 2));
+                            console.log('🔍 overall_score:', evaluation?.overall_score);
+                            console.log('🔍 performance_level:', evaluation?.performance_level);
+                            console.log('🔍 executive_summary:', evaluation?.executive_summary?.substring(0, 100));
                             setEvaluation(evaluation);
                             setShowEvaluationSummary(true);
                           } else {
