@@ -535,18 +535,11 @@ export default function RoleplayView() {
       const audio = new Audio(audioUrl)
       audioRef.current = audio
 
-      // Quando o áudio terminar, iniciar gravação automaticamente
+      // Quando o áudio terminar, apenas liberar para o usuário falar
       audio.onended = () => {
         setIsPlayingAudio(false)
         URL.revokeObjectURL(audioUrl)
-
-        // Iniciar gravação automaticamente após o áudio terminar
-        console.log('🎤 Iniciando gravação automática...')
-        setTimeout(() => {
-          if (isSimulating && !isLoading) {
-            startRecording()
-          }
-        }, 500) // Pequeno delay para transição suave
+        console.log('🔊 Áudio do cliente finalizado - aguardando usuário clicar no microfone')
       }
 
       // Tocar o áudio

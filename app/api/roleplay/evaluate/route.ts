@@ -12,7 +12,7 @@ const supabase = createClient(
   }
 )
 
-const N8N_WEBHOOK_URL = 'https://ezboard.app.n8n.cloud/webhook/f058c533-a72d-45c4-a516-0d4f5fa3225e'
+const N8N_WEBHOOK_URL = 'https://ezboard.app.n8n.cloud/webhook/b34f1d38-493b-4ae8-8998-b8450ab84d16'
 
 export async function POST(request: Request) {
   try {
@@ -86,8 +86,19 @@ export async function POST(request: Request) {
       )
     }
 
-    const evaluation = await n8nResponse.json()
-    console.log('✅ Avaliação recebida do N8N')
+    let rawResponse = await n8nResponse.json()
+    console.log('✅ Resposta recebida do N8N:', JSON.stringify(rawResponse).substring(0, 200))
+
+    // N8N retorna array com objeto {output: "json_string"}
+    let evaluation
+    if (Array.isArray(rawResponse) && rawResponse[0]?.output) {
+      console.log('📦 Detectado formato N8N com output - fazendo parse...')
+      evaluation = JSON.parse(rawResponse[0].output)
+    } else {
+      evaluation = rawResponse
+    }
+
+    console.log('✅ Avaliação parseada:', JSON.stringify(evaluation).substring(0, 200))
 
     // Salvar avaliação no Supabase
     const { error: updateError } = await supabase
