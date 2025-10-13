@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import ChatInterface from './ChatInterface'
 import ConfigHub from './ConfigHub'
 import RoleplayView from './RoleplayView'
+import HistoricoView from './HistoricoView'
 import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut } from 'lucide-react'
 
 interface DashboardProps {
@@ -26,6 +27,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'roleplay') {
       return <RoleplayView />
+    }
+
+    if (currentView === 'historico') {
+      return <HistoricoView />
     }
 
     // Home view

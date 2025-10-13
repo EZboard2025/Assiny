@@ -1,23 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2 } from 'lucide-react'
 import {
   getEmployees,
   addEmployee as addEmployeeDB,
   updateEmployee,
   deleteEmployee,
-  getCustomerSegments,
-  addCustomerSegment,
-  deleteCustomerSegment,
   getCompanyType,
   setCompanyType,
   getObjections,
   addObjection,
   deleteObjection,
+  getPersonas,
+  addPersona,
+  deletePersona,
   type Employee,
-  type CustomerSegment,
-  type Objection
+  type Objection,
+  type Persona,
+  type PersonaB2B,
+  type PersonaB2C
 } from '@/lib/config'
 
 interface ConfigHubProps {
@@ -26,15 +28,16 @@ interface ConfigHubProps {
 
 // Component for the main configuration interface
 function ConfigurationInterface() {
-  const [activeTab, setActiveTab] = useState<'employees' | 'segments' | 'objections' | 'files'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'business-type' | 'personas' | 'objections' | 'files'>('employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
   const [newEmployeePassword, setNewEmployeePassword] = useState('')
   const [addingEmployee, setAddingEmployee] = useState(false)
-  const [segments, setSegments] = useState<CustomerSegment[]>([])
-  const [newSegment, setNewSegment] = useState('')
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2C')
+  const [personas, setPersonas] = useState<Persona[]>([])
+  const [showPersonaForm, setShowPersonaForm] = useState(false)
+  const [newPersona, setNewPersona] = useState<Partial<PersonaB2B> | Partial<PersonaB2C>>({})
   const [objections, setObjections] = useState<Objection[]>([])
   const [newObjection, setNewObjection] = useState('')
   const [loading, setLoading] = useState(true)
@@ -63,16 +66,16 @@ function ConfigurationInterface() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [employeesData, segmentsData, companyTypeData, objectionsData] = await Promise.all([
+      const [employeesData, companyTypeData, personasData, objectionsData] = await Promise.all([
         getEmployees(),
-        getCustomerSegments(),
         getCompanyType(),
+        getPersonas(),
         getObjections()
       ])
 
       setEmployees(employeesData)
-      setSegments(segmentsData)
       setBusinessType(companyTypeData)
+      setPersonas(personasData)
       setObjections(objectionsData)
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -124,9 +127,9 @@ function ConfigurationInterface() {
     }
   }
 
-  const handleDeleteEmployee = async (id: string) => {
+  const handleDeleteEmployee = async (id: string, email: string) => {
     if (!confirm('Tem certeza que deseja excluir este funcionário?')) return
-    const success = await deleteEmployee(id)
+    const success = await deleteEmployee(id, email)
     if (success) {
       setEmployees(employees.filter(e => e.id !== id))
     }
@@ -193,28 +196,46 @@ function ConfigurationInterface() {
     }
   }
 
-  const handleAddSegment = async () => {
-    if (newSegment.trim()) {
-      const segment = await addCustomerSegment(newSegment.trim())
-      if (segment) {
-        setSegments([...segments, segment])
-        setNewSegment('')
-      }
-    }
-  }
-
-  const handleRemoveSegment = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este segmento?')) return
-    const success = await deleteCustomerSegment(id)
-    if (success) {
-      setSegments(segments.filter(s => s.id !== id))
-    }
-  }
-
   const handleSetBusinessType = async (type: 'B2B' | 'B2C') => {
     const success = await setCompanyType(type)
     if (success) {
       setBusinessType(type)
+    }
+  }
+
+  const handleSavePersona = async () => {
+    if (businessType === 'B2B') {
+      const persona = newPersona as PersonaB2B
+      if (!persona.job_title) {
+        alert('Por favor, preencha o cargo')
+        return
+      }
+      const result = await addPersona({ ...persona, business_type: 'B2B' })
+      if (result) {
+        setPersonas([...personas, result])
+        setNewPersona({})
+        setShowPersonaForm(false)
+      }
+    } else {
+      const persona = newPersona as PersonaB2C
+      if (!persona.profession) {
+        alert('Por favor, preencha a profissão')
+        return
+      }
+      const result = await addPersona({ ...persona, business_type: 'B2C' })
+      if (result) {
+        setPersonas([...personas, result])
+        setNewPersona({})
+        setShowPersonaForm(false)
+      }
+    }
+  }
+
+  const handleDeletePersona = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta persona?')) return
+    const success = await deletePersona(id)
+    if (success) {
+      setPersonas(personas.filter(p => p.id !== id))
     }
   }
 
@@ -353,15 +374,26 @@ function ConfigurationInterface() {
           Funcionários
         </button>
         <button
-          onClick={() => setActiveTab('segments')}
+          onClick={() => setActiveTab('business-type')}
           className={`px-6 py-3 font-medium transition-all ${
-            activeTab === 'segments'
+            activeTab === 'business-type'
               ? 'border-b-2 border-purple-500 text-white'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
           <Building2 className="w-4 h-4 inline mr-2" />
-          Segmentação
+          Tipo de Empresa
+        </button>
+        <button
+          onClick={() => setActiveTab('personas')}
+          className={`px-6 py-3 font-medium transition-all ${
+            activeTab === 'personas'
+              ? 'border-b-2 border-purple-500 text-white'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          <UserCircle2 className="w-4 h-4 inline mr-2" />
+          Personas
         </button>
         <button
           onClick={() => setActiveTab('objections')}
@@ -413,7 +445,7 @@ function ConfigurationInterface() {
                           <td className="py-3 text-sm text-gray-300">{emp.email}</td>
                           <td className="py-3">
                             <button
-                              onClick={() => handleDeleteEmployee(emp.id)}
+                              onClick={() => handleDeleteEmployee(emp.id, emp.email)}
                               className="text-red-400 hover:text-red-300 transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -490,8 +522,8 @@ function ConfigurationInterface() {
           </div>
         )}
 
-        {/* Segmentação Tab */}
-        {activeTab === 'segments' && (
+        {/* Tipo de Empresa Tab */}
+        {activeTab === 'business-type' && (
           <div className="space-y-6">
             <div>
               <h3 className="text-xl font-bold mb-4">Tipo de Empresa</h3>
@@ -518,47 +550,274 @@ function ConfigurationInterface() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
 
+        {/* Personas Tab */}
+        {activeTab === 'personas' && (
+          <div className="space-y-6">
             <div>
-              <h3 className="text-xl font-bold mb-4">Segmentos de Clientes</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Personas {businessType}</h3>
+                <button
+                  onClick={() => {
+                    setShowPersonaForm(true)
+                    setNewPersona({})
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nova Persona {businessType}
+                </button>
+              </div>
 
-              {/* Lista de segmentos */}
-              {segments.length > 0 && (
-                <div className="mb-4 space-y-2">
-                  {segments.map((segment) => (
+              {/* Lista de personas */}
+              {personas.filter(p => p.business_type === businessType).length > 0 && (
+                <div className="mb-4 space-y-4">
+                  {personas.filter(p => p.business_type === businessType).map((persona) => (
                     <div
-                      key={segment.id}
-                      className="flex items-center justify-between bg-gray-900/50 border border-purple-500/20 rounded-xl px-4 py-3"
+                      key={persona.id}
+                      className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-purple-500/30 rounded-xl p-5 hover:border-purple-500/50 transition-all shadow-lg"
                     >
-                      <span className="text-gray-300">{segment.name}</span>
-                      <button
-                        onClick={() => handleRemoveSegment(segment.id)}
-                        className="text-red-400 hover:text-red-300 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-3">
+                          {/* Título */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center flex-shrink-0">
+                              <UserCircle2 className="w-7 h-7 text-white" />
+                            </div>
+                            <h4 className="text-lg font-bold text-white">
+                              {persona.business_type === 'B2B'
+                                ? (persona as PersonaB2B).job_title
+                                : (persona as PersonaB2C).profession}
+                            </h4>
+                          </div>
+
+                          {/* Conteúdo B2B */}
+                          {persona.business_type === 'B2B' && (
+                            <div className="space-y-2 pl-15">
+                              {(persona as PersonaB2B).company_type && (
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  <span className="font-bold text-purple-400">Tipo de Empresa:</span>{' '}
+                                  {(persona as PersonaB2B).company_type}
+                                </p>
+                              )}
+                              {(persona as PersonaB2B).company_goals && (
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                  {(persona as PersonaB2B).company_goals}
+                                </p>
+                              )}
+                              {(persona as PersonaB2B).business_challenges && (
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  <span className="font-bold text-purple-400">Desafios:</span>{' '}
+                                  {(persona as PersonaB2B).business_challenges}
+                                </p>
+                              )}
+                              {(persona as PersonaB2B).context && (
+                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-purple-500/20">
+                                  {(persona as PersonaB2B).context}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Conteúdo B2C */}
+                          {persona.business_type === 'B2C' && (
+                            <div className="space-y-2 pl-15">
+                              {(persona as PersonaB2C).what_seeks && (
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                  {(persona as PersonaB2C).what_seeks}
+                                </p>
+                              )}
+                              {(persona as PersonaB2C).main_pains && (
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  <span className="font-bold text-purple-400">Dores:</span>{' '}
+                                  {(persona as PersonaB2C).main_pains}
+                                </p>
+                              )}
+                              {(persona as PersonaB2C).context && (
+                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-purple-500/20">
+                                  {(persona as PersonaB2C).context}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Botão deletar */}
+                        <button
+                          onClick={() => handleDeletePersona(persona.id!)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg transition-all flex-shrink-0"
+                          title="Deletar persona"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Adicionar novo segmento */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newSegment}
-                  onChange={(e) => setNewSegment(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSegment()}
-                  className="flex-1 px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
-                  placeholder="Ex: Tecnologia, Saúde, Educação..."
-                />
-                <button
-                  onClick={handleAddSegment}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
+              {/* Formulário de Nova Persona */}
+              {showPersonaForm && (
+                <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-bold">Nova Persona {businessType}</h4>
+                    <button
+                      onClick={() => {
+                        setShowPersonaForm(false)
+                        setNewPersona({})
+                      }}
+                      className="text-gray-400 hover:text-gray-300"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {businessType === 'B2B' ? (
+                    <>
+                      {/* Formulário B2B */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Cargo *
+                        </label>
+                        <input
+                          type="text"
+                          value={(newPersona as PersonaB2B).job_title || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, job_title: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                          placeholder="Ex: Gerente de Compras, CEO, Diretor de TI"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Tipo de Empresa e Faturamento
+                        </label>
+                        <input
+                          type="text"
+                          value={(newPersona as PersonaB2B).company_type || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, company_type: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                          placeholder="Ex: Startup de tecnologia com faturamento de R$500k/mês"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Contexto (descrição livre)
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2B).context || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Responsável por decisões de compra, equipe de 10 pessoas, busca inovação"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          O que busca para a empresa?
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2B).company_goals || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, company_goals: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Aumentar eficiência, reduzir custos, melhorar processos, escalar o negócio"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Principais desafios/dores do negócio
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2B).business_challenges || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, business_challenges: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Processos manuais demorados, falta de integração, dificuldade em medir resultados"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Formulário B2C */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Profissão *
+                        </label>
+                        <input
+                          type="text"
+                          value={(newPersona as PersonaB2C).profession || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, profession: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                          placeholder="Ex: Professor, Médico, Estudante"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Contexto (descrição livre)
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2C).context || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Mãe de 2 filhos, mora em apartamento, trabalha home office"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          O que busca/valoriza?
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2C).what_seeks || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, what_seeks: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Praticidade, economia de tempo, produtos de qualidade, bom atendimento"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Principais dores/problemas
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2C).main_pains || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, main_pains: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Falta de tempo, dificuldade em encontrar produtos confiáveis, preços altos"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-sm text-blue-300">
+                    <strong>Lembre-se:</strong> Nome, idade, temperamento e objeções serão configurados antes de iniciar cada roleplay.
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowPersonaForm(false)
+                        setNewPersona({})
+                      }}
+                      className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:border-purple-500/40 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSavePersona}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
+                    >
+                      Salvar Persona
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

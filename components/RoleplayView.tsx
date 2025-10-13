@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2 } from 'lucide-react'
-import { getCustomerSegments, getObjections, type CustomerSegment, type Objection } from '@/lib/config'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle } from 'lucide-react'
+import { getPersonas, getObjections, getCompanyType, type Persona, type PersonaB2B, type PersonaB2C, type Objection } from '@/lib/config'
+import { createRoleplaySession, addMessageToSession, endRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 
 export default function RoleplayView() {
   const [showConfig, setShowConfig] = useState(false)
@@ -19,11 +20,12 @@ export default function RoleplayView() {
   // Configurações do roleplay
   const [age, setAge] = useState(30)
   const [temperament, setTemperament] = useState('Analítico')
-  const [selectedSegment, setSelectedSegment] = useState('')
+  const [selectedPersona, setSelectedPersona] = useState('')
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
 
   // Dados do banco
-  const [segments, setSegments] = useState<CustomerSegment[]>([])
+  const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2C')
+  const [personas, setPersonas] = useState<Persona[]>([])
   const [objections, setObjections] = useState<Objection[]>([])
 
   // Chat simulation
@@ -34,6 +36,7 @@ export default function RoleplayView() {
   const [currentTranscription, setCurrentTranscription] = useState<string>('') // Para mostrar transcrição em tempo real
   const [isProcessingTranscription, setIsProcessingTranscription] = useState(false) // Para mostrar que está processando
   const [lastUserMessage, setLastUserMessage] = useState<string>('') // Para destacar última mensagem do usuário
+  const [sessionId, setSessionId] = useState<string | null>(null) // ID da sessão no Supabase
 
   useEffect(() => {
     setMounted(true)
@@ -41,14 +44,19 @@ export default function RoleplayView() {
   }, [])
 
   const loadData = async () => {
-    const [segmentsData, objectionsData] = await Promise.all([
-      getCustomerSegments(),
+    const [businessTypeData, personasData, objectionsData] = await Promise.all([
+      getCompanyType(),
+      getPersonas(),
       getObjections(),
     ])
-    setSegments(segmentsData)
+    setBusinessType(businessTypeData)
+    setPersonas(personasData)
     setObjections(objectionsData)
-    if (segmentsData.length > 0) {
-      setSelectedSegment(segmentsData[0].id)
+
+    // Filtrar personas pelo tipo de empresa e selecionar a primeira
+    const filteredPersonas = personasData.filter(p => p.business_type === businessTypeData)
+    if (filteredPersonas.length > 0) {
+      setSelectedPersona(filteredPersonas[0].id!)
     }
   }
 
@@ -60,9 +68,22 @@ export default function RoleplayView() {
     setIsLoading(true)
 
     try {
-      // Buscar nome do segmento selecionado
-      const selectedSegmentData = segments.find(s => s.id === selectedSegment)
+      // Buscar persona selecionada
+      const selectedPersonaData = personas.find(p => p.id === selectedPersona)
       const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
+
+      // Montar descrição da persona baseado no tipo
+      let personaDescription = ''
+      if (selectedPersonaData) {
+        if (selectedPersonaData.business_type === 'B2B') {
+          const persona = selectedPersonaData as PersonaB2B
+          personaDescription = `${persona.job_title}`
+          if (persona.company_type) personaDescription += ` de ${persona.company_type}`
+        } else {
+          const persona = selectedPersonaData as PersonaB2C
+          personaDescription = persona.profession
+        }
+      }
 
       // Criar nova thread com configuração
       const response = await fetch('/api/roleplay/chat', {
@@ -74,7 +95,7 @@ export default function RoleplayView() {
           config: {
             age,
             temperament,
-            segment: selectedSegmentData?.name || 'Não especificado',
+            segment: personaDescription || 'Não especificado',
             objections: selectedObjectionsData.map(o => o.name),
           },
         }),
@@ -89,8 +110,32 @@ export default function RoleplayView() {
 
       setThreadId(data.threadId)
 
+      // Criar sessão no Supabase
+      const session = await createRoleplaySession(data.threadId, {
+        age,
+        temperament,
+        segment: personaDescription || 'Não especificado',
+        objections: selectedObjectionsData.map(o => o.name),
+      })
+
+      if (session) {
+        setSessionId(session.id)
+        console.log('💾 Sessão salva no Supabase:', session.id)
+      }
+
       // Adicionar primeira mensagem do cliente
+      const firstMessage: RoleplayMessage = {
+        role: 'client',
+        text: data.message,
+        timestamp: new Date().toISOString()
+      }
+
       setMessages([{ role: 'client', text: data.message }])
+
+      // Salvar mensagem no Supabase
+      if (session) {
+        await addMessageToSession(session.id, firstMessage)
+      }
 
       // Converter a primeira mensagem em áudio e tocar
       await textToSpeech(data.message)
@@ -109,6 +154,13 @@ export default function RoleplayView() {
     console.log('🔍 inputMessage atual:', inputMessage)
     console.log('🔍 isLoading:', isLoading)
     console.log('🔍 threadId:', threadId)
+    console.log('🔍 isSimulating:', isSimulating)
+
+    // Verificar se a simulação ainda está ativa
+    if (!isSimulating) {
+      console.log('⚠️ Simulação foi encerrada, cancelando envio')
+      return
+    }
 
     const message = messageToSend || inputMessage.trim()
 
@@ -135,6 +187,16 @@ export default function RoleplayView() {
     setMessages(prev => [...prev, { role: 'seller', text: userMessage }])
     setIsLoading(true)
 
+    // Salvar mensagem do vendedor no Supabase
+    if (sessionId) {
+      const sellerMessage: RoleplayMessage = {
+        role: 'seller',
+        text: userMessage,
+        timestamp: new Date().toISOString()
+      }
+      await addMessageToSession(sessionId, sellerMessage)
+    }
+
     try {
       // Enviar para API
       const response = await fetch('/api/roleplay/chat', {
@@ -157,6 +219,16 @@ export default function RoleplayView() {
 
       // Adicionar resposta do cliente
       setMessages(prev => [...prev, { role: 'client', text: data.message }])
+
+      // Salvar mensagem do cliente no Supabase
+      if (sessionId) {
+        const clientMessage: RoleplayMessage = {
+          role: 'client',
+          text: data.message,
+          timestamp: new Date().toISOString()
+        }
+        await addMessageToSession(sessionId, clientMessage)
+      }
 
       // Converter resposta em áudio e tocar
       await textToSpeech(data.message)
@@ -196,28 +268,54 @@ export default function RoleplayView() {
       audioChunksRef.current = []
 
       let isCheckingRef = { current: true }
+      let hasSpoken = false  // Flag para saber se o usuário já falou algo
+      let volumeHistory: number[] = []  // Histórico de volumes para análise
 
       // Detectar silêncio
       const checkSilence = () => {
-        if (!isCheckingRef.current) return
+        if (!isCheckingRef.current) {
+          console.log('⏹️ Checagem de silêncio parada')
+          return
+        }
 
         analyser.getByteFrequencyData(dataArray)
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
 
-        // Se o volume está baixo (silêncio)
-        if (average < 5) {
+        // Manter histórico dos últimos 10 volumes
+        volumeHistory.push(average)
+        if (volumeHistory.length > 10) volumeHistory.shift()
+
+        // Log do volume para debug (apenas a cada 60 frames = ~1 segundo)
+        if (Math.random() < 0.016) {
+          console.log('🎤 Volume médio:', average.toFixed(2), '| Histórico:', volumeHistory.map(v => v.toFixed(0)).join(','))
+        }
+
+        // Detectar se começou a falar (volume acima de 25)
+        if (average > 25 && !hasSpoken) {
+          hasSpoken = true
+          console.log('🗣️ Usuário começou a falar!')
+        }
+
+        // THRESHOLD AJUSTADO: Só detecta silêncio se já falou algo
+        // Se o volume está baixo (silêncio) E já falou algo
+        if (average < 15 && hasSpoken) {  // Aumentado de 5 para 15
           if (!silenceTimerRef.current) {
-            // Iniciar timer de 2 segundos de silêncio
+            console.log('🤫 Silêncio detectado (volume < 15), iniciando timer de 1.5s...')
+            // Iniciar timer de 1.5 segundos de silêncio (reduzido de 2s para resposta mais rápida)
             silenceTimerRef.current = setTimeout(() => {
-              console.log('🔇 Silêncio detectado, parando gravação...')
+              console.log('🔇 1.5 segundos de silêncio! Parando gravação...')
               if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                console.log('📝 Chamando stopRecording()...')
                 stopRecording()
+              } else {
+                console.log('⚠️ MediaRecorder não está gravando')
               }
-            }, 2000)
+            }, 1500)  // Reduzido de 2000ms para 1500ms
           }
         } else {
           // Se tem som, cancelar o timer
           if (silenceTimerRef.current) {
+            console.log('🔊 Som detectado (volume >= 15), cancelando timer de silêncio')
             clearTimeout(silenceTimerRef.current)
             silenceTimerRef.current = null
           }
@@ -236,11 +334,36 @@ export default function RoleplayView() {
       }
 
       mediaRecorder.onstop = async () => {
+        console.log('🛑 MediaRecorder.onstop disparado!')
+        console.log('🛑 Chunks de áudio capturados:', audioChunksRef.current.length)
         isCheckingRef.current = false
+
+        // Garantir que o indicador seja removido imediatamente
+        setIsRecording(false)
+
+        if (audioChunksRef.current.length === 0) {
+          console.log('⚠️ Nenhum chunk de áudio capturado!')
+          return
+        }
+
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        await transcribeAudio(audioBlob)
-        stream.getTracks().forEach(track => track.stop())
+        console.log('📦 Blob de áudio criado, tamanho:', audioBlob.size, 'bytes')
+
+        // Fechar stream e contexto de áudio
+        stream.getTracks().forEach(track => {
+          track.stop()
+          console.log('🔇 Track parada:', track.label)
+        })
         audioContext.close()
+        console.log('🔇 AudioContext fechado')
+
+        // Limpar referências
+        mediaRecorderRef.current = null
+        streamRef.current = null
+
+        // Transcrever o áudio
+        console.log('📝 Enviando para transcrição...')
+        await transcribeAudio(audioBlob)
       }
 
       mediaRecorder.start()
@@ -256,39 +379,57 @@ export default function RoleplayView() {
   }
 
   const stopRecording = () => {
-    console.log('🛑 Parando gravação...')
-    if (mediaRecorderRef.current && isRecording) {
-      // Limpar timer de silêncio
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current)
-        silenceTimerRef.current = null
-      }
+    console.log('🛑 stopRecording chamada')
+    console.log('🛑 Estado atual - isRecording:', isRecording)
+    console.log('🛑 MediaRecorder existe?', !!mediaRecorderRef.current)
+    console.log('🛑 MediaRecorder state:', mediaRecorderRef.current?.state)
 
-      // Parar gravação
-      if (mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop()
-      }
-      mediaRecorderRef.current = null
-
-      // Parar stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop()
-          console.log('🔇 Track de áudio parado:', track.label)
-        })
-        streamRef.current = null
-      }
-
-      setIsRecording(false)
+    // Limpar timer de silêncio
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+      console.log('✅ Timer de silêncio limpo')
     }
+
+    // Parar gravação se existir
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === 'recording') {
+          console.log('📝 Parando MediaRecorder...')
+          mediaRecorderRef.current.stop()
+          // NÃO setar para null aqui, pois o onstop precisa dele
+        } else {
+          console.log('⚠️ MediaRecorder não está gravando, state:', mediaRecorderRef.current.state)
+        }
+      } catch (error) {
+        console.error('❌ Erro ao parar MediaRecorder:', error)
+      }
+    } else {
+      console.log('⚠️ MediaRecorder não existe')
+    }
+
+    // NÃO fechar o stream aqui, deixar o onstop fazer isso
+    setIsRecording(false)
   }
 
   const transcribeAudio = async (audioBlob: Blob) => {
+    console.log('📝 Iniciando transcrição do áudio...')
+
+    // Verificar se a simulação ainda está ativa
+    if (!isSimulating) {
+      console.log('⚠️ Simulação foi encerrada, cancelando transcrição')
+      setIsRecording(false)
+      setIsProcessingTranscription(false)
+      setCurrentTranscription('')
+      return
+    }
+
+    // Garantir que o indicador de gravação seja removido
+    setIsRecording(false)
     setIsProcessingTranscription(true)
-    setCurrentTranscription('Processando sua fala...')
+    setCurrentTranscription('⏳ Processando sua fala...')
 
     try {
-      console.log('📝 Iniciando transcrição do áudio...')
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
 
@@ -312,7 +453,7 @@ export default function RoleplayView() {
         setLastUserMessage(data.text)
 
         // Aguardar um momento para o usuário ver antes de enviar
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise(resolve => setTimeout(resolve, 800))
       }
 
       // Enviar automaticamente após transcrever se houver texto
@@ -341,6 +482,7 @@ export default function RoleplayView() {
     } finally {
       setIsLoading(false)
       setIsProcessingTranscription(false)
+      setIsRecording(false) // Garantir que está false
     }
   }
 
@@ -449,27 +591,66 @@ export default function RoleplayView() {
                 ) : (
                   <button
                     onClick={() => {
-                      // Parar gravação se estiver ativa
-                      if (isRecording) {
-                        stopRecording();
+                      console.log('🛑 Encerrando simulação...')
+
+                      // Parar gravação imediatamente se estiver ativa
+                      if (mediaRecorderRef.current) {
+                        try {
+                          if (mediaRecorderRef.current.state === 'recording') {
+                            mediaRecorderRef.current.stop();
+                          }
+                          mediaRecorderRef.current = null;
+                        } catch (e) {
+                          console.log('Erro ao parar gravação:', e);
+                        }
                       }
+
+                      // Limpar timer de silêncio
+                      if (silenceTimerRef.current) {
+                        clearTimeout(silenceTimerRef.current);
+                        silenceTimerRef.current = null;
+                      }
+
                       // Parar áudio se estiver tocando
                       if (audioRef.current) {
-                        audioRef.current.pause();
-                        audioRef.current = null;
+                        try {
+                          audioRef.current.pause();
+                          audioRef.current = null;
+                        } catch (e) {
+                          console.log('Erro ao parar áudio:', e);
+                        }
                       }
-                      // Fechar stream de mídia
+
+                      // Fechar todos os streams de mídia
                       if (streamRef.current) {
-                        streamRef.current.getTracks().forEach(track => track.stop());
+                        streamRef.current.getTracks().forEach(track => {
+                          try {
+                            track.stop();
+                          } catch (e) {
+                            console.log('Erro ao parar track:', e);
+                          }
+                        });
                         streamRef.current = null;
                       }
-                      // Resetar estados
+
+                      // Finalizar sessão no Supabase
+                      if (sessionId) {
+                        endRoleplaySession(sessionId, 'completed');
+                      }
+
+                      // Resetar TODOS os estados
+                      setIsRecording(false);
                       setIsSimulating(false);
                       setMessages([]);
                       setThreadId(null);
                       setIsPlayingAudio(false);
                       setIsLoading(false);
                       setCurrentTranscription('');
+                      setIsProcessingTranscription(false);
+                      setLastUserMessage('');
+                      setSessionId(null);
+
+                      console.log('✅ Simulação encerrada');
                     }}
                     className="px-6 py-3 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-colors"
                   >
@@ -721,27 +902,90 @@ export default function RoleplayView() {
                     </div>
                   </div>
 
-                  {/* Segmento */}
+                  {/* Persona */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-3">
-                      Segmento/Setor
+                      Persona
                     </label>
-                    {segments.length === 0 ? (
+                    {personas.filter(p => p.business_type === businessType).length === 0 ? (
                       <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4 text-gray-400 text-sm">
-                        Nenhum segmento cadastrado. Configure no Hub de Configuração.
+                        Nenhuma persona {businessType} cadastrada. Configure no Hub de Configuração.
                       </div>
                     ) : (
-                      <select
-                        value={selectedSegment}
-                        onChange={(e) => setSelectedSegment(e.target.value)}
-                        className="w-full bg-gray-800/50 border border-purple-500/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500/40"
-                      >
-                        {segments.map((segment) => (
-                          <option key={segment.id} value={segment.id}>
-                            {segment.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="space-y-3">
+                        {personas
+                          .filter(p => p.business_type === businessType)
+                          .map((persona) => (
+                            <div
+                              key={persona.id}
+                              onClick={() => setSelectedPersona(persona.id!)}
+                              className={`cursor-pointer bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-4 transition-all ${
+                                selectedPersona === persona.id
+                                  ? 'border-purple-500 shadow-lg shadow-purple-500/20'
+                                  : 'border-purple-500/30 hover:border-purple-500/50'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center flex-shrink-0">
+                                  <UserCircle2 className="w-6 h-6 text-white" />
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                  <h4 className="font-bold text-white">
+                                    {persona.business_type === 'B2B'
+                                      ? (persona as PersonaB2B).job_title
+                                      : (persona as PersonaB2C).profession}
+                                  </h4>
+
+                                  {persona.business_type === 'B2B' && (
+                                    <>
+                                      {(persona as PersonaB2B).company_type && (
+                                        <p className="text-xs text-gray-300">
+                                          <span className="font-bold text-purple-400">Tipo de Empresa:</span>{' '}
+                                          {(persona as PersonaB2B).company_type}
+                                        </p>
+                                      )}
+                                      {(persona as PersonaB2B).company_goals && (
+                                        <p className="text-xs text-gray-300">
+                                          <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                          {(persona as PersonaB2B).company_goals}
+                                        </p>
+                                      )}
+                                      {(persona as PersonaB2B).business_challenges && (
+                                        <p className="text-xs text-gray-300">
+                                          <span className="font-bold text-purple-400">Desafios:</span>{' '}
+                                          {(persona as PersonaB2B).business_challenges}
+                                        </p>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {persona.business_type === 'B2C' && (
+                                    <>
+                                      {(persona as PersonaB2C).what_seeks && (
+                                        <p className="text-xs text-gray-300">
+                                          <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                          {(persona as PersonaB2C).what_seeks}
+                                        </p>
+                                      )}
+                                      {(persona as PersonaB2C).main_pains && (
+                                        <p className="text-xs text-gray-300">
+                                          <span className="font-bold text-purple-400">Dores:</span>{' '}
+                                          {(persona as PersonaB2C).main_pains}
+                                        </p>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+
+                                {selectedPersona === persona.id && (
+                                  <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                                    <CheckCircle className="w-4 h-4 text-white" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
                     )}
                   </div>
 

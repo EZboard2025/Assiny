@@ -93,18 +93,27 @@ export async function updateEmployee(id: string, employee: { name: string; email
   return true
 }
 
-export async function deleteEmployee(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('employees')
-    .delete()
-    .eq('id', id)
+export async function deleteEmployee(id: string, email: string): Promise<boolean> {
+  try {
+    const response = await fetch('/api/employees/delete', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ id, email }),
+    })
 
-  if (error) {
+    if (!response.ok) {
+      const error = await response.json()
+      console.error('Erro ao deletar funcionário:', error)
+      return false
+    }
+
+    return true
+  } catch (error) {
     console.error('Erro ao deletar funcionário:', error)
     return false
   }
-
-  return true
 }
 
 // Customer Segments
@@ -221,6 +230,91 @@ export async function deleteObjection(id: string): Promise<boolean> {
 
   if (error) {
     console.error('Erro ao deletar objeção:', error)
+    return false
+  }
+
+  return true
+}
+
+// Personas
+export interface PersonaB2C {
+  id?: string
+  business_type: 'B2C'
+  photo_url?: string
+  context?: string
+  profession: string
+  what_seeks?: string
+  main_pains?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface PersonaB2B {
+  id?: string
+  business_type: 'B2B'
+  photo_url?: string
+  context?: string
+  job_title: string
+  company_type?: string
+  company_goals?: string
+  business_challenges?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type Persona = PersonaB2C | PersonaB2B
+
+export async function getPersonas(): Promise<Persona[]> {
+  const { data, error } = await supabase
+    .from('personas')
+    .select('*')
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Erro ao buscar personas:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function addPersona(persona: Omit<Persona, 'id' | 'created_at' | 'updated_at'>): Promise<Persona | null> {
+  const { data, error } = await supabase
+    .from('personas')
+    .insert([persona])
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Erro ao adicionar persona:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function updatePersona(id: string, persona: Partial<Persona>): Promise<boolean> {
+  const { error } = await supabase
+    .from('personas')
+    .update(persona)
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erro ao atualizar persona:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function deletePersona(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('personas')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erro ao deletar persona:', error)
     return false
   }
 
