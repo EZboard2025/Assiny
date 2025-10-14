@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play } from 'lucide-react'
+import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getUserRoleplaySessions } from '@/lib/roleplay'
 
 export default function PerfilView() {
@@ -17,6 +17,8 @@ export default function PerfilView() {
   const [userName, setUserName] = useState('')
   const [evolutionData, setEvolutionData] = useState<Array<{ label: string, score: number, date: string }>>([])
   const [latestSession, setLatestSession] = useState<{ label: string, score: number, improvement: number } | null>(null)
+  const [scrollIndex, setScrollIndex] = useState(0)
+  const maxVisibleSessions = 8
 
   useEffect(() => {
     setMounted(true)
@@ -140,6 +142,24 @@ export default function PerfilView() {
     }
   }
 
+  // Funções de navegação do gráfico
+  const handlePrevious = () => {
+    if (scrollIndex > 0) {
+      setScrollIndex(scrollIndex - 1)
+    }
+  }
+
+  const handleNext = () => {
+    if (scrollIndex < evolutionData.length - maxVisibleSessions) {
+      setScrollIndex(scrollIndex + 1)
+    }
+  }
+
+  // Dados visíveis no gráfico
+  const visibleData = evolutionData.slice(scrollIndex, scrollIndex + maxVisibleSessions)
+  const canScrollLeft = scrollIndex > 0
+  const canScrollRight = scrollIndex < evolutionData.length - maxVisibleSessions
+
   const spinMetrics = [
     { label: 'Situação', icon: Search, score: spinAverages.S, color: 'from-cyan-500 to-blue-500' },
     { label: 'Problema', icon: Settings, score: spinAverages.P, color: 'from-green-500 to-emerald-500' },
@@ -192,88 +212,126 @@ export default function PerfilView() {
               ) : evolutionData.length === 0 ? (
                 <div className="text-center text-gray-400 py-20">Nenhuma sessão avaliada ainda</div>
               ) : (
-                <div className="relative h-64">
-                  <svg className="w-full h-full" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet">
-                    {/* Grid lines */}
-                    {[0, 2, 4, 6, 8, 10].map((line) => (
-                      <line
-                        key={line}
-                        x1="60"
-                        y1={220 - (line * 20)}
-                        x2="580"
-                        y2={220 - (line * 20)}
-                        stroke="rgba(139, 92, 246, 0.1)"
-                        strokeWidth="1"
-                      />
-                    ))}
+                <>
+                  <div className="relative h-80">
+                    <svg className="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet">
+                      {/* Grid lines - 10 linhas para escala 0-10 */}
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((line) => (
+                        <line
+                          key={line}
+                          x1="70"
+                          y1={260 - (line * 24)}
+                          x2="580"
+                          y2={260 - (line * 24)}
+                          stroke={line === 0 ? "rgba(139, 92, 246, 0.3)" : "rgba(139, 92, 246, 0.1)"}
+                          strokeWidth={line === 0 ? "2" : "1"}
+                        />
+                      ))}
 
-                    {/* Y-axis labels */}
-                    {[0, 2, 4, 6, 8, 10].map((num, i) => (
-                      <text
-                        key={num}
-                        x="40"
-                        y={225 - (i * 20)}
-                        fill="rgba(156, 163, 175, 0.6)"
-                        fontSize="14"
-                        textAnchor="end"
+                      {/* Y-axis labels - 0 a 10 */}
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                        <text
+                          key={num}
+                          x="55"
+                          y={264 - (num * 24)}
+                          fill="rgba(156, 163, 175, 0.8)"
+                          fontSize="13"
+                          textAnchor="end"
+                          fontWeight="500"
+                        >
+                          {num}
+                        </text>
+                      ))}
+
+                      {/* Line path */}
+                      {visibleData.length > 1 && (
+                        <path
+                          d={visibleData.map((point, i) => {
+                            const totalWidth = 500
+                            const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
+                            const x = 80 + (i * spacing)
+                            const y = 260 - (point.score * 24)
+                            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
+                          }).join(' ')}
+                          fill="none"
+                          stroke="url(#lineGradient)"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                      )}
+
+                      {/* Gradient definition */}
+                      <defs>
+                        <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#8b5cf6" />
+                          <stop offset="100%" stopColor="#ec4899" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Points */}
+                      {visibleData.map((point, i) => {
+                        const totalWidth = 500
+                        const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
+                        const x = 80 + (i * spacing)
+                        const y = 260 - (point.score * 24)
+                        return (
+                          <g key={i}>
+                            {/* Glow */}
+                            <circle cx={x} cy={y} r="10" fill="#8b5cf6" opacity="0.3" />
+                            {/* Point */}
+                            <circle cx={x} cy={y} r="6" fill="#8b5cf6" />
+                            {/* X-axis label - session number */}
+                            <text
+                              x={x}
+                              y="285"
+                              fill="rgba(156, 163, 175, 0.8)"
+                              fontSize="13"
+                              textAnchor="middle"
+                              fontWeight="600"
+                            >
+                              {point.label}
+                            </text>
+                          </g>
+                        )
+                      })}
+                    </svg>
+                  </div>
+
+                  {/* Navigation Controls */}
+                  {evolutionData.length > maxVisibleSessions && (
+                    <div className="flex items-center justify-between mt-4 px-4">
+                      <button
+                        onClick={handlePrevious}
+                        disabled={!canScrollLeft}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                          canScrollLeft
+                            ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                            : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
-                        {num}
-                      </text>
-                    ))}
+                        <ChevronLeft className="w-4 h-4" />
+                        Anterior
+                      </button>
 
-                    {/* Line path */}
-                    {evolutionData.length > 1 && (
-                      <path
-                        d={evolutionData.map((point, i) => {
-                          const totalWidth = 520
-                          const spacing = evolutionData.length > 1 ? totalWidth / (evolutionData.length - 1) : 0
-                          const x = 60 + (i * spacing)
-                          const y = 220 - (point.score * 20)
-                          return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-                        }).join(' ')}
-                        fill="none"
-                        stroke="url(#lineGradient)"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                      />
-                    )}
+                      <div className="text-sm text-gray-400">
+                        Mostrando {scrollIndex + 1} - {Math.min(scrollIndex + maxVisibleSessions, evolutionData.length)} de {evolutionData.length} sessões
+                      </div>
 
-                    {/* Gradient definition */}
-                    <defs>
-                      <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#8b5cf6" />
-                        <stop offset="100%" stopColor="#ec4899" />
-                      </linearGradient>
-                    </defs>
-
-                    {/* Points */}
-                    {evolutionData.map((point, i) => {
-                      const totalWidth = 520
-                      const spacing = evolutionData.length > 1 ? totalWidth / (evolutionData.length - 1) : 0
-                      const x = 60 + (i * spacing)
-                      const y = 220 - (point.score * 20)
-                      return (
-                        <g key={i}>
-                          {/* Glow */}
-                          <circle cx={x} cy={y} r="10" fill="#8b5cf6" opacity="0.3" />
-                          {/* Point */}
-                          <circle cx={x} cy={y} r="6" fill="#8b5cf6" />
-                          {/* X-axis label - session number */}
-                          <text
-                            x={x}
-                            y="242"
-                            fill="rgba(156, 163, 175, 0.8)"
-                            fontSize="12"
-                            textAnchor="middle"
-                            fontWeight="600"
-                          >
-                            {point.label}
-                          </text>
-                        </g>
-                      )
-                    })}
-                  </svg>
-                </div>
+                      <button
+                        onClick={handleNext}
+                        disabled={!canScrollRight}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                          canScrollRight
+                            ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                            : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        Próximo
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
