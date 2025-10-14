@@ -1116,94 +1116,295 @@ export default function RoleplayView() {
           </div>
         )}
 
-        {/* Modal de Resumo Rápido */}
+        {/* Modal de Avaliação - Novo Design */}
         {showEvaluationSummary && evaluation && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-purple-500/30 rounded-2xl p-8 max-w-2xl w-full space-y-6">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold text-white">Avaliação Completa ✨</h3>
-                <button
-                  onClick={() => setShowEvaluationSummary(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="relative w-full max-w-6xl my-8">
+              {/* Close Button */}
+              <button
+                onClick={() => setShowEvaluationSummary(false)}
+                className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-purple-500/30"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
 
-              {/* Score */}
-              <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-xl p-6 text-center">
-                <div className="text-6xl font-bold text-white mb-2">{evaluation.overall_score}</div>
-                <div className="text-lg text-purple-300 uppercase tracking-wider">
-                  {evaluation.performance_level === 'legendary' && '🏆 Lendário'}
-                  {evaluation.performance_level === 'excellent' && '⭐ Excelente'}
-                  {evaluation.performance_level === 'very_good' && '✨ Muito Bom'}
-                  {evaluation.performance_level === 'good' && '👍 Bom'}
-                  {evaluation.performance_level === 'needs_improvement' && '📈 Precisa Melhorar'}
-                  {evaluation.performance_level === 'poor' && '📚 Em Desenvolvimento'}
+              {/* Header com Tabs */}
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-purple-500/30 p-6">
+                <h2 className="text-3xl font-bold text-center text-white mb-6">DESEMPENHO DO VENDEDOR</h2>
+                <div className="flex justify-center gap-2">
+                  <button className="px-6 py-2 bg-gray-800/50 text-gray-400 rounded-lg hover:bg-gray-700/50 transition-colors">
+                    Conversa
+                  </button>
+                  <button className="px-6 py-2 bg-purple-600 text-white rounded-lg shadow-lg shadow-purple-500/30">
+                    Avaliação
+                  </button>
+                  <button className="px-6 py-2 bg-gray-800/50 text-gray-400 rounded-lg hover:bg-gray-700/50 transition-colors">
+                    Feedback
+                  </button>
                 </div>
               </div>
 
-              {/* Resumo Executivo */}
-              <div className="space-y-3">
-                <h4 className="font-bold text-white text-lg">Resumo da Performance</h4>
-                <p className="text-gray-300 leading-relaxed">{evaluation.executive_summary}</p>
-              </div>
+              {/* Main Content */}
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-purple-500/30 p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-              {/* Pontos Fortes */}
-              {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="font-bold text-green-400 text-lg flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    Pontos Fortes
-                  </h4>
-                  <ul className="space-y-2">
-                    {evaluation.top_strengths.map((strength: string, idx: number) => (
-                      <li key={idx} className="text-gray-300 flex items-start gap-2">
-                        <span className="text-green-400 mt-1">•</span>
-                        <span>{strength}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {/* Left Side - SPIN Radar Chart */}
+                  <div className="space-y-6">
+                    <div className="bg-gray-800/40 rounded-2xl p-6 border border-purple-500/20">
+                      <h3 className="text-xl font-bold text-white mb-6 text-center">Métricas de Competências SPIN</h3>
+
+                      {/* Radar Chart Visual - Diamond Shape */}
+                      <div className="relative w-full aspect-square max-w-sm mx-auto mb-6">
+                        <svg viewBox="0 0 240 240" className="w-full h-full">
+                          {/* Background diamonds (losangos) - 10 níveis */}
+                          {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
+                            const size = level * 8; // Cada nível representa 8 pixels
+                            return (
+                              <polygon
+                                key={level}
+                                points={`120,${120-size} ${120+size},120 120,${120+size} ${120-size},120`}
+                                fill="none"
+                                stroke={level % 2 === 0 ? "rgba(139, 92, 246, 0.15)" : "rgba(139, 92, 246, 0.08)"}
+                                strokeWidth="1"
+                              />
+                            );
+                          })}
+
+                          {/* Diagonal lines connecting opposite vertices (forming X inside diamond) */}
+                          <line x1="120" y1="40" x2="120" y2="200" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="0.5" />
+                          <line x1="40" y1="120" x2="200" y2="120" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="0.5" />
+
+                          {/* Data polygon */}
+                          {evaluation.spin_evaluation && (() => {
+                            const S = evaluation.spin_evaluation.S?.final_score || 0
+                            const P = evaluation.spin_evaluation.P?.final_score || 0
+                            const I = evaluation.spin_evaluation.I?.final_score || 0
+                            const N = evaluation.spin_evaluation.N?.final_score || 0
+
+                            // Calculate positions for diamond (4 vertices)
+                            const sY = 120 - (S * 8)  // Top (S)
+                            const pX = 120 + (P * 8)  // Right (P)
+                            const iY = 120 + (I * 8)  // Bottom (I)
+                            const nX = 120 - (N * 8)  // Left (N)
+
+                            return (
+                              <>
+                                <polygon
+                                  points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
+                                  fill="rgba(168, 85, 247, 0.3)"
+                                  stroke="rgb(168, 85, 247)"
+                                  strokeWidth="2"
+                                />
+                                {/* Data points */}
+                                <circle cx="120" cy={sY} r="5" fill="rgb(168, 85, 247)" />
+                                <circle cx={pX} cy="120" r="5" fill="rgb(168, 85, 247)" />
+                                <circle cx="120" cy={iY} r="5" fill="rgb(168, 85, 247)" />
+                                <circle cx={nX} cy="120" r="5" fill="rgb(168, 85, 247)" />
+                              </>
+                            )
+                          })()}
+
+                          {/* Labels */}
+                          <text x="120" y="32" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">S</text>
+                          <text x="208" y="125" textAnchor="start" fill="white" fontSize="14" fontWeight="bold">P</text>
+                          <text x="120" y="215" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">I</text>
+                          <text x="32" y="125" textAnchor="end" fill="white" fontSize="14" fontWeight="bold">N</text>
+                        </svg>
+
+                        {/* Center label with hover */}
+                        {evaluation.spin_evaluation?.P && (
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                            <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-purple-500/30">
+                              <div className="text-lg font-bold text-purple-400">P</div>
+                              <div className="text-xs text-gray-400">Problema</div>
+                              <div className="text-sm text-white font-semibold">{evaluation.spin_evaluation.P.final_score}/10</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SPIN Scores */}
+                      <div className="grid grid-cols-4 gap-2 mb-4">
+                        {evaluation.spin_evaluation && (
+                          <>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-400 mb-1">S</div>
+                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.S?.final_score?.toFixed(1) || '0'}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-400 mb-1">P</div>
+                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.P?.final_score?.toFixed(1) || '0'}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-400 mb-1">I</div>
+                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.I?.final_score?.toFixed(1) || '0'}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-400 mb-1">N</div>
+                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.N?.final_score?.toFixed(1) || '0'}</div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Detalhamento SPIN */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
+                          <span className="text-sm text-gray-300">Situação</span>
+                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.S?.final_score || 0}/10</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
+                          <span className="text-sm text-gray-300">Problema</span>
+                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.P?.final_score || 0}/10</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
+                          <span className="text-sm text-gray-300">Implicação</span>
+                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.I?.final_score || 0}/10</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
+                          <span className="text-sm text-gray-300">Necessidade</span>
+                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.N?.final_score || 0}/10</span>
+                        </div>
+                      </div>
+
+                      {/* Média Geral */}
+                      <div className="mt-6 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl px-6 py-3 text-center">
+                        <div className="text-sm text-purple-100 mb-1">Média Geral</div>
+                        <div className="text-2xl font-bold text-white">
+                          {evaluation.spin_evaluation ? (
+                            ((evaluation.spin_evaluation.S?.final_score || 0) +
+                             (evaluation.spin_evaluation.P?.final_score || 0) +
+                             (evaluation.spin_evaluation.I?.final_score || 0) +
+                             (evaluation.spin_evaluation.N?.final_score || 0)) / 4
+                          ).toFixed(1) : '0'}/10
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side - Performance Metrics */}
+                  <div className="space-y-6">
+                    {/* Overall Score */}
+                    <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-2xl p-6">
+                      <h3 className="text-center text-sm text-gray-400 mb-2">Performance Geral</h3>
+                      <div className="text-center">
+                        <div className="text-6xl font-bold text-white mb-2">{evaluation.overall_score}/10</div>
+                        <div className="inline-block px-4 py-1 bg-purple-600/30 rounded-full text-sm text-purple-300 font-medium">
+                          {evaluation.performance_level === 'legendary' && 'Lendário'}
+                          {evaluation.performance_level === 'excellent' && 'Excelente'}
+                          {evaluation.performance_level === 'very_good' && 'Muito Bom'}
+                          {evaluation.performance_level === 'good' && 'Bom'}
+                          {evaluation.performance_level === 'needs_improvement' && 'Precisa Melhorar'}
+                          {evaluation.performance_level === 'poor' && 'Em Desenvolvimento'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Performance Bars */}
+                    <div className="bg-gray-800/40 rounded-2xl p-6 border border-purple-500/20 space-y-4">
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-gray-300">Abertura e Rapport</span>
+                          <span className="text-sm font-semibold text-white">8/10</span>
+                        </div>
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '80%'}}></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-gray-300">Investigação de Necessidades</span>
+                          <span className="text-sm font-semibold text-white">6/10</span>
+                        </div>
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '60%'}}></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-gray-300">Apresentação de Soluções</span>
+                          <span className="text-sm font-semibold text-white">4/10</span>
+                        </div>
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-orange-500 to-orange-400" style={{width: '40%'}}></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-gray-300">Tratamento de Objeções</span>
+                          <span className="text-sm font-semibold text-white">8/10</span>
+                        </div>
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '80%'}}></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-gray-300">Fechamento e Próximos Passos</span>
+                          <span className="text-sm font-semibold text-white">6/10</span>
+                        </div>
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '60%'}}></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-gray-300">Comunicação Geral</span>
+                          <span className="text-sm font-semibold text-white">6.8/10</span>
+                        </div>
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '68%'}}></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Competências */}
+                    <div className="bg-gray-800/40 rounded-2xl p-6 border border-purple-500/20">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-sm font-semibold text-green-400 mb-2">Maior competência</h4>
+                          <p className="text-xs text-gray-300">
+                            {evaluation.top_strengths && evaluation.top_strengths.length > 0
+                              ? evaluation.top_strengths[0]
+                              : 'Não identificado'}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-orange-400 mb-2">Foco de melhoria</h4>
+                          <p className="text-xs text-gray-300">
+                            {evaluation.critical_gaps && evaluation.critical_gaps.length > 0
+                              ? evaluation.critical_gaps[0]
+                              : 'Não identificado'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              {/* Áreas de Melhoria */}
-              {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="font-bold text-orange-400 text-lg flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    Principais Gaps
-                  </h4>
-                  <ul className="space-y-2">
-                    {evaluation.critical_gaps.map((gap: string, idx: number) => (
-                      <li key={idx} className="text-gray-300 flex items-start gap-2">
-                        <span className="text-orange-400 mt-1">•</span>
-                        <span>{gap}</span>
-                      </li>
-                    ))}
-                  </ul>
+                {/* Action Buttons */}
+                <div className="flex gap-4 mt-8">
+                  <button
+                    onClick={() => setShowEvaluationSummary(false)}
+                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors text-white"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEvaluationSummary(false);
+                      window.location.href = '/?view=historico';
+                    }}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-purple-500/30"
+                  >
+                    Ver Análise Completa no Histórico
+                  </button>
                 </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowEvaluationSummary(false)}
-                  className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
-                >
-                  Fechar
-                </button>
-                <button
-                  onClick={() => {
-                    setShowEvaluationSummary(false);
-                    // Navegar para histórico (você pode implementar navegação aqui)
-                    window.location.href = '/?view=historico';
-                  }}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
-                >
-                  Ver Análise Completa no Histórico
-                </button>
               </div>
             </div>
           </div>

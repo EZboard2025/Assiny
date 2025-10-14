@@ -297,34 +297,130 @@ export default function HistoricoView() {
                             </div>
                           )}
 
-                          {/* Avaliação SPIN */}
+                          {/* Avaliação SPIN com Gráfico Radar */}
                           {evaluation.spin_evaluation && (
-                            <div className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
-                              <h5 className="font-semibold text-white mb-3">Metodologia SPIN</h5>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gray-900/50 rounded-lg p-3">
-                                  <div className="text-xs text-gray-500 mb-1">Situação</div>
-                                  <div className="text-2xl font-bold text-purple-400">
-                                    {evaluation.spin_evaluation.S?.final_score?.toFixed(1) ?? 'N/A'}
-                                  </div>
+                            <div className="bg-gradient-to-br from-gray-800/50 to-purple-900/20 border border-purple-500/30 rounded-2xl p-6 mb-4 shadow-lg shadow-purple-500/10">
+                              <h5 className="font-bold text-white mb-6 text-center text-xl">Metodologia SPIN</h5>
+
+                              {/* Radar Chart - Diamond Shape */}
+                              <div className="relative w-full aspect-square max-w-md mx-auto mb-6">
+                                <svg viewBox="0 0 240 240" className="w-full h-full drop-shadow-2xl">
+                                  {/* Background diamonds (losangos) - 10 níveis */}
+                                  {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
+                                    const size = level * 8; // Cada nível representa 8 pixels
+                                    return (
+                                      <polygon
+                                        key={level}
+                                        points={`120,${120-size} ${120+size},120 120,${120+size} ${120-size},120`}
+                                        fill="none"
+                                        stroke={level % 2 === 0 ? "rgba(139, 92, 246, 0.15)" : "rgba(139, 92, 246, 0.08)"}
+                                        strokeWidth="1"
+                                      />
+                                    );
+                                  })}
+
+                                  {/* Diagonal lines connecting opposite vertices (forming X inside diamond) */}
+                                  <line x1="120" y1="40" x2="120" y2="200" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="0.5" />
+                                  <line x1="40" y1="120" x2="200" y2="120" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="0.5" />
+
+                                  {/* Data polygon */}
+                                  {(() => {
+                                    const S = evaluation.spin_evaluation.S?.final_score || 0
+                                    const P = evaluation.spin_evaluation.P?.final_score || 0
+                                    const I = evaluation.spin_evaluation.I?.final_score || 0
+                                    const N = evaluation.spin_evaluation.N?.final_score || 0
+
+                                    // Calculate positions for diamond (4 vertices)
+                                    const sY = 120 - (S * 8)  // Top (S)
+                                    const pX = 120 + (P * 8)  // Right (P)
+                                    const iY = 120 + (I * 8)  // Bottom (I)
+                                    const nX = 120 - (N * 8)  // Left (N)
+
+                                    return (
+                                      <>
+                                        {/* Glow effect behind polygon */}
+                                        <polygon
+                                          points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
+                                          fill="rgba(168, 85, 247, 0.2)"
+                                          stroke="rgb(168, 85, 247)"
+                                          strokeWidth="3"
+                                          filter="url(#glow)"
+                                        />
+                                        <polygon
+                                          points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
+                                          fill="rgba(168, 85, 247, 0.4)"
+                                          stroke="rgb(168, 85, 247)"
+                                          strokeWidth="2"
+                                        />
+                                        {/* Data points with glow */}
+                                        <circle cx="120" cy={sY} r="6" fill="rgb(168, 85, 247)" opacity="0.5" />
+                                        <circle cx="120" cy={sY} r="4" fill="rgb(255, 255, 255)" />
+
+                                        <circle cx={pX} cy="120" r="6" fill="rgb(168, 85, 247)" opacity="0.5" />
+                                        <circle cx={pX} cy="120" r="4" fill="rgb(255, 255, 255)" />
+
+                                        <circle cx="120" cy={iY} r="6" fill="rgb(168, 85, 247)" opacity="0.5" />
+                                        <circle cx="120" cy={iY} r="4" fill="rgb(255, 255, 255)" />
+
+                                        <circle cx={nX} cy="120" r="6" fill="rgb(168, 85, 247)" opacity="0.5" />
+                                        <circle cx={nX} cy="120" r="4" fill="rgb(255, 255, 255)" />
+                                      </>
+                                    )
+                                  })()}
+
+                                  {/* Labels with background */}
+                                  <g>
+                                    <rect x="105" y="20" width="30" height="20" rx="4" fill="rgba(139, 92, 246, 0.3)" />
+                                    <text x="120" y="33" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">S</text>
+                                  </g>
+                                  <g>
+                                    <rect x="200" y="110" width="30" height="20" rx="4" fill="rgba(139, 92, 246, 0.3)" />
+                                    <text x="215" y="123" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">P</text>
+                                  </g>
+                                  <g>
+                                    <rect x="105" y="200" width="30" height="20" rx="4" fill="rgba(139, 92, 246, 0.3)" />
+                                    <text x="120" y="213" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">I</text>
+                                  </g>
+                                  <g>
+                                    <rect x="10" y="110" width="30" height="20" rx="4" fill="rgba(139, 92, 246, 0.3)" />
+                                    <text x="25" y="123" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">N</text>
+                                  </g>
+                                </svg>
+                              </div>
+
+                              {/* SPIN Scores Grid - Destacado */}
+                              <div className="grid grid-cols-4 gap-3 mb-4">
+                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
+                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Situação</div>
+                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.S?.final_score?.toFixed(1) || '0'}</div>
                                 </div>
-                                <div className="bg-gray-900/50 rounded-lg p-3">
-                                  <div className="text-xs text-gray-500 mb-1">Problema</div>
-                                  <div className="text-2xl font-bold text-purple-400">
-                                    {evaluation.spin_evaluation.P?.final_score?.toFixed(1) ?? 'N/A'}
-                                  </div>
+                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
+                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Problema</div>
+                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.P?.final_score?.toFixed(1) || '0'}</div>
                                 </div>
-                                <div className="bg-gray-900/50 rounded-lg p-3">
-                                  <div className="text-xs text-gray-500 mb-1">Implicação</div>
-                                  <div className="text-2xl font-bold text-purple-400">
-                                    {evaluation.spin_evaluation.I?.final_score?.toFixed(1) ?? 'N/A'}
-                                  </div>
+                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
+                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Implicação</div>
+                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.I?.final_score?.toFixed(1) || '0'}</div>
                                 </div>
-                                <div className="bg-gray-900/50 rounded-lg p-3">
-                                  <div className="text-xs text-gray-500 mb-1">Necessidade</div>
-                                  <div className="text-2xl font-bold text-purple-400">
-                                    {evaluation.spin_evaluation.N?.final_score?.toFixed(1) ?? 'N/A'}
-                                  </div>
+                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
+                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Necessidade</div>
+                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.N?.final_score?.toFixed(1) || '0'}</div>
+                                </div>
+                              </div>
+
+                              {/* Média Geral SPIN */}
+                              <div className="mt-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl px-6 py-4 text-center shadow-lg">
+                                <div className="text-sm text-purple-100 mb-1 font-semibold">Média Geral SPIN</div>
+                                <div className="text-3xl font-bold text-white">
+                                  {(() => {
+                                    const avg = (
+                                      (evaluation.spin_evaluation.S?.final_score || 0) +
+                                      (evaluation.spin_evaluation.P?.final_score || 0) +
+                                      (evaluation.spin_evaluation.I?.final_score || 0) +
+                                      (evaluation.spin_evaluation.N?.final_score || 0)
+                                    ) / 4;
+                                    return avg.toFixed(1);
+                                  })()}/10
                                 </div>
                               </div>
                             </div>
