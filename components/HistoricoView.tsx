@@ -91,6 +91,7 @@ export default function HistoricoView() {
     return evaluation
   }
 
+
   return (
     <div className="min-h-screen py-20 px-6 relative z-10">
       <div className="max-w-7xl mx-auto">
@@ -104,9 +105,9 @@ export default function HistoricoView() {
           </p>
         </div>
 
-        {/* Filtros */}
+        {/* Filtros e Resumo */}
         <div className={`mb-8 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-wrap gap-3 justify-center items-center">
             <button
               onClick={() => setFilterStatus('all')}
               className={`px-6 py-2 rounded-xl font-medium transition-all ${
@@ -137,6 +138,7 @@ export default function HistoricoView() {
             >
               Em andamento ({sessions.filter(s => s.status === 'in_progress').length})
             </button>
+
           </div>
         </div>
 
