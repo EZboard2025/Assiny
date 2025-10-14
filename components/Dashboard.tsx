@@ -5,6 +5,7 @@ import ChatInterface from './ChatInterface'
 import ConfigHub from './ConfigHub'
 import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
+import PerfilView from './PerfilView'
 import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut } from 'lucide-react'
 
 interface DashboardProps {
@@ -13,7 +14,7 @@ interface DashboardProps {
 
 export default function Dashboard({ onLogout }: DashboardProps) {
   const [showConfigHub, setShowConfigHub] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'avaliacao' | 'pdi' | 'historico'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'avaliacao' | 'pdi' | 'historico' | 'perfil'>('home')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -31,6 +32,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'historico') {
       return <HistoricoView />
+    }
+
+    if (currentView === 'perfil') {
+      return <PerfilView />
     }
 
     // Home view
@@ -215,6 +220,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 className={`hover:text-white transition-colors ${currentView === 'historico' ? 'text-white' : ''}`}
               >
                 Histórico
+              </button>
+              <button
+                onClick={() => setCurrentView('perfil')}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-full font-medium shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70 hover:scale-105 transition-all"
+              >
+                Meu Perfil
               </button>
             </nav>
 
