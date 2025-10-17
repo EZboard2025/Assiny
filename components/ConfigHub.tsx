@@ -1638,7 +1638,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
     <>
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className={`relative max-w-5xl w-full max-h-[90vh] overflow-hidden transition-transform duration-300 ${
-        showPersonaEvaluationModal ? 'sm:-translate-x-[250px]' : ''
+        showPersonaEvaluationModal || showObjectionEvaluationModal ? 'sm:-translate-x-[250px]' : ''
       }`}>
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
         <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
@@ -1955,9 +1955,9 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
     {/* Modal de Avaliação de Objeção - Side Panel (fora do ConfigHub) */}
     {showObjectionEvaluationModal && objectionEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4">
-        <div className="h-full bg-gray-900 border border-purple-500/30 rounded-xl shadow-2xl overflow-y-auto animate-slide-in">
-          <div className="sticky top-0 bg-gray-900 border-b border-purple-500/30 p-4 flex items-center justify-between z-10">
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 bg-gradient-to-br from-green-950/90 via-gray-900/95 to-gray-900/95">
+        <div className="h-full bg-gradient-to-b from-green-900/20 to-gray-900/50 border border-green-500/30 rounded-xl shadow-2xl overflow-y-auto animate-slide-in">
+          <div className="sticky top-0 bg-gradient-to-b from-green-900/80 to-gray-900/80 backdrop-blur-sm border-b border-green-500/30 p-4 flex items-center justify-between z-10">
             <h3 className="font-bold text-white">Avaliação da Objeção</h3>
             <button
               onClick={() => setShowObjectionEvaluationModal(false)}
