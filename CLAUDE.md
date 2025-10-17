@@ -135,6 +135,13 @@ npm run lint         # Run ESLint
 
 - **File Upload**: `https://ezboard.app.n8n.cloud/webhook/c91010a1-9003-4a8b-b9bd-30e689c7c4ac`
 
+- **Persona Evaluation**: `https://ezboard.app.n8n.cloud/webhook/persona-consultor`
+  - Triggered when admin clicks "AVALIAR PERSONA" in ConfigHub
+  - Input: `{ persona: string }` (formatted text with all 5 persona fields)
+  - Output: `[{ output: "```json\n{...}\n```" }]` (JSON wrapped in markdown code block)
+  - Agent evaluates persona quality for B2B/B2C sales roleplay scenarios
+  - Returns scores (0-10) for each field, SPIN readiness, strengths, gaps, and recommendations
+
 **N8N Response Parsing:**
 N8N can return evaluations in multiple formats. Always handle both:
 
@@ -158,6 +165,13 @@ if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
   } catch (e) {
     console.error('Failed to parse evaluation:', e)
   }
+}
+
+// Persona Evaluation (ConfigHub.tsx) - Remove markdown code blocks
+if (Array.isArray(result) && result[0]?.output) {
+  const outputString = result[0].output
+  const jsonString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
+  evaluation = JSON.parse(jsonString)
 }
 ```
 
@@ -218,6 +232,13 @@ if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
   - Password protected (`admin123`)
   - Manages employees, personas, objections, business type
   - File upload for document embeddings
+  - **Persona Evaluation System**:
+    - "AVALIAR PERSONA" button sends persona data to N8N consultant agent
+    - Agent evaluates using SPIN Selling methodology (5 fields: cargo, tipo_empresa_faturamento, contexto, busca, dores)
+    - Returns detailed JSON with scores (0-10), SPIN readiness, suggestions, and quality classification
+    - Side panel displays evaluation (z-[70]) while ConfigHub shifts left (translate-x-[-250px])
+    - Red warning banner: Personas below 7.0 may compromise roleplay quality
+    - Evaluation webhook: `https://ezboard.app.n8n.cloud/webhook/persona-consultor`
 
 **Libraries:**
 - `lib/roleplay.ts` - Session CRUD operations
@@ -314,6 +335,8 @@ data?.forEach((row) => {
 - User must manually click microphone button (no auto-recording after TTS)
 
 ### Evaluation Data Structure
+
+**Roleplay Session Evaluation:**
 ```typescript
 {
   overall_score: number,
@@ -329,6 +352,37 @@ data?.forEach((row) => {
   top_strengths: string[],
   critical_gaps: string[],
   priority_improvements: [{ area, current_gap, action_plan, priority }]
+}
+```
+
+**Persona Quality Evaluation:**
+```typescript
+{
+  qualidade_geral: 'alta'|'média'|'baixa',
+  score_geral: number,  // 0-10
+  nivel_qualidade_textual: 'excelente'|'bom'|'precisa_melhorias'|'insuficiente',
+  score_detalhado: {
+    cargo: number,
+    tipo_empresa_faturamento: number,
+    contexto: number,
+    busca: number,
+    dores: number
+  },
+  destaques_positivos: string[],
+  spin_readiness: {
+    situacao: 'pronto'|'precisa_ajuste'|'insuficiente',
+    problema: 'pronto'|'precisa_ajuste'|'insuficiente',
+    implicacao: 'pronto'|'precisa_ajuste'|'insuficiente',
+    need_payoff: 'pronto'|'precisa_ajuste'|'insuficiente',
+    score_spin_total: number
+  },
+  campos_excelentes: string[],        // Fields with score >= 9
+  campos_que_precisam_ajuste: string[], // Fields with score < 7
+  sugestoes_melhora_prioritarias: string[],
+  pronto_para_roleplay: boolean,
+  nivel_complexidade_roleplay: 'básico'|'intermediário'|'avançado',
+  proxima_acao_recomendada: string,
+  mensagem_motivacional: string
 }
 ```
 
@@ -374,6 +428,33 @@ if (msg?.data?.content) {
   content = msg
 }
 ```
+
+### Persona Evaluation UI Pattern
+
+**Side Panel Layout:**
+The persona evaluation results display in a side panel (500px width) that slides in from the right while the ConfigHub shifts left by 250px, creating a side-by-side layout:
+
+```typescript
+// ConfigHub container shifts left when evaluation is shown
+<div className={`relative max-w-5xl w-full transition-transform duration-300 ${
+  showPersonaEvaluationModal ? 'sm:-translate-x-[250px]' : ''
+}`}>
+
+// Evaluation panel positioned fixed at right edge
+<div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4">
+  <div className="animate-slide-in">
+    {/* Evaluation content */}
+  </div>
+</div>
+```
+
+**Key UI Elements:**
+- Red warning banner at top of Personas tab (personas < 7.0 compromise quality)
+- Green "AVALIAR PERSONA" button on each persona card
+- Loading state with spinner during evaluation
+- Side panel with: Score Geral, Scores por Campo, Destaques Positivos, Prontidão SPIN, Campos Excelentes/Para Ajustar, Sugestões, Status, Próxima Ação
+- Compact design with small fonts (10px-14px) to fit all content without scroll issues
+- Color-coded sections: green (positive), orange (needs work), blue (suggestions), purple (SPIN)
 
 ## Common Issues
 
