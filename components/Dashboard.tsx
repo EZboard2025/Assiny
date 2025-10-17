@@ -14,7 +14,7 @@ interface DashboardProps {
 
 export default function Dashboard({ onLogout }: DashboardProps) {
   const [showConfigHub, setShowConfigHub] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'avaliacao' | 'pdi' | 'historico' | 'perfil'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil'>('home')
   const [mounted, setMounted] = useState(false)
   const chatRef = useRef<ChatInterfaceHandle>(null)
 
@@ -131,25 +131,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </button>
 
-            {/* Avaliação Card */}
-            <div
-              className={`feature-card group ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '200ms' }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition-all">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-purple-600/20 rounded-2xl flex items-center justify-center">
-                    <BarChart3 className="w-7 h-7 text-purple-400" />
-                  </div>
-                  <h3 className="text-2xl font-bold">Avaliação</h3>
-                </div>
-                <p className="text-gray-400 text-lg">
-                  Acompanhe seu desempenho e receba análises detalhadas de suas vendas.
-                </p>
-              </div>
-            </div>
-
             {/* PDI Card */}
             <div
               className={`feature-card group ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
@@ -211,12 +192,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 className={`hover:text-white transition-colors ${currentView === 'roleplay' ? 'text-white' : ''}`}
               >
                 Roleplays
-              </button>
-              <button
-                onClick={() => handleViewChange('avaliacao')}
-                className={`hover:text-white transition-colors ${currentView === 'avaliacao' ? 'text-white' : ''}`}
-              >
-                Avaliação
               </button>
               <button
                 onClick={() => handleViewChange('pdi')}
