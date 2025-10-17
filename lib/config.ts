@@ -26,6 +26,8 @@ export interface CompanyType {
 export interface Objection {
   id: string
   name: string
+  rebuttals: string[]
+  evaluation_score: number | null
   created_at: string
   updated_at: string
 }
@@ -207,10 +209,10 @@ export async function getObjections(): Promise<Objection[]> {
   return data || []
 }
 
-export async function addObjection(name: string): Promise<Objection | null> {
+export async function addObjection(name: string, rebuttals: string[] = []): Promise<Objection | null> {
   const { data, error } = await supabase
     .from('objections')
-    .insert([{ name }])
+    .insert([{ name, rebuttals }])
     .select()
     .single()
 
@@ -220,6 +222,38 @@ export async function addObjection(name: string): Promise<Objection | null> {
   }
 
   return data
+}
+
+export async function updateObjection(id: string, name: string, rebuttals: string[]): Promise<boolean> {
+  const { error } = await supabase
+    .from('objections')
+    .update({
+      name,
+      rebuttals,
+      evaluation_score: null // Reset score quando editado
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erro ao atualizar objeção:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function updateObjectionScore(id: string, score: number): Promise<boolean> {
+  const { error } = await supabase
+    .from('objections')
+    .update({ evaluation_score: score })
+    .eq('id', id)
+
+  if (error) {
+    console.error('Erro ao atualizar score da objeção:', error)
+    return false
+  }
+
+  return true
 }
 
 export async function deleteObjection(id: string): Promise<boolean> {

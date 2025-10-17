@@ -255,7 +255,7 @@ export default function HistoricoView() {
                           <div className="flex flex-wrap gap-1 mt-1">
                             {selectedSession.config.objections.map((obj, i) => (
                               <span key={i} className="px-2 py-1 bg-purple-500/20 rounded text-xs">
-                                {obj}
+                                {typeof obj === 'string' ? obj : obj.name}
                               </span>
                             ))}
                           </div>
@@ -277,7 +277,9 @@ export default function HistoricoView() {
                           {/* Score Geral */}
                           <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-xl p-4 text-center mb-4">
                             <div className="text-4xl font-bold text-white mb-1">
-                              {evaluation.overall_score ?? 'N/A'}
+                              {evaluation.overall_score !== undefined && evaluation.overall_score !== null
+                                ? `${(evaluation.overall_score / 10).toFixed(1)}/10`
+                                : 'N/A'}
                             </div>
                             <div className="text-sm text-purple-300 uppercase tracking-wider">
                               {evaluation.performance_level === 'legendary' && '🏆 Lendário'}
@@ -428,45 +430,78 @@ export default function HistoricoView() {
                             </div>
                           )}
 
-                        {/* Feedback Detalhado */}
+                        {/* Feedback Detalhado SPIN */}
                         {evaluation.spin_evaluation && (
                           <details className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
                             <summary className="font-semibold text-white cursor-pointer hover:text-purple-400 transition-colors">
-                              Ver Feedback Detalhado SPIN
+                              Análise Detalhada SPIN
                             </summary>
-                            <div className="mt-4 space-y-4 text-sm">
-                              {evaluation.spin_evaluation.S?.technical_feedback && (
-                                <div>
-                                  <h6 className="font-semibold text-purple-400 mb-2">Situação (S)</h6>
-                                  <p className="text-gray-300 whitespace-pre-wrap">
-                                    {evaluation.spin_evaluation.S.technical_feedback}
-                                  </p>
-                                </div>
-                              )}
-                              {evaluation.spin_evaluation.P?.technical_feedback && (
-                                <div>
-                                  <h6 className="font-semibold text-purple-400 mb-2">Problema (P)</h6>
-                                  <p className="text-gray-300 whitespace-pre-wrap">
-                                    {evaluation.spin_evaluation.P.technical_feedback}
-                                  </p>
-                                </div>
-                              )}
-                              {evaluation.spin_evaluation.I?.technical_feedback && (
-                                <div>
-                                  <h6 className="font-semibold text-purple-400 mb-2">Implicação (I)</h6>
-                                  <p className="text-gray-300 whitespace-pre-wrap">
-                                    {evaluation.spin_evaluation.I.technical_feedback}
-                                  </p>
-                                </div>
-                              )}
-                              {evaluation.spin_evaluation.N?.technical_feedback && (
-                                <div>
-                                  <h6 className="font-semibold text-purple-400 mb-2">Necessidade (N)</h6>
-                                  <p className="text-gray-300 whitespace-pre-wrap">
-                                    {evaluation.spin_evaluation.N.technical_feedback}
-                                  </p>
-                                </div>
-                              )}
+                            <div className="mt-4 space-y-6">
+                              {['S', 'P', 'I', 'N'].map((letter) => {
+                                const spinData = evaluation.spin_evaluation[letter]
+                                if (!spinData) return null
+
+                                const letterNames: any = {
+                                  'S': 'Situação',
+                                  'P': 'Problema',
+                                  'I': 'Implicação',
+                                  'N': 'Necessidade'
+                                }
+
+                                return (
+                                  <div key={letter} className="bg-gray-900/50 rounded-lg p-4 border border-purple-500/10">
+                                    {/* Header com nome e score */}
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h6 className="font-semibold text-purple-400">
+                                        {letterNames[letter]} ({letter})
+                                      </h6>
+                                      <span className="text-xl font-bold text-white">
+                                        {spinData.final_score?.toFixed(1)}
+                                      </span>
+                                    </div>
+
+                                    {/* Indicadores detalhados */}
+                                    {spinData.indicators && Object.keys(spinData.indicators).length > 0 && (
+                                      <div className="grid grid-cols-2 gap-2 mb-3">
+                                        {Object.entries(spinData.indicators).map(([key, value]: [string, any]) => (
+                                          <div key={key} className="bg-gray-800/50 rounded px-2 py-1">
+                                            <span className="text-xs text-gray-400">
+                                              {key.replace(/_/g, ' ').replace('score', '')}:
+                                            </span>
+                                            <span className="text-xs font-semibold text-gray-300 ml-1">
+                                              {value}/10
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Feedback técnico */}
+                                    <div className="mb-3">
+                                      <p className="text-sm text-gray-300 leading-relaxed">
+                                        {spinData.technical_feedback}
+                                      </p>
+                                    </div>
+
+                                    {/* Oportunidades perdidas */}
+                                    {spinData.missed_opportunities?.length > 0 && (
+                                      <div className="bg-orange-500/10 border border-orange-500/20 rounded p-2">
+                                        <h6 className="text-xs font-semibold text-orange-400 mb-1">
+                                          Oportunidades Perdidas:
+                                        </h6>
+                                        <ul className="space-y-1">
+                                          {spinData.missed_opportunities.map((opp: string, i: number) => (
+                                            <li key={i} className="text-xs text-orange-300 flex items-start">
+                                              <span className="text-orange-400 mr-1">•</span>
+                                              <span>{opp}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           </details>
                         )}
@@ -475,17 +510,58 @@ export default function HistoricoView() {
                         {evaluation.objections_analysis?.length > 0 && (
                           <details className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
                             <summary className="font-semibold text-white cursor-pointer hover:text-purple-400 transition-colors">
-                              Análise de Objeções ({evaluation.objections_analysis.length})
+                              Análise Detalhada de Objeções ({evaluation.objections_analysis.length})
                             </summary>
                             <div className="mt-4 space-y-4">
                               {evaluation.objections_analysis.map((obj: any, idx: number) => (
-                                <div key={idx} className="bg-gray-900/50 rounded-lg p-3 border border-purple-500/10">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-semibold text-purple-400 uppercase">{obj.objection_type}</span>
-                                    <span className="text-lg font-bold text-white">{obj.score}/10</span>
+                                <div key={idx} className="bg-gray-900/50 rounded-lg p-4 border border-purple-500/10">
+                                  {/* Header com tipo e score */}
+                                  <div className="flex items-center justify-between mb-3">
+                                    <span className="text-sm font-semibold text-purple-400 uppercase bg-purple-500/10 px-2 py-1 rounded">
+                                      {obj.objection_type}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-2xl font-bold text-white">{obj.score}</span>
+                                      <span className="text-gray-400">/10</span>
+                                    </div>
                                   </div>
-                                  <p className="text-sm text-gray-300 mb-2 italic">"{obj.objection_text}"</p>
-                                  <p className="text-xs text-gray-400">{obj.detailed_analysis}</p>
+
+                                  {/* Texto da objeção */}
+                                  <div className="bg-gray-800/50 rounded-lg p-3 mb-3 border-l-2 border-purple-500/30">
+                                    <p className="text-sm text-gray-300 italic">
+                                      <span className="text-purple-400 mr-1">Cliente:</span>
+                                      "{obj.objection_text}"
+                                    </p>
+                                  </div>
+
+                                  {/* Análise detalhada */}
+                                  <div className="mb-3">
+                                    <h6 className="text-xs font-semibold text-gray-400 uppercase mb-1">Análise</h6>
+                                    <p className="text-sm text-gray-300 leading-relaxed">{obj.detailed_analysis}</p>
+                                  </div>
+
+                                  {/* Erros críticos */}
+                                  {obj.critical_errors?.length > 0 && (
+                                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-3">
+                                      <h6 className="text-xs font-semibold text-red-400 uppercase mb-2">⚠️ Erros Críticos</h6>
+                                      <ul className="space-y-1">
+                                        {obj.critical_errors.map((error: string, i: number) => (
+                                          <li key={i} className="text-sm text-red-300 flex items-start">
+                                            <span className="text-red-400 mr-2">•</span>
+                                            <span>{error}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {/* Resposta ideal */}
+                                  {obj.ideal_response && (
+                                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                                      <h6 className="text-xs font-semibold text-green-400 uppercase mb-2">✅ Resposta Ideal</h6>
+                                      <p className="text-sm text-green-300 italic leading-relaxed">"{obj.ideal_response}"</p>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>

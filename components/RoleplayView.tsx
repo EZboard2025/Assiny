@@ -88,6 +88,12 @@ export default function RoleplayView() {
         }
       }
 
+      // Formatar objeções com suas formas de quebra
+      const objectionsWithRebuttals = selectedObjectionsData.map(o => ({
+        name: o.name,
+        rebuttals: o.rebuttals || []
+      }))
+
       // Criar nova thread com configuração
       const response = await fetch('/api/roleplay/chat', {
         method: 'POST',
@@ -99,7 +105,7 @@ export default function RoleplayView() {
             age,
             temperament,
             segment: personaDescription || 'Não especificado',
-            objections: selectedObjectionsData.map(o => o.name),
+            objections: objectionsWithRebuttals,
           },
         }),
       })
@@ -118,7 +124,7 @@ export default function RoleplayView() {
         age,
         temperament,
         segment: personaDescription || 'Não especificado',
-        objections: selectedObjectionsData.map(o => o.name),
+        objections: objectionsWithRebuttals,
       })
 
       if (session) {
@@ -1392,7 +1398,11 @@ export default function RoleplayView() {
                     <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-2xl p-5">
                       <h3 className="text-center text-xs text-gray-400 mb-2">Performance Geral</h3>
                       <div className="text-center">
-                        <div className="text-5xl font-bold text-white mb-2">{evaluation.overall_score}/10</div>
+                        <div className="text-5xl font-bold text-white mb-2">
+                          {evaluation.overall_score !== undefined && evaluation.overall_score !== null
+                            ? `${(evaluation.overall_score / 10).toFixed(1)}/10`
+                            : 'N/A'}
+                        </div>
                         <div className="inline-block px-3 py-1 bg-purple-600/30 rounded-full text-xs text-purple-300 font-medium">
                           {evaluation.performance_level === 'legendary' && 'Lendário'}
                           {evaluation.performance_level === 'excellent' && 'Excelente'}

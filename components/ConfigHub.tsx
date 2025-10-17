@@ -11,6 +11,8 @@ import {
   setCompanyType,
   getObjections,
   addObjection,
+  updateObjection,
+  updateObjectionScore,
   deleteObjection,
   getPersonas,
   addPersona,
@@ -31,12 +33,20 @@ function ConfigurationInterface({
   personaEvaluation,
   setPersonaEvaluation,
   showPersonaEvaluationModal,
-  setShowPersonaEvaluationModal
+  setShowPersonaEvaluationModal,
+  objectionEvaluation,
+  setObjectionEvaluation,
+  showObjectionEvaluationModal,
+  setShowObjectionEvaluationModal
 }: {
   personaEvaluation: any
   setPersonaEvaluation: (val: any) => void
   showPersonaEvaluationModal: boolean
   setShowPersonaEvaluationModal: (val: boolean) => void
+  objectionEvaluation: any
+  setObjectionEvaluation: (val: any) => void
+  showObjectionEvaluationModal: boolean
+  setShowObjectionEvaluationModal: (val: boolean) => void
 }) {
   const [activeTab, setActiveTab] = useState<'employees' | 'business-type' | 'personas' | 'objections' | 'files'>('employees')
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -51,6 +61,10 @@ function ConfigurationInterface({
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null)
   const [objections, setObjections] = useState<Objection[]>([])
   const [newObjection, setNewObjection] = useState('')
+  const [newRebuttal, setNewRebuttal] = useState('')
+  const [editingObjectionId, setEditingObjectionId] = useState<string | null>(null)
+  const [expandedObjections, setExpandedObjections] = useState<Set<string>>(new Set())
+  const [evaluatingObjection, setEvaluatingObjection] = useState(false)
   const [loading, setLoading] = useState(true)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
@@ -398,11 +412,44 @@ function ConfigurationInterface({
 
   const handleAddObjection = async () => {
     if (newObjection.trim()) {
-      const objection = await addObjection(newObjection.trim())
+      const objection = await addObjection(newObjection.trim(), [])
       if (objection) {
         setObjections([...objections, objection])
         setNewObjection('')
+        setEditingObjectionId(objection.id)
+        setExpandedObjections(new Set([objection.id]))
       }
+    }
+  }
+
+  const handleAddRebuttal = async (objectionId: string) => {
+    if (!newRebuttal.trim()) return
+
+    const objection = objections.find(o => o.id === objectionId)
+    if (!objection) return
+
+    const updatedRebuttals = [...(objection.rebuttals || []), newRebuttal.trim()]
+    const success = await updateObjection(objectionId, objection.name, updatedRebuttals)
+
+    if (success) {
+      setObjections(objections.map(o =>
+        o.id === objectionId ? { ...o, rebuttals: updatedRebuttals } : o
+      ))
+      setNewRebuttal('')
+    }
+  }
+
+  const handleRemoveRebuttal = async (objectionId: string, rebuttalIndex: number) => {
+    const objection = objections.find(o => o.id === objectionId)
+    if (!objection) return
+
+    const updatedRebuttals = objection.rebuttals.filter((_, i) => i !== rebuttalIndex)
+    const success = await updateObjection(objectionId, objection.name, updatedRebuttals)
+
+    if (success) {
+      setObjections(objections.map(o =>
+        o.id === objectionId ? { ...o, rebuttals: updatedRebuttals } : o
+      ))
     }
   }
 
@@ -411,6 +458,96 @@ function ConfigurationInterface({
     const success = await deleteObjection(id)
     if (success) {
       setObjections(objections.filter(o => o.id !== id))
+      setExpandedObjections(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
+    }
+  }
+
+  const toggleObjectionExpanded = (id: string) => {
+    setExpandedObjections(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const handleEvaluateObjection = async (objection: Objection) => {
+    setEvaluatingObjection(true)
+    setObjectionEvaluation(null)
+
+    try {
+      console.log('🔍 Iniciando avaliação da objeção:', objection.name)
+
+      // Formatar como texto único
+      let objectionText = `OBJEÇÃO:\n${objection.name}\n\nFORMAS DE QUEBRAR:`
+
+      if (objection.rebuttals && objection.rebuttals.length > 0) {
+        objection.rebuttals.forEach((rebuttal, index) => {
+          objectionText += `\n${index + 1}. ${rebuttal}`
+        })
+      } else {
+        objectionText += `\nNenhuma forma de quebrar cadastrada.`
+      }
+
+      const payload = {
+        objecao_completa: objectionText
+      }
+
+      console.log('📤 Enviando para N8N:', payload)
+
+      const response = await fetch('https://ezboard.app.n8n.cloud/webhook/ed84cced-6bf5-4c4d-87e7-4ca3057be871', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log('📥 Resposta N8N:', result)
+
+      // Parse do formato N8N
+      let evaluation = result
+      if (Array.isArray(result) && result[0]?.output) {
+        const outputString = result[0].output
+        evaluation = JSON.parse(outputString)
+      } else if (result?.output && typeof result.output === 'string') {
+        evaluation = JSON.parse(result.output)
+      }
+
+      console.log('✅ Avaliação processada:', evaluation)
+
+      // Salvar score no banco de dados
+      if (evaluation?.nota_final !== undefined) {
+        const success = await updateObjectionScore(objection.id, evaluation.nota_final)
+        if (success) {
+          console.log('💾 Score salvo no banco:', evaluation.nota_final)
+          // Atualizar state local
+          setObjections(objections.map(o =>
+            o.id === objection.id ? { ...o, evaluation_score: evaluation.nota_final } : o
+          ))
+        }
+      }
+
+      setObjectionEvaluation(evaluation)
+      setShowObjectionEvaluationModal(true)
+
+    } catch (error) {
+      console.error('💥 Erro ao avaliar objeção:', error)
+      alert('Erro ao conectar com o serviço de avaliação')
+    } finally {
+      setEvaluatingObjection(false)
     }
   }
 
@@ -1045,22 +1182,127 @@ function ConfigurationInterface({
           <div className="space-y-6">
             <div>
               <h3 className="text-xl font-bold mb-4">Principais Objeções</h3>
+              <p className="text-gray-400 mb-6 text-sm">
+                Registre objeções comuns e adicione múltiplas formas de quebrá-las para cada uma.
+              </p>
 
               {/* Lista de objeções */}
               {objections.length > 0 && (
-                <div className="mb-4 space-y-2">
+                <div className="mb-4 space-y-3">
                   {objections.map((objection) => (
                     <div
                       key={objection.id}
-                      className="flex items-center justify-between bg-gray-900/50 border border-purple-500/20 rounded-xl px-4 py-3"
+                      className="bg-gray-900/50 border border-purple-500/20 rounded-xl overflow-hidden"
                     >
-                      <span className="text-gray-300">{objection.name}</span>
-                      <button
-                        onClick={() => handleRemoveObjection(objection.id)}
-                        className="text-red-400 hover:text-red-300 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Header da objeção */}
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          <button
+                            onClick={() => toggleObjectionExpanded(objection.id)}
+                            className="text-purple-400 hover:text-purple-300 transition-colors"
+                          >
+                            <svg
+                              className={`w-5 h-5 transform transition-transform ${expandedObjections.has(objection.id) ? 'rotate-90' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                          <div className="flex-1">
+                            <span className="text-gray-300 font-medium">{objection.name}</span>
+                            <span className="text-gray-500 text-sm ml-2">
+                              ({objection.rebuttals?.length || 0} {objection.rebuttals?.length === 1 ? 'forma de quebra' : 'formas de quebra'})
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* Score Badge */}
+                          {objection.evaluation_score !== null && objection.evaluation_score !== undefined && (
+                            <div className={`px-2 py-1 rounded text-xs font-bold ${
+                              objection.evaluation_score >= 7 ? 'bg-green-600/20 text-green-400' :
+                              objection.evaluation_score >= 4 ? 'bg-yellow-600/20 text-yellow-400' :
+                              'bg-red-600/20 text-red-400'
+                            }`}>
+                              {objection.evaluation_score.toFixed(1)}
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => handleEvaluateObjection(objection)}
+                            disabled={evaluatingObjection}
+                            className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-lg text-xs font-medium text-green-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {evaluatingObjection ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              objection.evaluation_score !== null && objection.evaluation_score !== undefined ? 'REAVALIAR' : 'AVALIAR'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleRemoveObjection(objection.id)}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Conteúdo expandido */}
+                      {expandedObjections.has(objection.id) && (
+                        <div className="border-t border-purple-500/20 px-4 py-3 space-y-3 bg-gray-800/30">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-400 mb-2">Formas de Quebrar:</h4>
+
+                            {/* Lista de rebuttals */}
+                            {objection.rebuttals && objection.rebuttals.length > 0 ? (
+                              <div className="space-y-2 mb-3">
+                                {objection.rebuttals.map((rebuttal, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-start gap-2 bg-gray-900/50 border border-purple-500/10 rounded-lg px-3 py-2"
+                                  >
+                                    <span className="text-purple-400 font-bold text-sm mt-0.5">{index + 1}.</span>
+                                    <span className="text-gray-300 text-sm flex-1">{rebuttal}</span>
+                                    <button
+                                      onClick={() => handleRemoveRebuttal(objection.id, index)}
+                                      className="text-red-400 hover:text-red-300 transition-colors"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-gray-500 text-sm mb-3 italic">Nenhuma forma de quebra registrada ainda.</p>
+                            )}
+
+                            {/* Adicionar nova forma de quebra */}
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={editingObjectionId === objection.id ? newRebuttal : ''}
+                                onFocus={() => setEditingObjectionId(objection.id)}
+                                onChange={(e) => setNewRebuttal(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleAddRebuttal(objection.id)
+                                  }
+                                }}
+                                className="flex-1 px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                                placeholder="Ex: Apresentar cálculo de ROI detalhado mostrando retorno em 6 meses com base em cases reais do segmento"
+                              />
+                              <button
+                                onClick={() => handleAddRebuttal(objection.id)}
+                                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 rounded-lg font-medium hover:scale-105 transition-transform text-sm"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1074,7 +1316,7 @@ function ConfigurationInterface({
                   onChange={(e) => setNewObjection(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddObjection()}
                   className="flex-1 px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
-                  placeholder="Ex: Preço muito alto, Não tenho tempo agora..."
+                  placeholder="Ex: Cliente diz que o preço está acima do orçamento disponível e questiona se terá ROI rápido o suficiente para justificar"
                 />
                 <button
                   onClick={handleAddObjection}
@@ -1376,6 +1618,10 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
   } | null>(null)
   const [showPersonaEvaluationModal, setShowPersonaEvaluationModal] = useState(false)
 
+  // Estados para avaliação de objeção
+  const [objectionEvaluation, setObjectionEvaluation] = useState<any>(null)
+  const [showObjectionEvaluationModal, setShowObjectionEvaluationModal] = useState(false)
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -1469,6 +1715,10 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 setPersonaEvaluation={setPersonaEvaluation}
                 showPersonaEvaluationModal={showPersonaEvaluationModal}
                 setShowPersonaEvaluationModal={setShowPersonaEvaluationModal}
+                objectionEvaluation={objectionEvaluation}
+                setObjectionEvaluation={setObjectionEvaluation}
+                showObjectionEvaluationModal={showObjectionEvaluationModal}
+                setShowObjectionEvaluationModal={setShowObjectionEvaluationModal}
               />
             )}
           </div>
@@ -1698,6 +1948,69 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Modal de Avaliação de Objeção - Side Panel (fora do ConfigHub) */}
+    {showObjectionEvaluationModal && objectionEvaluation && (
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4">
+        <div className="h-full bg-gray-900 border border-purple-500/30 rounded-xl shadow-2xl overflow-y-auto animate-slide-in">
+          <div className="sticky top-0 bg-gray-900 border-b border-purple-500/30 p-4 flex items-center justify-between z-10">
+            <h3 className="font-bold text-white">Avaliação da Objeção</h3>
+            <button
+              onClick={() => setShowObjectionEvaluationModal(false)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Score Geral */}
+            <div className={`rounded-xl p-4 text-center ${
+              objectionEvaluation.status === 'APROVADA' ? 'bg-green-500/20 border border-green-500/30' :
+              objectionEvaluation.status === 'REVISAR' ? 'bg-yellow-500/20 border border-yellow-500/30' :
+              'bg-red-500/20 border border-red-500/30'
+            }`}>
+              <div className="text-4xl font-bold text-white mb-2">
+                {objectionEvaluation.nota_final?.toFixed(1)}/10
+              </div>
+              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                objectionEvaluation.status === 'APROVADA' ? 'bg-green-600/30 text-green-300' :
+                objectionEvaluation.status === 'REVISAR' ? 'bg-yellow-600/30 text-yellow-300' :
+                'bg-red-600/30 text-red-300'
+              }`}>
+                {objectionEvaluation.status}
+              </div>
+            </div>
+
+            {/* Como Melhorar */}
+            {objectionEvaluation.como_melhorar?.length > 0 && (
+              <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4">
+                <h4 className="font-semibold text-purple-400 mb-3 text-sm">
+                  💡 Como Melhorar
+                </h4>
+                <ul className="space-y-2">
+                  {objectionEvaluation.como_melhorar.map((sugestao: string, idx: number) => (
+                    <li key={idx} className="text-sm text-gray-300 flex items-start">
+                      <span className="text-purple-400 mr-2 font-bold">{idx + 1}.</span>
+                      <span className="flex-1">{sugestao}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Mensagem de Aprovação */}
+            {objectionEvaluation.status === 'APROVADA' && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-center">
+                <p className="text-green-300 text-sm">
+                  ✅ Objeção bem estruturada e pronta para usar no treinamento!
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

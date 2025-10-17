@@ -33,15 +33,29 @@ export async function POST(request: NextRequest) {
       console.log('✅ Thread criada:', thread.id)
 
       // Montar mensagem de contexto
-      const objectionsList = config.objections?.length > 0
-        ? config.objections.join(', ')
-        : 'Nenhuma objeção específica'
+      let objectionsText = 'Nenhuma objeção específica'
+      if (config.objections?.length > 0) {
+        objectionsText = config.objections.map((obj: any) => {
+          if (typeof obj === 'string') {
+            return obj
+          }
+          // Formato novo: { name: string, rebuttals: string[] }
+          let text = obj.name
+          if (obj.rebuttals && obj.rebuttals.length > 0) {
+            text += `\n  Formas de quebrar esta objeção:\n`
+            text += obj.rebuttals.map((r: string, i: number) => `  ${i + 1}. ${r}`).join('\n')
+          }
+          return text
+        }).join('\n\n')
+      }
 
       const contextMessage = `Você está em uma simulação de venda. Características do cliente:
 - Idade: ${config.age} anos
 - Temperamento: ${config.temperament}
 - Segmento: ${config.segment}
-- Objeções: ${objectionsList}
+
+Objeções que o cliente pode usar:
+${objectionsText}
 
 Interprete este personagem e inicie a conversa como cliente.`
 

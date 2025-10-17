@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       })
       .join('\n')
 
-    // Preparar contexto
+    // Preparar contexto (mantido para compatibilidade)
     const config = session.config as any
     const context = {
       age: config.age,
@@ -56,14 +56,49 @@ export async function POST(request: Request) {
       objections: config.objections || []
     }
 
+    // Preparar perfil completo do cliente simulado (em texto formatado)
+    let client_profile = `PERFIL DO CLIENTE SIMULADO
+
+DADOS DEMOGRÁFICOS:
+- Idade: ${config.age}
+- Temperamento: ${config.temperament}
+- Persona/Segmento: ${config.segment || config.persona || 'Não especificado'}
+
+OBJEÇÕES TRABALHADAS:`
+
+    if (config.objections && config.objections.length > 0) {
+      config.objections.forEach((obj: any, index: number) => {
+        // Se for string (formato antigo)
+        if (typeof obj === 'string') {
+          client_profile += `\n\n${index + 1}. ${obj}`
+          client_profile += `\n   Formas de quebrar: Não cadastradas`
+        } else {
+          // Formato novo com rebuttals
+          client_profile += `\n\n${index + 1}. ${obj.name}`
+          if (obj.rebuttals && obj.rebuttals.length > 0) {
+            client_profile += `\n   Formas de quebrar:`
+            obj.rebuttals.forEach((rebuttal: string, i: number) => {
+              client_profile += `\n   ${String.fromCharCode(97 + i)}) ${rebuttal}`
+            })
+          } else {
+            client_profile += `\n   Formas de quebrar: Não cadastradas`
+          }
+        }
+      })
+    } else {
+      client_profile += `\n\nNenhuma objeção específica foi configurada para este roleplay.`
+    }
+
     console.log('📤 Enviando para N8N...')
-    console.log('Contexto:', context)
+    console.log('Contexto:', JSON.stringify(context, null, 2))
+    console.log('Perfil do Cliente:\n', client_profile)
     console.log('Transcrição:', transcription.substring(0, 200) + '...')
 
     // Enviar para N8N
     const n8nPayload = {
       transcription,
-      context
+      context,
+      client_profile
     }
 
     console.log('📡 Enviando payload para N8N:', JSON.stringify(n8nPayload, null, 2))
