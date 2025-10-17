@@ -38,6 +38,7 @@ function ConfigurationInterface() {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [showPersonaForm, setShowPersonaForm] = useState(false)
   const [newPersona, setNewPersona] = useState<Partial<PersonaB2B> | Partial<PersonaB2C>>({})
+  const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null)
   const [objections, setObjections] = useState<Objection[]>([])
   const [newObjection, setNewObjection] = useState('')
   const [loading, setLoading] = useState(true)
@@ -210,11 +211,35 @@ function ConfigurationInterface() {
         alert('Por favor, preencha o cargo')
         return
       }
-      const result = await addPersona({ ...persona, business_type: 'B2B' })
-      if (result) {
-        setPersonas([...personas, result])
+
+      if (editingPersonaId) {
+        // Atualizar persona existente
+        const { supabase } = await import('@/lib/supabase')
+        const { data, error } = await supabase
+          .from('personas')
+          .update({ ...persona, business_type: 'B2B' })
+          .eq('id', editingPersonaId)
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Erro ao atualizar persona:', error)
+          alert('Erro ao atualizar persona!')
+          return
+        }
+
+        setPersonas(personas.map(p => p.id === editingPersonaId ? data : p))
         setNewPersona({})
         setShowPersonaForm(false)
+        setEditingPersonaId(null)
+      } else {
+        // Criar nova persona
+        const result = await addPersona({ ...persona, business_type: 'B2B' })
+        if (result) {
+          setPersonas([...personas, result])
+          setNewPersona({})
+          setShowPersonaForm(false)
+        }
       }
     } else {
       const persona = newPersona as PersonaB2C
@@ -222,11 +247,35 @@ function ConfigurationInterface() {
         alert('Por favor, preencha a profissão')
         return
       }
-      const result = await addPersona({ ...persona, business_type: 'B2C' })
-      if (result) {
-        setPersonas([...personas, result])
+
+      if (editingPersonaId) {
+        // Atualizar persona existente
+        const { supabase } = await import('@/lib/supabase')
+        const { data, error } = await supabase
+          .from('personas')
+          .update({ ...persona, business_type: 'B2C' })
+          .eq('id', editingPersonaId)
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Erro ao atualizar persona:', error)
+          alert('Erro ao atualizar persona!')
+          return
+        }
+
+        setPersonas(personas.map(p => p.id === editingPersonaId ? data : p))
         setNewPersona({})
         setShowPersonaForm(false)
+        setEditingPersonaId(null)
+      } else {
+        // Criar nova persona
+        const result = await addPersona({ ...persona, business_type: 'B2C' })
+        if (result) {
+          setPersonas([...personas, result])
+          setNewPersona({})
+          setShowPersonaForm(false)
+        }
       }
     }
   }
@@ -236,6 +285,45 @@ function ConfigurationInterface() {
     const success = await deletePersona(id)
     if (success) {
       setPersonas(personas.filter(p => p.id !== id))
+    }
+  }
+
+  const handleEvaluatePersona = async (persona: Persona) => {
+    try {
+      console.log('📊 Enviando persona para avaliação...', persona)
+
+      // Juntar todos os campos do formulário em um único texto
+      let personaText = ''
+
+      if (persona.business_type === 'B2B') {
+        const personaB2B = persona as PersonaB2B
+        personaText = `Tipo de Negócio: B2B\n\nCargo: ${personaB2B.job_title || 'N/A'}\n\nTipo de Empresa: ${personaB2B.company_type || 'N/A'}\n\nContexto: ${personaB2B.context || 'N/A'}\n\nO que busca para a empresa: ${personaB2B.company_goals || 'N/A'}\n\nPrincipais desafios/dores do negócio: ${personaB2B.business_challenges || 'N/A'}`
+      } else {
+        const personaB2C = persona as PersonaB2C
+        personaText = `Tipo de Negócio: B2C\n\nProfissão: ${personaB2C.profession || 'N/A'}\n\nContexto: ${personaB2C.context || 'N/A'}\n\nO que busca/valoriza: ${personaB2C.what_seeks || 'N/A'}\n\nPrincipais dores/problemas: ${personaB2C.main_pains || 'N/A'}`
+      }
+
+      const response = await fetch('https://ezboard.app.n8n.cloud/webhook-test/persona-consultor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          persona: personaText
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('✅ Persona avaliada com sucesso:', result)
+        alert('Persona avaliada com sucesso!')
+      } else {
+        console.error('❌ Erro ao avaliar persona:', response.status)
+        alert(`Erro ao avaliar persona (${response.status})`)
+      }
+    } catch (error) {
+      console.error('💥 Erro ao avaliar persona:', error)
+      alert('Erro ao conectar com o serviço de avaliação')
     }
   }
 
@@ -563,6 +651,7 @@ function ConfigurationInterface() {
                   onClick={() => {
                     setShowPersonaForm(true)
                     setNewPersona({})
+                    setEditingPersonaId(null)
                   }}
                   className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
                 >
@@ -572,7 +661,7 @@ function ConfigurationInterface() {
               </div>
 
               {/* Lista de personas */}
-              {personas.filter(p => p.business_type === businessType).length > 0 && (
+              {!showPersonaForm && personas.filter(p => p.business_type === businessType).length > 0 && (
                 <div className="mb-4 space-y-4">
                   {personas.filter(p => p.business_type === businessType).map((persona) => (
                     <div
@@ -646,29 +735,52 @@ function ConfigurationInterface() {
                           )}
                         </div>
 
-                        {/* Botão deletar */}
-                        <button
-                          onClick={() => handleDeletePersona(persona.id!)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg transition-all flex-shrink-0"
-                          title="Deletar persona"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
+                        {/* Botões de ação */}
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleEvaluatePersona(persona)}
+                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg shadow-green-500/30"
+                            title="Avaliar persona"
+                          >
+                            AVALIAR PERSONA
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPersonaId(persona.id!)
+                              setNewPersona(persona)
+                              setShowPersonaForm(true)
+                            }}
+                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 p-2 rounded-lg transition-all"
+                            title="Editar persona"
+                          >
+                            <Settings className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePersona(persona.id!)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg transition-all"
+                            title="Deletar persona"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Formulário de Nova Persona */}
+              {/* Formulário de Nova/Editar Persona */}
               {showPersonaForm && (
                 <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6 space-y-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-bold">Nova Persona {businessType}</h4>
+                    <h4 className="text-lg font-bold">
+                      {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType}
+                    </h4>
                     <button
                       onClick={() => {
                         setShowPersonaForm(false)
                         setNewPersona({})
+                        setEditingPersonaId(null)
                       }}
                       className="text-gray-400 hover:text-gray-300"
                     >
@@ -804,6 +916,7 @@ function ConfigurationInterface() {
                       onClick={() => {
                         setShowPersonaForm(false)
                         setNewPersona({})
+                        setEditingPersonaId(null)
                       }}
                       className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:border-purple-500/40 transition-all"
                     >
@@ -813,7 +926,7 @@ function ConfigurationInterface() {
                       onClick={handleSavePersona}
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
                     >
-                      Salvar Persona
+                      {editingPersonaId ? 'Atualizar' : 'Salvar'} Persona
                     </button>
                   </div>
                 </div>
