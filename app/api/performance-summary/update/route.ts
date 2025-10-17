@@ -92,42 +92,39 @@ export async function POST(request: NextRequest) {
     const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
     const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
 
-    allEvaluations.forEach(e => {
+    allEvaluations.forEach((e, index) => {
       if (e?.spin_evaluation) {
         const spin = e.spin_evaluation
         const sessionScores = []
 
-        // Normalizar notas SPIN para escala 0-10 e coletar para média
+        // CRÍTICO: Usar !== undefined (não truthy) para incluir scores zero
         if (spin.S?.final_score !== undefined) {
-          let score = spin.S.final_score
-          if (score > 10) score = score / 10
+          const score = spin.S.final_score
           spinTotals.S += score
           spinCounts.S++
           sessionScores.push(score)
         }
         if (spin.P?.final_score !== undefined) {
-          let score = spin.P.final_score
-          if (score > 10) score = score / 10
+          const score = spin.P.final_score
           spinTotals.P += score
           spinCounts.P++
           sessionScores.push(score)
         }
         if (spin.I?.final_score !== undefined) {
-          let score = spin.I.final_score
-          if (score > 10) score = score / 10
+          const score = spin.I.final_score
           spinTotals.I += score
           spinCounts.I++
           sessionScores.push(score)
         }
         if (spin.N?.final_score !== undefined) {
-          let score = spin.N.final_score
-          if (score > 10) score = score / 10
+          const score = spin.N.final_score
           spinTotals.N += score
           spinCounts.N++
           sessionScores.push(score)
         }
 
         // Calcular média geral desta sessão (média das 4 notas SPIN)
+        // Mesma lógica que PerfilView usa
         if (sessionScores.length > 0) {
           const avgScore = sessionScores.reduce((sum, s) => sum + s, 0) / sessionScores.length
           totalScore += avgScore

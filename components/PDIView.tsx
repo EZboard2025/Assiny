@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface PDIData {
   versao?: string
@@ -39,9 +39,261 @@ interface PDIData {
 }
 
 export default function PDIView() {
-  const [pdiData] = useState<PDIData | null>(null)
-  const [isLoading] = useState(false)
+  const [pdiData, setPdiData] = useState<PDIData | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [lastPdiDate, setLastPdiDate] = useState<string | null>(null)
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
   const hasData = pdiData !== null
+
+  // Carregar PDI mais recente ao montar o componente
+  useEffect(() => {
+    const loadLatestPDI = async () => {
+      try {
+        const { supabase } = await import('@/lib/supabase')
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) return
+
+        // Buscar PDI ativo mais recente
+        const { data: pdiRecord, error } = await supabase
+          .from('pdis')
+          .select('pdi_json, created_at')
+          .eq('user_id', user.id)
+          .eq('status', 'ativo')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (error || !pdiRecord) {
+          console.log('Nenhum PDI encontrado para este usuário')
+          return
+        }
+
+        // Carregar o PDI do banco
+        setPdiData(pdiRecord.pdi_json as PDIData)
+        setLastPdiDate(pdiRecord.created_at)
+
+        // Calcular cooldown
+        const createdAt = new Date(pdiRecord.created_at)
+        const now = new Date()
+        const diffInDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+        const remaining = Math.max(0, 7 - diffInDays)
+        setCooldownRemaining(remaining)
+
+        console.log('PDI carregado do banco:', pdiRecord.pdi_json)
+      } catch (error) {
+        console.error('Erro ao carregar PDI:', error)
+      }
+    }
+
+    loadLatestPDI()
+  }, [])
+
+  const handleGeneratePDI = async () => {
+    // Verificar cooldown
+    if (cooldownRemaining > 0) {
+      alert(`Você só pode gerar um novo PDI após ${cooldownRemaining} dia(s). Aguarde o período de cooldown.`)
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      // Buscar dados do usuário autenticado
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        alert('Usuário não autenticado')
+        setIsLoading(false)
+        return
+      }
+
+      // Deletar PDI antigo antes de criar novo
+      if (hasData) {
+        const { error: deleteError } = await supabase
+          .from('pdis')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('status', 'ativo')
+
+        if (deleteError) {
+          console.error('Erro ao deletar PDI antigo:', deleteError)
+          alert('Erro ao remover PDI antigo. Tente novamente.')
+          setIsLoading(false)
+          return
+        }
+        console.log('PDI antigo removido com sucesso')
+      }
+
+      // Buscar resumo de performance do usuário
+      const { data: performanceSummary, error } = await supabase
+        .from('user_performance_summaries')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (error || !performanceSummary) {
+        alert('Você precisa completar algumas sessões de roleplay antes de gerar o PDI.')
+        setIsLoading(false)
+        return
+      }
+
+      // Formatar resumo de performance em texto único
+      const userName = user.user_metadata?.name || user.email?.split('@')[0] || 'Vendedor'
+
+      // Extrair médias SPIN corretamente (a tabela usa colunas separadas, não um objeto)
+      const spinS = performanceSummary.spin_s_average !== undefined && performanceSummary.spin_s_average !== null
+        ? parseFloat(performanceSummary.spin_s_average)
+        : 0
+      const spinP = performanceSummary.spin_p_average !== undefined && performanceSummary.spin_p_average !== null
+        ? parseFloat(performanceSummary.spin_p_average)
+        : 0
+      const spinI = performanceSummary.spin_i_average !== undefined && performanceSummary.spin_i_average !== null
+        ? parseFloat(performanceSummary.spin_i_average)
+        : 0
+      const spinN = performanceSummary.spin_n_average !== undefined && performanceSummary.spin_n_average !== null
+        ? parseFloat(performanceSummary.spin_n_average)
+        : 0
+
+      // Extrair pontos fortes (podem ser objetos ou strings)
+      const topStrengths = performanceSummary.top_strengths || []
+      const strengthsList = topStrengths.map((item: any) => {
+        if (typeof item === 'string') return item
+        if (item.strength) return item.strength
+        if (item.text) return item.text
+        return JSON.stringify(item)
+      }).filter((s: string) => s && s.trim() !== '')
+
+      // Extrair gaps críticos (podem ser objetos ou strings)
+      const criticalGaps = performanceSummary.critical_gaps || []
+      const gapsList = criticalGaps.map((item: any) => {
+        if (typeof item === 'string') return item
+        if (item.gap) return item.gap
+        if (item.text) return item.text
+        return JSON.stringify(item)
+      }).filter((g: string) => g && g.trim() !== '')
+
+      const resumoTexto = `
+RESUMO DE PERFORMANCE - ${userName}
+
+DADOS GERAIS:
+- Nome: ${userName}
+- Empresa: Assiny
+- Total de Sessões: ${performanceSummary.total_sessions}
+- Nota Média Geral: ${performanceSummary.overall_average?.toFixed(1) || 'N/A'}
+
+MÉDIAS SPIN:
+- Situação (S): ${spinS.toFixed(1)}
+- Problema (P): ${spinP.toFixed(1)}
+- Implicação (I): ${spinI.toFixed(1)}
+- Necessidade (N): ${spinN.toFixed(1)}
+
+PONTOS FORTES RECORRENTES:
+${strengthsList.length > 0 ? strengthsList.map((s: string) => `- ${s}`).join('\n') : '- Nenhum ponto forte identificado ainda'}
+
+GAPS CRÍTICOS RECORRENTES:
+${gapsList.length > 0 ? gapsList.map((g: string) => `- ${g}`).join('\n') : '- Nenhum gap identificado ainda'}
+
+MELHORIAS PRIORITÁRIAS:
+${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.priority_improvements.map((improvement: any, index: number) =>
+  `${index + 1}. Área: ${improvement.area || 'N/A'}
+   - Prioridade: ${improvement.priority || 'N/A'}
+   - Gap Atual: ${improvement.current_gap || 'N/A'}
+   - Ação Sugerida: ${improvement.action_plan || 'N/A'}`
+).join('\n\n') : '- Nenhuma melhoria prioritária identificada ainda'}
+      `.trim()
+
+      console.log('=== DEBUG PDI ===')
+      console.log('Performance Summary Raw:', performanceSummary)
+      console.log('SPIN Averages:', { spinS, spinP, spinI, spinN })
+      console.log('Strengths List:', strengthsList)
+      console.log('Gaps List:', gapsList)
+      console.log('Resumo formatado:', resumoTexto)
+
+      // Enviar para o webhook do N8N (produção)
+      const response = await fetch('https://ezboard.app.n8n.cloud/webhook/pdi/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          userName: userName,
+          resumoPerformance: resumoTexto
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao gerar PDI')
+      }
+
+      const pdiResult = await response.json()
+
+      // Processar resposta do N8N (pode vir em diferentes formatos)
+      let parsedPDI = pdiResult
+      if (Array.isArray(pdiResult) && pdiResult[0]?.output) {
+        parsedPDI = JSON.parse(pdiResult[0].output)
+      } else if (pdiResult?.output && typeof pdiResult.output === 'string') {
+        parsedPDI = JSON.parse(pdiResult.output)
+      }
+
+      // Adicionar dados do vendedor se não vieram no PDI
+      if (!parsedPDI.vendedor) {
+        parsedPDI.vendedor = {
+          nome: userName,
+          empresa: 'Assiny',
+          total_sessoes: performanceSummary.total_sessions
+        }
+      }
+
+      // Salvar PDI no banco de dados
+      const { error: insertError } = await supabase
+        .from('pdis')
+        .insert({
+          user_id: user.id,
+          vendedor_nome: parsedPDI.vendedor.nome,
+          vendedor_empresa: parsedPDI.vendedor.empresa,
+          total_sessoes: parsedPDI.vendedor.total_sessoes,
+          versao: parsedPDI.versao || 'pdi.7dias.v1',
+          periodo: parsedPDI.periodo,
+          gerado_em: parsedPDI.gerado_em,
+          nota_geral: parsedPDI.diagnostico.nota_geral,
+          resumo: parsedPDI.diagnostico.resumo,
+          nota_situacao: parsedPDI.notas_spin.situacao,
+          nota_problema: parsedPDI.notas_spin.problema,
+          nota_implicacao: parsedPDI.notas_spin.implicacao,
+          nota_necessidade: parsedPDI.notas_spin.necessidade,
+          meta_objetivo: parsedPDI.meta_7_dias.objetivo,
+          meta_nota_atual: parsedPDI.meta_7_dias.nota_atual,
+          meta_nota_meta: parsedPDI.meta_7_dias.nota_meta,
+          meta_como_medir: parsedPDI.meta_7_dias.como_medir,
+          acoes: parsedPDI.acoes,
+          checkpoint_quando: parsedPDI.checkpoint.quando,
+          checkpoint_como_avaliar: parsedPDI.checkpoint.como_avaliar,
+          proximos_passos: parsedPDI.proximos_passos,
+          status: 'ativo',
+          pdi_json: parsedPDI
+        })
+
+      if (insertError) {
+        console.error('Erro ao salvar PDI no banco:', insertError)
+        alert('PDI gerado com sucesso, mas houve um erro ao salvar. Tente novamente.')
+        return
+      }
+
+      console.log('PDI salvo no banco com sucesso!')
+      setPdiData(parsedPDI)
+
+      // Atualizar data do último PDI e resetar cooldown
+      setLastPdiDate(new Date().toISOString())
+      setCooldownRemaining(7)
+    } catch (error) {
+      console.error('Erro ao gerar PDI:', error)
+      alert('Erro ao gerar PDI. Tente novamente.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -56,8 +308,8 @@ export default function PDIView() {
     const labels = ['S', 'P', 'I', 'N']
     const values = [scores.situacao, scores.problema, scores.implicacao, scores.necessidade]
     const max = 10
-    const centerX = 100
-    const centerY = 100
+    const centerX = 110
+    const centerY = 110
     const radius = 70
     const angleStep = (Math.PI * 2) / 4
     const startAngle = -Math.PI / 2
@@ -72,14 +324,14 @@ export default function PDIView() {
 
     const labelPositions = labels.map((label, index) => {
       const angle = startAngle + angleStep * index
-      const r = radius + 20
+      const r = radius + 25
       const x = centerX + r * Math.cos(angle)
       const y = centerY + r * Math.sin(angle)
       return { label, x, y, value: values[index] }
     })
 
     return (
-      <svg viewBox="0 0 200 200" className="w-full h-full">
+      <svg viewBox="0 0 220 220" className="w-full h-full">
         {[0.25, 0.5, 0.75, 1].map((scale, i) => (
           <circle key={i} cx={centerX} cy={centerY} r={radius * scale} fill="none" stroke="#374151" strokeWidth="0.5" opacity="0.3" />
         ))}
@@ -109,22 +361,22 @@ export default function PDIView() {
 
   const renderEmptyRadarChart = () => {
     const labels = ['S', 'P', 'I', 'N']
-    const centerX = 100
-    const centerY = 100
+    const centerX = 110
+    const centerY = 110
     const radius = 70
     const angleStep = (Math.PI * 2) / 4
     const startAngle = -Math.PI / 2
 
     const labelPositions = labels.map((label, index) => {
       const angle = startAngle + angleStep * index
-      const r = radius + 20
+      const r = radius + 25
       const x = centerX + r * Math.cos(angle)
       const y = centerY + r * Math.sin(angle)
       return { label, x, y }
     })
 
     return (
-      <svg viewBox="0 0 200 200" className="w-full h-full opacity-30">
+      <svg viewBox="0 0 220 220" className="w-full h-full opacity-30">
         {[0.25, 0.5, 0.75, 1].map((scale, i) => (
           <circle key={i} cx={centerX} cy={centerY} r={radius * scale} fill="none" stroke="#374151" strokeWidth="0.5" />
         ))}
@@ -143,9 +395,9 @@ export default function PDIView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black text-white overflow-hidden relative">
-        {/* Animated background particles */}
-        <div className="absolute inset-0 overflow-hidden">
+      <div className="min-h-screen bg-black text-white relative">
+        {/* Animated background particles - fixed position */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="stars"></div>
           <div className="stars2"></div>
           <div className="stars3"></div>
@@ -162,15 +414,15 @@ export default function PDIView() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* Animated background particles */}
-      <div className="absolute inset-0 overflow-hidden">
+    <div className="min-h-screen bg-black text-white relative">
+      {/* Animated background particles - fixed position */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="stars"></div>
         <div className="stars2"></div>
         <div className="stars3"></div>
       </div>
 
-      <div className="relative z-10 p-4 md:p-8 overflow-y-auto min-h-screen">
+      <div className="relative z-10 p-4 md:p-8 min-h-screen">
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
 
         {/* Header */}
@@ -184,7 +436,51 @@ export default function PDIView() {
                 {hasData && pdiData.vendedor ? `${pdiData.vendedor.nome} • ${pdiData.vendedor.empresa}` : 'Aguardando dados...'}
               </p>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              {!hasData ? (
+                <button
+                  onClick={handleGeneratePDI}
+                  disabled={isLoading}
+                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-green-500/50 transition-all duration-300 hover:scale-105 disabled:scale-100 flex items-center gap-2 justify-center"
+                  style={{ boxShadow: '0 0 30px rgba(34, 197, 94, 0.5), 0 0 60px rgba(34, 197, 94, 0.3)' }}
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl">✨</span>
+                      Gerar PDI
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleGeneratePDI}
+                  disabled={isLoading || cooldownRemaining > 0}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105 disabled:scale-100 flex items-center gap-2 justify-center"
+                  title={cooldownRemaining > 0 ? `Disponível em ${cooldownRemaining} dia(s)` : 'Gerar novo PDI'}
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                      Gerando...
+                    </>
+                  ) : cooldownRemaining > 0 ? (
+                    <>
+                      <span className="text-2xl">🔒</span>
+                      Aguarde {cooldownRemaining} dia(s)
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl">🔄</span>
+                      Gerar Novo PDI
+                    </>
+                  )}
+                </button>
+              )}
               <span className="px-4 py-2 rounded-lg border font-semibold text-center bg-purple-500/20 text-purple-400 border-purple-500/30">
                 {hasData ? pdiData.periodo : '7 dias'}
               </span>
@@ -360,35 +656,15 @@ export default function PDIView() {
           </div>
         </div>
 
-        {/* Checkpoint e Próximos Passos */}
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Checkpoint */}
-          <div className="bg-gray-800/50 rounded-2xl p-6 md:p-8 border border-gray-700/50 shadow-xl">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="text-3xl">✅</span>
-              Checkpoint
-            </h2>
-            <div className="p-5 bg-gray-900/50 rounded-lg border border-gray-700">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-full bg-blue-900/30 border border-blue-500/30 flex items-center justify-center">
-                  <span className="text-blue-400 font-bold text-lg">{hasData ? pdiData.checkpoint.quando : '?'}</span>
-                </div>
-                <p className="text-blue-400 font-semibold">{hasData ? pdiData.checkpoint.quando : 'Data do checkpoint...'}</p>
-              </div>
-              <p className="text-gray-400 text-sm italic">{hasData ? pdiData.checkpoint.como_avaliar : 'Forma de avaliação será definida...'}</p>
-            </div>
-          </div>
-
-          {/* Próximos Passos */}
-          <div className="bg-gradient-to-r from-purple-900/60 to-blue-900/60 rounded-2xl p-6 md:p-8 border border-purple-500/40 shadow-xl">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="text-3xl">🚀</span>
-              Próximos Passos
-            </h2>
-            <p className="text-gray-300 leading-relaxed italic">
-              {hasData ? pdiData.proximos_passos : 'Orientações sobre os próximos passos aparecerão aqui após a geração do PDI...'}
-            </p>
-          </div>
+        {/* Próximos Passos */}
+        <div className="bg-gradient-to-r from-purple-900/60 to-blue-900/60 rounded-2xl p-6 md:p-8 border border-purple-500/40 shadow-xl">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <span className="text-3xl">🚀</span>
+            Próximos Passos
+          </h2>
+          <p className="text-gray-300 leading-relaxed italic">
+            {hasData ? pdiData.proximos_passos : 'Orientações sobre os próximos passos aparecerão aqui após a geração do PDI...'}
+          </p>
         </div>
 
         {/* Footer */}
