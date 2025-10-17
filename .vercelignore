@@ -1,0 +1,13 @@
+# Ignore Supabase Deno functions (not compatible with Vercel)
+supabase/functions/
+
+# Ignore SQL files
+*.sql
+
+# Ignore local env
+.env.local
+.env*.local
+
+# Ignore backup files
+*.backup
+CLAUDE.md.backup
