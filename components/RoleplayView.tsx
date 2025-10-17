@@ -686,6 +686,30 @@ export default function RoleplayView() {
                             console.log('🔍 executive_summary:', evaluation?.executive_summary?.substring(0, 100));
                             setEvaluation(evaluation);
                             setShowEvaluationSummary(true);
+
+                            // Atualizar resumo de performance após avaliação bem-sucedida
+                            console.log('📊 Atualizando resumo de performance...');
+                            try {
+                              const { supabase } = await import('@/lib/supabase')
+                              const { data: { user } } = await supabase.auth.getUser()
+
+                              if (user) {
+                                const updateResponse = await fetch('/api/performance-summary/update', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ userId: user.id })
+                                });
+
+                                if (updateResponse.ok) {
+                                  console.log('✅ Resumo de performance atualizado');
+                                } else {
+                                  console.warn('⚠️ Falha ao atualizar resumo de performance');
+                                }
+                              }
+                            } catch (perfError) {
+                              console.error('❌ Erro ao atualizar resumo de performance:', perfError);
+                              // Não bloqueia o fluxo principal
+                            }
                           } else {
                             const errorText = await evalResponse.text();
                             console.error('❌ Erro ao avaliar sessão - Status:', evalResponse.status);
