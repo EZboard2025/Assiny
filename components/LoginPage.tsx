@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import Image from 'next/image'
 
 interface LoginPageProps {
   onLogin: () => void
@@ -101,16 +100,20 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-3xl p-6 border border-emerald-500/30 shadow-2xl shadow-emerald-500/20">
               {/* Logo e Título */}
               <div className="text-center mb-6">
-                {/* Logo Next.js Image */}
-                <div className="flex items-center justify-center mb-4">
-                  <Image
-                    src="/images/ramppy-logo.png"
-                    alt="Ramppy Logo"
-                    width={300}
-                    height={45}
-                    className="rounded-lg"
-                    priority
-                  />
+                {/* Logo Ramppy - SVG inline */}
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  {/* Growth chart icon */}
+                  <svg width="50" height="50" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 80L40 60L50 70L80 40L85 45L50 80L40 70L15 95L20 80Z" fill="#10b981"/>
+                    <rect x="30" y="65" width="8" height="15" fill="#10b981"/>
+                    <rect x="45" y="55" width="8" height="25" fill="#10b981"/>
+                    <rect x="60" y="45" width="8" height="35" fill="#10b981"/>
+                  </svg>
+                  {/* Text Ramppy */}
+                  <div className="text-4xl font-bold">
+                    <span className="text-white">Ramp</span>
+                    <span className="text-emerald-400">py</span>
+                  </div>
                 </div>
 
                 <h1 className="text-2xl font-bold mb-2">
