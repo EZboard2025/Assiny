@@ -966,6 +966,42 @@ export default function RoleplayView() {
                       <span>18</span>
                       <span>60</span>
                     </div>
+
+                    {/* Caixa de Comportamento por Faixa Etária */}
+                    <div className="mt-4 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-4">
+                      {age >= 18 && age <= 24 && (
+                        <div>
+                          <p className="text-sm font-semibold text-blue-400 mb-2">18 a 24 anos</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Informal e moderno</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Mano", "Tipo assim", "Na moral", "Vi isso no Instagram"</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Aceita novidades facilmente • Teme risco operacional • Referências digitais e trends</p>
+                        </div>
+                      )}
+                      {age >= 25 && age <= 34 && (
+                        <div>
+                          <p className="text-sm font-semibold text-green-400 mb-2">25 a 34 anos</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Pragmático e orientado a resultados</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Preciso ver o retorno disso", "Quanto isso impacta no CPA?"</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em ROI e métricas • Aceita risco calculado • Profissional mas não engessado</p>
+                        </div>
+                      )}
+                      {age >= 35 && age <= 44 && (
+                        <div>
+                          <p className="text-sm font-semibold text-yellow-400 mb-2">35 a 44 anos</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Preciso garantir que isso não quebra nada", "Como fica a parte de compliance?"</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Valoriza compliance e previsibilidade • Cauteloso com promessas • Exige validação prática</p>
+                        </div>
+                      )}
+                      {age >= 45 && age <= 60 && (
+                        <div>
+                          <p className="text-sm font-semibold text-orange-400 mb-2">45 a 60 anos</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Conservador e formal</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Não posso me dar ao luxo de instabilidade", "Quem garante que isso funciona?"</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em segurança e governança • Avesso a riscos • Exige suporte dedicado e validação ampla</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Temperamento */}
@@ -987,6 +1023,50 @@ export default function RoleplayView() {
                           {temp}
                         </button>
                       ))}
+                    </div>
+
+                    {/* Caixa de Descrição do Temperamento */}
+                    <div className="mt-4 bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-4">
+                      {temperament === 'Analítico' && (
+                        <div>
+                          <p className="text-sm font-semibold text-purple-400 mb-2">Analítico</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Tom formal e lógico • Faz perguntas técnicas • Desconfia de argumentos subjetivos • Cobra detalhes quando vendedor é vago</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Formal, racional, calmo e preciso</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Dados concretos, estatísticas, provas de eficácia, garantias</p>
+                        </div>
+                      )}
+                      {temperament === 'Empático' && (
+                        <div>
+                          <p className="text-sm font-semibold text-pink-400 mb-2">Empático</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Demonstra empatia genuína • Compartilha experiências pessoais • Pergunta sobre impacto humano • Usa expressões emocionais • Reage positivamente a atenção</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Afável, próximo, gentil e emocional</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Histórias reais, propósito, apoio humano, relacionamento</p>
+                        </div>
+                      )}
+                      {temperament === 'Determinado' && (
+                        <div>
+                          <p className="text-sm font-semibold text-red-400 mb-2">Determinado</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Postura firme e objetiva • Corta rodeios • Perguntas estratégicas • Demonstra impaciência se vendedor demora • Mostra pressa e decisão rápida</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Soluções rápidas, eficiência, autoridade, resultado imediato</p>
+                        </div>
+                      )}
+                      {temperament === 'Indeciso' && (
+                        <div>
+                          <p className="text-sm font-semibold text-yellow-400 mb-2">Indeciso</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Demonstra insegurança e dúvida • Faz perguntas repetidas • Expressa medo ("não sei se é o momento certo") • Busca garantias constantemente • Muda de opinião facilmente</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Hesitante, cauteloso e questionador</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Depoimentos, garantias, segurança, prova social</p>
+                        </div>
+                      )}
+                      {temperament === 'Sociável' && (
+                        <div>
+                          <p className="text-sm font-semibold text-cyan-400 mb-2">Sociável</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Animado e espontâneo • Usa humor leve e linguagem descontraída • Faz comentários fora do tema • Mostra tédio se vendedor for frio ou formal</p>
+                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Leve, animado, entusiasmado e informal</p>
+                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Amizade, humor, interesse genuíno, energia positiva</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1319,7 +1399,7 @@ export default function RoleplayView() {
                           {evaluation.performance_level === 'very_good' && 'Muito Bom'}
                           {evaluation.performance_level === 'good' && 'Bom'}
                           {evaluation.performance_level === 'needs_improvement' && 'Precisa Melhorar'}
-                          {evaluation.performance_level === 'poor' && 'Em Desenvolvimento'}
+                          {evaluation.performance_level === 'poor' && 'Insuficiente'}
                         </div>
                       </div>
                     </div>

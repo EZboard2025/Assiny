@@ -87,22 +87,23 @@ export async function POST(request: Request) {
     }
 
     let rawResponse = await n8nResponse.json()
-    console.log('✅ Resposta recebida do N8N (completa):', JSON.stringify(rawResponse, null, 2))
+    console.log('✅ Resposta N8N recebida')
 
-    // N8N retorna array com objeto {output: "json_string"}
-    let evaluation
-    if (Array.isArray(rawResponse) && rawResponse[0]?.output) {
-      console.log('📦 Detectado formato N8N com output - fazendo parse...')
-      const outputString = rawResponse[0].output
-      console.log('📦 Output string:', outputString.substring(0, 300))
-      evaluation = JSON.parse(outputString)
-    } else {
-      evaluation = rawResponse
+    // Parse do formato N8N: sempre verifica se tem campo 'output' string
+    let evaluation = rawResponse
+
+    // Caso 1: {output: "json_string"}
+    if (evaluation?.output && typeof evaluation.output === 'string') {
+      console.log('📦 Parseando campo output...')
+      evaluation = JSON.parse(evaluation.output)
+    }
+    // Caso 2: [{output: "json_string"}]
+    else if (Array.isArray(evaluation) && evaluation[0]?.output && typeof evaluation[0].output === 'string') {
+      console.log('📦 Parseando campo output do array...')
+      evaluation = JSON.parse(evaluation[0].output)
     }
 
-    console.log('✅ Avaliação parseada (completa):', JSON.stringify(evaluation, null, 2))
-    console.log('🔍 overall_score:', evaluation.overall_score)
-    console.log('🔍 performance_level:', evaluation.performance_level)
+    console.log('✅ Avaliação pronta - Score:', evaluation.overall_score, '| Level:', evaluation.performance_level)
 
     // Salvar avaliação no Supabase
     const { error: updateError } = await supabase

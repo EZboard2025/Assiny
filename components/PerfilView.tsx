@@ -50,12 +50,15 @@ export default function PerfilView() {
     try {
       setLoading(true)
       const allSessions = await getUserRoleplaySessions(1000) // Buscar todas as sessões
+      console.log(`📊 PerfilView: Total de sessões carregadas: ${allSessions.length}`)
       setSessions(allSessions) // Salvar todas as sessões para o resumo
 
       // Filtrar apenas sessões completadas com avaliação
       const completedSessions = allSessions.filter(session =>
         session.status === 'completed' && (session as any).evaluation
       )
+
+      console.log(`✅ Sessões completadas com avaliação: ${completedSessions.length}`)
 
       if (completedSessions.length === 0) {
         setLoading(false)
@@ -74,12 +77,19 @@ export default function PerfilView() {
       completedSessions.forEach((session, index) => {
         let evaluation = (session as any).evaluation
 
+        console.log(`🔍 Sessão ${index + 1}:`, {
+          id: session.id,
+          hasOutput: evaluation?.output !== undefined,
+          hasSpinEval: evaluation?.spin_evaluation !== undefined
+        })
+
         // Parse se necessário (formato N8N)
         if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+          console.log('📦 Parseando evaluation com output...')
           try {
             evaluation = JSON.parse(evaluation.output)
           } catch (e) {
-            console.error('Erro ao fazer parse de evaluation:', e)
+            console.error('❌ Erro ao fazer parse de evaluation:', e)
             return
           }
         }
@@ -88,36 +98,47 @@ export default function PerfilView() {
         if (evaluation?.spin_evaluation) {
           const spinEval = evaluation.spin_evaluation
 
-          if (spinEval.S?.final_score) {
+          if (spinEval.S?.final_score !== undefined) {
             totals.S += spinEval.S.final_score
             counts.S += 1
           }
-          if (spinEval.P?.final_score) {
+          if (spinEval.P?.final_score !== undefined) {
             totals.P += spinEval.P.final_score
             counts.P += 1
           }
-          if (spinEval.I?.final_score) {
+          if (spinEval.I?.final_score !== undefined) {
             totals.I += spinEval.I.final_score
             counts.I += 1
           }
-          if (spinEval.N?.final_score) {
+          if (spinEval.N?.final_score !== undefined) {
             totals.N += spinEval.N.final_score
             counts.N += 1
           }
         }
 
-        // Adicionar ponto de evolução (overall_score da sessão)
-        if (evaluation?.overall_score) {
-          totalOverallScore += evaluation.overall_score
-          countOverallScore++
+        // Calcular overall_score como média das 4 notas SPIN
+        if (evaluation?.spin_evaluation) {
+          const spinEval = evaluation.spin_evaluation
+          const scores = []
 
-          const sessionDate = new Date(session.created_at)
-          const label = `#${completedSessions.length - index}`
-          evolutionPoints.push({
-            label,
-            score: evaluation.overall_score,
-            date: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-          })
+          if (spinEval.S?.final_score !== undefined) scores.push(spinEval.S.final_score)
+          if (spinEval.P?.final_score !== undefined) scores.push(spinEval.P.final_score)
+          if (spinEval.I?.final_score !== undefined) scores.push(spinEval.I.final_score)
+          if (spinEval.N?.final_score !== undefined) scores.push(spinEval.N.final_score)
+
+          if (scores.length > 0) {
+            const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length
+            totalOverallScore += avgScore
+            countOverallScore++
+
+            const sessionDate = new Date(session.created_at)
+            const label = `#${completedSessions.length - index}`
+            evolutionPoints.push({
+              label,
+              score: avgScore,
+              date: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+            })
+          }
         }
       })
 
@@ -186,8 +207,27 @@ export default function PerfilView() {
     const allEvaluations = completedSessions.map(s => getProcessedEvaluation(s)).filter(e => e !== null)
 
     // Calcular médias gerais (usando todas as sessões)
-    const totalScore = allEvaluations.reduce((sum, e) => sum + (e.overall_score || 0), 0)
-    const avgScore = totalScore / allEvaluations.length
+    // Calcular overall como média das 4 notas SPIN
+    let totalScore = 0
+    let countScore = 0
+
+    allEvaluations.forEach(e => {
+      if (e?.spin_evaluation) {
+        const spin = e.spin_evaluation
+        const scores = []
+        if (spin.S?.final_score !== undefined) scores.push(spin.S.final_score)
+        if (spin.P?.final_score !== undefined) scores.push(spin.P.final_score)
+        if (spin.I?.final_score !== undefined) scores.push(spin.I.final_score)
+        if (spin.N?.final_score !== undefined) scores.push(spin.N.final_score)
+
+        if (scores.length > 0) {
+          totalScore += scores.reduce((sum, s) => sum + s, 0) / scores.length
+          countScore++
+        }
+      }
+    })
+
+    const avgScore = countScore > 0 ? totalScore / countScore : 0
 
     // Médias SPIN (usando todas as sessões)
     const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
@@ -196,10 +236,10 @@ export default function PerfilView() {
     allEvaluations.forEach(e => {
       if (e?.spin_evaluation) {
         const spin = e.spin_evaluation
-        if (spin.S?.final_score) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
-        if (spin.P?.final_score) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
-        if (spin.I?.final_score) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
-        if (spin.N?.final_score) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
+        if (spin.S?.final_score !== undefined) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
+        if (spin.P?.final_score !== undefined) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
+        if (spin.I?.final_score !== undefined) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
+        if (spin.N?.final_score !== undefined) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
       }
     })
 
@@ -212,36 +252,58 @@ export default function PerfilView() {
 
     // Para pontos fortes, gaps e melhorias, usar apenas os últimos 5 roleplays
     const last5Sessions = completedSessions.slice(-5) // Pegar os 5 mais recentes
-    const last5Evaluations = last5Sessions.map(s => getProcessedEvaluation(s)).filter(e => e !== null)
+    const last5Evaluations = last5Sessions.map((s, index) => ({
+      evaluation: getProcessedEvaluation(s),
+      sessionNumber: completedSessions.length - 4 + index // Número da sessão (ex: #3, #4, #5, #6, #7)
+    })).filter(item => item.evaluation !== null)
 
-    // Coletar pontos fortes e gaps dos últimos 5 roleplays
-    const allStrengths: string[] = []
-    const allGaps: string[] = []
+    // Coletar pontos fortes e gaps dos últimos 5 roleplays com número da sessão
+    const allStrengths: Array<{ text: string, session: number }> = []
+    const allGaps: Array<{ text: string, session: number }> = []
     const allImprovements: any[] = []
 
-    last5Evaluations.forEach(e => {
-      if (e.top_strengths) allStrengths.push(...e.top_strengths)
-      if (e.critical_gaps) allGaps.push(...e.critical_gaps)
-      if (e.priority_improvements) allImprovements.push(...e.priority_improvements)
+    last5Evaluations.forEach(({ evaluation: e, sessionNumber }) => {
+      if (e.top_strengths) {
+        e.top_strengths.forEach((strength: string) => {
+          allStrengths.push({ text: strength, session: sessionNumber })
+        })
+      }
+      if (e.critical_gaps) {
+        e.critical_gaps.forEach((gap: string) => {
+          allGaps.push({ text: gap, session: sessionNumber })
+        })
+      }
+      if (e.priority_improvements) {
+        e.priority_improvements.forEach((imp: any) => {
+          allImprovements.push({ ...imp, session: sessionNumber })
+        })
+      }
     })
 
-    // Contar frequência de pontos fortes e gaps
-    const strengthCounts: { [key: string]: number } = {}
-    const gapCounts: { [key: string]: number } = {}
+    // Agrupar por texto e coletar sessões onde apareceu
+    const strengthMap: { [key: string]: number[] } = {}
+    const gapMap: { [key: string]: number[] } = {}
 
-    allStrengths.forEach(s => strengthCounts[s] = (strengthCounts[s] || 0) + 1)
-    allGaps.forEach(g => gapCounts[g] = (gapCounts[g] || 0) + 1)
+    allStrengths.forEach(({ text, session }) => {
+      if (!strengthMap[text]) strengthMap[text] = []
+      if (!strengthMap[text].includes(session)) strengthMap[text].push(session)
+    })
 
-    // Top 5 pontos fortes e gaps mais frequentes
-    const topStrengths = Object.entries(strengthCounts)
-      .sort(([, a], [, b]) => b - a)
+    allGaps.forEach(({ text, session }) => {
+      if (!gapMap[text]) gapMap[text] = []
+      if (!gapMap[text].includes(session)) gapMap[text].push(session)
+    })
+
+    // Top 5 pontos fortes e gaps mais frequentes com sessões
+    const topStrengths = Object.entries(strengthMap)
+      .sort(([, a], [, b]) => b.length - a.length)
       .slice(0, 5)
-      .map(([text, count]) => ({ text, count }))
+      .map(([text, sessions]) => ({ text, count: sessions.length, sessions }))
 
-    const topGaps = Object.entries(gapCounts)
-      .sort(([, a], [, b]) => b - a)
+    const topGaps = Object.entries(gapMap)
+      .sort(([, a], [, b]) => b.length - a.length)
       .slice(0, 5)
-      .map(([text, count]) => ({ text, count }))
+      .map(([text, sessions]) => ({ text, count: sessions.length, sessions }))
 
     setSummaryData({
       totalSessions: completedSessions.length,
@@ -550,13 +612,13 @@ export default function PerfilView() {
 
         {/* Modal de Resumo Geral */}
         {showSummary && summaryData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl border border-purple-500/30 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-24 bg-black/80 backdrop-blur-sm">
+            <div className="relative w-full max-w-6xl max-h-[85vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl border border-purple-500/30 shadow-2xl">
               <div className="sticky top-0 bg-gray-900/95 backdrop-blur-xl border-b border-purple-500/20 p-6 flex items-center justify-between">
                 <div>
                   <h2 className="text-3xl font-bold flex items-center gap-3">
                     <FileText className="w-8 h-8 text-green-400" />
-                    Resumo Geral de Performance
+                    Resumo Geral de Performance - <span className="text-green-400">{userName}</span>
                   </h2>
                   <p className="text-gray-400 mt-1">
                     Análise consolidada de {summaryData.totalSessions} sessões completadas
@@ -605,10 +667,16 @@ export default function PerfilView() {
                     <div className="space-y-3">
                       {summaryData.topStrengths.map((strength: any, i: number) => (
                         <div key={i} className="bg-green-600/10 border border-green-500/30 rounded-xl p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <p className="text-gray-300 flex-1">{strength.text}</p>
-                            <div className="px-3 py-1 bg-green-600/20 rounded-full text-sm font-semibold text-green-400">
-                              {strength.count}x
+                          <div className="flex items-start gap-4">
+                            <div className="flex-1">
+                              <p className="text-gray-300">{strength.text}</p>
+                              <div className="flex gap-1 mt-2">
+                                {strength.sessions?.map((session: number, idx: number) => (
+                                  <span key={idx} className="text-xs px-2 py-0.5 bg-green-600/30 text-green-300 rounded">
+                                    #{session}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -624,10 +692,16 @@ export default function PerfilView() {
                     <div className="space-y-3">
                       {summaryData.topGaps.map((gap: any, i: number) => (
                         <div key={i} className="bg-orange-600/10 border border-orange-500/30 rounded-xl p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <p className="text-gray-300 flex-1">{gap.text}</p>
-                            <div className="px-3 py-1 bg-orange-600/20 rounded-full text-sm font-semibold text-orange-400">
-                              {gap.count}x
+                          <div className="flex items-start gap-4">
+                            <div className="flex-1">
+                              <p className="text-gray-300">{gap.text}</p>
+                              <div className="flex gap-1 mt-2">
+                                {gap.sessions?.map((session: number, idx: number) => (
+                                  <span key={idx} className="text-xs px-2 py-0.5 bg-orange-600/30 text-orange-300 rounded">
+                                    #{session}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -653,7 +727,14 @@ export default function PerfilView() {
                                improvement.priority === 'high' ? 'ALTO' : 'MÉDIO'}
                             </div>
                             <div className="flex-1">
-                              <p className="font-semibold text-white mb-1">{improvement.area}</p>
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <p className="font-semibold text-white">{improvement.area}</p>
+                                {improvement.session && (
+                                  <span className="text-xs px-2 py-0.5 bg-blue-600/30 text-blue-300 rounded">
+                                    #{improvement.session}
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-sm text-gray-400 mb-2">{improvement.current_gap}</p>
                               <p className="text-sm text-blue-300">💡 {improvement.action_plan}</p>
                             </div>

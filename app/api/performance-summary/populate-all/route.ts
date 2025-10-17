@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obter IDs únicos de usuários
-    const uniqueUserIds = [...new Set(sessions.map(s => s.user_id))]
+    const uniqueUserIds = Array.from(new Set(sessions.map(s => s.user_id)))
 
     console.log(`📊 Encontrados ${uniqueUserIds.length} usuários com sessões completadas`)
 

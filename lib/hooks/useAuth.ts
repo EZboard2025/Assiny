@@ -14,7 +14,7 @@ export function useAuth() {
   useEffect(() => {
     // Verificar sessão atual
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+      setUser((session?.user as AuthUser) ?? null)
       setLoading(false)
     })
 
@@ -22,7 +22,7 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      setUser((session?.user as AuthUser) ?? null)
     })
 
     return () => subscription.unsubscribe()

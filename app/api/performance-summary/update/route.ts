@@ -93,17 +93,46 @@ export async function POST(request: NextRequest) {
     const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
 
     allEvaluations.forEach(e => {
-      if (e.overall_score) {
-        totalScore += e.overall_score
-        countScore++
-      }
-
       if (e?.spin_evaluation) {
         const spin = e.spin_evaluation
-        if (spin.S?.final_score) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
-        if (spin.P?.final_score) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
-        if (spin.I?.final_score) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
-        if (spin.N?.final_score) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
+        const sessionScores = []
+
+        // Normalizar notas SPIN para escala 0-10 e coletar para média
+        if (spin.S?.final_score !== undefined) {
+          let score = spin.S.final_score
+          if (score > 10) score = score / 10
+          spinTotals.S += score
+          spinCounts.S++
+          sessionScores.push(score)
+        }
+        if (spin.P?.final_score !== undefined) {
+          let score = spin.P.final_score
+          if (score > 10) score = score / 10
+          spinTotals.P += score
+          spinCounts.P++
+          sessionScores.push(score)
+        }
+        if (spin.I?.final_score !== undefined) {
+          let score = spin.I.final_score
+          if (score > 10) score = score / 10
+          spinTotals.I += score
+          spinCounts.I++
+          sessionScores.push(score)
+        }
+        if (spin.N?.final_score !== undefined) {
+          let score = spin.N.final_score
+          if (score > 10) score = score / 10
+          spinTotals.N += score
+          spinCounts.N++
+          sessionScores.push(score)
+        }
+
+        // Calcular média geral desta sessão (média das 4 notas SPIN)
+        if (sessionScores.length > 0) {
+          const avgScore = sessionScores.reduce((sum, s) => sum + s, 0) / sessionScores.length
+          totalScore += avgScore
+          countScore++
+        }
       }
     })
 

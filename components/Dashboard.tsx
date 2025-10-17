@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import ChatInterface from './ChatInterface'
+import { useState, useEffect, useRef } from 'react'
+import ChatInterface, { ChatInterfaceHandle } from './ChatInterface'
 import ConfigHub from './ConfigHub'
 import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
@@ -16,14 +16,23 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'avaliacao' | 'pdi' | 'historico' | 'perfil'>('home')
   const [mounted, setMounted] = useState(false)
+  const chatRef = useRef<ChatInterfaceHandle>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  const handleViewChange = async (newView: typeof currentView) => {
+    // Se está saindo do chat, verificar se precisa confirmar
+    if (currentView === 'chat' && newView !== 'chat' && chatRef.current) {
+      await chatRef.current.requestLeave()
+    }
+    setCurrentView(newView)
+  }
+
   const renderContent = () => {
     if (currentView === 'chat') {
-      return <ChatInterface />
+      return <ChatInterface ref={chatRef} />
     }
 
     if (currentView === 'roleplay') {
@@ -35,7 +44,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'perfil') {
-      return <PerfilView />
+      return <PerfilView key={Date.now()} />
     }
 
     // Home view
@@ -57,14 +66,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               {/* Main CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
                 <button
-                  onClick={() => setCurrentView('chat')}
+                  onClick={() => handleViewChange('chat')}
                   className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-purple"
                 >
                   <MessageCircle className="w-5 h-5" />
                   Acessar Chat IA
                 </button>
                 <button
-                  onClick={() => setCurrentView('roleplay')}
+                  onClick={() => handleViewChange('roleplay')}
                   className="px-8 py-4 bg-gray-800/50 backdrop-blur-sm text-white rounded-2xl font-semibold text-lg border border-purple-500/30 hover:bg-gray-700/50 transition-colors flex items-center gap-3"
                 >
                   <Users className="w-5 h-5" />
@@ -84,7 +93,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Chat IA Card */}
             <button
-              onClick={() => setCurrentView('chat')}
+              onClick={() => handleViewChange('chat')}
               className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '0ms' }}
             >
@@ -104,7 +113,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
             {/* Roleplay Card */}
             <button
-              onClick={() => setCurrentView('roleplay')}
+              onClick={() => handleViewChange('roleplay')}
               className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
@@ -179,50 +188,50 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <div className="text-3xl font-bold tracking-tight cursor-pointer" onClick={() => setCurrentView('home')}>
+            <div className="text-3xl font-bold tracking-tight cursor-pointer" onClick={() => handleViewChange('home')}>
               Assiny<span className="text-purple-500">.</span>
             </div>
 
             {/* Navigation */}
             <nav className="hidden md:flex items-center space-x-8 text-gray-300">
               <button
-                onClick={() => setCurrentView('home')}
+                onClick={() => handleViewChange('home')}
                 className={`hover:text-white transition-colors ${currentView === 'home' ? 'text-white' : ''}`}
               >
                 Home
               </button>
               <button
-                onClick={() => setCurrentView('chat')}
+                onClick={() => handleViewChange('chat')}
                 className={`hover:text-white transition-colors ${currentView === 'chat' ? 'text-white' : ''}`}
               >
                 Chat IA
               </button>
               <button
-                onClick={() => setCurrentView('roleplay')}
+                onClick={() => handleViewChange('roleplay')}
                 className={`hover:text-white transition-colors ${currentView === 'roleplay' ? 'text-white' : ''}`}
               >
                 Roleplays
               </button>
               <button
-                onClick={() => setCurrentView('avaliacao')}
+                onClick={() => handleViewChange('avaliacao')}
                 className={`hover:text-white transition-colors ${currentView === 'avaliacao' ? 'text-white' : ''}`}
               >
                 Avaliação
               </button>
               <button
-                onClick={() => setCurrentView('pdi')}
+                onClick={() => handleViewChange('pdi')}
                 className={`hover:text-white transition-colors ${currentView === 'pdi' ? 'text-white' : ''}`}
               >
                 PDI
               </button>
               <button
-                onClick={() => setCurrentView('historico')}
+                onClick={() => handleViewChange('historico')}
                 className={`hover:text-white transition-colors ${currentView === 'historico' ? 'text-white' : ''}`}
               >
                 Histórico
               </button>
               <button
-                onClick={() => setCurrentView('perfil')}
+                onClick={() => handleViewChange('perfil')}
                 className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-full font-medium shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70 hover:scale-105 transition-all"
               >
                 Meu Perfil
