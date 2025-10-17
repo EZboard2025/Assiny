@@ -1223,7 +1223,7 @@ export default function RoleplayView() {
         {/* Modal de Avaliação - Novo Design */}
         {showEvaluationSummary && evaluation && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="relative w-full max-w-6xl my-8">
+            <div className="relative w-full max-w-5xl my-8">
               {/* Close Button */}
               <button
                 onClick={() => setShowEvaluationSummary(false)}
@@ -1249,16 +1249,16 @@ export default function RoleplayView() {
               </div>
 
               {/* Main Content */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-purple-500/30 p-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-purple-500/30 p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                   {/* Left Side - SPIN Radar Chart */}
-                  <div className="space-y-6">
-                    <div className="bg-gray-800/40 rounded-2xl p-6 border border-purple-500/20">
-                      <h3 className="text-xl font-bold text-white mb-6 text-center">Métricas de Competências SPIN</h3>
+                  <div className="space-y-4">
+                    <div className="bg-gray-800/40 rounded-2xl p-5 border border-purple-500/20">
+                      <h3 className="text-lg font-bold text-white mb-4 text-center">Métricas de Competências SPIN</h3>
 
                       {/* Radar Chart Visual - Diamond Shape */}
-                      <div className="relative w-full aspect-square max-w-sm mx-auto mb-6">
+                      <div className="relative w-full aspect-square max-w-xs mx-auto mb-4">
                         <svg viewBox="0 0 240 240" className="w-full h-full">
                           {/* Background diamonds (losangos) - 10 níveis */}
                           {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
@@ -1328,53 +1328,53 @@ export default function RoleplayView() {
                       </div>
 
                       {/* SPIN Scores */}
-                      <div className="grid grid-cols-4 gap-2 mb-4">
+                      <div className="grid grid-cols-4 gap-2 mb-3">
                         {evaluation.spin_evaluation && (
                           <>
                             <div className="text-center">
                               <div className="text-xs text-gray-400 mb-1">S</div>
-                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.S?.final_score?.toFixed(1) || '0'}</div>
+                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.S?.final_score?.toFixed(1) || '0'}</div>
                             </div>
                             <div className="text-center">
                               <div className="text-xs text-gray-400 mb-1">P</div>
-                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.P?.final_score?.toFixed(1) || '0'}</div>
+                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.P?.final_score?.toFixed(1) || '0'}</div>
                             </div>
                             <div className="text-center">
                               <div className="text-xs text-gray-400 mb-1">I</div>
-                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.I?.final_score?.toFixed(1) || '0'}</div>
+                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.I?.final_score?.toFixed(1) || '0'}</div>
                             </div>
                             <div className="text-center">
                               <div className="text-xs text-gray-400 mb-1">N</div>
-                              <div className="text-lg font-bold text-white">{evaluation.spin_evaluation.N?.final_score?.toFixed(1) || '0'}</div>
+                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.N?.final_score?.toFixed(1) || '0'}</div>
                             </div>
                           </>
                         )}
                       </div>
 
                       {/* Detalhamento SPIN */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
-                          <span className="text-sm text-gray-300">Situação</span>
-                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.S?.final_score || 0}/10</span>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
+                          <span className="text-xs text-gray-300">Situação</span>
+                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.S?.final_score || 0}/10</span>
                         </div>
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
-                          <span className="text-sm text-gray-300">Problema</span>
-                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.P?.final_score || 0}/10</span>
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
+                          <span className="text-xs text-gray-300">Problema</span>
+                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.P?.final_score || 0}/10</span>
                         </div>
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
-                          <span className="text-sm text-gray-300">Implicação</span>
-                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.I?.final_score || 0}/10</span>
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
+                          <span className="text-xs text-gray-300">Implicação</span>
+                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.I?.final_score || 0}/10</span>
                         </div>
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-4 py-2">
-                          <span className="text-sm text-gray-300">Necessidade</span>
-                          <span className="text-sm font-semibold text-white">{evaluation.spin_evaluation?.N?.final_score || 0}/10</span>
+                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
+                          <span className="text-xs text-gray-300">Necessidade</span>
+                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.N?.final_score || 0}/10</span>
                         </div>
                       </div>
 
                       {/* Média Geral */}
-                      <div className="mt-6 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl px-6 py-3 text-center">
-                        <div className="text-sm text-purple-100 mb-1">Média Geral</div>
-                        <div className="text-2xl font-bold text-white">
+                      <div className="mt-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl px-4 py-2.5 text-center">
+                        <div className="text-xs text-purple-100 mb-1">Média Geral</div>
+                        <div className="text-xl font-bold text-white">
                           {evaluation.spin_evaluation ? (
                             ((evaluation.spin_evaluation.S?.final_score || 0) +
                              (evaluation.spin_evaluation.P?.final_score || 0) +
@@ -1387,13 +1387,13 @@ export default function RoleplayView() {
                   </div>
 
                   {/* Right Side - Performance Metrics */}
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Overall Score */}
-                    <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-2xl p-6">
-                      <h3 className="text-center text-sm text-gray-400 mb-2">Performance Geral</h3>
+                    <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-2xl p-5">
+                      <h3 className="text-center text-xs text-gray-400 mb-2">Performance Geral</h3>
                       <div className="text-center">
-                        <div className="text-6xl font-bold text-white mb-2">{evaluation.overall_score}/10</div>
-                        <div className="inline-block px-4 py-1 bg-purple-600/30 rounded-full text-sm text-purple-300 font-medium">
+                        <div className="text-5xl font-bold text-white mb-2">{evaluation.overall_score}/10</div>
+                        <div className="inline-block px-3 py-1 bg-purple-600/30 rounded-full text-xs text-purple-300 font-medium">
                           {evaluation.performance_level === 'legendary' && 'Lendário'}
                           {evaluation.performance_level === 'excellent' && 'Excelente'}
                           {evaluation.performance_level === 'very_good' && 'Muito Bom'}
@@ -1404,90 +1404,6 @@ export default function RoleplayView() {
                       </div>
                     </div>
 
-                    {/* Performance Bars */}
-                    <div className="bg-gray-800/40 rounded-2xl p-6 border border-purple-500/20 space-y-4">
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-gray-300">Abertura e Rapport</span>
-                          <span className="text-sm font-semibold text-white">8/10</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '80%'}}></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-gray-300">Investigação de Necessidades</span>
-                          <span className="text-sm font-semibold text-white">6/10</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '60%'}}></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-gray-300">Apresentação de Soluções</span>
-                          <span className="text-sm font-semibold text-white">4/10</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-orange-500 to-orange-400" style={{width: '40%'}}></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-gray-300">Tratamento de Objeções</span>
-                          <span className="text-sm font-semibold text-white">8/10</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '80%'}}></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-gray-300">Fechamento e Próximos Passos</span>
-                          <span className="text-sm font-semibold text-white">6/10</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '60%'}}></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-gray-300">Comunicação Geral</span>
-                          <span className="text-sm font-semibold text-white">6.8/10</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400" style={{width: '68%'}}></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Competências */}
-                    <div className="bg-gray-800/40 rounded-2xl p-6 border border-purple-500/20">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="text-sm font-semibold text-green-400 mb-2">Maior competência</h4>
-                          <p className="text-xs text-gray-300">
-                            {evaluation.top_strengths && evaluation.top_strengths.length > 0
-                              ? evaluation.top_strengths[0]
-                              : 'Não identificado'}
-                          </p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-semibold text-orange-400 mb-2">Foco de melhoria</h4>
-                          <p className="text-xs text-gray-300">
-                            {evaluation.critical_gaps && evaluation.critical_gaps.length > 0
-                              ? evaluation.critical_gaps[0]
-                              : 'Não identificado'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
