@@ -245,6 +245,7 @@ export interface PersonaB2C {
   profession: string
   what_seeks?: string
   main_pains?: string
+  evaluation_score?: number
   created_at?: string
   updated_at?: string
 }
@@ -258,6 +259,7 @@ export interface PersonaB2B {
   company_type?: string
   company_goals?: string
   business_challenges?: string
+  evaluation_score?: number
   created_at?: string
   updated_at?: string
 }

@@ -69,6 +69,7 @@ function ConfigurationInterface({
     proxima_acao: string
   } | null>(null)
   const [evaluatingPersona, setEvaluatingPersona] = useState(false)
+  const [editedPersonaIds, setEditedPersonaIds] = useState<Set<string>>(new Set())
 
   // Carregar dados do Supabase
   useEffect(() => {
@@ -240,6 +241,10 @@ function ConfigurationInterface({
         }
 
         setPersonas(personas.map(p => p.id === editingPersonaId ? data : p))
+        // Marcar persona como editada (permite reavaliação)
+        if (editingPersonaId) {
+          setEditedPersonaIds(prev => new Set(prev).add(editingPersonaId))
+        }
         setNewPersona({})
         setShowPersonaForm(false)
         setEditingPersonaId(null)
@@ -276,6 +281,10 @@ function ConfigurationInterface({
         }
 
         setPersonas(personas.map(p => p.id === editingPersonaId ? data : p))
+        // Marcar persona como editada (permite reavaliação)
+        if (editingPersonaId) {
+          setEditedPersonaIds(prev => new Set(prev).add(editingPersonaId))
+        }
         setNewPersona({})
         setShowPersonaForm(false)
         setEditingPersonaId(null)
@@ -349,6 +358,32 @@ function ConfigurationInterface({
         console.log('✅ Avaliação processada:', evaluation)
         setPersonaEvaluation(evaluation)
         setShowPersonaEvaluationModal(true)
+
+        // Salvar o score no banco de dados
+        if (evaluation.score_geral && persona.id) {
+          const { supabase } = await import('@/lib/supabase')
+          const { error: updateError } = await supabase
+            .from('personas')
+            .update({ evaluation_score: evaluation.score_geral })
+            .eq('id', persona.id)
+
+          if (!updateError) {
+            // Atualizar a lista local de personas
+            setPersonas(personas.map(p =>
+              p.id === persona.id
+                ? { ...p, evaluation_score: evaluation.score_geral }
+                : p
+            ))
+            // Remover da lista de editadas (desabilita o botão)
+            if (persona.id) {
+              setEditedPersonaIds(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(persona.id!)
+                return newSet
+              })
+            }
+          }
+        }
       } else {
         console.error('❌ Erro ao avaliar persona:', response.status)
         alert(`Erro ao avaliar persona (${response.status})`)
@@ -782,15 +817,37 @@ function ConfigurationInterface({
                         </div>
 
                         {/* Botões de ação */}
-                        <div className="flex gap-2 flex-shrink-0">
+                        <div className="flex gap-2 flex-shrink-0 items-center">
+                          {/* Score da avaliação */}
+                          {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
+                            <div className="flex items-center gap-1.5 px-3 py-2 bg-green-900/30 border border-green-500/40 rounded-lg">
+                              <span className="text-xs text-green-300 font-medium">Nota:</span>
+                              <span className="text-lg font-bold text-green-400">{persona.evaluation_score.toFixed(1)}</span>
+                            </div>
+                          )}
+
                           <button
                             onClick={() => handleEvaluatePersona(persona)}
-                            disabled={evaluatingPersona}
-                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            title="Avaliar persona"
+                            disabled={evaluatingPersona || (persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!))}
+                            className={`px-4 py-2 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 ${
+                              editedPersonaIds.has(persona.id!)
+                                ? 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
+                                : 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
+                            }`}
+                            title={
+                              persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!)
+                                ? 'Edite a persona para poder reavaliá-la'
+                                : editedPersonaIds.has(persona.id!)
+                                ? 'Reavaliar persona após edição'
+                                : 'Avaliar persona'
+                            }
                           >
                             {evaluatingPersona && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {evaluatingPersona ? 'AVALIANDO...' : 'AVALIAR PERSONA'}
+                            {evaluatingPersona
+                              ? 'AVALIANDO...'
+                              : editedPersonaIds.has(persona.id!)
+                              ? 'REAVALIAR PERSONA'
+                              : 'AVALIAR PERSONA'}
                           </button>
                           <button
                             onClick={() => {
