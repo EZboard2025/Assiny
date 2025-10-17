@@ -58,6 +58,35 @@ function ConfigurationInterface() {
     principais_gaps: string[]
     proxima_acao: string
   } | null>(null)
+  const [personaEvaluation, setPersonaEvaluation] = useState<{
+    qualidade_geral: string
+    score_geral: number
+    nivel_qualidade_textual: string
+    score_detalhado: {
+      cargo: number
+      tipo_empresa_faturamento: number
+      contexto: number
+      busca: number
+      dores: number
+    }
+    destaques_positivos: string[]
+    spin_readiness: {
+      situacao: string
+      problema: string
+      implicacao: string
+      need_payoff: string
+      score_spin_total: number
+    }
+    campos_excelentes: string[]
+    campos_que_precisam_ajuste: string[]
+    sugestoes_melhora_prioritarias: string[]
+    pronto_para_roleplay: boolean
+    nivel_complexidade_roleplay: string
+    proxima_acao_recomendada: string
+    mensagem_motivacional: string
+  } | null>(null)
+  const [showPersonaEvaluationModal, setShowPersonaEvaluationModal] = useState(false)
+  const [evaluatingPersona, setEvaluatingPersona] = useState(false)
 
   // Carregar dados do Supabase
   useEffect(() => {
@@ -289,6 +318,7 @@ function ConfigurationInterface() {
   }
 
   const handleEvaluatePersona = async (persona: Persona) => {
+    setEvaluatingPersona(true)
     try {
       console.log('📊 Enviando persona para avaliação...', persona)
 
@@ -303,7 +333,7 @@ function ConfigurationInterface() {
         personaText = `Tipo de Negócio: B2C\n\nProfissão: ${personaB2C.profession || 'N/A'}\n\nContexto: ${personaB2C.context || 'N/A'}\n\nO que busca/valoriza: ${personaB2C.what_seeks || 'N/A'}\n\nPrincipais dores/problemas: ${personaB2C.main_pains || 'N/A'}`
       }
 
-      const response = await fetch('https://ezboard.app.n8n.cloud/webhook-test/persona-consultor', {
+      const response = await fetch('https://ezboard.app.n8n.cloud/webhook/persona-consultor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -315,8 +345,28 @@ function ConfigurationInterface() {
 
       if (response.ok) {
         const result = await response.json()
-        console.log('✅ Persona avaliada com sucesso:', result)
-        alert('Persona avaliada com sucesso!')
+        console.log('✅ Resposta recebida:', result)
+
+        // Parse do JSON retornado pelo N8N
+        let evaluation
+
+        // N8N retorna array com objeto {output: "```json\n{...}\n```"}
+        if (Array.isArray(result) && result[0]?.output) {
+          const outputString = result[0].output
+          // Remover ```json e ``` do início e fim
+          const jsonString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
+          evaluation = JSON.parse(jsonString)
+        } else if (result.output) {
+          const outputString = result.output
+          const jsonString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
+          evaluation = JSON.parse(jsonString)
+        } else {
+          evaluation = result
+        }
+
+        console.log('✅ Avaliação processada:', evaluation)
+        setPersonaEvaluation(evaluation)
+        setShowPersonaEvaluationModal(true)
       } else {
         console.error('❌ Erro ao avaliar persona:', response.status)
         alert(`Erro ao avaliar persona (${response.status})`)
@@ -324,6 +374,8 @@ function ConfigurationInterface() {
     } catch (error) {
       console.error('💥 Erro ao avaliar persona:', error)
       alert('Erro ao conectar com o serviço de avaliação')
+    } finally {
+      setEvaluatingPersona(false)
     }
   }
 
@@ -739,10 +791,12 @@ function ConfigurationInterface() {
                         <div className="flex gap-2 flex-shrink-0">
                           <button
                             onClick={() => handleEvaluatePersona(persona)}
-                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg shadow-green-500/30"
+                            disabled={evaluatingPersona}
+                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             title="Avaliar persona"
                           >
-                            AVALIAR PERSONA
+                            {evaluatingPersona && <Loader2 className="w-4 h-4 animate-spin" />}
+                            {evaluatingPersona ? 'AVALIANDO...' : 'AVALIAR PERSONA'}
                           </button>
                           <button
                             onClick={() => {
@@ -1232,6 +1286,218 @@ function ConfigurationInterface() {
           </div>
         )}
       </div>
+
+      {/* Modal de Avaliação de Persona */}
+      {showPersonaEvaluationModal && personaEvaluation && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
+            <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-green-500/30 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-green-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-green-600/20 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="w-7 h-7 text-green-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Avaliação da Persona</h2>
+                    <p className="text-sm text-gray-400">{personaEvaluation.mensagem_motivacional}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPersonaEvaluationModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] space-y-6">
+                {/* Score Geral */}
+                <div className="bg-gradient-to-br from-green-900/30 to-transparent border border-green-500/30 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-1">Score Geral</h3>
+                      <p className="text-sm text-gray-400 capitalize">{personaEvaluation.qualidade_geral} • {personaEvaluation.nivel_qualidade_textual}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-5xl font-bold text-green-400">{personaEvaluation.score_geral.toFixed(1)}</div>
+                      <div className="text-sm text-gray-500">/10</div>
+                    </div>
+                  </div>
+
+                  {/* Barra de progresso */}
+                  <div className="w-full bg-gray-800 rounded-full h-3">
+                    <div
+                      className="bg-gradient-to-r from-green-600 to-green-400 h-3 rounded-full transition-all"
+                      style={{ width: `${(personaEvaluation.score_geral / 10) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Scores Detalhados */}
+                <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4">Scores por Campo</h3>
+                  <div className="space-y-3">
+                    {Object.entries(personaEvaluation.score_detalhado).map(([campo, score]) => (
+                      <div key={campo}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-gray-300 capitalize">
+                            {campo.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-sm font-bold text-purple-400">{score}/10</span>
+                        </div>
+                        <div className="w-full bg-gray-800 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              score >= 9 ? 'bg-green-500' :
+                              score >= 7 ? 'bg-blue-500' :
+                              score >= 5 ? 'bg-yellow-500' :
+                              'bg-orange-500'
+                            }`}
+                            style={{ width: `${(score / 10) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Destaques Positivos */}
+                {personaEvaluation.destaques_positivos.length > 0 && (
+                  <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      Destaques Positivos
+                    </h3>
+                    <ul className="space-y-2">
+                      {personaEvaluation.destaques_positivos.map((destaque, idx) => (
+                        <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                          <span className="text-green-400 mt-0.5">•</span>
+                          <span>{destaque}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* SPIN Readiness */}
+                <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white">Prontidão SPIN Selling</h3>
+                    <span className="text-2xl font-bold text-purple-400">
+                      {personaEvaluation.spin_readiness.score_spin_total}/10
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(personaEvaluation.spin_readiness)
+                      .filter(([key]) => key !== 'score_spin_total')
+                      .map(([etapa, status]) => (
+                        <div key={etapa} className="bg-gray-800/50 rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-300 uppercase">
+                              {etapa.replace(/_/g, ' ')}
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              status === 'pronto' ? 'bg-green-500/20 text-green-400' :
+                              status === 'precisa_ajuste' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {status === 'pronto' ? '✓ Pronto' :
+                               status === 'precisa_ajuste' ? '⚠ Ajustar' :
+                               '✗ Insuficiente'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Campos Excelentes */}
+                {personaEvaluation.campos_excelentes.length > 0 && (
+                  <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                      🌟 Campos Excelentes (≥9)
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {personaEvaluation.campos_excelentes.map((campo, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm">
+                          {campo.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Campos que Precisam Ajuste */}
+                {personaEvaluation.campos_que_precisam_ajuste.length > 0 && (
+                  <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-orange-400" />
+                      Campos para Ajustar
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {personaEvaluation.campos_que_precisam_ajuste.map((campo, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-orange-500/20 text-orange-300 rounded-full text-sm">
+                          {campo.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sugestões de Melhoria */}
+                {personaEvaluation.sugestoes_melhora_prioritarias.length > 0 && (
+                  <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                      💡 Sugestões Prioritárias de Melhoria
+                    </h3>
+                    <ul className="space-y-2">
+                      {personaEvaluation.sugestoes_melhora_prioritarias.map((sugestao, idx) => (
+                        <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                          <span className="text-blue-400 mt-0.5 font-bold">{idx + 1}.</span>
+                          <span>{sugestao}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Status e Recomendação */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={`rounded-xl p-4 border ${
+                    personaEvaluation.pronto_para_roleplay
+                      ? 'bg-green-900/20 border-green-500/30'
+                      : 'bg-yellow-900/20 border-yellow-500/30'
+                  }`}>
+                    <h4 className="font-semibold mb-2 text-white">Status Roleplay</h4>
+                    <p className={`text-sm font-bold ${
+                      personaEvaluation.pronto_para_roleplay ? 'text-green-400' : 'text-yellow-400'
+                    }`}>
+                      {personaEvaluation.pronto_para_roleplay ? '✓ Pronto para usar' : '⚠ Precisa ajustes'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4">
+                    <h4 className="font-semibold mb-2 text-white">Complexidade</h4>
+                    <p className="text-sm text-purple-400 capitalize font-bold">
+                      {personaEvaluation.nivel_complexidade_roleplay}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Próxima Ação */}
+                <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-2">🎯 Próxima Ação Recomendada</h3>
+                  <p className="text-gray-300 capitalize">
+                    {personaEvaluation.proxima_acao_recomendada.replace(/_/g, ' ')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
