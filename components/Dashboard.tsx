@@ -6,6 +6,7 @@ import ConfigHub from './ConfigHub'
 import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
+import PDIView from './PDIView'
 import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut } from 'lucide-react'
 
 interface DashboardProps {
@@ -37,6 +38,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'roleplay') {
       return <RoleplayView />
+    }
+
+    if (currentView === 'pdi') {
+      return <PDIView />
     }
 
     if (currentView === 'historico') {
@@ -132,9 +137,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </button>
 
             {/* PDI Card */}
-            <div
-              className={`feature-card group ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '300ms' }}
+            <button
+              onClick={() => handleViewChange('pdi')}
+              className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '200ms' }}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
               <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition-all">
@@ -148,7 +154,27 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   Plano de Desenvolvimento Individual personalizado para sua evolução.
                 </p>
               </div>
-            </div>
+            </button>
+
+            {/* Meu Perfil Card */}
+            <button
+              onClick={() => handleViewChange('perfil')}
+              className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '300ms' }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition-all">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 bg-purple-600/20 rounded-2xl flex items-center justify-center">
+                    <User className="w-7 h-7 text-purple-400" />
+                  </div>
+                  <h3 className="text-2xl font-bold">Meu Perfil</h3>
+                </div>
+                <p className="text-gray-400 text-lg">
+                  Acompanhe suas métricas, evolução e desempenho nas vendas.
+                </p>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -166,8 +192,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Header Navigation */}
       <header className="fixed top-0 w-full bg-black/50 backdrop-blur-xl z-50 border-b border-purple-900/20">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between h-20">
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-center h-20">
+          <div className="w-full flex items-center justify-between">
             {/* Logo */}
             <div className="text-3xl font-bold tracking-tight cursor-pointer" onClick={() => handleViewChange('home')}>
               Assiny<span className="text-purple-500">.</span>
