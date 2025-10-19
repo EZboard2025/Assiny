@@ -264,92 +264,9 @@ export default function RoleplayView() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      // Criar analisador de áudio para detectar silêncio
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const analyser = audioContext.createAnalyser()
-      const microphone = audioContext.createMediaStreamSource(stream)
-      const dataArray = new Uint8Array(analyser.frequencyBinCount)
-
-      microphone.connect(analyser)
-
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
-
-      let isCheckingRef = { current: true }
-      let hasSpoken = false  // Flag para saber se o usuário já falou algo
-      let volumeHistory: number[] = []  // Histórico de volumes para análise
-      let consecutiveLowVolume = 0  // Contador de frames consecutivos com volume baixo
-      let consecutiveHighVolume = 0  // Contador de frames consecutivos com volume alto
-
-      // Detectar silêncio
-      const checkSilence = () => {
-        if (!isCheckingRef.current) {
-          console.log('⏹️ Checagem de silêncio parada')
-          return
-        }
-
-        analyser.getByteFrequencyData(dataArray)
-        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
-
-        // Manter histórico dos últimos 20 volumes para análise mais precisa
-        volumeHistory.push(average)
-        if (volumeHistory.length > 20) volumeHistory.shift()
-
-        // Log do volume para debug (apenas a cada 60 frames = ~1 segundo)
-        if (Math.random() < 0.016) {
-          console.log('🎤 Volume médio:', average.toFixed(2), '| Histórico:', volumeHistory.map(v => v.toFixed(0)).join(','))
-        }
-
-        // NOVO: Detectar fala real (não ruído) - precisa de volume consistente
-        if (average > 35) {  // Aumentado threshold para detectar fala real
-          consecutiveHighVolume++
-          consecutiveLowVolume = 0  // Reset contador de silêncio
-
-          // Só considera como fala após 5 frames consecutivos com volume alto (evita ruídos pontuais)
-          if (consecutiveHighVolume >= 5 && !hasSpoken) {
-            hasSpoken = true
-            console.log('🗣️ Fala real detectada! Volume consistente acima de 35')
-          }
-        } else if (average < 20) {  // Threshold para silêncio
-          consecutiveLowVolume++
-          consecutiveHighVolume = 0  // Reset contador de fala
-        } else {
-          // Volume médio - reset ambos contadores
-          consecutiveLowVolume = 0
-          consecutiveHighVolume = 0
-        }
-
-        // NOVO: Só detecta fim da fala se teve volume baixo consistente
-        // Precisa de 30 frames consecutivos de silêncio (cerca de 0.5 segundos)
-        if (consecutiveLowVolume >= 30 && hasSpoken) {
-          if (!silenceTimerRef.current) {
-            console.log('🤫 Silêncio consistente detectado, iniciando timer de 1s...')
-            // Timer de 1 segundo após detectar silêncio consistente
-            silenceTimerRef.current = setTimeout(() => {
-              console.log('🔇 Finalizando gravação após silêncio prolongado')
-              if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                console.log('📝 Chamando stopRecording()...')
-                stopRecording()
-              } else {
-                console.log('⚠️ MediaRecorder não está gravando')
-              }
-            }, 1000)  // Reduzido para 1 segundo
-          }
-        } else if (average > 25) {  // Se detectar qualquer som significativo, cancelar timer
-          // Cancelar o timer se detectar som
-          if (silenceTimerRef.current) {
-            console.log('🔊 Som detectado, cancelando timer de silêncio')
-            clearTimeout(silenceTimerRef.current)
-            silenceTimerRef.current = null
-          }
-        }
-
-        // Continuar checando
-        if (isCheckingRef.current) {
-          requestAnimationFrame(checkSilence)
-        }
-      }
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -360,7 +277,6 @@ export default function RoleplayView() {
       mediaRecorder.onstop = async () => {
         console.log('🛑 MediaRecorder.onstop disparado!')
         console.log('🛑 Chunks de áudio capturados:', audioChunksRef.current.length)
-        isCheckingRef.current = false
 
         // Garantir que o indicador seja removido imediatamente
         setIsRecording(false)
@@ -373,13 +289,11 @@ export default function RoleplayView() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         console.log('📦 Blob de áudio criado, tamanho:', audioBlob.size, 'bytes')
 
-        // Fechar stream e contexto de áudio
+        // Fechar stream
         stream.getTracks().forEach(track => {
           track.stop()
           console.log('🔇 Track parada:', track.label)
         })
-        audioContext.close()
-        console.log('🔇 AudioContext fechado')
 
         // Limpar referências
         mediaRecorderRef.current = null
@@ -392,9 +306,6 @@ export default function RoleplayView() {
 
       mediaRecorder.start()
       setIsRecording(true)
-
-      // Iniciar detecção de silêncio
-      checkSilence()
 
     } catch (error) {
       console.error('Erro ao acessar microfone:', error)
@@ -847,7 +758,7 @@ export default function RoleplayView() {
                       <div className="flex items-center justify-center">
                         <div className="flex items-center gap-2 px-4 py-2 bg-red-600/20 rounded-full animate-pulse">
                           <Mic className="w-4 h-4 text-red-400" />
-                          <span className="text-xs text-red-400">🎤 Ouvindo... (pare de falar para enviar)</span>
+                          <span className="text-xs text-red-400">🎤 Gravando...</span>
                         </div>
                       </div>
                     </div>
@@ -881,27 +792,13 @@ export default function RoleplayView() {
                 </div>
 
                 <div className="flex items-center justify-center gap-2 pt-4 border-t border-purple-500/20">
-                  {/* Apenas botão de microfone para conversa por voz */}
+                  {/* Botões de controle de gravação */}
                   {isSimulating && (
                     <div className="flex items-center gap-3">
                       {isPlayingAudio && (
                         <div className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 rounded-full">
                           <Volume2 className="w-4 h-4 text-purple-400 animate-pulse" />
                           <span className="text-sm text-purple-400">Aguarde o cliente terminar...</span>
-                        </div>
-                      )}
-
-                      {isRecording && (
-                        <div className="flex flex-col gap-2 items-center">
-                          <div className="flex items-center gap-2 px-4 py-2 bg-red-600/20 rounded-full">
-                            <Mic className="w-4 h-4 text-red-400 animate-pulse" />
-                            <span className="text-sm text-red-400">Fale agora (pare para enviar)</span>
-                          </div>
-                          {currentTranscription && (
-                            <div className="px-4 py-2 bg-gray-800/50 rounded-lg max-w-md">
-                              <p className="text-xs text-gray-400">"{currentTranscription}"</p>
-                            </div>
-                          )}
                         </div>
                       )}
 
@@ -916,14 +813,26 @@ export default function RoleplayView() {
                         </div>
                       )}
 
-                      {/* Botão manual de microfone (apenas para backup/emergência) */}
+                      {/* Botão de Iniciar Gravação */}
                       {!isPlayingAudio && !isRecording && !isLoading && (
                         <button
                           onClick={startRecording}
                           className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-full hover:bg-purple-600/30 transition-all"
-                          title="Clique para falar"
+                          title="Clique para começar a falar"
                         >
                           <Mic className="w-6 h-6 text-purple-400" />
+                        </button>
+                      )}
+
+                      {/* Botão de Finalizar Fala */}
+                      {isRecording && (
+                        <button
+                          onClick={stopRecording}
+                          className="px-6 py-3 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-all flex items-center gap-2"
+                          title="Clique para finalizar e enviar"
+                        >
+                          <MicOff className="w-5 h-5 text-red-400" />
+                          <span className="text-sm font-medium text-red-400">Finalizar Fala</span>
                         </button>
                       )}
                     </div>

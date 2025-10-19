@@ -86,7 +86,13 @@ npm run lint         # Run ESLint
   - Has `created_at` timestamp for cooldown calculation (1 week between generations)
   - Only one active PDI per user at a time (deleted when generating new)
 - `personas` - B2B/B2C customer personas (linked to business_type)
+  - Has `evaluation_score` column (DECIMAL 0-10) for quality assessment
+  - Score resets to NULL when persona is edited
 - `objections` - Sales objections library
+  - `name` - The objection text
+  - `rebuttals` - JSONB array of rebuttal strategies
+  - `evaluation_score` - DECIMAL(3,1) for quality assessment (0-10)
+  - Score resets to NULL when objection or rebuttals are edited
 - `knowledge_base` - SPIN/psychology content (category, title, content)
 - `customer_segments` - (Legacy, replaced by personas)
 - `company_type` - Business type configuration (B2B or B2C)
