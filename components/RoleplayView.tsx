@@ -40,6 +40,10 @@ export default function RoleplayView() {
   const [isEvaluating, setIsEvaluating] = useState(false) // Loading durante avaliação
   const [showEvaluationSummary, setShowEvaluationSummary] = useState(false) // Modal de resumo
   const [evaluation, setEvaluation] = useState<any>(null) // Avaliação recebida
+  const [audioVolume, setAudioVolume] = useState(0) // Volume do áudio para animação do blob
+  const audioAnalyserRef = useRef<AnalyserNode | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -452,10 +456,21 @@ export default function RoleplayView() {
       const audio = new Audio(audioUrl)
       audioRef.current = audio
 
-      // Quando o áudio terminar, apenas liberar para o usuário falar
+      // Configurar visualizador de áudio
+      setupAudioVisualizer(audio)
+
+      // Quando o áudio terminar, limpar visualizador
       audio.onended = () => {
         setIsPlayingAudio(false)
+        setAudioVolume(0)
         URL.revokeObjectURL(audioUrl)
+
+        // Limpar animação
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current)
+          animationFrameRef.current = null
+        }
+
         console.log('🔊 Áudio do cliente finalizado - aguardando usuário clicar no microfone')
       }
 
@@ -465,6 +480,51 @@ export default function RoleplayView() {
     } catch (error) {
       console.error('❌ Erro ao converter texto em áudio:', error)
       setIsPlayingAudio(false)
+      setAudioVolume(0)
+    }
+  }
+
+  // Configurar visualizador de áudio
+  const setupAudioVisualizer = (audio: HTMLAudioElement) => {
+    try {
+      // Criar contexto de áudio se não existir
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+      }
+
+      const audioContext = audioContextRef.current
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 128 // Menor FFT = mais responsivo aos picos
+      analyser.smoothingTimeConstant = 0.3 // Menos suavização = mais reativo
+
+      const source = audioContext.createMediaElementSource(audio)
+      source.connect(analyser)
+      analyser.connect(audioContext.destination)
+
+      audioAnalyserRef.current = analyser
+
+      // Analisar volume em tempo real
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+      const updateVolume = () => {
+        if (!audioAnalyserRef.current || !isPlayingAudio) return
+
+        analyser.getByteFrequencyData(dataArray)
+
+        // Focar nas frequências médias/altas (fala humana)
+        const relevantFrequencies = dataArray.slice(5, 40)
+        const average = relevantFrequencies.reduce((a, b) => a + b, 0) / relevantFrequencies.length
+
+        // Normalizar e AMPLIFICAR MUITO para visualização dramática
+        const normalizedVolume = Math.min((average / 80) * 2.5, 1.2) // Permite ultrapassar 1
+        setAudioVolume(normalizedVolume)
+
+        animationFrameRef.current = requestAnimationFrame(updateVolume)
+      }
+
+      updateVolume()
+    } catch (error) {
+      console.error('Erro ao configurar visualizador de áudio:', error)
     }
   }
 
@@ -486,28 +546,7 @@ export default function RoleplayView() {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
             <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30">
-              <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
-                {/* Tempo Limite */}
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Clock className="w-5 h-5 text-purple-400" />
-                  <span className="text-sm">Tempo limite:</span>
-                  <span className="text-green-400 font-semibold">10 minutos restantes</span>
-                </div>
-
-                {/* Modo */}
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Zap className="w-5 h-5 text-purple-400" />
-                  <span className="text-sm">Modo: {isSimulating ? 'Simulação Ativa' : 'Simulação IA Ativa'}</span>
-                </div>
-
-                {/* Data */}
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Calendar className="w-5 h-5 text-purple-400" />
-                  <span className="text-sm">2024-10-26, 14:30</span>
-                </div>
-              </div>
-
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-4 mb-6">
                 {!isSimulating ? (
                   <button
                     onClick={() => setShowConfig(true)}
@@ -663,18 +702,88 @@ export default function RoleplayView() {
                   </button>
                 )}
               </div>
+
+              {/* Data e Hora Atual */}
+              <div className="flex items-center justify-center gap-2 text-gray-300 pt-4 border-t border-purple-500/20">
+                <Calendar className="w-5 h-5 text-purple-400" />
+                <span className="text-sm">
+                  {new Date().toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  })}
+                  {', '}
+                  {new Date().toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Main Chat Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Purple Blob Illustration */}
+          {/* Purple Blob Illustration - Audio Reactive */}
           <div className={`${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '100ms' }}>
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-transparent rounded-3xl blur-2xl"></div>
               <div className="relative flex items-center justify-center p-12">
-                <div className="w-64 h-64 bg-gradient-to-br from-purple-400/30 to-purple-600/30 rounded-full blur-3xl"></div>
+                {/* Blob principal - MEGA REATIVO */}
+                <div
+                  className="bg-gradient-to-br from-purple-400/40 to-purple-600/40 rounded-full transition-all ease-out"
+                  style={{
+                    width: `${256 + audioVolume * 150}px`,
+                    height: `${256 + audioVolume * 150}px`,
+                    opacity: 0.4 + audioVolume * 0.6,
+                    filter: `blur(${48 + audioVolume * 40}px)`,
+                    transitionDuration: '50ms',
+                    transform: `scale(${1 + audioVolume * 0.3})`,
+                  }}
+                ></div>
+
+                {/* Blob secundário - Pulsação rápida */}
+                {isPlayingAudio && (
+                  <div
+                    className="absolute bg-gradient-to-br from-purple-300/30 to-purple-500/30 rounded-full"
+                    style={{
+                      width: `${220 + audioVolume * 120}px`,
+                      height: `${220 + audioVolume * 120}px`,
+                      opacity: audioVolume * 0.7,
+                      filter: `blur(${30 + audioVolume * 30}px)`,
+                      transitionDuration: '80ms',
+                    }}
+                  ></div>
+                )}
+
+                {/* Blob terciário - Camada externa */}
+                {isPlayingAudio && audioVolume > 0.3 && (
+                  <div
+                    className="absolute bg-gradient-to-br from-purple-200/20 to-purple-400/20 rounded-full"
+                    style={{
+                      width: `${300 + audioVolume * 100}px`,
+                      height: `${300 + audioVolume * 100}px`,
+                      opacity: audioVolume * 0.4,
+                      filter: `blur(${60 + audioVolume * 30}px)`,
+                      transitionDuration: '100ms',
+                    }}
+                  ></div>
+                )}
+
+                {/* Núcleo central brilhante - aparece nos picos */}
+                {isPlayingAudio && audioVolume > 0.5 && (
+                  <div
+                    className="absolute bg-white rounded-full"
+                    style={{
+                      width: `${40 + audioVolume * 80}px`,
+                      height: `${40 + audioVolume * 80}px`,
+                      opacity: (audioVolume - 0.5) * 1.5,
+                      filter: `blur(${20 + audioVolume * 20}px)`,
+                      boxShadow: `0 0 ${60 + audioVolume * 40}px rgba(168, 85, 247, ${audioVolume * 0.8})`,
+                    }}
+                  ></div>
+                )}
               </div>
             </div>
           </div>

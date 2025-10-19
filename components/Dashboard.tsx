@@ -71,15 +71,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               {/* Main CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
                 <button
-                  onClick={() => handleViewChange('chat')}
-                  className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-purple"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  Acessar Chat IA
-                </button>
-                <button
                   onClick={() => handleViewChange('roleplay')}
-                  className="px-8 py-4 bg-gray-800/50 backdrop-blur-sm text-white rounded-2xl font-semibold text-lg border border-purple-500/30 hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+                  className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-purple"
                 >
                   <Users className="w-5 h-5" />
                   Treinar com Roleplay
@@ -96,26 +89,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Chat IA Card */}
-            <button
-              onClick={() => handleViewChange('chat')}
-              className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '0ms' }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition-all">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-purple-600/20 rounded-2xl flex items-center justify-center">
-                    <MessageCircle className="w-7 h-7 text-purple-400" />
-                  </div>
-                  <h3 className="text-2xl font-bold">Chat IA</h3>
-                </div>
-                <p className="text-gray-400 text-lg">
-                  Tire conversas, tire dúvidas e aprenda com nosso chatbot baseado em SPIN Selling.
-                </p>
-              </div>
-            </button>
-
             {/* Roleplay Card */}
             <button
               onClick={() => handleViewChange('roleplay')}
@@ -206,12 +179,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 className={`hover:text-white transition-colors ${currentView === 'home' ? 'text-white' : ''}`}
               >
                 Home
-              </button>
-              <button
-                onClick={() => handleViewChange('chat')}
-                className={`hover:text-white transition-colors ${currentView === 'chat' ? 'text-white' : ''}`}
-              >
-                Chat IA
               </button>
               <button
                 onClick={() => handleViewChange('roleplay')}

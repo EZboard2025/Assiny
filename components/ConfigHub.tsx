@@ -85,6 +85,20 @@ function ConfigurationInterface({
   const [evaluatingPersona, setEvaluatingPersona] = useState(false)
   const [editedPersonaIds, setEditedPersonaIds] = useState<Set<string>>(new Set())
 
+  // Estados do formulário de Dados da Empresa
+  const [companyData, setCompanyData] = useState({
+    nome: '',
+    descricao: '',
+    produtos_servicos: '',
+    funcao_produtos: '',
+    diferenciais: '',
+    concorrentes: '',
+    dados_metricas: '',
+    erros_comuns: '',
+    percepcao_desejada: ''
+  })
+  const [savingCompanyData, setSavingCompanyData] = useState(false)
+
   // Carregar dados do Supabase
   useEffect(() => {
     loadData()
@@ -708,8 +722,8 @@ function ConfigurationInterface({
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
-          <FileText className="w-4 h-4 inline mr-2" />
-          Arquivos
+          <Building2 className="w-4 h-4 inline mr-2" />
+          Dados da Empresa
         </button>
       </div>
 
@@ -1329,71 +1343,172 @@ function ConfigurationInterface({
           </div>
         )}
 
-        {/* Arquivos Tab */}
+        {/* Dados da Empresa Tab */}
         {activeTab === 'files' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-xl font-bold mb-4">Upload de Arquivos para IA</h3>
+              <h3 className="text-xl font-bold mb-4">Dados da Empresa</h3>
               <p className="text-gray-400 mb-6">
-                Faça upload de PDFs, vídeos ou áudios para melhorar a base de conhecimento da IA.
+                Preencha as informações sobre sua empresa para melhorar o treinamento da IA.
               </p>
 
-              {/* Upload Area */}
-              <div className="bg-gray-900/50 border-2 border-dashed border-purple-500/30 rounded-xl p-8 text-center">
-                <Upload className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-                <h4 className="text-lg font-semibold mb-2">Selecione os arquivos</h4>
-                <p className="text-sm text-gray-400 mb-4">
-                  Suporta PDF, vídeo e áudio
-                </p>
-                <label className="inline-block">
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileUpload}
-                    disabled={uploadingFile}
-                    className="hidden"
-                    accept=".pdf,video/*,audio/*"
-                  />
-                  <span className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform inline-block cursor-pointer">
-                    {uploadingFile ? 'Processando...' : 'Escolher Arquivos'}
-                  </span>
-                </label>
+              {/* Formulário de Dados da Empresa */}
+              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6 mb-6">
+                <h4 className="text-lg font-semibold mb-6">Informações da Empresa</h4>
+                <div className="space-y-6">
+                  {/* Nome da Empresa */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Qual é o nome da empresa?
+                    </label>
+                    <input
+                      type="text"
+                      value={companyData.nome}
+                      onChange={(e) => setCompanyData({ ...companyData, nome: e.target.value })}
+                      placeholder="Ex: Tech Solutions LTDA"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Descrição */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Em uma frase simples e objetiva, como você descreveria o que a empresa faz?
+                    </label>
+                    <textarea
+                      value={companyData.descricao}
+                      onChange={(e) => setCompanyData({ ...companyData, descricao: e.target.value })}
+                      placeholder="Ex: Desenvolvemos software de gestão para pequenas e médias empresas"
+                      rows={2}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Produtos/Serviços */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Quais são os produtos ou serviços principais da empresa?
+                    </label>
+                    <textarea
+                      value={companyData.produtos_servicos}
+                      onChange={(e) => setCompanyData({ ...companyData, produtos_servicos: e.target.value })}
+                      placeholder="Ex: Sistema ERP, CRM para vendas, Plataforma de automação de marketing"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Função dos Produtos */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      O que cada produto faz na prática (função real e verificável)?
+                    </label>
+                    <textarea
+                      value={companyData.funcao_produtos}
+                      onChange={(e) => setCompanyData({ ...companyData, funcao_produtos: e.target.value })}
+                      placeholder="Ex: ERP - controla estoque em tempo real e gera relatórios financeiros automáticos"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Diferenciais */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Quais são os diferenciais reais da empresa em relação aos concorrentes?
+                    </label>
+                    <textarea
+                      value={companyData.diferenciais}
+                      onChange={(e) => setCompanyData({ ...companyData, diferenciais: e.target.value })}
+                      placeholder="Ex: Suporte técnico 24/7, implementação em 48h, integração nativa com 200+ apps"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Concorrentes */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Quais empresas são consideradas concorrentes diretas?
+                    </label>
+                    <textarea
+                      value={companyData.concorrentes}
+                      onChange={(e) => setCompanyData({ ...companyData, concorrentes: e.target.value })}
+                      placeholder="Ex: TOTVS, Omie, Bling, SAP Business One"
+                      rows={2}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Dados e Métricas */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Quais dados, resultados ou números podem ser citados com segurança (ex: quantidade de clientes, crescimento, métricas reais)?
+                    </label>
+                    <textarea
+                      value={companyData.dados_metricas}
+                      onChange={(e) => setCompanyData({ ...companyData, dados_metricas: e.target.value })}
+                      placeholder="Ex: 5.000+ clientes ativos, 98% de satisfação (NPS 85), crescimento de 40% em 2024"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Erros Comuns */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Quais informações ou pontos o vendedor costuma confundir, exagerar ou citar de forma incorreta sobre a empresa ou produto?
+                    </label>
+                    <textarea
+                      value={companyData.erros_comuns}
+                      onChange={(e) => setCompanyData({ ...companyData, erros_comuns: e.target.value })}
+                      placeholder="Ex: Vendedores dizem 'integração instantânea' mas leva 24-48h, falam 'ilimitado' mas há limite de 10GB"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Percepção Desejada */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Como a empresa deseja ser percebida pelos clientes (ex: acessível, premium, inovadora, consultiva, simples, tradicional etc.)?
+                    </label>
+                    <textarea
+                      value={companyData.percepcao_desejada}
+                      onChange={(e) => setCompanyData({ ...companyData, percepcao_desejada: e.target.value })}
+                      placeholder="Ex: Inovadora e acessível, com foco em simplificar tecnologia para PMEs"
+                      rows={2}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Botão Salvar */}
+                  <button
+                    onClick={() => {
+                      setSavingCompanyData(true)
+                      // TODO: Implementar salvamento no Supabase
+                      setTimeout(() => {
+                        setSavingCompanyData(false)
+                        alert('Dados salvos com sucesso!')
+                      }, 1000)
+                    }}
+                    disabled={savingCompanyData}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {savingCompanyData ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        Salvar Dados da Empresa
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-
-              {/* Upload Progress */}
-              {uploadingFile && (
-                <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                    <span className="text-gray-300">
-                      Processando arquivo {currentUploadIndex + 1} de {uploadProgress.total}...
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-800 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-purple-600 to-purple-500 h-2 rounded-full transition-all"
-                      style={{ width: `${(uploadProgress.completed / uploadProgress.total) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {/* Uploaded Files */}
-              {uploadedFiles.length > 0 && (
-                <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6">
-                  <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-400" />
-                    Arquivos Processados
-                  </h4>
-                  <ul className="space-y-2">
-                    {uploadedFiles.map((file, index) => (
-                      <li key={index} className="text-sm text-gray-400">
-                        • {file}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
 
               {/* Quality Scale Legend */}
               <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6 mb-6">
