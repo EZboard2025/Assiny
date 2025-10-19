@@ -93,10 +93,21 @@ npm run lint         # Run ESLint
   - `rebuttals` - JSONB array of rebuttal strategies
   - `evaluation_score` - DECIMAL(3,1) for quality assessment (0-10)
   - Score resets to NULL when objection or rebuttals are edited
+  - Evaluation webhook: `https://ezboard.app.n8n.cloud/webhook/ed84cced-6bf5-4c4d-87e7-4ca3057be871`
+- `company_data` - **Company information for AI training**
+  - Stores 9 fields: nome, descricao, produtos_servicos, funcao_produtos, diferenciais, concorrentes, dados_metricas, erros_comuns, percepcao_desejada
+  - Single record per system (uses UPDATE not INSERT when exists)
+  - Auto-generates embeddings on save/update via `/api/company/generate-embeddings`
+- `documents` - **Vector embeddings for company knowledge (pgvector, N8N compatible)**
+  - Stores embeddings from `company_data` in chunks (8 chunks per company)
+  - Columns: `id`, `company_data_id`, `category`, `question`, `content`, `embedding` (VECTOR 1536), `metadata` (JSONB)
+  - ON DELETE CASCADE - embeddings auto-deleted when company_data is deleted
+  - 100% cleared and regenerated when company_data is updated
+  - Uses `match_company_knowledge()` function for semantic search
+  - Compatible with N8N Supabase Vector Store (uses standard table name)
 - `knowledge_base` - SPIN/psychology content (category, title, content)
 - `customer_segments` - (Legacy, replaced by personas)
 - `company_type` - Business type configuration (B2B or B2C)
-- `documents` - Vector embeddings for AI knowledge base (pgvector)
 
 **Important Notes:**
 - All config tables have Row Level Security (RLS) enabled
@@ -123,8 +134,14 @@ npm run lint         # Run ESLint
 - `/api/performance-summary/update` - Update user's performance summary (auto-called after evaluation)
 - `/api/performance-summary/populate-all` - Populate summaries for all users with existing sessions
 
+**Company Data & Embeddings:**
+- `/api/company/generate-embeddings` - Generate vector embeddings from company_data
+  - Called automatically after company_data save/update
+  - Deletes all old embeddings, creates 8 new chunks
+  - Uses OpenAI text-embedding-ada-002 model
+- `/api/company/search` - Semantic search test endpoint (for debugging)
+
 **Other:**
-- `/api/upload-file` - Upload files to N8N for embedding
 - `/api/evaluate-quality` - Quality evaluation endpoint
 
 ### N8N Webhook Integration
@@ -165,6 +182,12 @@ npm run lint         # Run ESLint
   - Agent generates 7-day development plan based on SPIN performance data
   - Returns: diagnostics, SPIN scores, goals, actions, checkpoint, next steps
   - **Cooldown**: 1 week between generations (enforced by frontend)
+
+- **Objection Evaluation**: `https://ezboard.app.n8n.cloud/webhook/ed84cced-6bf5-4c4d-87e7-4ca3057be871`
+  - Triggered when admin clicks "AVALIAR" on objection in ConfigHub
+  - Input: `{ objecao_completa: string }` (formatted text with objection + rebuttals)
+  - Output: JSON with nota_final, status, como_melhorar, etc.
+  - Score saved to `objections.evaluation_score` column
 
 **N8N Response Parsing:**
 N8N can return evaluations in multiple formats. Always handle both:
@@ -227,11 +250,21 @@ if (Array.isArray(result) && result[0]?.output) {
     - Clicking session loads full conversation from database
 
 - `RoleplayView.tsx` - Voice-based roleplay training interface
+  - **Audio Recording**: Manual start/stop (no automatic silence detection)
+    - User clicks microphone to START recording
+    - User clicks "Finalizar Fala" button to STOP and send
+    - Removes buggy auto-detection of silence
+  - **Audio Visualization**: Purple blob reacts to TTS playback
+    - 4 layers: main blob, secondary, tertiary (volume >0.3), bright core (volume >0.5)
+    - Uses Web Audio API to analyze frequency data in real-time
+    - Dynamic size, opacity, blur, and transform based on audio volume
+    - FFT size 128, smoothing 0.3 for high responsiveness
   - Manages recording, transcription, TTS playback
   - Creates/updates roleplay sessions
   - Triggers evaluation on session end
   - Shows evaluation modal with scores
   - Auto-updates performance summary after successful evaluation
+  - **Session Info**: Shows real-time date/time (no static timestamps)
   - **Age & Temperament Info Boxes**: Dynamic behavior descriptions shown based on user selections
     - Age ranges: 18-24, 25-34, 35-44, 45-60 (tone, vocabulary, behavior patterns)
     - Temperaments: Analítico, Empático, Determinado, Indeciso, Sociável (behavior, style, triggers)
@@ -254,8 +287,12 @@ if (Array.isArray(result) && result[0]?.output) {
 
 - `ConfigHub.tsx` - Admin configuration hub
   - Password protected (`admin123`)
-  - Manages employees, personas, objections, business type
-  - File upload for document embeddings
+  - Manages employees, personas, objections, business type, company data
+  - **Dados da Empresa Tab**:
+    - 9-field form for company information (nome, descricao, produtos_servicos, etc.)
+    - Button dynamically shows "Salvar" (first time) or "Atualizar" (when editing)
+    - Auto-generates embeddings on save via `/api/company/generate-embeddings`
+    - Tracks `companyDataId` state to prevent duplicates (UPDATE vs INSERT)
   - **Persona Evaluation System**:
     - "AVALIAR PERSONA" button sends persona data to N8N consultant agent
     - Agent evaluates using SPIN Selling methodology (5 fields: cargo, tipo_empresa_faturamento, contexto, busca, dores)
@@ -263,6 +300,12 @@ if (Array.isArray(result) && result[0]?.output) {
     - Side panel displays evaluation (z-[70]) while ConfigHub shifts left (translate-x-[-250px])
     - Red warning banner: Personas below 7.0 may compromise roleplay quality
     - Evaluation webhook: `https://ezboard.app.n8n.cloud/webhook/persona-consultor`
+  - **Objection Evaluation System**:
+    - "AVALIAR" button on each objection (becomes "REAVALIAR" after first evaluation)
+    - Sends formatted text with objection + all rebuttals to N8N
+    - Green-themed modal displays results (nota_final, status, como_melhorar)
+    - Score badge shows color-coded rating (green ≥7, yellow 4-6.9, red <4)
+    - Score resets to NULL when objection or rebuttals are edited
 
 - `PDIView.tsx` - **PDI (Plano de Desenvolvimento Individual) interface**
   - Displays AI-generated 7-day development plans
@@ -372,11 +415,46 @@ data?.forEach((row) => {
 2. Turn: Record audio → Transcribe → Send to Assistant → Get response → Play TTS
 3. End: Stop recording → Save final state → Call evaluate API → Update performance summary → Show modal
 
-### Audio Recording Pattern
-- Uses `MediaRecorder` with silence detection
-- Auto-stops after 1s of silence (30 frames of low volume)
+### Audio Recording Pattern (Manual Control)
+- Uses `MediaRecorder` with **manual** start/stop (no automatic silence detection)
+- User workflow:
+  1. Click microphone button → Starts recording
+  2. Speak freely (no time limit)
+  3. Click "Finalizar Fala" button → Stops recording and sends for transcription
 - Must track `isRecording`, `isPlayingAudio`, `isLoading` states
-- User must manually click microphone button (no auto-recording after TTS)
+- Removed automatic silence detection to prevent bugs
+
+### Audio Visualization Pattern
+```typescript
+// Setup audio visualizer when TTS plays
+const setupAudioVisualizer = (audio: HTMLAudioElement) => {
+  const audioContext = new AudioContext()
+  const analyser = audioContext.createAnalyser()
+  analyser.fftSize = 128 // Smaller = more responsive
+  analyser.smoothingTimeConstant = 0.3 // Less smoothing = more reactive
+
+  const source = audioContext.createMediaStreamSource(audio)
+  source.connect(analyser)
+  analyser.connect(audioContext.destination)
+
+  // Analyze frequencies in real-time
+  const updateVolume = () => {
+    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+    analyser.getByteFrequencyData(dataArray)
+
+    // Focus on mid-high frequencies (human voice)
+    const relevantFrequencies = dataArray.slice(5, 40)
+    const average = relevantFrequencies.reduce((a, b) => a + b) / relevantFrequencies.length
+
+    // Amplify for dramatic effect
+    const normalizedVolume = Math.min((average / 80) * 2.5, 1.2)
+    setAudioVolume(normalizedVolume)
+
+    requestAnimationFrame(updateVolume)
+  }
+  updateVolume()
+}
+```
 
 ### Evaluation Data Structure
 
@@ -544,6 +622,68 @@ await supabase
   .eq('status', 'ativo')
 ```
 
+### Company Data Embeddings Pattern
+
+**Two-table architecture for semantic search:**
+
+1. **`company_data` table** (source of truth):
+   - Single record with 9 fields describing the company
+   - Uses UPDATE (not INSERT) when `companyDataId` exists
+   - Triggers embedding generation on save
+
+2. **`documents` table** (vector embeddings):
+   - 8 chunks per company (one per category)
+   - Columns: `company_data_id`, `category`, `question`, `content`, `embedding`, `metadata`
+   - 100% cleared and regenerated on company_data update
+   - Uses `ON DELETE CASCADE` FK
+
+**Save flow:**
+```typescript
+// 1. Check if company_data exists
+if (companyDataId) {
+  // UPDATE existing record
+  await supabase.from('company_data').update(data).eq('id', companyDataId)
+} else {
+  // INSERT new record
+  const { data } = await supabase.from('company_data').insert(data)
+  setCompanyDataId(data.id) // Track for future updates
+}
+
+// 2. Generate embeddings (async, non-blocking)
+fetch('/api/company/generate-embeddings', {
+  method: 'POST',
+  body: JSON.stringify({ companyDataId })
+})
+```
+
+**Embedding generation (in API):**
+```typescript
+// 1. Delete old embeddings
+await supabase.from('documents').delete().eq('company_data_id', companyDataId)
+
+// 2. Create 8 chunks (categories: identidade, produtos, diferenciais, etc.)
+// 3. Generate embedding for each chunk (OpenAI ada-002)
+// 4. Insert with metadata for N8N compatibility
+await supabase.from('documents').insert({
+  company_data_id: companyDataId,
+  category: chunk.category,
+  question: chunk.question,
+  content: chunk.content,
+  embedding: embedding,
+  metadata: { category, question, company_data_id } // N8N needs this
+})
+```
+
+**Semantic search:**
+```typescript
+const { data } = await supabase.rpc('match_company_knowledge', {
+  query_embedding: await generateEmbedding(question),
+  match_threshold: 0.7,
+  match_count: 5
+})
+// Returns most similar chunks with similarity scores
+```
+
 ### Persona Evaluation UI Pattern
 
 **Side Panel Layout:**
@@ -653,18 +793,25 @@ OPENAI_API_KEY=sk-...             # For Assistant API
 1. `criar-tabelas-config.sql` - Config tables (segments, objections, company_type)
 2. `criar-tabela-employees.sql` - Employees table
 3. `criar-tabela-personas.sql` - Personas (B2B/B2C)
-4. `criar-tabela-roleplay-sessions.sql` - Sessions table
-5. `adicionar-coluna-evaluation.sql` - Add evaluation JSONB column
-6. `criar-tabela-resumos-performance.sql` - Performance summaries table
-7. `adicionar-unique-constraint.sql` - Add UNIQUE constraint on user_id (required for upsert)
-8. `criar-tabela-knowledge-base.sql` - Knowledge base for SPIN/psychology content
-9. `criar-tabela-chat-sessions.sql` or `limpar-e-recriar-chat-sessions.sql` - Chat sessions (LangChain format)
-10. `adicionar-user-id-chat-sessions.sql` - Add user_id column with RLS policies
-11. `trigger-auto-user-id.sql` - Auto-populate user_id for messages in same session
-12. `criar-tabela-pdis.sql` - PDI (Plano de Desenvolvimento Individual) table
-13. `criar-tabela-embeddings.sql` - Documents with vector extension (optional)
-14. `criar-usuario-admin.sql` - Create admin user for testing
-15. `popular-resumos-existentes.sql` - Populate summaries for existing sessions
+4. `adicionar-quebras-objecoes.sql` - Add rebuttals JSONB column to objections
+5. `adicionar-score-objecoes.sql` - Add evaluation_score to objections
+6. `criar-tabela-roleplay-sessions.sql` - Sessions table
+7. `adicionar-coluna-evaluation.sql` - Add evaluation JSONB column
+8. `criar-tabela-resumos-performance.sql` - Performance summaries table
+9. `adicionar-unique-constraint.sql` - Add UNIQUE constraint on user_id (required for upsert)
+10. `criar-tabela-knowledge-base.sql` - Knowledge base for SPIN/psychology content
+11. `criar-tabela-chat-sessions.sql` or `limpar-e-recriar-chat-sessions.sql` - Chat sessions (LangChain format)
+12. `adicionar-user-id-chat-sessions.sql` - Add user_id column with RLS policies
+13. `trigger-auto-user-id.sql` - Auto-populate user_id for messages in same session
+14. `criar-tabela-pdis.sql` - PDI (Plano de Desenvolvimento Individual) table
+15. `criar-tabela-company-data.sql` - Company information table
+16. `criar-tabela-company-embeddings.sql` - Documents table with pgvector (IMPORTANT: Run this BEFORE renaming)
+17. `renomear-para-documents.sql` - Rename company_knowledge_embeddings → documents (N8N compatibility)
+18. `adicionar-metadata-documents.sql` - Add metadata JSONB column to documents
+19. `atualizar-funcao-match.sql` - Update match_company_knowledge function for documents table
+20. `limpar-duplicatas-company-data.sql` - Remove duplicate company_data records (cleanup)
+21. `criar-usuario-admin.sql` - Create admin user for testing
+22. `popular-resumos-existentes.sql` - Populate summaries for existing sessions
 
 ## Deployment Considerations
 

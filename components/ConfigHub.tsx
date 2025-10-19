@@ -97,12 +97,136 @@ function ConfigurationInterface({
     erros_comuns: '',
     percepcao_desejada: ''
   })
+  const [companyDataId, setCompanyDataId] = useState<string | null>(null)
   const [savingCompanyData, setSavingCompanyData] = useState(false)
 
   // Carregar dados do Supabase
   useEffect(() => {
     loadData()
+    loadCompanyData()
   }, [])
+
+  // Carregar dados da empresa
+  const loadCompanyData = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data, error } = await supabase
+        .from('company_data')
+        .select('*')
+        .limit(1)
+        .single()
+
+      if (data && !error) {
+        setCompanyDataId(data.id) // Guardar ID para atualizar depois
+        setCompanyData({
+          nome: data.nome || '',
+          descricao: data.descricao || '',
+          produtos_servicos: data.produtos_servicos || '',
+          funcao_produtos: data.funcao_produtos || '',
+          diferenciais: data.diferenciais || '',
+          concorrentes: data.concorrentes || '',
+          dados_metricas: data.dados_metricas || '',
+          erros_comuns: data.erros_comuns || '',
+          percepcao_desejada: data.percepcao_desejada || ''
+        })
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados da empresa:', error)
+    }
+  }
+
+  // Salvar dados da empresa e gerar embeddings
+  const handleSaveCompanyData = async () => {
+    setSavingCompanyData(true)
+
+    try {
+      const { supabase } = await import('@/lib/supabase')
+
+      let savedData: any
+
+      // 1. Verificar se já existe registro
+      if (companyDataId) {
+        // ATUALIZAR registro existente
+        console.log('📝 Atualizando registro existente:', companyDataId)
+        const { data, error } = await supabase
+          .from('company_data')
+          .update({
+            nome: companyData.nome,
+            descricao: companyData.descricao,
+            produtos_servicos: companyData.produtos_servicos,
+            funcao_produtos: companyData.funcao_produtos,
+            diferenciais: companyData.diferenciais,
+            concorrentes: companyData.concorrentes,
+            dados_metricas: companyData.dados_metricas,
+            erros_comuns: companyData.erros_comuns,
+            percepcao_desejada: companyData.percepcao_desejada,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', companyDataId)
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Erro ao atualizar:', error)
+          alert('❌ Erro ao atualizar dados da empresa')
+          return
+        }
+        savedData = data
+      } else {
+        // CRIAR novo registro
+        console.log('➕ Criando novo registro')
+        const { data, error } = await supabase
+          .from('company_data')
+          .insert({
+            nome: companyData.nome,
+            descricao: companyData.descricao,
+            produtos_servicos: companyData.produtos_servicos,
+            funcao_produtos: companyData.funcao_produtos,
+            diferenciais: companyData.diferenciais,
+            concorrentes: companyData.concorrentes,
+            dados_metricas: companyData.dados_metricas,
+            erros_comuns: companyData.erros_comuns,
+            percepcao_desejada: companyData.percepcao_desejada
+          })
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Erro ao criar:', error)
+          alert('❌ Erro ao criar dados da empresa')
+          return
+        }
+        savedData = data
+        setCompanyDataId(data.id) // Guardar ID para próximas atualizações
+      }
+
+      console.log('✅ Dados salvos no Supabase:', savedData.id)
+
+      // 2. Gerar embeddings via API (assíncrono - não bloqueia)
+      console.log('🔄 Iniciando geração de embeddings...')
+
+      fetch('/api/company/generate-embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyDataId: savedData.id })
+      })
+        .then(res => res.json())
+        .then(result => {
+          console.log('✅ Embeddings gerados:', result)
+        })
+        .catch(error => {
+          console.error('⚠️ Erro ao gerar embeddings (não bloqueante):', error)
+        })
+
+      alert('✅ Dados salvos com sucesso! Embeddings estão sendo gerados em segundo plano.')
+
+    } catch (error) {
+      console.error('💥 Erro ao salvar dados:', error)
+      alert('❌ Erro ao salvar dados da empresa')
+    } finally {
+      setSavingCompanyData(false)
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -1482,28 +1606,21 @@ function ConfigurationInterface({
                     />
                   </div>
 
-                  {/* Botão Salvar */}
+                  {/* Botão Salvar/Atualizar */}
                   <button
-                    onClick={() => {
-                      setSavingCompanyData(true)
-                      // TODO: Implementar salvamento no Supabase
-                      setTimeout(() => {
-                        setSavingCompanyData(false)
-                        alert('Dados salvos com sucesso!')
-                      }, 1000)
-                    }}
+                    onClick={handleSaveCompanyData}
                     disabled={savingCompanyData}
                     className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {savingCompanyData ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Salvando...
+                        {companyDataId ? 'Atualizando e regenerando embeddings...' : 'Salvando e gerando embeddings...'}
                       </>
                     ) : (
                       <>
                         <CheckCircle className="w-5 h-5" />
-                        Salvar Dados da Empresa
+                        {companyDataId ? 'Atualizar Dados da Empresa' : 'Salvar Dados da Empresa'}
                       </>
                     )}
                   </button>
