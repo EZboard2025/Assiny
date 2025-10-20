@@ -249,11 +249,11 @@ export default function HistoricoView() {
                       <p className="text-sm text-gray-300">
                         <span className="text-gray-500">Persona:</span> {selectedSession.config.segment}
                       </p>
-                      {selectedSession.config.objections.length > 0 && (
+                      {selectedSession.config.objections && selectedSession.config.objections.length > 0 && (
                         <div className="text-sm text-gray-300">
                           <span className="text-gray-500">Objeções:</span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {selectedSession.config.objections.map((obj, i) => (
+                            {selectedSession.config.objections.map((obj: string | { name: string }, i: number) => (
                               <span key={i} className="px-2 py-1 bg-purple-500/20 rounded text-xs">
                                 {typeof obj === 'string' ? obj : obj.name}
                               </span>

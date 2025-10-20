@@ -5,7 +5,11 @@ import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, M
 import { getPersonas, getObjections, getCompanyType, type Persona, type PersonaB2B, type PersonaB2C, type Objection } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 
-export default function RoleplayView() {
+interface RoleplayViewProps {
+  onNavigateToHistory?: () => void
+}
+
+export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps = {}) {
   const [showConfig, setShowConfig] = useState(false)
   const [isSimulating, setIsSimulating] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -1446,7 +1450,11 @@ export default function RoleplayView() {
                   <button
                     onClick={() => {
                       setShowEvaluationSummary(false);
-                      window.location.href = '/?view=historico';
+                      if (onNavigateToHistory) {
+                        onNavigateToHistory();
+                      } else {
+                        window.location.href = '/?view=historico';
+                      }
                     }}
                     className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-purple-500/30"
                   >

@@ -21,6 +21,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   useEffect(() => {
     setMounted(true)
+
+    // Ler query string da URL para navegação direta
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const view = params.get('view')
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil'].includes(view)) {
+        setCurrentView(view as typeof currentView)
+      }
+    }
   }, [])
 
   const handleViewChange = async (newView: typeof currentView) => {
@@ -37,7 +46,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'roleplay') {
-      return <RoleplayView />
+      return <RoleplayView onNavigateToHistory={() => handleViewChange('historico')} />
     }
 
     if (currentView === 'pdi') {

@@ -10,7 +10,7 @@ export interface RoleplayConfig {
   age: number
   temperament: string
   segment: string
-  objections: string[]
+  objections: string[] | { name: string; rebuttals: string[] }[]
 }
 
 export interface RoleplaySession {
