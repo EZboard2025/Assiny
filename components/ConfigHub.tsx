@@ -37,7 +37,11 @@ function ConfigurationInterface({
   objectionEvaluation,
   setObjectionEvaluation,
   showObjectionEvaluationModal,
-  setShowObjectionEvaluationModal
+  setShowObjectionEvaluationModal,
+  qualityEvaluation,
+  setQualityEvaluation,
+  showCompanyEvaluationModal,
+  setShowCompanyEvaluationModal
 }: {
   personaEvaluation: any
   setPersonaEvaluation: (val: any) => void
@@ -47,6 +51,10 @@ function ConfigurationInterface({
   setObjectionEvaluation: (val: any) => void
   showObjectionEvaluationModal: boolean
   setShowObjectionEvaluationModal: (val: boolean) => void
+  qualityEvaluation: any
+  setQualityEvaluation: (val: any) => void
+  showCompanyEvaluationModal: boolean
+  setShowCompanyEvaluationModal: (val: boolean) => void
 }) {
   const [activeTab, setActiveTab] = useState<'employees' | 'business-type' | 'personas' | 'objections' | 'files'>('employees')
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -72,24 +80,6 @@ function ConfigurationInterface({
   const [currentUploadIndex, setCurrentUploadIndex] = useState<number>(-1)
   const [uploadProgress, setUploadProgress] = useState<{ total: number; completed: number }>({ total: 0, completed: 0 })
   const [evaluatingQuality, setEvaluatingQuality] = useState(false)
-  const [showCompanyEvaluationModal, setShowCompanyEvaluationModal] = useState(false)
-  const [qualityEvaluation, setQualityEvaluation] = useState<{
-    nota_final: number
-    classificacao: string
-    pode_usar: boolean
-    capacidade_roleplay: number
-    resumo: string
-    pontos_fortes: string[]
-    principais_gaps: {
-      campo: string
-      problema: string
-      impacto: string
-      acao: string
-    }[]
-    campos_criticos_vazios: string[]
-    proxima_acao: string
-    recomendacao_uso: string
-  } | null>(null)
   const [evaluatingPersona, setEvaluatingPersona] = useState(false)
   const [editedPersonaIds, setEditedPersonaIds] = useState<Set<string>>(new Set())
 
@@ -107,6 +97,7 @@ function ConfigurationInterface({
   })
   const [companyDataId, setCompanyDataId] = useState<string | null>(null)
   const [savingCompanyData, setSavingCompanyData] = useState(false)
+  const [companyDataEdited, setCompanyDataEdited] = useState(false)
 
   // Carregar dados do Supabase
   useEffect(() => {
@@ -137,6 +128,20 @@ function ConfigurationInterface({
           erros_comuns: data.erros_comuns || '',
           percepcao_desejada: data.percepcao_desejada || ''
         })
+
+        // Carregar última avaliação se existir
+        const { data: evalData, error: evalError } = await supabase
+          .from('company_data_evaluations')
+          .select('*')
+          .eq('company_data_id', data.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (evalData && !evalError) {
+          setQualityEvaluation(evalData)
+          console.log('✅ Última avaliação carregada do banco')
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados da empresa:', error)
@@ -227,6 +232,7 @@ function ConfigurationInterface({
         })
 
       alert('✅ Dados salvos com sucesso! Embeddings estão sendo gerados em segundo plano.')
+      setCompanyDataEdited(false) // Resetar flag de edição após salvar
 
     } catch (error) {
       console.error('💥 Erro ao salvar dados:', error)
@@ -811,8 +817,45 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
         }
 
         console.log('✅ Avaliação final processada:', evaluation)
+
+        // Salvar avaliação no Supabase
+        if (companyDataId) {
+          try {
+            const { supabase } = await import('@/lib/supabase')
+            const { data: { user } } = await supabase.auth.getUser()
+
+            if (user) {
+              const { error: saveError } = await supabase
+                .from('company_data_evaluations')
+                .insert({
+                  user_id: user.id,
+                  company_data_id: companyDataId,
+                  nota_final: evaluation.nota_final,
+                  classificacao: evaluation.classificacao,
+                  pode_usar: evaluation.pode_usar,
+                  capacidade_roleplay: evaluation.capacidade_roleplay,
+                  resumo: evaluation.resumo,
+                  pontos_fortes: evaluation.pontos_fortes || [],
+                  principais_gaps: evaluation.principais_gaps || [],
+                  campos_criticos_vazios: evaluation.campos_criticos_vazios || [],
+                  proxima_acao: evaluation.proxima_acao,
+                  recomendacao_uso: evaluation.recomendacao_uso
+                })
+
+              if (saveError) {
+                console.error('❌ Erro ao salvar avaliação no banco:', saveError)
+              } else {
+                console.log('✅ Avaliação salva no banco de dados')
+              }
+            }
+          } catch (saveError) {
+            console.error('💥 Erro ao salvar avaliação:', saveError)
+          }
+        }
+
         setQualityEvaluation(evaluation)
         setShowCompanyEvaluationModal(true)
+        setCompanyDataEdited(false) // Resetar flag de edição após avaliar
       } else {
         const errorText = await response.text()
         console.error('❌ Erro ao avaliar qualidade:', response.status, errorText)
@@ -1532,7 +1575,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     <input
                       type="text"
                       value={companyData.nome}
-                      onChange={(e) => setCompanyData({ ...companyData, nome: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, nome: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: Tech Solutions LTDA"
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
                     />
@@ -1545,7 +1591,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.descricao}
-                      onChange={(e) => setCompanyData({ ...companyData, descricao: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, descricao: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: Desenvolvemos software de gestão para pequenas e médias empresas"
                       rows={2}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
@@ -1559,7 +1608,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.produtos_servicos}
-                      onChange={(e) => setCompanyData({ ...companyData, produtos_servicos: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, produtos_servicos: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: Sistema ERP, CRM para vendas, Plataforma de automação de marketing"
                       rows={3}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
@@ -1573,7 +1625,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.funcao_produtos}
-                      onChange={(e) => setCompanyData({ ...companyData, funcao_produtos: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, funcao_produtos: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: ERP - controla estoque em tempo real e gera relatórios financeiros automáticos"
                       rows={3}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
@@ -1587,7 +1642,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.diferenciais}
-                      onChange={(e) => setCompanyData({ ...companyData, diferenciais: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, diferenciais: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: Suporte técnico 24/7, implementação em 48h, integração nativa com 200+ apps"
                       rows={3}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
@@ -1601,7 +1659,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.concorrentes}
-                      onChange={(e) => setCompanyData({ ...companyData, concorrentes: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, concorrentes: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: TOTVS, Omie, Bling, SAP Business One"
                       rows={2}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
@@ -1615,7 +1676,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.dados_metricas}
-                      onChange={(e) => setCompanyData({ ...companyData, dados_metricas: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, dados_metricas: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: 5.000+ clientes ativos, 98% de satisfação (NPS 85), crescimento de 40% em 2024"
                       rows={3}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
@@ -1629,7 +1693,10 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.erros_comuns}
-                      onChange={(e) => setCompanyData({ ...companyData, erros_comuns: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, erros_comuns: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: Vendedores dizem 'integração instantânea' mas leva 24-48h, falam 'ilimitado' mas há limite de 10GB"
                       rows={3}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
@@ -1643,37 +1710,48 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </label>
                     <textarea
                       value={companyData.percepcao_desejada}
-                      onChange={(e) => setCompanyData({ ...companyData, percepcao_desejada: e.target.value })}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, percepcao_desejada: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
                       placeholder="Ex: Inovadora e acessível, com foco em simplificar tecnologia para PMEs"
                       rows={2}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
                     />
                   </div>
 
-                  {/* Botões Salvar/Avaliar */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      onClick={handleSaveCompanyData}
-                      disabled={savingCompanyData}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {savingCompanyData ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          {companyDataId ? 'Atualizando...' : 'Salvando...'}
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-5 h-5" />
-                          {companyDataId ? 'Atualizar Dados' : 'Salvar Dados'}
-                        </>
-                      )}
-                    </button>
+                  {/* Botões Salvar/Avaliar/Ver */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Botão Salvar/Atualizar - só aparece se não há ID (primeira vez) OU se houve edição */}
+                    {(!companyDataId || companyDataEdited) && (
+                      <button
+                        onClick={handleSaveCompanyData}
+                        disabled={savingCompanyData}
+                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {savingCompanyData ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            {companyDataId ? 'Atualizando...' : 'Salvando...'}
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-5 h-5" />
+                            {companyDataId ? 'Atualizar Dados' : 'Salvar Dados'}
+                          </>
+                        )}
+                      </button>
+                    )}
 
                     <button
                       onClick={handleEvaluateQuality}
-                      disabled={evaluatingQuality}
+                      disabled={evaluatingQuality || (qualityEvaluation && !companyDataEdited)}
                       className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      title={
+                        qualityEvaluation && !companyDataEdited
+                          ? 'Edite os dados para poder reavaliar'
+                          : ''
+                      }
                     >
                       {evaluatingQuality ? (
                         <>
@@ -1683,147 +1761,22 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       ) : (
                         <>
                           <AlertCircle className="w-5 h-5" />
-                          Avaliar Dados
+                          {qualityEvaluation ? 'Reavaliar Dados' : 'Avaliar Dados'}
                         </>
                       )}
                     </button>
+
+                    {qualityEvaluation && (
+                      <button
+                        onClick={() => setShowCompanyEvaluationModal(true)}
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Ver Avaliação
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Painel Lateral de Avaliação de Dados da Empresa */}
-        {showCompanyEvaluationModal && qualityEvaluation && (
-          <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
-            <div className="animate-slide-in">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-purple-500/30">
-                <h3 className="text-xl font-bold text-white">Avaliação dos Dados</h3>
-                <button
-                  onClick={() => setShowCompanyEvaluationModal(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Score Geral */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">Score Geral</span>
-                  <span className="text-3xl font-bold text-purple-400">
-                    {qualityEvaluation.nota_final}
-                    <span className="text-lg text-gray-500">/100</span>
-                  </span>
-                </div>
-                <div className={`px-4 py-2 rounded-lg font-semibold text-center text-sm ${
-                  qualityEvaluation.classificacao === 'Excelente' ? 'bg-green-500/20 text-green-400' :
-                  qualityEvaluation.classificacao === 'Ótimo' ? 'bg-purple-500/20 text-purple-400' :
-                  qualityEvaluation.classificacao === 'Bom' ? 'bg-blue-500/20 text-blue-400' :
-                  qualityEvaluation.classificacao === 'Aceitável' ? 'bg-yellow-500/20 text-yellow-400' :
-                  qualityEvaluation.classificacao === 'Ruim' ? 'bg-orange-500/20 text-orange-400' :
-                  'bg-red-500/20 text-red-400'
-                }`}>
-                  {qualityEvaluation.classificacao}
-                </div>
-              </div>
-
-              {/* Capacidade para Roleplay */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">Capacidade Roleplay</span>
-                  <span className="text-2xl font-bold text-blue-400">
-                    {qualityEvaluation.capacidade_roleplay}%
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all"
-                    style={{ width: `${qualityEvaluation.capacidade_roleplay}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Resumo */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
-                <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Resumo</h4>
-                <p className="text-sm text-gray-300 leading-relaxed">{qualityEvaluation.resumo}</p>
-              </div>
-
-              {/* Pontos Fortes */}
-              {qualityEvaluation.pontos_fortes && qualityEvaluation.pontos_fortes.length > 0 && (
-                <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4 mb-4">
-                  <h4 className="text-xs text-green-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Pontos Fortes
-                  </h4>
-                  <ul className="space-y-2">
-                    {qualityEvaluation.pontos_fortes.map((ponto, index) => (
-                      <li key={index} className="text-xs text-gray-300 flex items-start gap-2">
-                        <span className="text-green-400 mt-0.5">✓</span>
-                        <span>{ponto}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Principais Gaps */}
-              {qualityEvaluation.principais_gaps && qualityEvaluation.principais_gaps.length > 0 && (
-                <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-4 mb-4">
-                  <h4 className="text-xs text-orange-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    Principais Gaps
-                  </h4>
-                  <div className="space-y-3">
-                    {qualityEvaluation.principais_gaps.map((gap, index) => (
-                      <div key={index} className="bg-gray-900/50 border border-orange-500/20 rounded-lg p-3">
-                        <div className="text-xs font-semibold text-orange-400 mb-1">
-                          {gap.campo}
-                        </div>
-                        <div className="text-xs text-gray-300 mb-2">{gap.problema}</div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-500">Impacto: {gap.impacto}</span>
-                        </div>
-                        <div className="mt-2 text-xs text-blue-400 bg-blue-900/20 rounded px-2 py-1">
-                          💡 {gap.acao}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Campos Críticos Vazios */}
-              {qualityEvaluation.campos_criticos_vazios && qualityEvaluation.campos_criticos_vazios.length > 0 && (
-                <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
-                  <h4 className="text-xs text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    Campos Críticos Vazios
-                  </h4>
-                  <ul className="space-y-1">
-                    {qualityEvaluation.campos_criticos_vazios.map((campo, index) => (
-                      <li key={index} className="text-xs text-red-300 flex items-start gap-2">
-                        <span className="text-red-400 mt-0.5">⚠</span>
-                        <span>{campo}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Próxima Ação */}
-              <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-4">
-                <h4 className="text-xs text-blue-400 uppercase tracking-wider mb-2">Próxima Ação</h4>
-                <p className="text-sm text-gray-300">{qualityEvaluation.proxima_acao}</p>
-              </div>
-
-              {/* Recomendação de Uso */}
-              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
-                <h4 className="text-xs text-purple-400 uppercase tracking-wider mb-2">Recomendação de Uso</h4>
-                <p className="text-sm text-gray-300">{qualityEvaluation.recomendacao_uso}</p>
               </div>
             </div>
           </div>
@@ -1872,6 +1825,26 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
   const [objectionEvaluation, setObjectionEvaluation] = useState<any>(null)
   const [showObjectionEvaluationModal, setShowObjectionEvaluationModal] = useState(false)
 
+  // Estados para avaliação de dados da empresa
+  const [qualityEvaluation, setQualityEvaluation] = useState<{
+    nota_final: number
+    classificacao: string
+    pode_usar: boolean
+    capacidade_roleplay: number
+    resumo: string
+    pontos_fortes: string[]
+    principais_gaps: {
+      campo: string
+      problema: string
+      impacto: string
+      acao: string
+    }[]
+    campos_criticos_vazios: string[]
+    proxima_acao: string
+    recomendacao_uso: string
+  } | null>(null)
+  const [showCompanyEvaluationModal, setShowCompanyEvaluationModal] = useState(false)
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -1888,7 +1861,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
     <>
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className={`relative max-w-5xl w-full max-h-[90vh] overflow-hidden transition-transform duration-300 ${
-        showPersonaEvaluationModal || showObjectionEvaluationModal ? 'sm:-translate-x-[250px]' : ''
+        showPersonaEvaluationModal || showObjectionEvaluationModal || showCompanyEvaluationModal ? 'sm:-translate-x-[250px]' : ''
       }`}>
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
         <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
@@ -1969,6 +1942,10 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 setObjectionEvaluation={setObjectionEvaluation}
                 showObjectionEvaluationModal={showObjectionEvaluationModal}
                 setShowObjectionEvaluationModal={setShowObjectionEvaluationModal}
+                qualityEvaluation={qualityEvaluation}
+                setQualityEvaluation={setQualityEvaluation}
+                showCompanyEvaluationModal={showCompanyEvaluationModal}
+                setShowCompanyEvaluationModal={setShowCompanyEvaluationModal}
               />
             )}
           </div>
@@ -2261,6 +2238,141 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Painel Lateral de Avaliação de Dados da Empresa */}
+    {showCompanyEvaluationModal && qualityEvaluation && (
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
+        <div className="animate-slide-in">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-purple-500/30">
+            <h3 className="text-xl font-bold text-white">Avaliação dos Dados</h3>
+            <button
+              onClick={() => setShowCompanyEvaluationModal(false)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Score Geral */}
+          <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wider">Score Geral</span>
+              <span className="text-3xl font-bold text-purple-400">
+                {qualityEvaluation.nota_final}
+                <span className="text-lg text-gray-500">/100</span>
+              </span>
+            </div>
+            <div className={`px-4 py-2 rounded-lg font-semibold text-center text-sm ${
+              qualityEvaluation.classificacao === 'Excelente' ? 'bg-green-500/20 text-green-400' :
+              qualityEvaluation.classificacao === 'Ótimo' ? 'bg-purple-500/20 text-purple-400' :
+              qualityEvaluation.classificacao === 'Bom' ? 'bg-blue-500/20 text-blue-400' :
+              qualityEvaluation.classificacao === 'Aceitável' ? 'bg-yellow-500/20 text-yellow-400' :
+              qualityEvaluation.classificacao === 'Ruim' ? 'bg-orange-500/20 text-orange-400' :
+              'bg-red-500/20 text-red-400'
+            }`}>
+              {qualityEvaluation.classificacao}
+            </div>
+          </div>
+
+          {/* Capacidade para Roleplay */}
+          <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-400 uppercase tracking-wider">Capacidade Roleplay</span>
+              <span className="text-2xl font-bold text-blue-400">
+                {qualityEvaluation.capacidade_roleplay}%
+              </span>
+            </div>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all"
+                style={{ width: `${qualityEvaluation.capacidade_roleplay}%` }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Resumo */}
+          <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+            <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Resumo</h4>
+            <p className="text-sm text-gray-300 leading-relaxed">{qualityEvaluation.resumo}</p>
+          </div>
+
+          {/* Pontos Fortes */}
+          {qualityEvaluation.pontos_fortes && qualityEvaluation.pontos_fortes.length > 0 && (
+            <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4 mb-4">
+              <h4 className="text-xs text-green-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Pontos Fortes
+              </h4>
+              <ul className="space-y-2">
+                {qualityEvaluation.pontos_fortes.map((ponto, index) => (
+                  <li key={index} className="text-xs text-gray-300 flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>{ponto}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Principais Gaps */}
+          {qualityEvaluation.principais_gaps && qualityEvaluation.principais_gaps.length > 0 && (
+            <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-4 mb-4">
+              <h4 className="text-xs text-orange-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Principais Gaps
+              </h4>
+              <div className="space-y-3">
+                {qualityEvaluation.principais_gaps.map((gap, index) => (
+                  <div key={index} className="bg-gray-900/50 border border-orange-500/20 rounded-lg p-3">
+                    <div className="text-xs font-semibold text-orange-400 mb-1">
+                      {gap.campo}
+                    </div>
+                    <div className="text-xs text-gray-300 mb-2">{gap.problema}</div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">Impacto: {gap.impacto}</span>
+                    </div>
+                    <div className="mt-2 text-xs text-blue-400 bg-blue-900/20 rounded px-2 py-1">
+                      💡 {gap.acao}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Campos Críticos Vazios */}
+          {qualityEvaluation.campos_criticos_vazios && qualityEvaluation.campos_criticos_vazios.length > 0 && (
+            <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
+              <h4 className="text-xs text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Campos Críticos Vazios
+              </h4>
+              <ul className="space-y-1">
+                {qualityEvaluation.campos_criticos_vazios.map((campo, index) => (
+                  <li key={index} className="text-xs text-red-300 flex items-start gap-2">
+                    <span className="text-red-400 mt-0.5">⚠</span>
+                    <span>{campo}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Próxima Ação */}
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-4">
+            <h4 className="text-xs text-blue-400 uppercase tracking-wider mb-2">Próxima Ação</h4>
+            <p className="text-sm text-gray-300">{qualityEvaluation.proxima_acao}</p>
+          </div>
+
+          {/* Recomendação de Uso */}
+          <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
+            <h4 className="text-xs text-purple-400 uppercase tracking-wider mb-2">Recomendação de Uso</h4>
+            <p className="text-sm text-gray-300">{qualityEvaluation.recomendacao_uso}</p>
           </div>
         </div>
       </div>
