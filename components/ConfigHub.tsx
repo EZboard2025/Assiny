@@ -72,15 +72,23 @@ function ConfigurationInterface({
   const [currentUploadIndex, setCurrentUploadIndex] = useState<number>(-1)
   const [uploadProgress, setUploadProgress] = useState<{ total: number; completed: number }>({ total: 0, completed: 0 })
   const [evaluatingQuality, setEvaluatingQuality] = useState(false)
-  const [qualityScore, setQualityScore] = useState<number>(60)
+  const [showCompanyEvaluationModal, setShowCompanyEvaluationModal] = useState(false)
   const [qualityEvaluation, setQualityEvaluation] = useState<{
     nota_final: number
     classificacao: string
     pode_usar: boolean
+    capacidade_roleplay: number
     resumo: string
     pontos_fortes: string[]
-    principais_gaps: string[]
+    principais_gaps: {
+      campo: string
+      problema: string
+      impacto: string
+      acao: string
+    }[]
+    campos_criticos_vazios: string[]
     proxima_acao: string
+    recomendacao_uso: string
   } | null>(null)
   const [evaluatingPersona, setEvaluatingPersona] = useState(false)
   const [editedPersonaIds, setEditedPersonaIds] = useState<Set<string>>(new Set())
@@ -702,7 +710,46 @@ function ConfigurationInterface({
     setEvaluatingQuality(true)
 
     try {
-      console.log('📊 Solicitando avaliação de qualidade...')
+      console.log('📊 Solicitando avaliação de qualidade dos dados da empresa...')
+
+      // Validar se há dados preenchidos
+      if (!companyData.nome || !companyData.descricao) {
+        alert('Preencha pelo menos o nome e descrição da empresa antes de avaliar.')
+        setEvaluatingQuality(false)
+        return
+      }
+
+      // Montar formulário completo como texto único
+      const formularioTexto = `
+DADOS RECEBIDOS DO FORMULÁRIO:
+
+1. Qual é o nome da empresa?
+${companyData.nome || '(não preenchido)'}
+
+2. Em uma frase simples e objetiva, como você descreveria o que a empresa faz?
+${companyData.descricao || '(não preenchido)'}
+
+3. Quais são os produtos ou serviços principais da empresa?
+${companyData.produtos_servicos || '(não preenchido)'}
+
+4. O que cada produto faz na prática (função real e verificável)?
+${companyData.funcao_produtos || '(não preenchido)'}
+
+5. Quais são os diferenciais reais da empresa em relação aos concorrentes?
+${companyData.diferenciais || '(não preenchido)'}
+
+6. Quais empresas são consideradas concorrentes diretas?
+${companyData.concorrentes || '(não preenchido)'}
+
+7. Quais dados, resultados ou números podem ser citados com segurança (ex: quantidade de clientes, crescimento, métricas reais)?
+${companyData.dados_metricas || '(não preenchido)'}
+
+8. Quais informações ou pontos o vendedor costuma confundir, exagerar ou citar de forma incorreta sobre a empresa ou produto?
+${companyData.erros_comuns || '(não preenchido)'}
+
+9. Como a empresa deseja ser percebida pelos clientes (ex: acessível, premium, inovadora, consultiva, simples, tradicional etc.)?
+${companyData.percepcao_desejada || '(não preenchido)'}
+`.trim()
 
       const response = await fetch('https://ezboard.app.n8n.cloud/webhook/avaliar-documento', {
         method: 'POST',
@@ -710,8 +757,7 @@ function ConfigurationInterface({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'evaluate_quality',
-          timestamp: new Date().toISOString()
+          formulario: formularioTexto
         })
       })
 
@@ -765,10 +811,8 @@ function ConfigurationInterface({
         }
 
         console.log('✅ Avaliação final processada:', evaluation)
-        setQualityScore(evaluation.nota_final)
         setQualityEvaluation(evaluation)
-
-        alert('Avaliação de qualidade concluída!')
+        setShowCompanyEvaluationModal(true)
       } else {
         const errorText = await response.text()
         console.error('❌ Erro ao avaliar qualidade:', response.status, errorText)
@@ -1606,206 +1650,180 @@ function ConfigurationInterface({
                     />
                   </div>
 
-                  {/* Botão Salvar/Atualizar */}
-                  <button
-                    onClick={handleSaveCompanyData}
-                    disabled={savingCompanyData}
-                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {savingCompanyData ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        {companyDataId ? 'Atualizando e regenerando embeddings...' : 'Salvando e gerando embeddings...'}
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        {companyDataId ? 'Atualizar Dados da Empresa' : 'Salvar Dados da Empresa'}
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+                  {/* Botões Salvar/Avaliar */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      onClick={handleSaveCompanyData}
+                      disabled={savingCompanyData}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {savingCompanyData ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          {companyDataId ? 'Atualizando...' : 'Salvando...'}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-5 h-5" />
+                          {companyDataId ? 'Atualizar Dados' : 'Salvar Dados'}
+                        </>
+                      )}
+                    </button>
 
-              {/* Quality Scale Legend */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6 mb-6">
-                <h4 className="text-lg font-semibold mb-4">Escala de Qualidade</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <span className="text-sm text-gray-300">0-19: Insuficiente</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                      <span className="text-sm text-gray-300">20-39: Ruim</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                      <span className="text-sm text-gray-300">40-59: Ok</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                      <span className="text-sm text-gray-300">60-79: Suficiente</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                      <span className="text-sm text-gray-300">80-94: Ótimo</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                      <span className="text-sm text-gray-300">95-100: Perfeito</span>
-                    </div>
+                    <button
+                      onClick={handleEvaluateQuality}
+                      disabled={evaluatingQuality}
+                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {evaluatingQuality ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Avaliando...
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-5 h-5" />
+                          Avaliar Dados
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
 
-              {/* Quality Evaluation */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6">
-                <h4 className="text-lg font-semibold mb-4">Avaliação de Qualidade</h4>
+        {/* Painel Lateral de Avaliação de Dados da Empresa */}
+        {showCompanyEvaluationModal && qualityEvaluation && (
+          <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
+            <div className="animate-slide-in">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-purple-500/30">
+                <h3 className="text-xl font-bold text-white">Avaliação dos Dados</h3>
                 <button
-                  onClick={handleEvaluateQuality}
-                  disabled={evaluatingQuality}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  onClick={() => setShowCompanyEvaluationModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
                 >
-                  {evaluatingQuality ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Avaliando...
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-5 h-5" />
-                      Avaliar Qualidade dos Arquivos
-                    </>
-                  )}
+                  <X className="w-6 h-6" />
                 </button>
+              </div>
 
-                {qualityEvaluation && (
-                  <div className="mt-6 space-y-4">
-                    {/* Score */}
-                    <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-gray-300 text-lg">Nota Final</span>
-                        <span className="text-4xl font-bold text-purple-400">
-                          {qualityEvaluation.nota_final}
-                          <span className="text-xl text-gray-500">/100</span>
-                        </span>
-                      </div>
+              {/* Score Geral */}
+              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-400 uppercase tracking-wider">Score Geral</span>
+                  <span className="text-3xl font-bold text-purple-400">
+                    {qualityEvaluation.nota_final}
+                    <span className="text-lg text-gray-500">/100</span>
+                  </span>
+                </div>
+                <div className={`px-4 py-2 rounded-lg font-semibold text-center text-sm ${
+                  qualityEvaluation.classificacao === 'Excelente' ? 'bg-green-500/20 text-green-400' :
+                  qualityEvaluation.classificacao === 'Ótimo' ? 'bg-purple-500/20 text-purple-400' :
+                  qualityEvaluation.classificacao === 'Bom' ? 'bg-blue-500/20 text-blue-400' :
+                  qualityEvaluation.classificacao === 'Aceitável' ? 'bg-yellow-500/20 text-yellow-400' :
+                  qualityEvaluation.classificacao === 'Ruim' ? 'bg-orange-500/20 text-orange-400' :
+                  'bg-red-500/20 text-red-400'
+                }`}>
+                  {qualityEvaluation.classificacao}
+                </div>
+              </div>
 
-                      {/* Quality Bar with Divisions */}
-                      <div className="relative mb-4">
-                        {/* Background Scale */}
-                        <div className="w-full h-6 rounded-full overflow-hidden flex">
-                          <div className="bg-red-500/30" style={{ width: '20%' }}></div>
-                          <div className="bg-orange-500/30" style={{ width: '20%' }}></div>
-                          <div className="bg-yellow-500/30" style={{ width: '20%' }}></div>
-                          <div className="bg-blue-500/30" style={{ width: '20%' }}></div>
-                          <div className="bg-purple-500/30" style={{ width: '15%' }}></div>
-                          <div className="bg-green-500/30" style={{ width: '5%' }}></div>
+              {/* Capacidade para Roleplay */}
+              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-400 uppercase tracking-wider">Capacidade Roleplay</span>
+                  <span className="text-2xl font-bold text-blue-400">
+                    {qualityEvaluation.capacidade_roleplay}%
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all"
+                    style={{ width: `${qualityEvaluation.capacidade_roleplay}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Resumo */}
+              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+                <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Resumo</h4>
+                <p className="text-sm text-gray-300 leading-relaxed">{qualityEvaluation.resumo}</p>
+              </div>
+
+              {/* Pontos Fortes */}
+              {qualityEvaluation.pontos_fortes && qualityEvaluation.pontos_fortes.length > 0 && (
+                <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4 mb-4">
+                  <h4 className="text-xs text-green-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Pontos Fortes
+                  </h4>
+                  <ul className="space-y-2">
+                    {qualityEvaluation.pontos_fortes.map((ponto, index) => (
+                      <li key={index} className="text-xs text-gray-300 flex items-start gap-2">
+                        <span className="text-green-400 mt-0.5">✓</span>
+                        <span>{ponto}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Principais Gaps */}
+              {qualityEvaluation.principais_gaps && qualityEvaluation.principais_gaps.length > 0 && (
+                <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-4 mb-4">
+                  <h4 className="text-xs text-orange-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Principais Gaps
+                  </h4>
+                  <div className="space-y-3">
+                    {qualityEvaluation.principais_gaps.map((gap, index) => (
+                      <div key={index} className="bg-gray-900/50 border border-orange-500/20 rounded-lg p-3">
+                        <div className="text-xs font-semibold text-orange-400 mb-1">
+                          {gap.campo}
                         </div>
-
-                        {/* Progress Bar */}
-                        <div className="absolute top-0 left-0 h-6 rounded-full overflow-hidden" style={{ width: `${qualityEvaluation.nota_final}%` }}>
-                          <div className="h-full flex">
-                            <div className="bg-red-500" style={{ width: `${Math.min(100, (20 / qualityEvaluation.nota_final) * 100)}%` }}></div>
-                            {qualityEvaluation.nota_final > 20 && (
-                              <div className="bg-orange-500" style={{ width: `${Math.min(100, ((20) / qualityEvaluation.nota_final) * 100)}%` }}></div>
-                            )}
-                            {qualityEvaluation.nota_final > 40 && (
-                              <div className="bg-yellow-500" style={{ width: `${Math.min(100, ((20) / qualityEvaluation.nota_final) * 100)}%` }}></div>
-                            )}
-                            {qualityEvaluation.nota_final > 60 && (
-                              <div className="bg-blue-500" style={{ width: `${Math.min(100, ((20) / qualityEvaluation.nota_final) * 100)}%` }}></div>
-                            )}
-                            {qualityEvaluation.nota_final > 80 && (
-                              <div className="bg-purple-500" style={{ width: `${Math.min(100, ((15) / qualityEvaluation.nota_final) * 100)}%` }}></div>
-                            )}
-                            {qualityEvaluation.nota_final > 95 && (
-                              <div className="bg-green-500" style={{ width: `${Math.min(100, ((5) / qualityEvaluation.nota_final) * 100)}%` }}></div>
-                            )}
-                          </div>
+                        <div className="text-xs text-gray-300 mb-2">{gap.problema}</div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">Impacto: {gap.impacto}</span>
                         </div>
-
-                        {/* Division Lines */}
-                        <div className="absolute inset-0 flex">
-                          <div className="flex-1" style={{ width: '20%', borderRight: '1px solid rgba(255,255,255,0.1)' }}></div>
-                          <div className="flex-1" style={{ width: '20%', borderRight: '1px solid rgba(255,255,255,0.1)' }}></div>
-                          <div className="flex-1" style={{ width: '20%', borderRight: '1px solid rgba(255,255,255,0.1)' }}></div>
-                          <div className="flex-1" style={{ width: '20%', borderRight: '1px solid rgba(255,255,255,0.1)' }}></div>
-                          <div className="flex-1" style={{ width: '15%', borderRight: '1px solid rgba(255,255,255,0.1)' }}></div>
-                          <div className="flex-1" style={{ width: '5%' }}></div>
+                        <div className="mt-2 text-xs text-blue-400 bg-blue-900/20 rounded px-2 py-1">
+                          💡 {gap.acao}
                         </div>
                       </div>
-
-                      {/* Classification Badge */}
-                      <div className="flex items-center justify-center">
-                        <div className={`px-6 py-2 rounded-full font-semibold text-sm ${
-                          qualityEvaluation.nota_final >= 95 ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                          qualityEvaluation.nota_final >= 80 ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
-                          qualityEvaluation.nota_final >= 60 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                          qualityEvaluation.nota_final >= 40 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                          qualityEvaluation.nota_final >= 20 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                          'bg-red-500/20 text-red-400 border border-red-500/30'
-                        }`}>
-                          ⭐ {qualityEvaluation.classificacao}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Summary */}
-                    <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4">
-                      <h5 className="font-semibold mb-2">Resumo</h5>
-                      <p className="text-sm text-gray-400">{qualityEvaluation.resumo}</p>
-                    </div>
-
-                    {/* Pontos Fortes */}
-                    {qualityEvaluation.pontos_fortes && qualityEvaluation.pontos_fortes.length > 0 && (
-                      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
-                        <h5 className="font-semibold mb-2 flex items-center gap-2">
-                          <CheckCircle className="w-5 h-5 text-green-400" />
-                          Pontos Fortes
-                        </h5>
-                        <ul className="space-y-1">
-                          {qualityEvaluation.pontos_fortes.map((ponto, index) => (
-                            <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                              <span className="text-green-400 mt-0.5">•</span>
-                              <span>{ponto}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Principais Gaps */}
-                    {qualityEvaluation.principais_gaps && qualityEvaluation.principais_gaps.length > 0 && (
-                      <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-4">
-                        <h5 className="font-semibold mb-2 flex items-center gap-2">
-                          <AlertCircle className="w-5 h-5 text-orange-400" />
-                          Principais Gaps
-                        </h5>
-                        <ul className="space-y-1">
-                          {qualityEvaluation.principais_gaps.map((gap, index) => (
-                            <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                              <span className="text-orange-400 mt-0.5">•</span>
-                              <span>{gap}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Próxima Ação */}
-                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
-                      <h5 className="font-semibold mb-2">Próxima Ação Recomendada</h5>
-                      <p className="text-sm text-gray-300">{qualityEvaluation.proxima_acao}</p>
-                    </div>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* Campos Críticos Vazios */}
+              {qualityEvaluation.campos_criticos_vazios && qualityEvaluation.campos_criticos_vazios.length > 0 && (
+                <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
+                  <h4 className="text-xs text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Campos Críticos Vazios
+                  </h4>
+                  <ul className="space-y-1">
+                    {qualityEvaluation.campos_criticos_vazios.map((campo, index) => (
+                      <li key={index} className="text-xs text-red-300 flex items-start gap-2">
+                        <span className="text-red-400 mt-0.5">⚠</span>
+                        <span>{campo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Próxima Ação */}
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-4">
+                <h4 className="text-xs text-blue-400 uppercase tracking-wider mb-2">Próxima Ação</h4>
+                <p className="text-sm text-gray-300">{qualityEvaluation.proxima_acao}</p>
+              </div>
+
+              {/* Recomendação de Uso */}
+              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
+                <h4 className="text-xs text-purple-400 uppercase tracking-wider mb-2">Recomendação de Uso</h4>
+                <p className="text-sm text-gray-300">{qualityEvaluation.recomendacao_uso}</p>
               </div>
             </div>
           </div>
