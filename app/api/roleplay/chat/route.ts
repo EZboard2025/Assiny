@@ -49,15 +49,39 @@ export async function POST(request: NextRequest) {
         }).join('\n\n')
       }
 
+      // Montar informações da persona
+      let personaInfo = ''
+      if (config.persona) {
+        const p = config.persona
+        if (p.business_type === 'B2B') {
+          personaInfo = `
+PERFIL DO CLIENTE B2B:
+- Cargo: ${p.job_title || 'Não especificado'}
+- Empresa: ${p.company_type || 'Não especificado'}
+- Contexto: ${p.context || 'Não especificado'}
+- O que busca para a empresa: ${p.company_goals || 'Não especificado'}
+- Principais desafios do negócio: ${p.business_challenges || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${p.prior_knowledge || 'Não sabe nada ainda'}`
+        } else if (p.business_type === 'B2C') {
+          personaInfo = `
+PERFIL DO CLIENTE B2C:
+- Profissão: ${p.profession || 'Não especificado'}
+- Contexto: ${p.context || 'Não especificado'}
+- O que busca/valoriza: ${p.what_seeks || 'Não especificado'}
+- Principais dores/problemas: ${p.main_pains || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${p.prior_knowledge || 'Não sabe nada ainda'}`
+        }
+      }
+
       const contextMessage = `Você está em uma simulação de venda. Características do cliente:
 - Idade: ${config.age} anos
 - Temperamento: ${config.temperament}
-- Segmento: ${config.segment}
+${personaInfo}
 
 Objeções que o cliente pode usar:
 ${objectionsText}
 
-Interprete este personagem e inicie a conversa como cliente.`
+Interprete este personagem de forma realista e consistente com todas as características acima. Inicie a conversa como cliente.`
 
       console.log('📝 Enviando contexto...')
 

@@ -83,16 +83,30 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       const selectedPersonaData = personas.find(p => p.id === selectedPersona)
       const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
 
-      // Montar descrição da persona baseado no tipo
-      let personaDescription = ''
+      // Enviar todos os dados da persona para o agente
+      let personaData: any = {}
       if (selectedPersonaData) {
         if (selectedPersonaData.business_type === 'B2B') {
           const persona = selectedPersonaData as PersonaB2B
-          personaDescription = `${persona.job_title}`
-          if (persona.company_type) personaDescription += ` de ${persona.company_type}`
+          personaData = {
+            business_type: 'B2B',
+            job_title: persona.job_title,
+            company_type: persona.company_type,
+            context: persona.context,
+            company_goals: persona.company_goals,
+            business_challenges: persona.business_challenges,
+            prior_knowledge: persona.prior_knowledge
+          }
         } else {
           const persona = selectedPersonaData as PersonaB2C
-          personaDescription = persona.profession
+          personaData = {
+            business_type: 'B2C',
+            profession: persona.profession,
+            context: persona.context,
+            what_seeks: persona.what_seeks,
+            main_pains: persona.main_pains,
+            prior_knowledge: persona.prior_knowledge
+          }
         }
       }
 
@@ -112,7 +126,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
           config: {
             age,
             temperament,
-            segment: personaDescription || 'Não especificado',
+            persona: personaData,
             objections: objectionsWithRebuttals,
           },
         }),
@@ -127,11 +141,20 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
 
       setThreadId(data.threadId)
 
+      // Criar descrição resumida para o banco (campo segment)
+      let segmentDescription = 'Não especificado'
+      if (personaData.business_type === 'B2B') {
+        segmentDescription = personaData.job_title
+        if (personaData.company_type) segmentDescription += ` de ${personaData.company_type}`
+      } else if (personaData.business_type === 'B2C') {
+        segmentDescription = personaData.profession
+      }
+
       // Criar sessão no Supabase
       const session = await createRoleplaySession(data.threadId, {
         age,
         temperament,
-        segment: personaDescription || 'Não especificado',
+        segment: segmentDescription,
         objections: objectionsWithRebuttals,
       })
 
@@ -1089,6 +1112,12 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
                                           {(persona as PersonaB2B).business_challenges}
                                         </p>
                                       )}
+                                      {(persona as PersonaB2B).prior_knowledge && (
+                                        <p className="text-xs text-gray-300">
+                                          <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                          {(persona as PersonaB2B).prior_knowledge}
+                                        </p>
+                                      )}
                                     </>
                                   )}
 
@@ -1104,6 +1133,12 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
                                         <p className="text-xs text-gray-300">
                                           <span className="font-bold text-purple-400">Dores:</span>{' '}
                                           {(persona as PersonaB2C).main_pains}
+                                        </p>
+                                      )}
+                                      {(persona as PersonaB2C).prior_knowledge && (
+                                        <p className="text-xs text-gray-300">
+                                          <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                          {(persona as PersonaB2C).prior_knowledge}
                                         </p>
                                       )}
                                     </>

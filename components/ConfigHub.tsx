@@ -489,10 +489,10 @@ function ConfigurationInterface({
 
       if (persona.business_type === 'B2B') {
         const personaB2B = persona as PersonaB2B
-        personaText = `Tipo de Negócio: B2B\n\nCargo: ${personaB2B.job_title || 'N/A'}\n\nTipo de Empresa: ${personaB2B.company_type || 'N/A'}\n\nContexto: ${personaB2B.context || 'N/A'}\n\nO que busca para a empresa: ${personaB2B.company_goals || 'N/A'}\n\nPrincipais desafios/dores do negócio: ${personaB2B.business_challenges || 'N/A'}`
+        personaText = `Tipo de Negócio: B2B\n\nCargo: ${personaB2B.job_title || 'N/A'}\n\nTipo de Empresa: ${personaB2B.company_type || 'N/A'}\n\nContexto: ${personaB2B.context || 'N/A'}\n\nO que busca para a empresa: ${personaB2B.company_goals || 'N/A'}\n\nPrincipais desafios/dores do negócio: ${personaB2B.business_challenges || 'N/A'}\n\nO que já sabe sobre a empresa: ${personaB2B.prior_knowledge || 'N/A'}`
       } else {
         const personaB2C = persona as PersonaB2C
-        personaText = `Tipo de Negócio: B2C\n\nProfissão: ${personaB2C.profession || 'N/A'}\n\nContexto: ${personaB2C.context || 'N/A'}\n\nO que busca/valoriza: ${personaB2C.what_seeks || 'N/A'}\n\nPrincipais dores/problemas: ${personaB2C.main_pains || 'N/A'}`
+        personaText = `Tipo de Negócio: B2C\n\nProfissão: ${personaB2C.profession || 'N/A'}\n\nContexto: ${personaB2C.context || 'N/A'}\n\nO que busca/valoriza: ${personaB2C.what_seeks || 'N/A'}\n\nPrincipais dores/problemas: ${personaB2C.main_pains || 'N/A'}\n\nO que já sabe sobre a empresa: ${personaB2C.prior_knowledge || 'N/A'}`
       }
 
       const response = await fetch('https://ezboard.app.n8n.cloud/webhook/persona-consultor', {
@@ -1203,6 +1203,12 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                   {(persona as PersonaB2B).business_challenges}
                                 </p>
                               )}
+                              {(persona as PersonaB2B).prior_knowledge && (
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                  {(persona as PersonaB2B).prior_knowledge}
+                                </p>
+                              )}
                               {(persona as PersonaB2B).context && (
                                 <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-purple-500/20">
                                   {(persona as PersonaB2B).context}
@@ -1224,6 +1230,12 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                 <p className="text-sm text-gray-300 leading-relaxed">
                                   <span className="font-bold text-purple-400">Dores:</span>{' '}
                                   {(persona as PersonaB2C).main_pains}
+                                </p>
+                              )}
+                              {(persona as PersonaB2C).prior_knowledge && (
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                  {(persona as PersonaB2C).prior_knowledge}
                                 </p>
                               )}
                               {(persona as PersonaB2C).context && (
@@ -1376,6 +1388,18 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                           placeholder="Ex: Processos manuais demorados, falta de integração, dificuldade em medir resultados"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          O que a persona já sabe sobre a sua empresa e seus serviços?
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2B).prior_knowledge || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
+                        />
+                      </div>
                     </>
                   ) : (
                     <>
@@ -1426,6 +1450,18 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                           onChange={(e) => setNewPersona({ ...newPersona, main_pains: e.target.value })}
                           className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
                           placeholder="Ex: Falta de tempo, dificuldade em encontrar produtos confiáveis, preços altos"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          O que a persona já sabe sobre a sua empresa e seus serviços?
+                        </label>
+                        <textarea
+                          value={(newPersona as PersonaB2C).prior_knowledge || ''}
+                          onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
                         />
                       </div>
                     </>
