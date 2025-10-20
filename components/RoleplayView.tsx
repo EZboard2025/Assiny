@@ -886,28 +886,141 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
                         </div>
                       )}
 
-                      {/* Botão de Iniciar Gravação */}
-                      {!isPlayingAudio && !isRecording && !isLoading && (
-                        <button
-                          onClick={startRecording}
-                          className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-full hover:bg-purple-600/30 transition-all"
-                          title="Clique para começar a falar"
-                        >
-                          <Mic className="w-6 h-6 text-purple-400" />
-                        </button>
-                      )}
+                      {/* Container flex para botões lado a lado */}
+                      <div className="flex items-center gap-4">
+                        {/* Botão de Iniciar Gravação / Finalizar Fala */}
+                        {!isPlayingAudio && !isRecording && !isLoading && (
+                          <button
+                            onClick={startRecording}
+                            className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-full hover:bg-purple-600/30 transition-all"
+                            title="Clique para começar a falar"
+                          >
+                            <Mic className="w-6 h-6 text-purple-400" />
+                          </button>
+                        )}
 
-                      {/* Botão de Finalizar Fala */}
-                      {isRecording && (
-                        <button
-                          onClick={stopRecording}
-                          className="px-6 py-3 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-all flex items-center gap-2"
-                          title="Clique para finalizar e enviar"
+                        {isRecording && (
+                          <button
+                            onClick={stopRecording}
+                            className="px-6 py-3 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-all flex items-center gap-2"
+                            title="Clique para finalizar e enviar"
+                          >
+                            <MicOff className="w-5 h-5 text-red-400" />
+                            <span className="text-sm font-medium text-red-400">Finalizar Fala</span>
+                          </button>
+                        )}
+
+                        {/* Botão Finalizar Sessão - sempre visível ao lado do microfone */}
+                        {sessionId && !isEvaluating && (
+                          <button
+                            onClick={async () => {
+                            console.log('🛑 Encerrando simulação...')
+
+                            // Parar gravação se estiver ativa
+                            if (mediaRecorderRef.current) {
+                              try {
+                                if (mediaRecorderRef.current.state === 'recording') {
+                                  mediaRecorderRef.current.stop();
+                                }
+                                mediaRecorderRef.current = null;
+                              } catch (e) {
+                                console.log('Erro ao parar gravação:', e);
+                              }
+                            }
+
+                            // Limpar timer
+                            if (silenceTimerRef.current) {
+                              clearTimeout(silenceTimerRef.current);
+                              silenceTimerRef.current = null;
+                            }
+
+                            // Parar áudio
+                            if (audioRef.current) {
+                              try {
+                                audioRef.current.pause();
+                                audioRef.current = null;
+                              } catch (e) {
+                                console.log('Erro ao parar áudio:', e);
+                              }
+                            }
+
+                            // Fechar streams
+                            if (streamRef.current) {
+                              streamRef.current.getTracks().forEach(track => {
+                                try {
+                                  track.stop();
+                                } catch (e) {
+                                  console.log('Erro ao parar track:', e);
+                                }
+                              });
+                              streamRef.current = null;
+                            }
+
+                            // Finalizar sessão e avaliar
+                            if (sessionId) {
+                              console.log('📝 Finalizando sessão...');
+                              await endRoleplaySession(sessionId, 'completed');
+
+                              setIsEvaluating(true);
+                              try {
+                                const evalResponse = await fetch('/api/roleplay/evaluate', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ sessionId })
+                                });
+
+                                if (evalResponse.ok) {
+                                  const result = await evalResponse.json();
+                                  let { evaluation } = result;
+
+                                  if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+                                    evaluation = JSON.parse(evaluation.output);
+                                  }
+
+                                  setEvaluation(evaluation);
+                                  setShowEvaluationSummary(true);
+
+                                  // Atualizar performance
+                                  const { supabase } = await import('@/lib/supabase')
+                                  const { data: { user } } = await supabase.auth.getUser()
+                                  if (user) {
+                                    await fetch('/api/performance-summary/update', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ userId: user.id })
+                                    });
+                                  }
+                                } else {
+                                  alert('Não foi possível gerar a avaliação. A sessão foi salva no histórico.');
+                                }
+                              } catch (error) {
+                                console.error('❌ Erro na avaliação:', error);
+                                alert('Erro ao processar avaliação. A sessão foi salva no histórico.');
+                              } finally {
+                                setIsEvaluating(false);
+                              }
+                            }
+
+                            // Resetar estados
+                            setIsRecording(false);
+                            setIsSimulating(false);
+                            setMessages([]);
+                            setThreadId(null);
+                            setIsPlayingAudio(false);
+                            setIsLoading(false);
+                            setCurrentTranscription('');
+                            setIsProcessingTranscription(false);
+                            setLastUserMessage('');
+                            setSessionId(null);
+                          }}
+                          className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-all flex items-center gap-2 text-sm"
+                          title="Encerrar e avaliar sessão"
                         >
-                          <MicOff className="w-5 h-5 text-red-400" />
-                          <span className="text-sm font-medium text-red-400">Finalizar Fala</span>
-                        </button>
-                      )}
+                            <X className="w-4 h-4 text-red-400" />
+                            <span className="text-red-400 font-medium">Finalizar Sessão</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -1423,28 +1536,6 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .slider-purple::-webkit-slider-thumb {
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          background: linear-gradient(to right, #9333ea, #a855f7);
-          border-radius: 50%;
-          cursor: pointer;
-          box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
-        }
-
-        .slider-purple::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
-          background: linear-gradient(to right, #9333ea, #a855f7);
-          border-radius: 50%;
-          cursor: pointer;
-          border: none;
-          box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
-        }
-      `}</style>
     </div>
   )
 }
