@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2 } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check } from 'lucide-react'
 import {
   getEmployees,
   addEmployee as addEmployeeDB,
@@ -82,6 +82,11 @@ function ConfigurationInterface({
   const [evaluatingQuality, setEvaluatingQuality] = useState(false)
   const [evaluatingPersona, setEvaluatingPersona] = useState(false)
   const [editedPersonaIds, setEditedPersonaIds] = useState<Set<string>>(new Set())
+  const [editedObjectionIds, setEditedObjectionIds] = useState<Set<string>>(new Set())
+  const [editingObjectionName, setEditingObjectionName] = useState<string | null>(null)
+  const [tempObjectionName, setTempObjectionName] = useState('')
+  const [editingRebuttalId, setEditingRebuttalId] = useState<{objectionId: string, index: number} | null>(null)
+  const [tempRebuttalText, setTempRebuttalText] = useState('')
 
   // Estados do formulário de Dados da Empresa
   const [companyData, setCompanyData] = useState({
@@ -585,9 +590,52 @@ function ConfigurationInterface({
 
     if (success) {
       setObjections(objections.map(o =>
-        o.id === objectionId ? { ...o, rebuttals: updatedRebuttals } : o
+        o.id === objectionId ? { ...o, rebuttals: updatedRebuttals, evaluation_score: null } : o
       ))
       setNewRebuttal('')
+      // Marcar como editada para permitir reavaliação
+      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
+    }
+  }
+
+  const handleUpdateObjectionName = async (objectionId: string) => {
+    if (!tempObjectionName.trim()) return
+
+    const objection = objections.find(o => o.id === objectionId)
+    if (!objection) return
+
+    const success = await updateObjection(objectionId, tempObjectionName.trim(), objection.rebuttals || [])
+
+    if (success) {
+      setObjections(objections.map(o =>
+        o.id === objectionId ? { ...o, name: tempObjectionName.trim(), evaluation_score: null } : o
+      ))
+      setEditingObjectionName(null)
+      setTempObjectionName('')
+      // Marcar como editada para permitir reavaliação
+      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
+    }
+  }
+
+  const handleUpdateRebuttal = async (objectionId: string, index: number) => {
+    if (!tempRebuttalText.trim()) return
+
+    const objection = objections.find(o => o.id === objectionId)
+    if (!objection || !objection.rebuttals) return
+
+    const updatedRebuttals = [...objection.rebuttals]
+    updatedRebuttals[index] = tempRebuttalText.trim()
+
+    const success = await updateObjection(objectionId, objection.name, updatedRebuttals)
+
+    if (success) {
+      setObjections(objections.map(o =>
+        o.id === objectionId ? { ...o, rebuttals: updatedRebuttals, evaluation_score: null } : o
+      ))
+      setEditingRebuttalId(null)
+      setTempRebuttalText('')
+      // Marcar como editada para permitir reavaliação
+      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
     }
   }
 
@@ -600,8 +648,10 @@ function ConfigurationInterface({
 
     if (success) {
       setObjections(objections.map(o =>
-        o.id === objectionId ? { ...o, rebuttals: updatedRebuttals } : o
+        o.id === objectionId ? { ...o, rebuttals: updatedRebuttals, evaluation_score: null } : o
       ))
+      // Marcar como editada para permitir reavaliação
+      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
     }
   }
 
@@ -694,6 +744,13 @@ function ConfigurationInterface({
 
       setObjectionEvaluation(evaluation)
       setShowObjectionEvaluationModal(true)
+
+      // Limpar flag de edição após avaliação bem-sucedida
+      setEditedObjectionIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(objection.id)
+        return newSet
+      })
 
     } catch (error) {
       console.error('💥 Erro ao avaliar objeção:', error)
@@ -1411,6 +1468,18 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                 Registre objeções comuns e adicione múltiplas formas de quebrá-las para cada uma.
               </p>
 
+              {/* Aviso de Qualidade */}
+              <div className="mb-4 bg-red-900/20 border border-red-500/40 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-red-300 leading-relaxed">
+                      <span className="font-bold">Atenção:</span> Objeções com pontuação abaixo de 7.0 podem comprometer a qualidade e a eficácia do treinamento de vendas.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Lista de objeções */}
               {objections.length > 0 && (
                 <div className="mb-4 space-y-3">
@@ -1435,11 +1504,57 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                           </button>
-                          <div className="flex-1">
-                            <span className="text-gray-300 font-medium">{objection.name}</span>
-                            <span className="text-gray-500 text-sm ml-2">
-                              ({objection.rebuttals?.length || 0} {objection.rebuttals?.length === 1 ? 'forma de quebra' : 'formas de quebra'})
-                            </span>
+                          <div className="flex-1 flex items-center gap-2">
+                            {editingObjectionName === objection.id ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={tempObjectionName}
+                                  onChange={(e) => setTempObjectionName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleUpdateObjectionName(objection.id)
+                                    } else if (e.key === 'Escape') {
+                                      setEditingObjectionName(null)
+                                      setTempObjectionName('')
+                                    }
+                                  }}
+                                  className="flex-1 px-2 py-1 bg-gray-800/50 border border-purple-500/30 rounded text-white text-sm focus:outline-none focus:border-purple-500"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleUpdateObjectionName(objection.id)}
+                                  className="text-green-400 hover:text-green-300 transition-colors"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingObjectionName(null)
+                                    setTempObjectionName('')
+                                  }}
+                                  className="text-gray-400 hover:text-gray-300 transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-gray-300 font-medium">{objection.name}</span>
+                                <button
+                                  onClick={() => {
+                                    setEditingObjectionName(objection.id)
+                                    setTempObjectionName(objection.name)
+                                  }}
+                                  className="text-purple-400 hover:text-purple-300 transition-colors"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                </button>
+                                <span className="text-gray-500 text-sm">
+                                  ({objection.rebuttals?.length || 0} {objection.rebuttals?.length === 1 ? 'forma de quebra' : 'formas de quebra'})
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1456,8 +1571,13 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
 
                           <button
                             onClick={() => handleEvaluateObjection(objection)}
-                            disabled={evaluatingObjection}
+                            disabled={evaluatingObjection || (objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id))}
                             className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-lg text-xs font-medium text-green-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={
+                              objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id)
+                                ? 'Edite a objeção para poder reavaliar'
+                                : ''
+                            }
                           >
                             {evaluatingObjection ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -1489,13 +1609,59 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                     className="flex items-start gap-2 bg-gray-900/50 border border-purple-500/10 rounded-lg px-3 py-2"
                                   >
                                     <span className="text-purple-400 font-bold text-sm mt-0.5">{index + 1}.</span>
-                                    <span className="text-gray-300 text-sm flex-1">{rebuttal}</span>
-                                    <button
-                                      onClick={() => handleRemoveRebuttal(objection.id, index)}
-                                      className="text-red-400 hover:text-red-300 transition-colors"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
+                                    {editingRebuttalId?.objectionId === objection.id && editingRebuttalId?.index === index ? (
+                                      <>
+                                        <input
+                                          type="text"
+                                          value={tempRebuttalText}
+                                          onChange={(e) => setTempRebuttalText(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              handleUpdateRebuttal(objection.id, index)
+                                            } else if (e.key === 'Escape') {
+                                              setEditingRebuttalId(null)
+                                              setTempRebuttalText('')
+                                            }
+                                          }}
+                                          className="flex-1 px-2 py-1 bg-gray-800/50 border border-purple-500/30 rounded text-white text-sm focus:outline-none focus:border-purple-500"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => handleUpdateRebuttal(objection.id, index)}
+                                          className="text-green-400 hover:text-green-300 transition-colors"
+                                        >
+                                          <Check className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setEditingRebuttalId(null)
+                                            setTempRebuttalText('')
+                                          }}
+                                          className="text-gray-400 hover:text-gray-300 transition-colors"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-gray-300 text-sm flex-1">{rebuttal}</span>
+                                        <button
+                                          onClick={() => {
+                                            setEditingRebuttalId({ objectionId: objection.id, index })
+                                            setTempRebuttalText(rebuttal)
+                                          }}
+                                          className="text-purple-400 hover:text-purple-300 transition-colors"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleRemoveRebuttal(objection.id, index)}
+                                          className="text-red-400 hover:text-red-300 transition-colors"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 ))}
                               </div>

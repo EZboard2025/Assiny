@@ -727,73 +727,10 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
           </div>
         </div>
 
-        {/* Main Chat Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Purple Blob Illustration - Audio Reactive */}
-          <div className={`${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '100ms' }}>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-transparent rounded-3xl blur-2xl"></div>
-              <div className="relative flex items-center justify-center p-12">
-                {/* Blob principal - MEGA REATIVO */}
-                <div
-                  className="bg-gradient-to-br from-purple-400/40 to-purple-600/40 rounded-full transition-all ease-out"
-                  style={{
-                    width: `${256 + audioVolume * 150}px`,
-                    height: `${256 + audioVolume * 150}px`,
-                    opacity: 0.4 + audioVolume * 0.6,
-                    filter: `blur(${48 + audioVolume * 40}px)`,
-                    transitionDuration: '50ms',
-                    transform: `scale(${1 + audioVolume * 0.3})`,
-                  }}
-                ></div>
-
-                {/* Blob secundário - Pulsação rápida */}
-                {isPlayingAudio && (
-                  <div
-                    className="absolute bg-gradient-to-br from-purple-300/30 to-purple-500/30 rounded-full"
-                    style={{
-                      width: `${220 + audioVolume * 120}px`,
-                      height: `${220 + audioVolume * 120}px`,
-                      opacity: audioVolume * 0.7,
-                      filter: `blur(${30 + audioVolume * 30}px)`,
-                      transitionDuration: '80ms',
-                    }}
-                  ></div>
-                )}
-
-                {/* Blob terciário - Camada externa */}
-                {isPlayingAudio && audioVolume > 0.3 && (
-                  <div
-                    className="absolute bg-gradient-to-br from-purple-200/20 to-purple-400/20 rounded-full"
-                    style={{
-                      width: `${300 + audioVolume * 100}px`,
-                      height: `${300 + audioVolume * 100}px`,
-                      opacity: audioVolume * 0.4,
-                      filter: `blur(${60 + audioVolume * 30}px)`,
-                      transitionDuration: '100ms',
-                    }}
-                  ></div>
-                )}
-
-                {/* Núcleo central brilhante - aparece nos picos */}
-                {isPlayingAudio && audioVolume > 0.5 && (
-                  <div
-                    className="absolute bg-white rounded-full"
-                    style={{
-                      width: `${40 + audioVolume * 80}px`,
-                      height: `${40 + audioVolume * 80}px`,
-                      opacity: (audioVolume - 0.5) * 1.5,
-                      filter: `blur(${20 + audioVolume * 20}px)`,
-                      boxShadow: `0 0 ${60 + audioVolume * 40}px rgba(168, 85, 247, ${audioVolume * 0.8})`,
-                    }}
-                  ></div>
-                )}
-              </div>
-            </div>
-          </div>
-
+        {/* Main Chat Section - Centralizado */}
+        <div className="flex justify-center max-w-3xl mx-auto">
           {/* Chat da Simulação */}
-          <div className={`${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
+          <div className={`w-full ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
               <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-purple-500/30">
@@ -1342,17 +1279,6 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
                           <text x="120" y="215" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">I</text>
                           <text x="32" y="125" textAnchor="end" fill="white" fontSize="14" fontWeight="bold">N</text>
                         </svg>
-
-                        {/* Center label with hover */}
-                        {evaluation.spin_evaluation?.P && (
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-                            <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-purple-500/30">
-                              <div className="text-lg font-bold text-purple-400">P</div>
-                              <div className="text-xs text-gray-400">Problema</div>
-                              <div className="text-sm text-white font-semibold">{evaluation.spin_evaluation.P.final_score}/10</div>
-                            </div>
-                          </div>
-                        )}
                       </div>
 
                       {/* SPIN Scores */}
@@ -1420,18 +1346,14 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
                     <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-2xl p-5">
                       <h3 className="text-center text-xs text-gray-400 mb-2">Performance Geral</h3>
                       <div className="text-center">
-                        <div className="text-5xl font-bold text-white mb-2">
-                          {evaluation.overall_score !== undefined && evaluation.overall_score !== null
-                            ? `${(evaluation.overall_score / 10).toFixed(1)}/10`
-                            : 'N/A'}
-                        </div>
-                        <div className="inline-block px-3 py-1 bg-purple-600/30 rounded-full text-xs text-purple-300 font-medium">
+                        <div className="text-4xl font-bold text-white">
                           {evaluation.performance_level === 'legendary' && 'Lendário'}
                           {evaluation.performance_level === 'excellent' && 'Excelente'}
                           {evaluation.performance_level === 'very_good' && 'Muito Bom'}
                           {evaluation.performance_level === 'good' && 'Bom'}
                           {evaluation.performance_level === 'needs_improvement' && 'Precisa Melhorar'}
                           {evaluation.performance_level === 'poor' && 'Insuficiente'}
+                          {!evaluation.performance_level && 'N/A'}
                         </div>
                       </div>
                     </div>
