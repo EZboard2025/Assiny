@@ -193,12 +193,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   )}
                 </button>
 
-                <div className="text-center pt-4">
-                  <span className="text-gray-400">Não tem uma conta? </span>
-                  <a href="#" className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
-                    Cadastre-se
-                  </a>
-                </div>
               </form>
             </div>
           </div>
