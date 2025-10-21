@@ -594,7 +594,7 @@ function ConfigurationInterface({
       ))
       setNewRebuttal('')
       // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
+      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
@@ -613,7 +613,7 @@ function ConfigurationInterface({
       setEditingObjectionName(null)
       setTempObjectionName('')
       // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
+      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
@@ -635,7 +635,7 @@ function ConfigurationInterface({
       setEditingRebuttalId(null)
       setTempRebuttalText('')
       // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
+      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
@@ -651,7 +651,7 @@ function ConfigurationInterface({
         o.id === objectionId ? { ...o, rebuttals: updatedRebuttals, evaluation_score: null } : o
       ))
       // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set([...prev, objectionId]))
+      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
