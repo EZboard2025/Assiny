@@ -813,7 +813,73 @@ OPENAI_API_KEY=sk-...             # For Assistant API
 21. `criar-usuario-admin.sql` - Create admin user for testing
 22. `popular-resumos-existentes.sql` - Populate summaries for existing sessions
 
-## Deployment Considerations
+## Deployment
+
+### Production Server (Hostinger VPS)
+
+**Server Details:**
+- Host: `31.97.84.130`
+- Domain: `https://ramppy.site`
+- OS: Ubuntu
+- Node.js: v20.19.5 (via NVM)
+- Process Manager: PM2
+- Web Server: Nginx (reverse proxy)
+- SSL: Let's Encrypt (auto-renewal via Certbot)
+
+**Automatic Deployment:**
+GitHub Actions workflow (`.github/workflows/deploy.yml`) automatically deploys to production on every push to `main`:
+1. Connects to VPS via SSH
+2. Pulls latest code from GitHub
+3. Installs dependencies
+4. Builds production bundle
+5. Restarts PM2 process
+
+**Manual Deployment:**
+```bash
+ssh root@31.97.84.130
+cd /var/www/assiny
+git pull origin main
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+npm install
+npm run build
+pm2 restart assiny
+```
+
+**Server Management:**
+```bash
+# View application status
+pm2 status
+
+# View logs
+pm2 logs assiny
+
+# Restart application
+pm2 restart assiny
+
+# Edit environment variables
+nano /var/www/assiny/.env.local
+pm2 restart assiny  # Must restart after env changes
+
+# Check Nginx configuration
+nginx -t
+
+# Restart Nginx
+systemctl restart nginx
+
+# Renew SSL certificate (auto-renews, but manual trigger if needed)
+certbot renew
+```
+
+**Important Files on Server:**
+- Application: `/var/www/assiny/`
+- Environment: `/var/www/assiny/.env.local`
+- Nginx config: `/etc/nginx/sites-available/assiny`
+- SSL certs: `/etc/letsencrypt/live/ramppy.site/`
+- PM2 config: `~/.pm2/`
+- SSH deploy key: `~/.ssh/github_deploy`
+
+### Deployment Checklist
 
 - N8N webhooks are in production mode
 - ConfigHub password should be changed from `admin123`
@@ -825,3 +891,7 @@ OPENAI_API_KEY=sk-...             # For Assistant API
 - **Session Finalization**: Ensure N8N workflow for session finalization webhook is deployed
 - **PDI**: Ensure N8N PDI generation workflow is deployed and returns proper JSON format
 - **PDI**: Verify `pdis` table has RLS policies configured for user access
+- **VPS**: Verify GitHub Actions secrets are configured (SSH_PRIVATE_KEY, SSH_HOST, SSH_USER)
+- **VPS**: Ensure PM2 is running and configured to start on boot (`pm2 startup` + `pm2 save`)
+- **VPS**: Verify Nginx reverse proxy is configured for both HTTP and HTTPS
+- **VPS**: Confirm SSL certificate auto-renewal is enabled via Certbot
