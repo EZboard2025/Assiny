@@ -2128,10 +2128,6 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                     Acessar Configurações
                   </button>
                 </form>
-
-                <p className="text-center text-sm text-gray-500 mt-6">
-                  Senha temporária: admin123
-                </p>
               </div>
             ) : (
               // Configuration Interface
