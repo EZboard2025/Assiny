@@ -175,7 +175,7 @@ export async function getCompanyType(): Promise<'B2B' | 'B2C'> {
     return 'B2C' // Default
   }
 
-  return data.type
+  return data.name
 }
 
 export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
@@ -184,7 +184,7 @@ export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
 
   const { error } = await supabase
     .from('company_type')
-    .insert([{ type }])
+    .insert([{ name: type }])
 
   if (error) {
     console.error('Erro ao definir tipo de empresa:', error)
