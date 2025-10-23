@@ -8,12 +8,14 @@ import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
 import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut } from 'lucide-react'
+import { useCompany } from '@/lib/contexts/CompanyContext'
 
 interface DashboardProps {
   onLogout: () => void
 }
 
 export default function Dashboard({ onLogout }: DashboardProps) {
+  const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil'>('home')
   const [mounted, setMounted] = useState(false)
@@ -175,7 +177,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div className="w-full flex items-center justify-between">
             {/* Logo */}
             <div className="text-3xl font-bold tracking-tight cursor-pointer" onClick={() => handleViewChange('home')}>
-              Assiny<span className="text-purple-500">.</span>
+              {companyLoading ? 'Loading...' : (currentCompany?.name || 'Ramppy')}<span className="text-purple-500">.</span>
             </div>
 
             {/* Navigation */}
