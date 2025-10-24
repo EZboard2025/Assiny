@@ -23,6 +23,7 @@ import {
   type PersonaB2B,
   type PersonaB2C
 } from '@/lib/config'
+import { useCompany } from '@/lib/contexts/CompanyContext'
 
 interface ConfigHubProps {
   onClose: () => void
@@ -56,6 +57,7 @@ function ConfigurationInterface({
   showCompanyEvaluationModal: boolean
   setShowCompanyEvaluationModal: (val: boolean) => void
 }) {
+  const { currentCompany } = useCompany()
   const [activeTab, setActiveTab] = useState<'employees' | 'business-type' | 'personas' | 'objections' | 'files'>('employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
@@ -274,7 +276,18 @@ function ConfigurationInterface({
       return
     }
 
+    if (!currentCompany?.id) {
+      alert('Erro: empresa não identificada')
+      return
+    }
+
     try {
+      console.log('🟢 Enviando para API:', {
+        name: newEmployeeName,
+        email: newEmployeeEmail,
+        company_id: currentCompany.id
+      })
+
       const response = await fetch('/api/employees/create', {
         method: 'POST',
         headers: {
@@ -283,13 +296,24 @@ function ConfigurationInterface({
         body: JSON.stringify({
           name: newEmployeeName,
           email: newEmployeeEmail,
-          password: newEmployeePassword
+          password: newEmployeePassword,
+          company_id: currentCompany.id
         }),
       })
 
+      console.log('📨 Status da resposta:', response.status)
+
       if (!response.ok) {
-        const error = await response.json()
-        alert('Erro ao criar funcionário: ' + error.message)
+        const errorText = await response.text()
+        console.error('❌ Erro completo:', errorText)
+        let errorMsg = `Erro ${response.status}`
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMsg = errorJson.error || errorJson.message || errorText
+        } catch {
+          errorMsg = errorText
+        }
+        alert('Erro ao criar funcionário: ' + errorMsg)
         return
       }
 

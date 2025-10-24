@@ -42,6 +42,13 @@ export async function createRoleplaySession(
       return null
     }
 
+    // Obter company_id do employee
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single()
+
     const { data, error } = await supabase
       .from('roleplay_sessions')
       .insert({
@@ -49,7 +56,8 @@ export async function createRoleplaySession(
         thread_id: threadId,
         config,
         messages: [],
-        status: 'in_progress'
+        status: 'in_progress',
+        company_id: employee?.company_id
       })
       .select()
       .single()
