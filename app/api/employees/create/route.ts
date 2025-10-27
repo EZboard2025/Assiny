@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-<<<<<<< HEAD
-=======
 import { cookies } from 'next/headers'
->>>>>>> c75df84 (feat: enhance employee creation and company association)
 
 // Criar cliente Supabase com service role key para admin
 const supabaseAdmin = createClient(
@@ -22,19 +19,19 @@ const supabaseAdmin = createClient(
  */
 async function getCompanyIdFromAuth(request: Request): Promise<string | null> {
   try {
-    // Criar cliente Supabase com cookies da requisição
-    const cookieStore = await cookies()
+    // Obtenha os cookies como string para usar com Supabase Auth
+    const cookieStore = cookies()
+    // Crie o cliente Supabase normalmente, sem a opção `cookies` (que não existe)
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-        },
-      }
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
+
+    // Em APIs route handlers Next.js, supabase-js já acessa cookies do ambiente do server corretamente via fetch
+    // Se desejar passar o token de autenticação manualmente:
+    // const access_token = cookieStore.get('sb-access-token')?.value;
+    // Se necessário, você pode usar: supabase.auth.setSession({ access_token, refresh_token }) aqui
+
 
     // Obter usuário autenticado
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -80,8 +77,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome, email e senha são obrigatórios' }, { status: 400 })
     }
 
-<<<<<<< HEAD
-=======
     // Obter company_id do usuário autenticado
     const companyId = await getCompanyIdFromAuth(request)
 
@@ -94,7 +89,6 @@ export async function POST(request: Request) {
 
     console.log('✅ Validação OK, company_id:', companyId)
 
->>>>>>> c75df84 (feat: enhance employee creation and company association)
     // Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -111,10 +105,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authError.message }, { status: 400 })
     }
 
-    // Criar registro na tabela employees
+    // Criar registro na tabela employees (vinculado ao company_id e user_id)
     const { data: employee, error } = await supabaseAdmin
       .from('employees')
-      .insert([{ name, email, role: 'Vendedor' }])
+      .insert([{
+        name,
+        email,
+        role: 'Vendedor',
+        user_id: authData.user.id,
+        company_id: companyId
+      }])
       .select()
       .single()
 

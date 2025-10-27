@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getCompanyIdFromUser } from './utils/getCompanyId'
 
 export interface Employee {
   id: string
@@ -317,8 +318,6 @@ export async function getPersonas(): Promise<Persona[]> {
 }
 
 export async function addPersona(persona: Omit<Persona, 'id' | 'created_at' | 'updated_at'>): Promise<Persona | null> {
-<<<<<<< HEAD
-=======
   const companyId = await getCompanyIdFromUser()
 
   if (!companyId) {
@@ -329,7 +328,6 @@ export async function addPersona(persona: Omit<Persona, 'id' | 'created_at' | 'u
   console.log('[addPersona] Inserindo persona com company_id:', companyId)
   console.log('[addPersona] Dados da persona:', { ...persona, company_id: companyId })
 
->>>>>>> c75df84 (feat: enhance employee creation and company association)
   const { data, error } = await supabase
     .from('personas')
     .insert([persona])
