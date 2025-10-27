@@ -2136,7 +2136,8 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
     <>
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className={`relative max-w-5xl w-full max-h-[90vh] overflow-hidden transition-transform duration-300 ${
-        showPersonaEvaluationModal || showObjectionEvaluationModal || showCompanyEvaluationModal ? 'sm:-translate-x-[250px]' : ''
+        showPersonaEvaluationModal || showCompanyEvaluationModal ? 'sm:-translate-x-[250px]' :
+        showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
       }`}>
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
         <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
@@ -2453,29 +2454,29 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
     {/* Modal de Avaliação de Objeção - Side Panel (fora do ConfigHub) */}
     {showObjectionEvaluationModal && objectionEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 bg-gradient-to-br from-green-950/90 via-gray-900/95 to-gray-900/95">
-        <div className="h-full bg-gradient-to-b from-green-900/20 to-gray-900/50 border border-green-500/30 rounded-xl shadow-2xl overflow-y-auto animate-slide-in">
-          <div className="sticky top-0 bg-gradient-to-b from-green-900/80 to-gray-900/80 backdrop-blur-sm border-b border-green-500/30 p-4 flex items-center justify-between z-10">
-            <h3 className="font-bold text-white">Avaliação da Objeção</h3>
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[420px] z-[70] p-3 bg-gradient-to-br from-green-950/90 via-gray-900/95 to-gray-900/95">
+        <div className="h-full bg-gradient-to-b from-green-900/20 to-gray-900/50 border border-green-500/30 rounded-lg shadow-2xl overflow-y-auto animate-slide-in">
+          <div className="sticky top-0 bg-gradient-to-b from-green-900/80 to-gray-900/80 backdrop-blur-sm border-b border-green-500/30 p-3 flex items-center justify-between z-10">
+            <h3 className="font-bold text-white text-sm">Avaliação da Objeção</h3>
             <button
               onClick={() => setShowObjectionEvaluationModal(false)}
               className="text-gray-400 hover:text-white transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="p-4 space-y-4">
+          <div className="p-3 space-y-3">
             {/* Score Geral */}
-            <div className={`rounded-xl p-4 text-center ${
+            <div className={`rounded-lg p-3 text-center ${
               objectionEvaluation.status === 'APROVADA' ? 'bg-green-500/20 border border-green-500/30' :
               objectionEvaluation.status === 'REVISAR' ? 'bg-yellow-500/20 border border-yellow-500/30' :
               'bg-red-500/20 border border-red-500/30'
             }`}>
-              <div className="text-4xl font-bold text-white mb-2">
+              <div className="text-3xl font-bold text-white mb-1">
                 {objectionEvaluation.nota_final?.toFixed(1)}/10
               </div>
-              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+              <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                 objectionEvaluation.status === 'APROVADA' ? 'bg-green-600/30 text-green-300' :
                 objectionEvaluation.status === 'REVISAR' ? 'bg-yellow-600/30 text-yellow-300' :
                 'bg-red-600/30 text-red-300'
@@ -2486,15 +2487,15 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
             {/* Como Melhorar */}
             {objectionEvaluation.como_melhorar?.length > 0 && (
-              <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4">
-                <h4 className="font-semibold text-purple-400 mb-3 text-sm">
+              <div className="bg-gray-800/50 border border-purple-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-purple-400 mb-2 text-xs">
                   💡 Como Melhorar
                 </h4>
-                <ul className="space-y-2">
+                <ul className="space-y-1.5">
                   {objectionEvaluation.como_melhorar.map((sugestao: string, idx: number) => (
-                    <li key={idx} className="text-sm text-gray-300 flex items-start">
-                      <span className="text-purple-400 mr-2 font-bold">{idx + 1}.</span>
-                      <span className="flex-1">{sugestao}</span>
+                    <li key={idx} className="text-xs text-gray-300 flex items-start">
+                      <span className="text-purple-400 mr-1.5 font-bold">{idx + 1}.</span>
+                      <span className="flex-1 leading-relaxed">{sugestao}</span>
                     </li>
                   ))}
                 </ul>
@@ -2503,8 +2504,8 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
             {/* Mensagem de Aprovação */}
             {objectionEvaluation.status === 'APROVADA' && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-center">
-                <p className="text-green-300 text-sm">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+                <p className="text-green-300 text-xs">
                   ✅ Objeção bem estruturada e pronta para usar no treinamento!
                 </p>
               </div>
