@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     }
 
     console.log('✅ Dados da empresa encontrados:', companyData.nome)
+    console.log('🏢 Company ID:', companyData.company_id)
 
     // 2. Limpar embeddings antigos
     const { error: deleteError } = await supabase
@@ -125,6 +126,7 @@ export async function POST(req: Request) {
           .from('documents')
           .insert({
             company_data_id: companyDataId,
+            company_id: companyData.company_id, // Multi-tenant support
             category: chunk.category,
             question: chunk.question,
             content: chunk.content,
@@ -132,7 +134,8 @@ export async function POST(req: Request) {
             metadata: {
               category: chunk.category,
               question: chunk.question,
-              company_data_id: companyDataId
+              company_data_id: companyDataId,
+              company_id: companyData.company_id
             }
           })
 

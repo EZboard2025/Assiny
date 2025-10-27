@@ -35,7 +35,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   // Chat simulation
   const [messages, setMessages] = useState<Array<{ role: 'client' | 'seller', text: string }>>([])
   const [inputMessage, setInputMessage] = useState('')
-  const [threadId, setThreadId] = useState<string | null>(null)
+  const [sessionIdN8N, setSessionIdN8N] = useState<string | null>(null) // SessionId do N8N
   const [isLoading, setIsLoading] = useState(false)
   const [currentTranscription, setCurrentTranscription] = useState<string>('') // Para mostrar transcrição em tempo real
   const [isProcessingTranscription, setIsProcessingTranscription] = useState(false) // Para mostrar que está processando
@@ -79,6 +79,23 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     setIsLoading(true)
 
     try {
+      // Buscar userId e companyId
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { user } } = await supabase.auth.getUser()
+      const userId = user?.id
+
+      if (!userId) {
+        throw new Error('Usuário não autenticado')
+      }
+
+      // Buscar companyId do employee
+      const { getCompanyIdFromUserId } = await import('@/lib/utils/getCompanyId')
+      const companyId = await getCompanyIdFromUserId(userId)
+
+      if (!companyId) {
+        throw new Error('Company ID não encontrado')
+      }
+
       // Buscar persona selecionada
       const selectedPersonaData = personas.find(p => p.id === selectedPersona)
       const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
@@ -116,7 +133,50 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         rebuttals: o.rebuttals || []
       }))
 
-      // Criar nova thread com configuração
+      // Montar mensagem de contexto (igual ao backend)
+      let objectionsText = 'Nenhuma objeção específica'
+      if (objectionsWithRebuttals.length > 0) {
+        objectionsText = objectionsWithRebuttals.map((obj: any) => {
+          let text = obj.name
+          if (obj.rebuttals && obj.rebuttals.length > 0) {
+            text += `\n  Formas de quebrar esta objeção:\n`
+            text += obj.rebuttals.map((r: string, i: number) => `  ${i + 1}. ${r}`).join('\n')
+          }
+          return text
+        }).join('\n\n')
+      }
+
+      let personaInfo = ''
+      if (personaData.business_type === 'B2B') {
+        personaInfo = `
+PERFIL DO CLIENTE B2B:
+- Cargo: ${personaData.job_title || 'Não especificado'}
+- Empresa: ${personaData.company_type || 'Não especificado'}
+- Contexto: ${personaData.context || 'Não especificado'}
+- O que busca para a empresa: ${personaData.company_goals || 'Não especificado'}
+- Principais desafios do negócio: ${personaData.business_challenges || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${personaData.prior_knowledge || 'Não sabe nada ainda'}`
+      } else if (personaData.business_type === 'B2C') {
+        personaInfo = `
+PERFIL DO CLIENTE B2C:
+- Profissão: ${personaData.profession || 'Não especificado'}
+- Contexto: ${personaData.context || 'Não especificado'}
+- O que busca/valoriza: ${personaData.what_seeks || 'Não especificado'}
+- Principais dores/problemas: ${personaData.main_pains || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${personaData.prior_knowledge || 'Não sabe nada ainda'}`
+      }
+
+      const contextMessage = `Você está em uma simulação de venda. Características do cliente:
+- Idade: ${age} anos
+- Temperamento: ${temperament}
+${personaInfo}
+
+Objeções que o cliente pode usar:
+${objectionsText}
+
+Interprete este personagem de forma realista e consistente com todas as características acima. Inicie a conversa como cliente.`
+
+      // Criar nova sessão com N8N
       const response = await fetch('/api/roleplay/chat', {
         method: 'POST',
         headers: {
@@ -129,6 +189,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
             persona: personaData,
             objections: objectionsWithRebuttals,
           },
+          userId: userId,
+          companyId: companyId,
         }),
       })
 
@@ -139,7 +201,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         throw new Error(data.error || 'Erro ao iniciar roleplay')
       }
 
-      setThreadId(data.threadId)
+      setSessionIdN8N(data.sessionId)
 
       // Criar descrição resumida para o banco (campo segment)
       let segmentDescription = 'Não especificado'
@@ -150,8 +212,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         segmentDescription = personaData.profession
       }
 
-      // Criar sessão no Supabase
-      const session = await createRoleplaySession(data.threadId, {
+      // Criar sessão no Supabase (usando sessionId do N8N como thread_id)
+      const session = await createRoleplaySession(data.sessionId, {
         age,
         temperament,
         segment: segmentDescription,
@@ -172,10 +234,37 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
 
       setMessages([{ role: 'client', text: data.message }])
 
-      // Salvar mensagem no Supabase
+      // Salvar mensagem no Supabase (roleplay_sessions)
       if (session) {
         await addMessageToSession(session.id, firstMessage)
       }
+
+      // Salvar contexto e primeira mensagem do cliente na roleplay_chat_memory
+      const { saveRoleplayChatMessage } = await import('@/lib/roleplayChatMemory')
+
+      // Salvar contexto inicial (mensagem do sistema)
+      await saveRoleplayChatMessage(
+        data.sessionId,
+        contextMessage,
+        'human',
+        userId,
+        companyId,
+        {
+          age,
+          temperament,
+          persona: personaData,
+          objections: objectionsWithRebuttals,
+        }
+      )
+
+      // Salvar resposta do cliente
+      await saveRoleplayChatMessage(
+        data.sessionId,
+        data.message,
+        'ai',
+        userId,
+        companyId
+      )
 
       // Converter a primeira mensagem em áudio e tocar
       await textToSpeech(data.message)
@@ -193,7 +282,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     console.log('🔍 handleSendMessage chamada com:', messageToSend)
     console.log('🔍 inputMessage atual:', inputMessage)
     console.log('🔍 isLoading:', isLoading)
-    console.log('🔍 threadId:', threadId)
+    console.log('🔍 sessionIdN8N:', sessionIdN8N)
     console.log('🔍 isSimulating:', isSimulating)
 
     // Verificar se a simulação ainda está ativa
@@ -209,8 +298,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       return
     }
 
-    if (!threadId) {
-      console.log('❌ Sem threadId, não enviando')
+    if (!sessionIdN8N) {
+      console.log('❌ Sem sessionId, não enviando')
       return
     }
 
@@ -222,6 +311,14 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     const userMessage = message
     console.log('📤 Enviando mensagem:', userMessage)
     setInputMessage('')
+
+    // Buscar userId e companyId
+    const { supabase } = await import('@/lib/supabase')
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+
+    const { getCompanyIdFromUserId } = await import('@/lib/utils/getCompanyId')
+    const companyId = await getCompanyIdFromUserId(userId!)
 
     // Adicionar mensagem do vendedor
     setMessages(prev => [...prev, { role: 'seller', text: userMessage }])
@@ -238,15 +335,17 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     }
 
     try {
-      // Enviar para API
+      // Enviar para API (N8N)
       const response = await fetch('/api/roleplay/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          threadId,
+          sessionId: sessionIdN8N,
           message: userMessage,
+          userId: userId,
+          companyId: companyId,
         }),
       })
 
@@ -260,7 +359,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       // Adicionar resposta do cliente
       setMessages(prev => [...prev, { role: 'client', text: data.message }])
 
-      // Salvar mensagem do cliente no Supabase
+      // Salvar mensagem do cliente no Supabase (roleplay_sessions)
       if (sessionId) {
         const clientMessage: RoleplayMessage = {
           role: 'client',
@@ -269,6 +368,27 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         }
         await addMessageToSession(sessionId, clientMessage)
       }
+
+      // Salvar mensagem do vendedor e resposta do cliente na roleplay_chat_memory
+      const { saveRoleplayChatMessage } = await import('@/lib/roleplayChatMemory')
+
+      // Salvar mensagem do vendedor (human)
+      await saveRoleplayChatMessage(
+        sessionIdN8N!,
+        userMessage,
+        'human',
+        userId!,
+        companyId!
+      )
+
+      // Salvar resposta do cliente (ai)
+      await saveRoleplayChatMessage(
+        sessionIdN8N!,
+        data.message,
+        'ai',
+        userId!,
+        companyId!
+      )
 
       // Converter resposta em áudio e tocar
       await textToSpeech(data.message)
@@ -713,7 +833,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
                       setIsRecording(false);
                       setIsSimulating(false);
                       setMessages([]);
-                      setThreadId(null);
+                      setSessionIdN8N(null);
                       setIsPlayingAudio(false);
                       setIsLoading(false);
                       setCurrentTranscription('');
@@ -1005,7 +1125,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
                             setIsRecording(false);
                             setIsSimulating(false);
                             setMessages([]);
-                            setThreadId(null);
+                            setSessionIdN8N(null);
                             setIsPlayingAudio(false);
                             setIsLoading(false);
                             setCurrentTranscription('');

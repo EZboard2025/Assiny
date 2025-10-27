@@ -116,10 +116,19 @@ function ConfigurationInterface({
   const loadCompanyData = async () => {
     try {
       const { supabase } = await import('@/lib/supabase')
+      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+
+      // Buscar company_id do usuário atual
+      const companyId = await getCompanyIdFromUser()
+      if (!companyId) {
+        console.warn('⚠️ company_id não encontrado')
+        return
+      }
+
       const { data, error } = await supabase
         .from('company_data')
         .select('*')
-        .limit(1)
+        .eq('company_id', companyId)
         .single()
 
       if (data && !error) {
@@ -161,6 +170,15 @@ function ConfigurationInterface({
 
     try {
       const { supabase } = await import('@/lib/supabase')
+      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+
+      // Buscar company_id do usuário atual
+      const companyId = await getCompanyIdFromUser()
+      if (!companyId) {
+        alert('❌ Erro: company_id não encontrado')
+        setSavingCompanyData(false)
+        return
+      }
 
       let savedData: any
 
@@ -194,10 +212,11 @@ function ConfigurationInterface({
         savedData = data
       } else {
         // CRIAR novo registro
-        console.log('➕ Criando novo registro')
+        console.log('➕ Criando novo registro para company_id:', companyId)
         const { data, error } = await supabase
           .from('company_data')
           .insert({
+            company_id: companyId,
             nome: companyData.nome,
             descricao: companyData.descricao,
             produtos_servicos: companyData.produtos_servicos,
@@ -711,6 +730,26 @@ function ConfigurationInterface({
     try {
       console.log('🔍 Iniciando avaliação da objeção:', objection.name)
 
+      // Buscar dados da empresa
+      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+      const { supabase } = await import('@/lib/supabase')
+
+      const companyId = await getCompanyIdFromUser()
+      let companyData = null
+
+      if (companyId) {
+        const { data, error } = await supabase
+          .from('company_data')
+          .select('*')
+          .eq('company_id', companyId)
+          .single()
+
+        if (!error && data) {
+          companyData = data
+          console.log('🏢 Dados da empresa carregados:', data.nome)
+        }
+      }
+
       // Formatar como texto único
       let objectionText = `OBJEÇÃO:\n${objection.name}\n\nFORMAS DE QUEBRAR:`
 
@@ -723,7 +762,8 @@ function ConfigurationInterface({
       }
 
       const payload = {
-        objecao_completa: objectionText
+        objecao_completa: objectionText,
+        companyData: companyData // Dados da empresa para contexto
       }
 
       console.log('📤 Enviando para N8N:', payload)
@@ -746,10 +786,19 @@ function ConfigurationInterface({
       // Parse do formato N8N
       let evaluation = result
       if (Array.isArray(result) && result[0]?.output) {
-        const outputString = result[0].output
+        let outputString = result[0].output
+        // Remover markdown code blocks se existirem
+        if (outputString.includes('```json')) {
+          outputString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
+        }
         evaluation = JSON.parse(outputString)
       } else if (result?.output && typeof result.output === 'string') {
-        evaluation = JSON.parse(result.output)
+        let outputString = result.output
+        // Remover markdown code blocks se existirem
+        if (outputString.includes('```json')) {
+          outputString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
+        }
+        evaluation = JSON.parse(outputString)
       }
 
       console.log('✅ Avaliação processada:', evaluation)

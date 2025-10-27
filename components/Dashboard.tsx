@@ -71,9 +71,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div className="text-center mb-16">
             <div className={`space-y-6 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
               <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-                Simule vendas, receba feedbacks automáticos
+                Aumente suas vendas com
                 <br />
-                e evolua com <span className="text-gradient-purple">inteligência artificial</span>
+                e evolua com <span className="text-gradient-purple">Roleplay inteligente</span>
               </h1>
 
               {/* Main CTA Buttons */}
