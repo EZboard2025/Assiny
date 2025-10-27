@@ -42,15 +42,33 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       if (typeof window === 'undefined') return
 
       const hostname = window.location.hostname
-      let subdomain = hostname.split('.')[0]
+      let subdomain = ''
 
-      // Se for localhost, usar query param ou padrão 'assiny'
+      // Detectar subdomínio baseado no ambiente
       if (hostname === 'localhost' || hostname.startsWith('127.0.0.1')) {
+        // Localhost puro sem subdomínio - usar query param ou padrão
         const params = new URLSearchParams(window.location.search)
         subdomain = params.get('company') || 'assiny' // Default para desenvolvimento
+      } else if (hostname.includes('.ramppy.local')) {
+        // Formato: assiny.ramppy.local:3000 -> "assiny"
+        subdomain = hostname.split('.')[0]
+      } else if (hostname.includes('.ramppy.site')) {
+        // Formato: assiny.ramppy.site -> "assiny"
+        subdomain = hostname.split('.')[0]
+      } else {
+        // Fallback
+        subdomain = hostname.split('.')[0]
       }
 
+      console.log('[CompanyContext] Hostname:', hostname)
       console.log('[CompanyContext] Buscando empresa com subdomain:', subdomain)
+
+      // Se for domínio principal (ramppy), não buscar empresa
+      if (subdomain === 'ramppy' || subdomain === 'www' || !subdomain) {
+        console.log('[CompanyContext] Domínio principal detectado, sem empresa específica')
+        setCurrentCompany(null)
+        return
+      }
 
       // Buscar empresa pelo subdomínio
       const { data, error: fetchError } = await supabase

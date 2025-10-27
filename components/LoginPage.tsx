@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useCompany } from '@/lib/contexts/CompanyContext'
 import Image from 'next/image'
 
 interface LoginPageProps {
@@ -10,6 +11,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
+  const { currentCompany, loading: companyLoading } = useCompany()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -114,7 +116,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 </div>
 
                 <h1 className="text-2xl font-bold mb-2">
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500">Bem-vindo!</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500">
+                    {companyLoading ? 'Carregando...' : currentCompany ? `Bem-vindo à ${currentCompany.name}!` : 'Bem-vindo!'}
+                  </span>
                 </h1>
                 <p className="text-gray-400 text-sm">
                   Faça login para continuar
