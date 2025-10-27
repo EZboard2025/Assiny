@@ -175,7 +175,7 @@ export async function getCompanyType(): Promise<'B2B' | 'B2C'> {
     return 'B2C' // Default
   }
 
-  return data.type
+  return data.name
 }
 
 export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
@@ -184,7 +184,7 @@ export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
 
   const { error } = await supabase
     .from('company_type')
-    .insert([{ type }])
+    .insert([{ name: type }])
 
   if (error) {
     console.error('Erro ao definir tipo de empresa:', error)
@@ -317,6 +317,19 @@ export async function getPersonas(): Promise<Persona[]> {
 }
 
 export async function addPersona(persona: Omit<Persona, 'id' | 'created_at' | 'updated_at'>): Promise<Persona | null> {
+<<<<<<< HEAD
+=======
+  const companyId = await getCompanyIdFromUser()
+
+  if (!companyId) {
+    console.error('[addPersona] company_id não encontrado')
+    return null
+  }
+
+  console.log('[addPersona] Inserindo persona com company_id:', companyId)
+  console.log('[addPersona] Dados da persona:', { ...persona, company_id: companyId })
+
+>>>>>>> c75df84 (feat: enhance employee creation and company association)
   const { data, error } = await supabase
     .from('personas')
     .insert([persona])
@@ -324,7 +337,10 @@ export async function addPersona(persona: Omit<Persona, 'id' | 'created_at' | 'u
     .single()
 
   if (error) {
-    console.error('Erro ao adicionar persona:', error)
+    console.error('[addPersona] Erro detalhado:', error)
+    console.error('[addPersona] Erro message:', error.message)
+    console.error('[addPersona] Erro code:', error.code)
+    console.error('[addPersona] Erro details:', error.details)
     return null
   }
 

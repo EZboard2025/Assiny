@@ -34,6 +34,13 @@
     @apply bg-gradient-to-r from-purple-400 via-purple-300 to-purple-500 bg-clip-text text-transparent;
   }
 
+  .text-gradient-green {
+    background: linear-gradient(135deg, #7FFF00 0%, #00FF41 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
   .card-gradient {
     @apply bg-gradient-to-br from-primary/10 to-primary-light/5;
   }
@@ -44,6 +51,10 @@
 
   .glow-purple {
     box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 30px rgba(127, 255, 0, 0.5), 0 0 60px rgba(127, 255, 0, 0.3);
   }
 
   .feature-card {

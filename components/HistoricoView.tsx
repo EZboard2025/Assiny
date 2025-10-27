@@ -112,8 +112,8 @@ export default function HistoricoView() {
               onClick={() => setFilterStatus('all')}
               className={`px-6 py-2 rounded-xl font-medium transition-all ${
                 filterStatus === 'all'
-                  ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                  : 'bg-gray-800/50 text-gray-400 border border-purple-500/20 hover:border-purple-500/40'
+                  ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                  : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
               }`}
             >
               Todas ({sessions.length})
@@ -122,8 +122,8 @@ export default function HistoricoView() {
               onClick={() => setFilterStatus('completed')}
               className={`px-6 py-2 rounded-xl font-medium transition-all ${
                 filterStatus === 'completed'
-                  ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                  : 'bg-gray-800/50 text-gray-400 border border-purple-500/20 hover:border-purple-500/40'
+                  ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                  : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
               }`}
             >
               Concluídas ({sessions.filter(s => s.status === 'completed').length})
@@ -132,8 +132,8 @@ export default function HistoricoView() {
               onClick={() => setFilterStatus('in_progress')}
               className={`px-6 py-2 rounded-xl font-medium transition-all ${
                 filterStatus === 'in_progress'
-                  ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                  : 'bg-gray-800/50 text-gray-400 border border-purple-500/20 hover:border-purple-500/40'
+                  ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                  : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
               }`}
             >
               Em andamento ({sessions.filter(s => s.status === 'in_progress').length})
@@ -147,17 +147,17 @@ export default function HistoricoView() {
           {/* Lista de Sessões */}
           <div className={`${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '100ms' }}>
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-purple-500/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
                 <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                  <MessageCircle className="w-6 h-6 text-purple-400" />
+                  <MessageCircle className="w-6 h-6 text-green-400" />
                   Sessões ({filteredSessions.length})
                 </h2>
 
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
                       <p className="text-gray-400">Carregando sessões...</p>
                     </div>
                   </div>
@@ -177,8 +177,8 @@ export default function HistoricoView() {
                         onClick={() => setSelectedSession(session)}
                         className={`w-full text-left p-4 rounded-xl transition-all ${
                           selectedSession?.id === session.id
-                            ? 'bg-purple-600/20 border-2 border-purple-500/60'
-                            : 'bg-gray-800/50 border-2 border-purple-500/20 hover:border-purple-500/40'
+                            ? 'bg-green-600/20 border-2 border-green-500/60'
+                            : 'bg-gray-800/50 border-2 border-green-500/20 hover:border-green-500/40'
                         }`}
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -211,8 +211,8 @@ export default function HistoricoView() {
           {/* Detalhes da Sessão */}
           <div className={`${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-purple-500/30 min-h-[600px]">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 min-h-[600px]">
                 {!selectedSession ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
@@ -223,7 +223,7 @@ export default function HistoricoView() {
                 ) : (
                   <div className="space-y-6">
                     {/* Header da Sessão */}
-                    <div className="flex items-start justify-between pb-4 border-b border-purple-500/20">
+                    <div className="flex items-start justify-between pb-4 border-b border-green-500/20">
                       <div>
                         <h3 className="text-2xl font-bold mb-2">Detalhes da Sessão</h3>
                         {getStatusBadge(selectedSession.status)}
@@ -239,7 +239,7 @@ export default function HistoricoView() {
 
                     {/* Configurações */}
                     <div className="bg-gray-800/50 rounded-xl p-4 space-y-2">
-                      <h4 className="font-semibold mb-3 text-purple-400">Configurações</h4>
+                      <h4 className="font-semibold mb-3 text-green-400">Configurações</h4>
                       <p className="text-sm text-gray-300">
                         <span className="text-gray-500">Idade:</span> {selectedSession.config.age} anos
                       </p>
@@ -254,7 +254,7 @@ export default function HistoricoView() {
                           <span className="text-gray-500">Objeções:</span>
                           <div className="flex flex-wrap gap-1 mt-1">
                             {selectedSession.config.objections.map((obj: string | { name: string }, i: number) => (
-                              <span key={i} className="px-2 py-1 bg-purple-500/20 rounded text-xs">
+                              <span key={i} className="px-2 py-1 bg-green-500/20 rounded text-xs">
                                 {typeof obj === 'string' ? obj : obj.name}
                               </span>
                             ))}
@@ -270,18 +270,18 @@ export default function HistoricoView() {
 
                       return (
                         <div className="mb-6">
-                          <h4 className="font-semibold mb-3 text-purple-400 text-lg">
+                          <h4 className="font-semibold mb-3 text-green-400 text-lg">
                             📊 Avaliação de Performance
                           </h4>
 
                           {/* Score Geral */}
-                          <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-xl p-4 text-center mb-4">
+                          <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/30 rounded-xl p-4 text-center mb-4">
                             <div className="text-4xl font-bold text-white mb-1">
                               {evaluation.overall_score !== undefined && evaluation.overall_score !== null
                                 ? `${(evaluation.overall_score / 10).toFixed(1)}/10`
                                 : 'N/A'}
                             </div>
-                            <div className="text-sm text-purple-300 uppercase tracking-wider">
+                            <div className="text-sm text-green-300 uppercase tracking-wider">
                               {evaluation.performance_level === 'legendary' && '🏆 Lendário'}
                               {evaluation.performance_level === 'excellent' && '⭐ Excelente'}
                               {evaluation.performance_level === 'very_good' && '✨ Muito Bom'}
@@ -293,7 +293,7 @@ export default function HistoricoView() {
 
                           {/* Resumo Executivo */}
                           {evaluation.executive_summary && (
-                            <div className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
+                            <div className="bg-gray-800/30 border border-green-500/20 rounded-xl p-4 mb-4">
                               <h5 className="font-semibold text-white mb-2">Resumo Executivo</h5>
                               <p className="text-sm text-gray-300 leading-relaxed">
                                 {evaluation.executive_summary}
@@ -303,7 +303,7 @@ export default function HistoricoView() {
 
                           {/* Avaliação SPIN com Gráfico Radar */}
                           {evaluation.spin_evaluation && (
-                            <div className="bg-gradient-to-br from-gray-800/50 to-purple-900/20 border border-purple-500/30 rounded-2xl p-6 mb-4 shadow-lg shadow-purple-500/10">
+                            <div className="bg-gradient-to-br from-gray-800/50 to-green-900/20 border border-green-500/30 rounded-2xl p-6 mb-4 shadow-lg shadow-green-500/10">
                               <h5 className="font-bold text-white mb-6 text-center text-xl">Metodologia SPIN</h5>
 
                               {/* Radar Chart - Diamond Shape */}
@@ -394,26 +394,26 @@ export default function HistoricoView() {
 
                               {/* SPIN Scores Grid - Destacado */}
                               <div className="grid grid-cols-4 gap-3 mb-4">
-                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
-                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Situação</div>
+                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
+                                  <div className="text-xs text-green-300 mb-1 font-semibold">Situação</div>
                                   <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.S?.final_score?.toFixed(1) || '0'}</div>
                                 </div>
-                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
-                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Problema</div>
+                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
+                                  <div className="text-xs text-green-300 mb-1 font-semibold">Problema</div>
                                   <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.P?.final_score?.toFixed(1) || '0'}</div>
                                 </div>
-                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
-                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Implicação</div>
+                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
+                                  <div className="text-xs text-green-300 mb-1 font-semibold">Implicação</div>
                                   <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.I?.final_score?.toFixed(1) || '0'}</div>
                                 </div>
-                                <div className="text-center bg-gradient-to-br from-purple-600/20 to-purple-400/10 rounded-lg p-3 border border-purple-500/20">
-                                  <div className="text-xs text-purple-300 mb-1 font-semibold">Necessidade</div>
+                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
+                                  <div className="text-xs text-green-300 mb-1 font-semibold">Necessidade</div>
                                   <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.N?.final_score?.toFixed(1) || '0'}</div>
                                 </div>
                               </div>
 
                               {/* Média Geral SPIN */}
-                              <div className="mt-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl px-6 py-4 text-center shadow-lg">
+                              <div className="mt-4 bg-gradient-to-r from-green-600 to-green-500 rounded-xl px-6 py-4 text-center shadow-lg">
                                 <div className="text-sm text-purple-100 mb-1 font-semibold">Média Geral SPIN</div>
                                 <div className="text-3xl font-bold text-white">
                                   {(() => {
@@ -432,8 +432,8 @@ export default function HistoricoView() {
 
                         {/* Feedback Detalhado SPIN */}
                         {evaluation.spin_evaluation && (
-                          <details className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
-                            <summary className="font-semibold text-white cursor-pointer hover:text-purple-400 transition-colors">
+                          <details className="bg-gray-800/30 border border-green-500/20 rounded-xl p-4 mb-4">
+                            <summary className="font-semibold text-white cursor-pointer hover:text-green-400 transition-colors">
                               Análise Detalhada SPIN
                             </summary>
                             <div className="mt-4 space-y-6">
@@ -449,10 +449,10 @@ export default function HistoricoView() {
                                 }
 
                                 return (
-                                  <div key={letter} className="bg-gray-900/50 rounded-lg p-4 border border-purple-500/10">
+                                  <div key={letter} className="bg-gray-900/50 rounded-lg p-4 border border-green-500/10">
                                     {/* Header com nome e score */}
                                     <div className="flex items-center justify-between mb-3">
-                                      <h6 className="font-semibold text-purple-400">
+                                      <h6 className="font-semibold text-green-400">
                                         {letterNames[letter]} ({letter})
                                       </h6>
                                       <span className="text-xl font-bold text-white">
@@ -508,16 +508,16 @@ export default function HistoricoView() {
 
                         {/* Análise de Objeções */}
                         {evaluation.objections_analysis?.length > 0 && (
-                          <details className="bg-gray-800/30 border border-purple-500/20 rounded-xl p-4 mb-4">
-                            <summary className="font-semibold text-white cursor-pointer hover:text-purple-400 transition-colors">
+                          <details className="bg-gray-800/30 border border-green-500/20 rounded-xl p-4 mb-4">
+                            <summary className="font-semibold text-white cursor-pointer hover:text-green-400 transition-colors">
                               Análise Detalhada de Objeções ({evaluation.objections_analysis.length})
                             </summary>
                             <div className="mt-4 space-y-4">
                               {evaluation.objections_analysis.map((obj: any, idx: number) => (
-                                <div key={idx} className="bg-gray-900/50 rounded-lg p-4 border border-purple-500/10">
+                                <div key={idx} className="bg-gray-900/50 rounded-lg p-4 border border-green-500/10">
                                   {/* Header com tipo e score */}
                                   <div className="flex items-center justify-between mb-3">
-                                    <span className="text-sm font-semibold text-purple-400 uppercase bg-purple-500/10 px-2 py-1 rounded">
+                                    <span className="text-sm font-semibold text-green-400 uppercase bg-green-500/10 px-2 py-1 rounded">
                                       {obj.objection_type}
                                     </span>
                                     <div className="flex items-center gap-2">
@@ -527,9 +527,9 @@ export default function HistoricoView() {
                                   </div>
 
                                   {/* Texto da objeção */}
-                                  <div className="bg-gray-800/50 rounded-lg p-3 mb-3 border-l-2 border-purple-500/30">
+                                  <div className="bg-gray-800/50 rounded-lg p-3 mb-3 border-l-2 border-green-500/30">
                                     <p className="text-sm text-gray-300 italic">
-                                      <span className="text-purple-400 mr-1">Cliente:</span>
+                                      <span className="text-green-400 mr-1">Cliente:</span>
                                       "{obj.objection_text}"
                                     </p>
                                   </div>
@@ -598,7 +598,7 @@ export default function HistoricoView() {
 
                     {/* Transcrição */}
                     <div>
-                      <h4 className="font-semibold mb-3 text-purple-400">
+                      <h4 className="font-semibold mb-3 text-green-400">
                         Transcrição ({selectedSession.messages.length} mensagens)
                       </h4>
                       <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
@@ -608,8 +608,8 @@ export default function HistoricoView() {
                             className={`flex gap-3 ${msg.role === 'seller' ? 'justify-end' : ''}`}
                           >
                             {msg.role === 'client' && (
-                              <div className="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                                <User className="w-4 h-4 text-purple-400" />
+                              <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                                <User className="w-4 h-4 text-green-400" />
                               </div>
                             )}
                             <div className={`flex-1 ${msg.role === 'seller' ? 'flex flex-col items-end' : ''}`}>
@@ -620,7 +620,7 @@ export default function HistoricoView() {
                                 className={`${
                                   msg.role === 'client'
                                     ? 'bg-gray-800/50 rounded-2xl rounded-tl-none'
-                                    : 'bg-purple-600/20 rounded-2xl rounded-tr-none max-w-md'
+                                    : 'bg-green-600/20 rounded-2xl rounded-tr-none max-w-md'
                                 } p-3 text-sm text-gray-300`}
                               >
                                 {msg.text}

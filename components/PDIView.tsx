@@ -352,7 +352,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
         {labelPositions.map((pos, index) => (
           <g key={index}>
             <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="middle" className="fill-gray-300 font-bold text-sm">{pos.label}</text>
-            <text x={pos.x} y={pos.y + 12} textAnchor="middle" dominantBaseline="middle" className="fill-purple-400 font-semibold text-xs">{pos.value.toFixed(1)}</text>
+            <text x={pos.x} y={pos.y + 12} textAnchor="middle" dominantBaseline="middle" className="fill-green-400 font-semibold text-xs">{pos.value.toFixed(1)}</text>
           </g>
         ))}
       </svg>
@@ -405,7 +405,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
 
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-500 mx-auto"></div>
             <p className="text-gray-400 mt-4">Gerando seu PDI...</p>
           </div>
         </div>
@@ -426,7 +426,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-900/40 to-blue-900/40 rounded-2xl p-6 md:p-8 border border-purple-500/20 shadow-2xl">
+        <div className="bg-gradient-to-r from-green-900/40 to-blue-900/40 rounded-2xl p-6 md:p-8 border border-green-500/20 shadow-2xl">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
@@ -481,7 +481,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
                   )}
                 </button>
               )}
-              <span className="px-4 py-2 rounded-lg border font-semibold text-center bg-purple-500/20 text-purple-400 border-purple-500/30">
+              <span className="px-4 py-2 rounded-lg border font-semibold text-center bg-green-500/20 text-green-400 border-green-500/30">
                 {hasData ? pdiData.periodo : '7 dias'}
               </span>
               {hasData && pdiData.vendedor && (
@@ -537,19 +537,19 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
               {hasData ? renderRadarChart(pdiData.notas_spin) : renderEmptyRadarChart()}
             </div>
             <div className="mt-6 grid grid-cols-4 gap-2">
-              <div className="text-center p-3 bg-purple-900/30 rounded-lg">
+              <div className="text-center p-3 bg-green-900/30 rounded-lg">
                 <p className="text-gray-400 text-xs mb-1">Situação</p>
                 <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.situacao.toFixed(1) : '---'}</p>
               </div>
-              <div className="text-center p-3 bg-purple-900/30 rounded-lg">
+              <div className="text-center p-3 bg-green-900/30 rounded-lg">
                 <p className="text-gray-400 text-xs mb-1">Problema</p>
                 <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.problema.toFixed(1) : '---'}</p>
               </div>
-              <div className="text-center p-3 bg-purple-900/30 rounded-lg">
+              <div className="text-center p-3 bg-green-900/30 rounded-lg">
                 <p className="text-gray-400 text-xs mb-1">Implicação</p>
                 <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.implicacao.toFixed(1) : '---'}</p>
               </div>
-              <div className="text-center p-3 bg-purple-900/30 rounded-lg">
+              <div className="text-center p-3 bg-green-900/30 rounded-lg">
                 <p className="text-gray-400 text-xs mb-1">Necessidade</p>
                 <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.necessidade.toFixed(1) : '---'}</p>
               </div>
@@ -563,8 +563,8 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
               Meta de 7 Dias
             </h2>
 
-            <div className="p-5 bg-gradient-to-r from-purple-900/40 to-blue-900/40 rounded-xl border border-purple-500/30 mb-4">
-              <p className="text-purple-300 font-semibold mb-2 text-sm">OBJETIVO</p>
+            <div className="p-5 bg-gradient-to-r from-green-900/40 to-blue-900/40 rounded-xl border border-green-500/30 mb-4">
+              <p className="text-green-300 font-semibold mb-2 text-sm">OBJETIVO</p>
               <p className="text-gray-400 text-base italic mb-4">{hasData ? pdiData.meta_7_dias.objetivo : 'Seu objetivo será definido aqui...'}</p>
 
               <div className="mb-4">
@@ -605,17 +605,17 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
               pdiData.acoes.map((acao, index) => (
                 <div
                   key={index}
-                  className="p-5 bg-gray-900/50 rounded-xl border border-gray-700 hover:border-purple-500/50 transition-all duration-300"
+                  className="p-5 bg-gray-900/50 rounded-xl border border-gray-700 hover:border-green-500/50 transition-all duration-300"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
-                      <span className="text-purple-400 font-bold">{index + 1}</span>
+                    <div className="w-10 h-10 rounded-full bg-green-900/40 border border-green-500/40 flex items-center justify-center flex-shrink-0">
+                      <span className="text-green-400 font-bold">{index + 1}</span>
                     </div>
                     <div className="flex-1">
                       <p className="text-white font-semibold mb-3">{acao.acao}</p>
                       <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
                         <p className="text-gray-500 text-xs mb-1">Resultado Esperado</p>
-                        <p className="text-purple-400 text-sm">{acao.resultado_esperado}</p>
+                        <p className="text-green-400 text-sm">{acao.resultado_esperado}</p>
                       </div>
                     </div>
                   </div>
@@ -657,7 +657,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
         </div>
 
         {/* Próximos Passos */}
-        <div className="bg-gradient-to-r from-purple-900/60 to-blue-900/60 rounded-2xl p-6 md:p-8 border border-purple-500/40 shadow-xl">
+        <div className="bg-gradient-to-r from-green-900/60 to-blue-900/60 rounded-2xl p-6 md:p-8 border border-green-500/40 shadow-xl">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <span className="text-3xl">🚀</span>
             Próximos Passos

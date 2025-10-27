@@ -38,6 +38,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sessão não encontrada' }, { status: 404 })
     }
 
+    // Buscar company_id do usuário da sessão
+    const { data: employeeData, error: employeeError } = await supabase
+      .from('employees')
+      .select('company_id')
+      .eq('user_id', session.user_id)
+      .single()
+
+    const companyId = employeeData?.company_id || null
+    if (!companyId) {
+      console.warn('⚠️ company_id não encontrado para o usuário:', session.user_id)
+    } else {
+      console.log('✅ company_id encontrado:', companyId)
+    }
+
     // Montar transcrição formatada
     const messages = session.messages as Array<{ role: string; text: string; timestamp: string }>
     const transcription = messages
@@ -98,7 +112,8 @@ OBJEÇÕES TRABALHADAS:`
     const n8nPayload = {
       transcription,
       context,
-      client_profile
+      client_profile,
+      companyId: companyId // ID da empresa para contexto do agente
     }
 
     console.log('📡 Enviando payload para N8N:', JSON.stringify(n8nPayload, null, 2))
