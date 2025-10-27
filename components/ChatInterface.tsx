@@ -487,10 +487,10 @@ Tendência: ${summaryData.trend || 'N/A'}`
     <div className="min-h-screen py-20 px-6 relative z-10">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 mb-6">
+        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-400 rounded-2xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-400 rounded-2xl flex items-center justify-center">
                 <Bot className="w-7 h-7 text-white" />
               </div>
               <div>
@@ -521,7 +521,7 @@ Tendência: ${summaryData.trend || 'N/A'}`
         </div>
 
         {/* Chat Container */}
-        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
+        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl border border-green-500/30 overflow-hidden">
           {/* Messages Area */}
           <div className="h-[60vh] overflow-y-auto p-6 space-y-4">
             {messages.map(message => (
@@ -532,7 +532,7 @@ Tendência: ${summaryData.trend || 'N/A'}`
                 }`}
               >
                 {message.role === 'assistant' && (
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-400 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-green-400 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                 )}
@@ -540,7 +540,7 @@ Tendência: ${summaryData.trend || 'N/A'}`
                 <div
                   className={`max-w-[70%] rounded-2xl px-4 py-3 ${
                     message.role === 'user'
-                      ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
+                      ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
                       : 'bg-gray-800/50 border border-gray-700/50 text-gray-200'
                   }`}
                 >
@@ -569,12 +569,12 @@ Tendência: ${summaryData.trend || 'N/A'}`
 
             {isLoading && (
               <div className="flex gap-3 justify-start">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-400 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-green-400 rounded-xl flex items-center justify-center">
                   <Bot className="w-6 h-6 text-white" />
                 </div>
                 <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                    <Loader2 className="w-4 h-4 animate-spin text-green-400" />
                     <span className="text-gray-400">Digitando...</span>
                   </div>
                 </div>
@@ -592,14 +592,14 @@ Tendência: ${summaryData.trend || 'N/A'}`
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Faça uma pergunta sobre vendas ou treinamento..."
-                className="flex-1 resize-none rounded-xl border border-gray-700/50 bg-gray-800/50 px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
+                className="flex-1 resize-none rounded-xl border border-gray-700/50 bg-gray-800/50 px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-green-500/50 transition-colors"
                 rows={1}
                 disabled={isLoading}
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 shadow-lg shadow-purple-500/30"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 shadow-lg shadow-green-500/30"
               >
                 <Send className="w-5 h-5" />
               </button>
@@ -707,7 +707,7 @@ Tendência: ${summaryData.trend || 'N/A'}`
                 </p>
                 <button
                   onClick={confirmEndSession}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-500 text-white text-lg font-semibold rounded-xl hover:scale-105 transition-all shadow-lg shadow-purple-500/30"
+                  className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white text-lg font-semibold rounded-xl hover:scale-105 transition-all shadow-lg shadow-green-500/30"
                 >
                   OK
                 </button>

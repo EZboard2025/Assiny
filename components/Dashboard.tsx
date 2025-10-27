@@ -21,6 +21,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [mounted, setMounted] = useState(false)
   const chatRef = useRef<ChatInterfaceHandle>(null)
 
+  // Sempre usar tema Ramppy (verde espacial) para TODAS as empresas
+  const isRamppy = true
+
   useEffect(() => {
     setMounted(true)
 
@@ -71,16 +74,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div className="text-center mb-16">
             <div className={`space-y-6 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
               <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-                Aumente suas vendas com
+                Aumente suas vendas com IA
                 <br />
-                e evolua com <span className="text-gradient-purple">Roleplay inteligente</span>
+                e evolua com <span className="text-gradient-green">Roleplay inteligente</span>
               </h1>
 
               {/* Main CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
                 <button
                   onClick={() => handleViewChange('roleplay')}
-                  className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-purple"
+                  className="px-8 py-4 bg-gradient-to-r from-green-600 to-lime-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-green"
                 >
                   <Users className="w-5 h-5" />
                   Treinar com Roleplay
@@ -103,11 +106,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition-all">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-purple-600/20 rounded-2xl flex items-center justify-center">
-                    <Users className="w-7 h-7 text-purple-400" />
+                  <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
+                    <Users className="w-7 h-7 text-green-400" />
                   </div>
                   <h3 className="text-2xl font-bold">Roleplay</h3>
                 </div>
@@ -123,11 +126,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '200ms' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition-all">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-purple-600/20 rounded-2xl flex items-center justify-center">
-                    <Target className="w-7 h-7 text-purple-400" />
+                  <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
+                    <Target className="w-7 h-7 text-green-400" />
                   </div>
                   <h3 className="text-2xl font-bold">PDI</h3>
                 </div>
@@ -143,11 +146,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '300ms' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition-all">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-purple-600/20 rounded-2xl flex items-center justify-center">
-                    <User className="w-7 h-7 text-purple-400" />
+                  <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
+                    <User className="w-7 h-7 text-green-400" />
                   </div>
                   <h3 className="text-2xl font-bold">Meu Perfil</h3>
                 </div>
@@ -172,12 +175,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       </div>
 
       {/* Header Navigation */}
-      <header className="fixed top-0 w-full bg-black/50 backdrop-blur-xl z-50 border-b border-purple-900/20">
+      <header className="fixed top-0 w-full bg-black/70 backdrop-blur-xl z-50 border-b border-green-500/30">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-center h-20">
           <div className="w-full flex items-center justify-between">
             {/* Logo */}
             <div className="text-3xl font-bold tracking-tight cursor-pointer" onClick={() => handleViewChange('home')}>
-              {companyLoading ? 'Loading...' : (currentCompany?.name || 'Ramppy')}<span className="text-purple-500">.</span>
+              Ramppy<span className="text-green-500">.</span>
             </div>
 
             {/* Navigation */}
@@ -208,7 +211,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </button>
               <button
                 onClick={() => handleViewChange('perfil')}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-full font-medium shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70 hover:scale-105 transition-all"
+                className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-full font-medium shadow-lg shadow-green-500/50 hover:shadow-green-500/70 hover:scale-105 transition-all"
               >
                 Meu Perfil
               </button>
@@ -218,14 +221,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowConfigHub(true)}
-                className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-purple-500/30"
+                className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
               >
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">Config</span>
               </button>
               <button
                 onClick={onLogout}
-                className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-purple-500/30"
+                className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Sair</span>

@@ -691,13 +691,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         {/* Session Info Card */}
         <div className={`max-w-2xl mx-auto mb-8 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
-            <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
+            <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30">
               <div className="flex justify-center gap-4 mb-6">
                 {!isSimulating ? (
                   <button
                     onClick={() => setShowConfig(true)}
-                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-purple"
+                    className="px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-green"
                   >
                     <Play className="w-5 h-5" />
                     Iniciar Simulação
@@ -851,8 +851,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </div>
 
               {/* Data e Hora Atual */}
-              <div className="flex items-center justify-center gap-2 text-gray-300 pt-4 border-t border-purple-500/20">
-                <Calendar className="w-5 h-5 text-purple-400" />
+              <div className="flex items-center justify-center gap-2 text-gray-300 pt-4 border-t border-green-500/20">
+                <Calendar className="w-5 h-5 text-green-400" />
                 <span className="text-sm">
                   {new Date().toLocaleDateString('pt-BR', {
                     day: '2-digit',
@@ -875,10 +875,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           {/* Chat da Simulação */}
           <div className={`w-full ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-purple-500/30">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-purple-500/20">
-                  <MessageCircle className="w-5 h-5 text-purple-400" />
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-green-500/20">
+                  <MessageCircle className="w-5 h-5 text-green-400" />
                   <h3 className="text-xl font-bold">Chat da Simulação</h3>
                 </div>
 
@@ -891,8 +891,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       {msg.role === 'client' && (
-                        <div className="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                          <User className="w-4 h-4 text-purple-400" />
+                        <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-green-400" />
                         </div>
                       )}
                       <div className={`flex-1 ${msg.role === 'seller' ? 'flex flex-col items-end' : ''}`}>
@@ -905,8 +905,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                               ? 'bg-gray-800/50 rounded-2xl rounded-tl-none'
                               : `${
                                   msg.text === lastUserMessage && lastUserMessage !== ''
-                                    ? 'bg-gradient-to-r from-purple-600/30 to-purple-500/30 border border-purple-500/40'
-                                    : 'bg-purple-600/20'
+                                    ? 'bg-gradient-to-r from-green-600/30 to-green-500/30 border border-green-500/40'
+                                    : 'bg-green-600/20'
                                 } rounded-2xl rounded-tr-none max-w-md`
                           } p-4 text-sm text-gray-300 transition-all duration-300`}
                         >
@@ -919,16 +919,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   {/* Loading indicator */}
                   {isLoading && (
                     <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                        <User className="w-4 h-4 text-purple-400" />
+                      <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-green-400" />
                       </div>
                       <div className="flex-1">
                         <div className="text-xs text-gray-400 mb-1">Cliente virtual (IA)</div>
                         <div className="bg-gray-800/50 rounded-2xl rounded-tl-none p-4 text-sm text-gray-300">
                           <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                           </div>
                         </div>
                       </div>
@@ -938,9 +938,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   {/* Audio playing indicator */}
                   {isPlayingAudio && (
                     <div className="flex items-center justify-center py-2">
-                      <div className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 rounded-full">
-                        <Volume2 className="w-4 h-4 text-purple-400 animate-pulse" />
-                        <span className="text-xs text-purple-400">Cliente falando...</span>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 rounded-full">
+                        <Volume2 className="w-4 h-4 text-green-400 animate-pulse" />
+                        <span className="text-xs text-green-400">Cliente falando...</span>
                       </div>
                     </div>
                   )}
@@ -967,7 +967,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           ? 'bg-blue-900/20 border-blue-500/30 shadow-lg shadow-blue-500/10'
                           : currentTranscription.includes('❌')
                           ? 'bg-red-900/20 border-red-500/30 shadow-lg shadow-red-500/10'
-                          : 'bg-gray-800/50 border-purple-500/20'
+                          : 'bg-gray-800/50 border-green-500/20'
                       }`}>
                         <p className="text-sm text-center font-medium">
                           {currentTranscription}
@@ -984,23 +984,23 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   )}
                 </div>
 
-                <div className="flex items-center justify-center gap-2 pt-4 border-t border-purple-500/20">
+                <div className="flex items-center justify-center gap-2 pt-4 border-t border-green-500/20">
                   {/* Botões de controle de gravação */}
                   {isSimulating && (
                     <div className="flex items-center gap-3">
                       {isPlayingAudio && (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 rounded-full">
-                          <Volume2 className="w-4 h-4 text-purple-400 animate-pulse" />
-                          <span className="text-sm text-purple-400">Aguarde o cliente terminar...</span>
+                        <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 rounded-full">
+                          <Volume2 className="w-4 h-4 text-green-400 animate-pulse" />
+                          <span className="text-sm text-green-400">Aguarde o cliente terminar...</span>
                         </div>
                       )}
 
                       {isLoading && !isRecording && !isPlayingAudio && (
                         <div className="flex items-center gap-2 px-4 py-2 bg-gray-600/20 rounded-full">
                           <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                           </div>
                           <span className="text-sm text-gray-400">Processando...</span>
                         </div>
@@ -1012,10 +1012,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         {!isPlayingAudio && !isRecording && !isLoading && (
                           <button
                             onClick={startRecording}
-                            className="p-4 bg-purple-600/20 border border-purple-500/30 rounded-full hover:bg-purple-600/30 transition-all"
+                            className="p-4 bg-green-600/20 border border-green-500/30 rounded-full hover:bg-green-600/30 transition-all"
                             title="Clique para começar a falar"
                           >
-                            <Mic className="w-6 h-6 text-purple-400" />
+                            <Mic className="w-6 h-6 text-green-400" />
                           </button>
                         )}
 
@@ -1157,8 +1157,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         {showConfig && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="relative max-w-2xl w-full">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30 max-h-[90vh] overflow-y-auto">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
+              <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-3xl font-bold">Configuração da Sessão</h2>
                   <button
@@ -1173,7 +1173,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   {/* Idade do Cliente */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-3">
-                      Idade do Cliente: <span className="text-purple-400 text-lg font-bold">{age} anos</span>
+                      Idade do Cliente: <span className="text-green-400 text-lg font-bold">{age} anos</span>
                     </label>
                     <input
                       type="range"
@@ -1189,7 +1189,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </div>
 
                     {/* Caixa de Comportamento por Faixa Etária */}
-                    <div className="mt-4 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-4">
+                    <div className="mt-4 bg-gradient-to-br from-blue-900/20 to-green-900/20 border border-blue-500/30 rounded-xl p-4">
                       {age >= 18 && age <= 24 && (
                         <div>
                           <p className="text-sm font-semibold text-blue-400 mb-2">18 a 24 anos</p>
@@ -1237,8 +1237,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           onClick={() => setTemperament(temp)}
                           className={`px-4 py-3 rounded-xl font-medium transition-all ${
                             temperament === temp
-                              ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                              : 'bg-gray-800/50 text-gray-400 border border-purple-500/20 hover:border-purple-500/40'
+                              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                              : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
                           }`}
                         >
                           {temp}
@@ -1247,10 +1247,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </div>
 
                     {/* Caixa de Descrição do Temperamento */}
-                    <div className="mt-4 bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-4">
+                    <div className="mt-4 bg-gradient-to-br from-green-900/20 to-pink-900/20 border border-green-500/30 rounded-xl p-4">
                       {temperament === 'Analítico' && (
                         <div>
-                          <p className="text-sm font-semibold text-purple-400 mb-2">Analítico</p>
+                          <p className="text-sm font-semibold text-green-400 mb-2">Analítico</p>
                           <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Tom formal e lógico • Faz perguntas técnicas • Desconfia de argumentos subjetivos • Cobra detalhes quando vendedor é vago</p>
                           <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Formal, racional, calmo e preciso</p>
                           <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Dados concretos, estatísticas, provas de eficácia, garantias</p>
@@ -1297,7 +1297,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       Persona
                     </label>
                     {personas.filter(p => p.business_type === businessType).length === 0 ? (
-                      <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4 text-gray-400 text-sm">
+                      <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-4 text-gray-400 text-sm">
                         Nenhuma persona {businessType} cadastrada. Configure no Hub de Configuração.
                       </div>
                     ) : (
@@ -1310,12 +1310,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                               onClick={() => setSelectedPersona(persona.id!)}
                               className={`cursor-pointer bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-4 transition-all ${
                                 selectedPersona === persona.id
-                                  ? 'border-purple-500 shadow-lg shadow-purple-500/20'
-                                  : 'border-purple-500/30 hover:border-purple-500/50'
+                                  ? 'border-green-500 shadow-lg shadow-green-500/20'
+                                  : 'border-green-500/30 hover:border-green-500/50'
                               }`}
                             >
                               <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center flex-shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
                                   <UserCircle2 className="w-6 h-6 text-white" />
                                 </div>
                                 <div className="flex-1 space-y-2">
@@ -1329,25 +1329,25 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                     <>
                                       {(persona as PersonaB2B).company_type && (
                                         <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-purple-400">Tipo de Empresa:</span>{' '}
+                                          <span className="font-bold text-green-400">Tipo de Empresa:</span>{' '}
                                           {(persona as PersonaB2B).company_type}
                                         </p>
                                       )}
                                       {(persona as PersonaB2B).company_goals && (
                                         <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                          <span className="font-bold text-green-400">Busca:</span>{' '}
                                           {(persona as PersonaB2B).company_goals}
                                         </p>
                                       )}
                                       {(persona as PersonaB2B).business_challenges && (
                                         <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-purple-400">Desafios:</span>{' '}
+                                          <span className="font-bold text-green-400">Desafios:</span>{' '}
                                           {(persona as PersonaB2B).business_challenges}
                                         </p>
                                       )}
                                       {(persona as PersonaB2B).prior_knowledge && (
                                         <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                          <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
                                           {(persona as PersonaB2B).prior_knowledge}
                                         </p>
                                       )}
@@ -1358,19 +1358,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                     <>
                                       {(persona as PersonaB2C).what_seeks && (
                                         <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                          <span className="font-bold text-green-400">Busca:</span>{' '}
                                           {(persona as PersonaB2C).what_seeks}
                                         </p>
                                       )}
                                       {(persona as PersonaB2C).main_pains && (
                                         <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-purple-400">Dores:</span>{' '}
+                                          <span className="font-bold text-green-400">Dores:</span>{' '}
                                           {(persona as PersonaB2C).main_pains}
                                         </p>
                                       )}
                                       {(persona as PersonaB2C).prior_knowledge && (
                                         <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                          <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
                                           {(persona as PersonaB2C).prior_knowledge}
                                         </p>
                                       )}
@@ -1379,7 +1379,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                 </div>
 
                                 {selectedPersona === persona.id && (
-                                  <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                                     <CheckCircle className="w-4 h-4 text-white" />
                                   </div>
                                 )}
@@ -1396,7 +1396,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       Objeções (selecione as que deseja praticar)
                     </label>
                     {objections.length === 0 ? (
-                      <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4 text-gray-400 text-sm">
+                      <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-4 text-gray-400 text-sm">
                         Nenhuma objeção cadastrada. Configure no Hub de Configuração.
                       </div>
                     ) : (
@@ -1404,13 +1404,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         {objections.map((objection) => (
                           <label
                             key={objection.id}
-                            className="flex items-center gap-3 bg-gray-800/50 border border-purple-500/20 rounded-xl px-4 py-3 cursor-pointer hover:border-purple-500/40 transition-colors"
+                            className="flex items-center gap-3 bg-gray-800/50 border border-green-500/20 rounded-xl px-4 py-3 cursor-pointer hover:border-green-500/40 transition-colors"
                           >
                             <input
                               type="checkbox"
                               checked={selectedObjections.includes(objection.id)}
                               onChange={() => toggleObjection(objection.id)}
-                              className="w-5 h-5 rounded border-purple-500/30 text-purple-600 focus:ring-purple-500 focus:ring-offset-0"
+                              className="w-5 h-5 rounded border-green-500/30 text-green-600 focus:ring-green-500 focus:ring-offset-0"
                             />
                             <span className="text-gray-300">{objection.name}</span>
                           </label>
@@ -1424,13 +1424,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <div className="flex gap-4 mt-8">
                   <button
                     onClick={() => setShowConfig(false)}
-                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-semibold hover:bg-gray-700/50 transition-colors"
+                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-semibold hover:bg-gray-700/50 transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleStartSimulation}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-semibold hover:scale-105 transition-transform glow-purple"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-semibold hover:scale-105 transition-transform glow-green"
                   >
                     Iniciar Roleplay
                   </button>
@@ -1443,8 +1443,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         {/* Modal de Loading - Avaliação */}
         {isEvaluating && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-purple-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
-              <Loader2 className="w-16 h-16 text-purple-400 animate-spin mx-auto" />
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
+              <Loader2 className="w-16 h-16 text-green-400 animate-spin mx-auto" />
               <div>
                 <h3 className="text-2xl font-bold text-white mb-2">Analisando sua performance...</h3>
                 <p className="text-gray-400">Nosso agente está avaliando sua conversa com base em metodologia SPIN Selling</p>
@@ -1460,19 +1460,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               {/* Close Button */}
               <button
                 onClick={() => setShowEvaluationSummary(false)}
-                className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-purple-500/30"
+                className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
               >
                 <X className="w-5 h-5 text-gray-400" />
               </button>
 
               {/* Header com Tabs */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-purple-500/30 p-6">
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-6">
                 <h2 className="text-3xl font-bold text-center text-white mb-6">DESEMPENHO DO VENDEDOR</h2>
                 <div className="flex justify-center gap-2">
                   <button className="px-6 py-2 bg-gray-800/50 text-gray-400 rounded-lg hover:bg-gray-700/50 transition-colors">
                     Conversa
                   </button>
-                  <button className="px-6 py-2 bg-purple-600 text-white rounded-lg shadow-lg shadow-purple-500/30">
+                  <button className="px-6 py-2 bg-green-600 text-white rounded-lg shadow-lg shadow-green-500/30">
                     Avaliação
                   </button>
                   <button className="px-6 py-2 bg-gray-800/50 text-gray-400 rounded-lg hover:bg-gray-700/50 transition-colors">
@@ -1482,12 +1482,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </div>
 
               {/* Main Content */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-purple-500/30 p-6">
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                   {/* Left Side - SPIN Radar Chart */}
                   <div className="space-y-4">
-                    <div className="bg-gray-800/40 rounded-2xl p-5 border border-purple-500/20">
+                    <div className="bg-gray-800/40 rounded-2xl p-5 border border-green-500/20">
                       <h3 className="text-lg font-bold text-white mb-4 text-center">Métricas de Competências SPIN</h3>
 
                       {/* Radar Chart Visual - Diamond Shape */}
@@ -1594,7 +1594,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       </div>
 
                       {/* Média Geral */}
-                      <div className="mt-4 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl px-4 py-2.5 text-center">
+                      <div className="mt-4 bg-gradient-to-r from-green-600 to-green-500 rounded-xl px-4 py-2.5 text-center">
                         <div className="text-xs text-purple-100 mb-1">Média Geral</div>
                         <div className="text-xl font-bold text-white">
                           {evaluation.spin_evaluation ? (
@@ -1611,7 +1611,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   {/* Right Side - Performance Metrics */}
                   <div className="space-y-4">
                     {/* Overall Score */}
-                    <div className="bg-gradient-to-br from-purple-600/20 to-purple-400/10 border border-purple-500/30 rounded-2xl p-5">
+                    <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/30 rounded-2xl p-5">
                       <h3 className="text-center text-xs text-gray-400 mb-2">Performance Geral</h3>
                       <div className="text-center">
                         <div className="text-4xl font-bold text-white">
@@ -1633,7 +1633,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <div className="flex gap-4 mt-8">
                   <button
                     onClick={() => setShowEvaluationSummary(false)}
-                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors text-white"
+                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors text-white"
                   >
                     Fechar
                   </button>
@@ -1646,7 +1646,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         window.location.href = '/?view=historico';
                       }
                     }}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-purple-500/30"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-green-500/30"
                   >
                     Ver Análise Completa no Histórico
                   </button>

@@ -1071,7 +1071,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
       </div>
     )
   }
@@ -1079,12 +1079,12 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
   return (
     <div className="space-y-6">
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-purple-500/20">
+      <div className="flex flex-wrap gap-2 border-b border-green-500/20">
         <button
           onClick={() => setActiveTab('employees')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'employees'
-              ? 'border-b-2 border-purple-500 text-white'
+              ? 'border-b-2 border-green-500 text-white'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -1095,7 +1095,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
           onClick={() => setActiveTab('business-type')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'business-type'
-              ? 'border-b-2 border-purple-500 text-white'
+              ? 'border-b-2 border-green-500 text-white'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -1106,7 +1106,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
           onClick={() => setActiveTab('personas')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'personas'
-              ? 'border-b-2 border-purple-500 text-white'
+              ? 'border-b-2 border-green-500 text-white'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -1117,7 +1117,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
           onClick={() => setActiveTab('objections')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'objections'
-              ? 'border-b-2 border-purple-500 text-white'
+              ? 'border-b-2 border-green-500 text-white'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -1128,7 +1128,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
           onClick={() => setActiveTab('files')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'files'
-              ? 'border-b-2 border-purple-500 text-white'
+              ? 'border-b-2 border-green-500 text-white'
               : 'text-gray-400 hover:text-gray-300'
           }`}
         >
@@ -1150,7 +1150,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                 <div className="mb-6 overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-left border-b border-purple-500/20">
+                      <tr className="text-left border-b border-green-500/20">
                         <th className="pb-3 text-sm font-medium text-gray-400">Nome</th>
                         <th className="pb-3 text-sm font-medium text-gray-400">Email</th>
                         <th className="pb-3 text-sm font-medium text-gray-400">Ações</th>
@@ -1158,7 +1158,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </thead>
                     <tbody>
                       {employees.map((emp) => (
-                        <tr key={emp.id} className="border-b border-purple-500/10">
+                        <tr key={emp.id} className="border-b border-green-500/10">
                           <td className="py-3 text-sm text-gray-300">{emp.name}</td>
                           <td className="py-3 text-sm text-gray-300">{emp.email}</td>
                           <td className="py-3">
@@ -1180,13 +1180,13 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
               {!addingEmployee ? (
                 <button
                   onClick={() => setAddingEmployee(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
+                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Adicionar Funcionário
                 </button>
               ) : (
-                <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6">
+                <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6">
                   <h4 className="text-lg font-semibold mb-4">Novo Funcionário</h4>
                   <div className="space-y-4">
                     <div>
@@ -1195,7 +1195,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         type="text"
                         value={newEmployeeName}
                         onChange={(e) => setNewEmployeeName(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                        className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                         placeholder="João Silva"
                       />
                     </div>
@@ -1205,7 +1205,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         type="email"
                         value={newEmployeeEmail}
                         onChange={(e) => setNewEmployeeEmail(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                        className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                         placeholder="joao@empresa.com"
                       />
                     </div>
@@ -1215,20 +1215,20 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         type="password"
                         value={newEmployeePassword}
                         onChange={(e) => setNewEmployeePassword(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                        className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                         placeholder="••••••••"
                       />
                     </div>
                     <div className="flex gap-3">
                       <button
                         onClick={() => setAddingEmployee(false)}
-                        className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+                        className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
                       >
                         Cancelar
                       </button>
                       <button
                         onClick={handleSaveEmployee}
-                        className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
+                        className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform"
                       >
                         Salvar
                       </button>
@@ -1250,8 +1250,8 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                   onClick={() => handleSetBusinessType('B2C')}
                   className={`flex-1 px-6 py-4 rounded-xl font-medium transition-all ${
                     businessType === 'B2C'
-                      ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                      : 'bg-gray-800/50 border border-purple-500/20 text-gray-400 hover:border-purple-500/40'
+                      ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                      : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
                   }`}
                 >
                   B2C (Business to Consumer)
@@ -1260,8 +1260,8 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                   onClick={() => handleSetBusinessType('B2B')}
                   className={`flex-1 px-6 py-4 rounded-xl font-medium transition-all ${
                     businessType === 'B2B'
-                      ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white'
-                      : 'bg-gray-800/50 border border-purple-500/20 text-gray-400 hover:border-purple-500/40'
+                      ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                      : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
                   }`}
                 >
                   B2B (Business to Business)
@@ -1283,7 +1283,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     setNewPersona({})
                     setEditingPersonaId(null)
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Nova Persona {businessType}
@@ -1308,13 +1308,13 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                   {personas.filter(p => p.business_type === businessType).map((persona) => (
                     <div
                       key={persona.id}
-                      className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-purple-500/30 rounded-xl p-5 hover:border-purple-500/50 transition-all shadow-lg"
+                      className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-green-500/30 rounded-xl p-5 hover:border-green-500/50 transition-all shadow-lg"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 space-y-3">
                           {/* Título */}
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-purple-400 flex items-center justify-center flex-shrink-0">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
                               <UserCircle2 className="w-7 h-7 text-white" />
                             </div>
                             <h4 className="text-lg font-bold text-white">
@@ -1329,30 +1329,30 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                             <div className="space-y-2 pl-15">
                               {(persona as PersonaB2B).company_type && (
                                 <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-purple-400">Tipo de Empresa:</span>{' '}
+                                  <span className="font-bold text-green-400">Tipo de Empresa:</span>{' '}
                                   {(persona as PersonaB2B).company_type}
                                 </p>
                               )}
                               {(persona as PersonaB2B).company_goals && (
                                 <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                  <span className="font-bold text-green-400">Busca:</span>{' '}
                                   {(persona as PersonaB2B).company_goals}
                                 </p>
                               )}
                               {(persona as PersonaB2B).business_challenges && (
                                 <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-purple-400">Desafios:</span>{' '}
+                                  <span className="font-bold text-green-400">Desafios:</span>{' '}
                                   {(persona as PersonaB2B).business_challenges}
                                 </p>
                               )}
                               {(persona as PersonaB2B).prior_knowledge && (
                                 <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                  <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
                                   {(persona as PersonaB2B).prior_knowledge}
                                 </p>
                               )}
                               {(persona as PersonaB2B).context && (
-                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-purple-500/20">
+                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
                                   {(persona as PersonaB2B).context}
                                 </p>
                               )}
@@ -1364,24 +1364,24 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                             <div className="space-y-2 pl-15">
                               {(persona as PersonaB2C).what_seeks && (
                                 <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-purple-400">Busca:</span>{' '}
+                                  <span className="font-bold text-green-400">Busca:</span>{' '}
                                   {(persona as PersonaB2C).what_seeks}
                                 </p>
                               )}
                               {(persona as PersonaB2C).main_pains && (
                                 <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-purple-400">Dores:</span>{' '}
+                                  <span className="font-bold text-green-400">Dores:</span>{' '}
                                   {(persona as PersonaB2C).main_pains}
                                 </p>
                               )}
                               {(persona as PersonaB2C).prior_knowledge && (
                                 <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-purple-400">Conhecimento prévio:</span>{' '}
+                                  <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
                                   {(persona as PersonaB2C).prior_knowledge}
                                 </p>
                               )}
                               {(persona as PersonaB2C).context && (
-                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-purple-500/20">
+                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
                                   {(persona as PersonaB2C).context}
                                 </p>
                               )}
@@ -1449,7 +1449,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
 
               {/* Formulário de Nova/Editar Persona */}
               {showPersonaForm && (
-                <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6 space-y-4">
+                <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 space-y-4">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold">
                       {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType}
@@ -1477,7 +1477,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                           type="text"
                           value={(newPersona as PersonaB2B).job_title || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, job_title: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Gerente de Compras, CEO, Diretor de TI"
                         />
                       </div>
@@ -1490,7 +1490,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                           type="text"
                           value={(newPersona as PersonaB2B).company_type || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, company_type: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Startup de tecnologia com faturamento de R$500k/mês"
                         />
                       </div>
@@ -1502,7 +1502,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).context || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Responsável por decisões de compra, equipe de 10 pessoas, busca inovação"
                         />
                       </div>
@@ -1514,7 +1514,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).company_goals || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, company_goals: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Aumentar eficiência, reduzir custos, melhorar processos, escalar o negócio"
                         />
                       </div>
@@ -1526,7 +1526,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).business_challenges || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, business_challenges: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Processos manuais demorados, falta de integração, dificuldade em medir resultados"
                         />
                       </div>
@@ -1538,7 +1538,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).prior_knowledge || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
                         />
                       </div>
@@ -1554,7 +1554,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                           type="text"
                           value={(newPersona as PersonaB2C).profession || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, profession: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Professor, Médico, Estudante"
                         />
                       </div>
@@ -1566,7 +1566,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).context || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Mãe de 2 filhos, mora em apartamento, trabalha home office"
                         />
                       </div>
@@ -1578,7 +1578,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).what_seeks || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, what_seeks: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Praticidade, economia de tempo, produtos de qualidade, bom atendimento"
                         />
                       </div>
@@ -1590,7 +1590,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).main_pains || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, main_pains: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Falta de tempo, dificuldade em encontrar produtos confiáveis, preços altos"
                         />
                       </div>
@@ -1602,7 +1602,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).prior_knowledge || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
                         />
                       </div>
@@ -1620,13 +1620,13 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         setNewPersona({})
                         setEditingPersonaId(null)
                       }}
-                      className="flex-1 px-6 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl font-medium hover:border-purple-500/40 transition-all"
+                      className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:border-green-500/40 transition-all"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={handleSavePersona}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform"
                     >
                       {editingPersonaId ? 'Atualizar' : 'Salvar'} Persona
                     </button>
@@ -1664,14 +1664,14 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                   {objections.map((objection) => (
                     <div
                       key={objection.id}
-                      className="bg-gray-900/50 border border-purple-500/20 rounded-xl overflow-hidden"
+                      className="bg-gray-900/50 border border-green-500/20 rounded-xl overflow-hidden"
                     >
                       {/* Header da objeção */}
                       <div className="flex items-center justify-between px-4 py-3">
                         <div className="flex items-center gap-3 flex-1">
                           <button
                             onClick={() => toggleObjectionExpanded(objection.id)}
-                            className="text-purple-400 hover:text-purple-300 transition-colors"
+                            className="text-green-400 hover:text-green-300 transition-colors"
                           >
                             <svg
                               className={`w-5 h-5 transform transition-transform ${expandedObjections.has(objection.id) ? 'rotate-90' : ''}`}
@@ -1697,7 +1697,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                       setTempObjectionName('')
                                     }
                                   }}
-                                  className="flex-1 px-2 py-1 bg-gray-800/50 border border-purple-500/30 rounded text-white text-sm focus:outline-none focus:border-purple-500"
+                                  className="flex-1 px-2 py-1 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500"
                                   autoFocus
                                 />
                                 <button
@@ -1724,7 +1724,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                     setEditingObjectionName(objection.id)
                                     setTempObjectionName(objection.name)
                                   }}
-                                  className="text-purple-400 hover:text-purple-300 transition-colors"
+                                  className="text-green-400 hover:text-green-300 transition-colors"
                                 >
                                   <Edit2 className="w-3 h-3" />
                                 </button>
@@ -1774,7 +1774,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
 
                       {/* Conteúdo expandido */}
                       {expandedObjections.has(objection.id) && (
-                        <div className="border-t border-purple-500/20 px-4 py-3 space-y-3 bg-gray-800/30">
+                        <div className="border-t border-green-500/20 px-4 py-3 space-y-3 bg-gray-800/30">
                           <div>
                             <h4 className="text-sm font-medium text-gray-400 mb-2">Formas de Quebrar:</h4>
 
@@ -1784,9 +1784,9 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                 {objection.rebuttals.map((rebuttal, index) => (
                                   <div
                                     key={index}
-                                    className="flex items-start gap-2 bg-gray-900/50 border border-purple-500/10 rounded-lg px-3 py-2"
+                                    className="flex items-start gap-2 bg-gray-900/50 border border-green-500/10 rounded-lg px-3 py-2"
                                   >
-                                    <span className="text-purple-400 font-bold text-sm mt-0.5">{index + 1}.</span>
+                                    <span className="text-green-400 font-bold text-sm mt-0.5">{index + 1}.</span>
                                     {editingRebuttalId?.objectionId === objection.id && editingRebuttalId?.index === index ? (
                                       <>
                                         <input
@@ -1801,7 +1801,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                               setTempRebuttalText('')
                                             }
                                           }}
-                                          className="flex-1 px-2 py-1 bg-gray-800/50 border border-purple-500/30 rounded text-white text-sm focus:outline-none focus:border-purple-500"
+                                          className="flex-1 px-2 py-1 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500"
                                           autoFocus
                                         />
                                         <button
@@ -1828,7 +1828,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                             setEditingRebuttalId({ objectionId: objection.id, index })
                                             setTempRebuttalText(rebuttal)
                                           }}
-                                          className="text-purple-400 hover:text-purple-300 transition-colors"
+                                          className="text-green-400 hover:text-green-300 transition-colors"
                                         >
                                           <Edit2 className="w-3 h-3" />
                                         </button>
@@ -1859,12 +1859,12 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                                     handleAddRebuttal(objection.id)
                                   }
                                 }}
-                                className="flex-1 px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                                className="flex-1 px-3 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                                 placeholder="Ex: Apresentar cálculo de ROI detalhado mostrando retorno em 6 meses com base em cases reais do segmento"
                               />
                               <button
                                 onClick={() => handleAddRebuttal(objection.id)}
-                                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-500 rounded-lg font-medium hover:scale-105 transition-transform text-sm"
+                                className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-lg font-medium hover:scale-105 transition-transform text-sm"
                               >
                                 <Plus className="w-4 h-4" />
                               </button>
@@ -1884,12 +1884,12 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                   value={newObjection}
                   onChange={(e) => setNewObjection(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddObjection()}
-                  className="flex-1 px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                  className="flex-1 px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                   placeholder="Ex: Cliente diz que o preço está acima do orçamento disponível e questiona se terá ROI rápido o suficiente para justificar"
                 />
                 <button
                   onClick={handleAddObjection}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform"
+                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
@@ -1908,7 +1908,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
               </p>
 
               {/* Formulário de Dados da Empresa */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-6 mb-6">
+              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">
                 <h4 className="text-lg font-semibold mb-6">Informações da Empresa</h4>
                 <div className="space-y-6">
                   {/* Nome da Empresa */}
@@ -1924,7 +1924,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         setCompanyDataEdited(true)
                       }}
                       placeholder="Ex: Tech Solutions LTDA"
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -1941,7 +1941,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: Desenvolvemos software de gestão para pequenas e médias empresas"
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -1958,7 +1958,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: Sistema ERP, CRM para vendas, Plataforma de automação de marketing"
                       rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -1975,7 +1975,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: ERP - controla estoque em tempo real e gera relatórios financeiros automáticos"
                       rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -1992,7 +1992,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: Suporte técnico 24/7, implementação em 48h, integração nativa com 200+ apps"
                       rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -2009,7 +2009,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: TOTVS, Omie, Bling, SAP Business One"
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -2026,7 +2026,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: 5.000+ clientes ativos, 98% de satisfação (NPS 85), crescimento de 40% em 2024"
                       rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -2043,7 +2043,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: Vendedores dizem 'integração instantânea' mas leva 24-48h, falam 'ilimitado' mas há limite de 10GB"
                       rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -2060,7 +2060,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: Inovadora e acessível, com foco em simplificar tecnologia para PMEs"
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
 
@@ -2071,7 +2071,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       <button
                         onClick={handleSaveCompanyData}
                         disabled={savingCompanyData}
-                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         {savingCompanyData ? (
                           <>
@@ -2208,13 +2208,13 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
         showPersonaEvaluationModal || showCompanyEvaluationModal ? 'sm:-translate-x-[250px]' :
         showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
       }`}>
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-transparent rounded-3xl blur-xl"></div>
-        <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
+        <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-green-500/30 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-purple-500/20">
+          <div className="flex items-center justify-between p-6 border-b border-green-500/20">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                <Settings className="w-6 h-6 text-purple-400" />
+              <div className="w-10 h-10 bg-green-600/20 rounded-xl flex items-center justify-center">
+                <Settings className="w-6 h-6 text-green-400" />
               </div>
               <h2 className="text-2xl font-bold text-white">Hub de Configuração</h2>
             </div>
@@ -2232,8 +2232,8 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               // Password Form
               <div className="max-w-md mx-auto py-8">
                 <div className="text-center mb-8">
-                  <div className="w-20 h-20 bg-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Lock className="w-10 h-10 text-purple-400" />
+                  <div className="w-20 h-20 bg-green-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Lock className="w-10 h-10 text-green-400" />
                   </div>
                   <h3 className="text-xl font-semibold mb-2">
                     Acesso Administrativo
@@ -2252,7 +2252,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                       placeholder="••••••••"
                       autoFocus
                     />
@@ -2266,7 +2266,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
                   <button
                     type="submit"
-                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-semibold hover:scale-105 transition-transform"
+                    className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-semibold hover:scale-105 transition-transform"
                   >
                     Acessar Configurações
                   </button>
@@ -2359,7 +2359,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               </div>
 
               {/* Scores Detalhados */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-3">
+              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-3">
                 <h3 className="text-sm font-bold text-white mb-3">Scores por Campo</h3>
                 <div className="space-y-2">
                   {personaEvaluation.score_detalhado && Object.entries(personaEvaluation.score_detalhado).map(([campo, score]: [string, any]) => {
@@ -2378,7 +2378,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                           <span className="text-xs text-gray-300">
                             {fieldNames[campo] || campo}
                           </span>
-                          <span className="text-xs font-bold text-purple-400">{score}/10</span>
+                          <span className="text-xs font-bold text-green-400">{score}/10</span>
                         </div>
                         <div className="w-full bg-gray-800 rounded-full h-1.5">
                           <div
@@ -2416,10 +2416,10 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               )}
 
               {/* SPIN Readiness */}
-              <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-3">
+              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-bold text-white">Prontidão SPIN</h3>
-                  <span className="text-lg font-bold text-purple-400">
+                  <span className="text-lg font-bold text-green-400">
                     {personaEvaluation.spin_readiness.score_spin_total}/10
                   </span>
                 </div>
@@ -2449,13 +2449,13 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
               {/* Campos Excelentes */}
               {personaEvaluation.campos_excelentes?.length > 0 && (
-                <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
+                <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
                   <h3 className="text-sm font-bold text-white mb-2">
                     🌟 Excelentes (≥9)
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {personaEvaluation.campos_excelentes.map((campo, idx) => (
-                      <span key={idx} className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full text-[10px]">
+                      <span key={idx} className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded-full text-[10px]">
                         {campo.replace(/_/g, ' ')}
                       </span>
                     ))}
@@ -2511,16 +2511,16 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                     {personaEvaluation.pronto_para_roleplay ? '✓ Pronto' : '⚠ Ajustar'}
                   </p>
                 </div>
-                <div className="bg-gray-900/50 border border-purple-500/20 rounded-lg p-2.5">
+                <div className="bg-gray-900/50 border border-green-500/20 rounded-lg p-2.5">
                   <h4 className="text-xs font-semibold mb-1 text-white">Nível</h4>
-                  <p className="text-xs text-purple-400 capitalize font-bold">
+                  <p className="text-xs text-green-400 capitalize font-bold">
                     {personaEvaluation.nivel_complexidade_roleplay}
                   </p>
                 </div>
               </div>
 
               {/* Próxima Ação */}
-              <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-xl p-3">
+              <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-500/30 rounded-xl p-3">
                 <h3 className="text-sm font-bold text-white mb-1.5">🎯 Próxima Ação</h3>
                 <p className="text-xs text-gray-300 leading-tight">
                   {(() => {
@@ -2574,14 +2574,14 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
             {/* Como Melhorar */}
             {objectionEvaluation.como_melhorar?.length > 0 && (
-              <div className="bg-gray-800/50 border border-purple-500/20 rounded-lg p-3">
-                <h4 className="font-semibold text-purple-400 mb-2 text-xs">
+              <div className="bg-gray-800/50 border border-green-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-green-400 mb-2 text-xs">
                   💡 Como Melhorar
                 </h4>
                 <ul className="space-y-1.5">
                   {objectionEvaluation.como_melhorar.map((sugestao: string, idx: number) => (
                     <li key={idx} className="text-xs text-gray-300 flex items-start">
-                      <span className="text-purple-400 mr-1.5 font-bold">{idx + 1}.</span>
+                      <span className="text-green-400 mr-1.5 font-bold">{idx + 1}.</span>
                       <span className="flex-1 leading-relaxed">{sugestao}</span>
                     </li>
                   ))}
@@ -2604,10 +2604,10 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
     {/* Painel Lateral de Avaliação de Dados da Empresa */}
     {showCompanyEvaluationModal && qualityEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-green-500/30">
         <div className="animate-slide-in">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-purple-500/30">
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-green-500/30">
             <h3 className="text-xl font-bold text-white">Avaliação dos Dados</h3>
             <button
               onClick={() => setShowCompanyEvaluationModal(false)}
@@ -2618,17 +2618,17 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
           </div>
 
           {/* Score Geral */}
-          <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+          <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-400 uppercase tracking-wider">Score Geral</span>
-              <span className="text-3xl font-bold text-purple-400">
+              <span className="text-3xl font-bold text-green-400">
                 {qualityEvaluation.nota_final}
                 <span className="text-lg text-gray-500">/100</span>
               </span>
             </div>
             <div className={`px-4 py-2 rounded-lg font-semibold text-center text-sm ${
               qualityEvaluation.classificacao === 'Excelente' ? 'bg-green-500/20 text-green-400' :
-              qualityEvaluation.classificacao === 'Ótimo' ? 'bg-purple-500/20 text-purple-400' :
+              qualityEvaluation.classificacao === 'Ótimo' ? 'bg-green-500/20 text-green-400' :
               qualityEvaluation.classificacao === 'Bom' ? 'bg-blue-500/20 text-blue-400' :
               qualityEvaluation.classificacao === 'Aceitável' ? 'bg-yellow-500/20 text-yellow-400' :
               qualityEvaluation.classificacao === 'Ruim' ? 'bg-orange-500/20 text-orange-400' :
@@ -2639,7 +2639,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
           </div>
 
           {/* Capacidade para Roleplay */}
-          <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+          <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-400 uppercase tracking-wider">Capacidade Roleplay</span>
               <span className="text-2xl font-bold text-blue-400">
@@ -2648,14 +2648,14 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
             </div>
             <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all"
+                className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all"
                 style={{ width: `${qualityEvaluation.capacidade_roleplay}%` }}
               ></div>
             </div>
           </div>
 
           {/* Resumo */}
-          <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-4 mb-4">
+          <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-4 mb-4">
             <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Resumo</h4>
             <p className="text-sm text-gray-300 leading-relaxed">{qualityEvaluation.resumo}</p>
           </div>
@@ -2729,8 +2729,8 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
           </div>
 
           {/* Recomendação de Uso */}
-          <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
-            <h4 className="text-xs text-purple-400 uppercase tracking-wider mb-2">Recomendação de Uso</h4>
+          <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
+            <h4 className="text-xs text-green-400 uppercase tracking-wider mb-2">Recomendação de Uso</h4>
             <p className="text-sm text-gray-300">{qualityEvaluation.recomendacao_uso}</p>
           </div>
         </div>
