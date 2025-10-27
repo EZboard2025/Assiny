@@ -527,6 +527,48 @@ function ConfigurationInterface({
     try {
       console.log('📊 Enviando persona para avaliação...', persona)
 
+      // Buscar dados da empresa e company_type
+      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+      const { supabase } = await import('@/lib/supabase')
+
+      const companyId = await getCompanyIdFromUser()
+      let companyData = null
+      let companyType = 'B2C' // Default
+
+      if (companyId) {
+        // Buscar company_data
+        const { data: companyDataResult, error: companyError } = await supabase
+          .from('company_data')
+          .select('*')
+          .eq('company_id', companyId)
+          .single()
+
+        if (!companyError && companyDataResult) {
+          companyData = companyDataResult
+          console.log('🏢 Dados da empresa carregados:', companyDataResult.nome)
+        }
+
+        // Buscar company_type
+        const { data: companyTypeResult, error: typeError } = await supabase
+          .from('company_type')
+          .select('name')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (typeError) {
+          console.warn('⚠️ Erro ao buscar company_type:', typeError)
+        }
+
+        if (companyTypeResult) {
+          companyType = companyTypeResult.name
+          console.log('🏷️ Company type encontrado:', companyType)
+        } else {
+          console.warn('⚠️ Company type não encontrado, usando default:', companyType)
+        }
+      }
+
       // Juntar todos os campos do formulário em um único texto
       let personaText = ''
 
@@ -538,14 +580,24 @@ function ConfigurationInterface({
         personaText = `Tipo de Negócio: B2C\n\nProfissão: ${personaB2C.profession || 'N/A'}\n\nContexto: ${personaB2C.context || 'N/A'}\n\nO que busca/valoriza: ${personaB2C.what_seeks || 'N/A'}\n\nPrincipais dores/problemas: ${personaB2C.main_pains || 'N/A'}\n\nO que já sabe sobre a empresa: ${personaB2C.prior_knowledge || 'N/A'}`
       }
 
+      const payload = {
+        persona: personaText,
+        companyData: companyData, // Dados da empresa
+        companyType: companyType   // B2B ou B2C
+      }
+
+      console.log('📤 Payload enviado para N8N:', {
+        hasCompanyData: !!companyData,
+        companyType: companyType,
+        companyName: companyData?.nome
+      })
+
       const response = await fetch('https://ezboard.app.n8n.cloud/webhook/persona-consultor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          persona: personaText
-        })
+        body: JSON.stringify(payload)
       })
 
       if (response.ok) {
@@ -730,14 +782,16 @@ function ConfigurationInterface({
     try {
       console.log('🔍 Iniciando avaliação da objeção:', objection.name)
 
-      // Buscar dados da empresa
+      // Buscar dados da empresa e company_type
       const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
       const { supabase } = await import('@/lib/supabase')
 
       const companyId = await getCompanyIdFromUser()
       let companyData = null
+      let companyType = 'B2C' // Default
 
       if (companyId) {
+        // Buscar company_data
         const { data, error } = await supabase
           .from('company_data')
           .select('*')
@@ -747,6 +801,20 @@ function ConfigurationInterface({
         if (!error && data) {
           companyData = data
           console.log('🏢 Dados da empresa carregados:', data.nome)
+        }
+
+        // Buscar company_type
+        const { data: companyTypeResult, error: typeError } = await supabase
+          .from('company_type')
+          .select('name')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (!typeError && companyTypeResult) {
+          companyType = companyTypeResult.name
+          console.log('🏷️ Company type:', companyType)
         }
       }
 
@@ -763,7 +831,8 @@ function ConfigurationInterface({
 
       const payload = {
         objecao_completa: objectionText,
-        companyData: companyData // Dados da empresa para contexto
+        companyData: companyData, // Dados da empresa para contexto
+        companyType: companyType   // B2B ou B2C
       }
 
       console.log('📤 Enviando para N8N:', payload)
@@ -2293,32 +2362,43 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               <div className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-3">
                 <h3 className="text-sm font-bold text-white mb-3">Scores por Campo</h3>
                 <div className="space-y-2">
-                  {Object.entries(personaEvaluation.score_detalhado).map(([campo, score]) => (
-                    <div key={campo}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-300 capitalize">
-                          {campo.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-xs font-bold text-purple-400">{score}/10</span>
+                  {personaEvaluation.score_detalhado && Object.entries(personaEvaluation.score_detalhado).map(([campo, score]: [string, any]) => {
+                    // Mapeamento de nomes para exibição
+                    const fieldNames: Record<string, string> = {
+                      'cargo_perfil': personaEvaluation.tipo_persona === 'b2b' ? 'Cargo' : 'Perfil',
+                      'tipo_empresa_faturamento_perfil_socioeconomico': personaEvaluation.tipo_persona === 'b2b' ? 'Tipo Empresa/Faturamento' : 'Perfil Socioeconômico',
+                      'contexto': 'Contexto',
+                      'busca': 'O que Busca',
+                      'dores': 'Dores/Desafios'
+                    }
+
+                    return (
+                      <div key={campo}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-300">
+                            {fieldNames[campo] || campo}
+                          </span>
+                          <span className="text-xs font-bold text-purple-400">{score}/10</span>
+                        </div>
+                        <div className="w-full bg-gray-800 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full transition-all ${
+                              score >= 9 ? 'bg-green-500' :
+                              score >= 7 ? 'bg-blue-500' :
+                              score >= 5 ? 'bg-yellow-500' :
+                              'bg-orange-500'
+                            }`}
+                            style={{ width: `${(score / 10) * 100}%` }}
+                          ></div>
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-800 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full transition-all ${
-                            score >= 9 ? 'bg-green-500' :
-                            score >= 7 ? 'bg-blue-500' :
-                            score >= 5 ? 'bg-yellow-500' :
-                            'bg-orange-500'
-                          }`}
-                          style={{ width: `${(score / 10) * 100}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
               {/* Destaques Positivos */}
-              {personaEvaluation.destaques_positivos.length > 0 && (
+              {personaEvaluation.destaques_positivos?.length > 0 && (
                 <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
                   <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-400" />
@@ -2368,7 +2448,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               </div>
 
               {/* Campos Excelentes */}
-              {personaEvaluation.campos_excelentes.length > 0 && (
+              {personaEvaluation.campos_excelentes?.length > 0 && (
                 <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3">
                   <h3 className="text-sm font-bold text-white mb-2">
                     🌟 Excelentes (≥9)
@@ -2384,7 +2464,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               )}
 
               {/* Campos que Precisam Ajuste */}
-              {personaEvaluation.campos_que_precisam_ajuste.length > 0 && (
+              {personaEvaluation.campos_que_precisam_ajuste?.length > 0 && (
                 <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-3">
                   <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 text-orange-400" />
@@ -2401,7 +2481,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               )}
 
               {/* Sugestões de Melhoria */}
-              {personaEvaluation.sugestoes_melhora_prioritarias.length > 0 && (
+              {personaEvaluation.sugestoes_melhora_prioritarias?.length > 0 && (
                 <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-3">
                   <h3 className="text-sm font-bold text-white mb-2">
                     💡 Sugestões Prioritárias
@@ -2442,8 +2522,15 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               {/* Próxima Ação */}
               <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-xl p-3">
                 <h3 className="text-sm font-bold text-white mb-1.5">🎯 Próxima Ação</h3>
-                <p className="text-xs text-gray-300 capitalize leading-tight">
-                  {personaEvaluation.proxima_acao_recomendada.replace(/_/g, ' ')}
+                <p className="text-xs text-gray-300 leading-tight">
+                  {(() => {
+                    const actionMap: Record<string, string> = {
+                      'usar_imediatamente': '✅ Usar imediatamente no treinamento',
+                      'refinar_campos_especificos': '⚠️ Refinar campos específicos',
+                      'reescrever_persona': '🔄 Reescrever persona do zero'
+                    }
+                    return actionMap[personaEvaluation.proxima_acao_recomendada] || personaEvaluation.proxima_acao_recomendada
+                  })()}
                 </p>
               </div>
             </div>
