@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import ChatInterface, { ChatInterfaceHandle } from './ChatInterface'
 import ConfigHub from './ConfigHub'
 import RoleplayView from './RoleplayView'
@@ -120,25 +121,27 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </button>
 
-            {/* PDI Card */}
-            <button
-              onClick={() => handleViewChange('pdi')}
-              className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+            {/* PDI Card - Indisponível */}
+            <div
+              className={`feature-card group text-left opacity-50 cursor-not-allowed ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '200ms' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-600/20 to-transparent rounded-3xl blur-xl"></div>
+              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-gray-500/30">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
-                    <Target className="w-7 h-7 text-green-400" />
+                  <div className="w-14 h-14 bg-gray-600/20 rounded-2xl flex items-center justify-center">
+                    <Target className="w-7 h-7 text-gray-400" />
                   </div>
-                  <h3 className="text-2xl font-bold">PDI</h3>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-300">PDI</h3>
+                    <span className="text-xs text-yellow-500 font-semibold">Em breve</span>
+                  </div>
                 </div>
-                <p className="text-gray-400 text-lg">
+                <p className="text-gray-500 text-lg">
                   Plano de Desenvolvimento Individual personalizado para sua evolução.
                 </p>
               </div>
-            </button>
+            </div>
 
             {/* Meu Perfil Card */}
             <button
@@ -175,12 +178,19 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       </div>
 
       {/* Header Navigation */}
-      <header className="fixed top-0 w-full bg-black/70 backdrop-blur-xl z-50 border-b border-green-500/30">
+      <header className="fixed top-0 w-full bg-black/70 backdrop-blur-xl z-50">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-center h-20">
           <div className="w-full flex items-center justify-between">
             {/* Logo */}
-            <div className="text-3xl font-bold tracking-tight cursor-pointer" onClick={() => handleViewChange('home')}>
-              Ramppy<span className="text-green-500">.</span>
+            <div className="cursor-pointer" onClick={() => handleViewChange('home')}>
+              <Image
+                src="/images/ramppy-logo.png"
+                alt="Ramppy"
+                width={600}
+                height={200}
+                className="h-40 w-auto"
+                priority
+              />
             </div>
 
             {/* Navigation */}
@@ -197,12 +207,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               >
                 Roleplays
               </button>
-              <button
-                onClick={() => handleViewChange('pdi')}
-                className={`hover:text-white transition-colors ${currentView === 'pdi' ? 'text-white' : ''}`}
-              >
-                PDI
-              </button>
+              <span className="text-gray-500 cursor-not-allowed">
+                PDI <span className="text-xs text-yellow-500">(em breve)</span>
+              </span>
               <button
                 onClick={() => handleViewChange('historico')}
                 className={`hover:text-white transition-colors ${currentView === 'historico' ? 'text-white' : ''}`}
