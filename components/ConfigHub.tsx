@@ -2365,8 +2365,8 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                   {personaEvaluation.score_detalhado && Object.entries(personaEvaluation.score_detalhado).map(([campo, score]: [string, any]) => {
                     // Mapeamento de nomes para exibição
                     const fieldNames: Record<string, string> = {
-                      'cargo_perfil': personaEvaluation.tipo_persona === 'b2b' ? 'Cargo' : 'Perfil',
-                      'tipo_empresa_faturamento_perfil_socioeconomico': personaEvaluation.tipo_persona === 'b2b' ? 'Tipo Empresa/Faturamento' : 'Perfil Socioeconômico',
+                      'cargo': 'Cargo',
+                      'tipo_empresa_faturamento': 'Tipo Empresa/Faturamento',
                       'contexto': 'Contexto',
                       'busca': 'O que Busca',
                       'dores': 'Dores/Desafios'
