@@ -170,9 +170,18 @@ export async function getUserRoleplaySessions(
   limit: number = 10
 ): Promise<RoleplaySession[]> {
   try {
+    // Obter o usuário atual
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      console.error('Usuário não autenticado')
+      return []
+    }
+
     const { data, error } = await supabase
       .from('roleplay_sessions')
       .select('*')
+      .eq('user_id', user.id)  // FILTRAR POR user_id
       .order('created_at', { ascending: false })
       .limit(limit)
 
@@ -181,6 +190,7 @@ export async function getUserRoleplaySessions(
       return []
     }
 
+    console.log(`[getUserRoleplaySessions] ${data?.length || 0} sessões encontradas para usuário ${user.id}`)
     return data || []
   } catch (error) {
     console.error('Erro ao buscar sessões:', error)
