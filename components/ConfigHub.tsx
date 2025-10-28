@@ -116,10 +116,10 @@ function ConfigurationInterface({
   const loadCompanyData = async () => {
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
 
-      // Buscar company_id do usuário atual
-      const companyId = await getCompanyIdFromUser()
+      // Buscar company_id (prioriza subdomínio, depois usuário)
+      const companyId = await getCompanyId()
       if (!companyId) {
         console.warn('⚠️ company_id não encontrado')
         return
@@ -170,10 +170,10 @@ function ConfigurationInterface({
 
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
 
-      // Buscar company_id do usuário atual
-      const companyId = await getCompanyIdFromUser()
+      // Buscar company_id (prioriza subdomínio, depois usuário)
+      const companyId = await getCompanyId()
       if (!companyId) {
         alert('❌ Erro: company_id não encontrado')
         setSavingCompanyData(false)
@@ -528,10 +528,10 @@ function ConfigurationInterface({
       console.log('📊 Enviando persona para avaliação...', persona)
 
       // Buscar dados da empresa e company_type
-      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
       const { supabase } = await import('@/lib/supabase')
 
-      const companyId = await getCompanyIdFromUser()
+      const companyId = await getCompanyId()
       let companyData = null
       let companyType = 'B2C' // Default
 
@@ -783,10 +783,10 @@ function ConfigurationInterface({
       console.log('🔍 Iniciando avaliação da objeção:', objection.name)
 
       // Buscar dados da empresa e company_type
-      const { getCompanyIdFromUser } = await import('@/lib/utils/getCompanyId')
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
       const { supabase } = await import('@/lib/supabase')
 
-      const companyId = await getCompanyIdFromUser()
+      const companyId = await getCompanyId()
       let companyData = null
       let companyType = 'B2C' // Default
 
