@@ -262,17 +262,31 @@ export async function getObjections(): Promise<Objection[]> {
 }
 
 export async function addObjection(name: string, rebuttals: string[] = []): Promise<Objection | null> {
+  const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
+
+  if (!companyId) {
+    console.error('[addObjection] Company ID não encontrado')
+    return null
+  }
+
+  console.log('[addObjection] Inserindo objeção com company_id:', companyId)
+
   const { data, error } = await supabase
     .from('objections')
-    .insert([{ name, rebuttals }])
+    .insert([{
+      name,
+      rebuttals,
+      company_id: companyId
+    }])
     .select()
     .single()
 
   if (error) {
-    console.error('Erro ao adicionar objeção:', error)
+    console.error('[addObjection] Erro ao adicionar objeção:', error)
     return null
   }
 
+  console.log('[addObjection] Objeção criada com sucesso:', data)
   return data
 }
 
@@ -380,7 +394,7 @@ export async function getPersonas(): Promise<Persona[]> {
 }
 
 export async function addPersona(persona: Omit<Persona, 'id' | 'created_at' | 'updated_at'>): Promise<Persona | null> {
-  const companyId = await getCompanyIdFromUser()
+  const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
 
   if (!companyId) {
     console.error('[addPersona] company_id não encontrado')
@@ -392,7 +406,10 @@ export async function addPersona(persona: Omit<Persona, 'id' | 'created_at' | 'u
 
   const { data, error } = await supabase
     .from('personas')
-    .insert([persona])
+    .insert([{
+      ...persona,
+      company_id: companyId
+    }])
     .select()
     .single()
 
