@@ -45,9 +45,17 @@ function generatePassword(length: number = 12): string {
 
 // Employees
 export async function getEmployees(): Promise<Employee[]> {
+  const companyId = await getCompanyIdFromUser()
+
+  if (!companyId) {
+    console.error('Company ID não encontrado')
+    return []
+  }
+
   const { data, error } = await supabase
     .from('employees')
     .select('*')
+    .eq('company_id', companyId)
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -197,9 +205,17 @@ export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
 
 // Objections
 export async function getObjections(): Promise<Objection[]> {
+  const companyId = await getCompanyIdFromUser()
+
+  if (!companyId) {
+    console.error('Company ID não encontrado')
+    return []
+  }
+
   const { data, error } = await supabase
     .from('objections')
     .select('*')
+    .eq('company_id', companyId)
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -304,9 +320,17 @@ export interface PersonaB2B {
 export type Persona = PersonaB2C | PersonaB2B
 
 export async function getPersonas(): Promise<Persona[]> {
+  const companyId = await getCompanyIdFromUser()
+
+  if (!companyId) {
+    console.error('Company ID não encontrado')
+    return []
+  }
+
   const { data, error } = await supabase
     .from('personas')
     .select('*')
+    .eq('company_id', companyId)
     .order('created_at', { ascending: true })
 
   if (error) {
