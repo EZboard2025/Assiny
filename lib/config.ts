@@ -177,33 +177,61 @@ export async function deleteCustomerSegment(id: string): Promise<boolean> {
 
 // Company Type
 export async function getCompanyType(): Promise<'B2B' | 'B2C'> {
+  const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
+
+  if (!companyId) {
+    console.error('[getCompanyType] Company ID não encontrado')
+    return 'B2C' // Default
+  }
+
+  console.log('[getCompanyType] Buscando tipo de empresa para company_id:', companyId)
+
   const { data, error } = await supabase
     .from('company_type')
     .select('*')
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
 
   if (error || !data) {
+    console.log('[getCompanyType] Tipo não encontrado, retornando default B2C')
     return 'B2C' // Default
   }
 
+  console.log('[getCompanyType] Tipo encontrado:', data.name)
   return data.name
 }
 
 export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
-  // Deletar tipo anterior (mantemos apenas um registro)
-  await supabase.from('company_type').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+  const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
 
-  const { error } = await supabase
-    .from('company_type')
-    .insert([{ name: type }])
-
-  if (error) {
-    console.error('Erro ao definir tipo de empresa:', error)
+  if (!companyId) {
+    console.error('[setCompanyType] Company ID não encontrado')
     return false
   }
 
+  console.log('[setCompanyType] Definindo tipo de empresa para company_id:', companyId)
+
+  // Deletar tipo anterior para esta empresa
+  await supabase
+    .from('company_type')
+    .delete()
+    .eq('company_id', companyId)
+
+  const { error } = await supabase
+    .from('company_type')
+    .insert([{
+      name: type,
+      company_id: companyId
+    }])
+
+  if (error) {
+    console.error('[setCompanyType] Erro ao definir tipo de empresa:', error)
+    return false
+  }
+
+  console.log('[setCompanyType] Tipo de empresa definido com sucesso:', type)
   return true
 }
 
