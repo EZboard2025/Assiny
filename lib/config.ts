@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { getCompanyIdFromUser } from './utils/getCompanyId'
+import { getCompanyId } from './utils/getCompanyFromSubdomain'
 
 export interface Employee {
   id: string
@@ -45,12 +46,14 @@ function generatePassword(length: number = 12): string {
 
 // Employees
 export async function getEmployees(): Promise<Employee[]> {
-  const companyId = await getCompanyIdFromUser()
+  const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
 
   if (!companyId) {
-    console.error('Company ID não encontrado')
+    console.error('[getEmployees] Company ID não encontrado')
     return []
   }
+
+  console.log('[getEmployees] Buscando funcionários para company_id:', companyId)
 
   const { data, error } = await supabase
     .from('employees')
@@ -59,10 +62,11 @@ export async function getEmployees(): Promise<Employee[]> {
     .order('created_at', { ascending: true })
 
   if (error) {
-    console.error('Erro ao buscar funcionários:', error)
+    console.error('[getEmployees] Erro ao buscar funcionários:', error)
     return []
   }
 
+  console.log('[getEmployees] Funcionários encontrados:', data?.length || 0)
   return data || []
 }
 
@@ -205,12 +209,14 @@ export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
 
 // Objections
 export async function getObjections(): Promise<Objection[]> {
-  const companyId = await getCompanyIdFromUser()
+  const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
 
   if (!companyId) {
-    console.error('Company ID não encontrado')
+    console.error('[getObjections] Company ID não encontrado')
     return []
   }
+
+  console.log('[getObjections] Buscando objeções para company_id:', companyId)
 
   const { data, error } = await supabase
     .from('objections')
@@ -219,10 +225,11 @@ export async function getObjections(): Promise<Objection[]> {
     .order('created_at', { ascending: true })
 
   if (error) {
-    console.error('Erro ao buscar objeções:', error)
+    console.error('[getObjections] Erro ao buscar objeções:', error)
     return []
   }
 
+  console.log('[getObjections] Objeções encontradas:', data?.length || 0)
   return data || []
 }
 
@@ -320,12 +327,14 @@ export interface PersonaB2B {
 export type Persona = PersonaB2C | PersonaB2B
 
 export async function getPersonas(): Promise<Persona[]> {
-  const companyId = await getCompanyIdFromUser()
+  const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
 
   if (!companyId) {
-    console.error('Company ID não encontrado')
+    console.error('[getPersonas] Company ID não encontrado')
     return []
   }
+
+  console.log('[getPersonas] Buscando personas para company_id:', companyId)
 
   const { data, error } = await supabase
     .from('personas')
@@ -334,10 +343,11 @@ export async function getPersonas(): Promise<Persona[]> {
     .order('created_at', { ascending: true })
 
   if (error) {
-    console.error('Erro ao buscar personas:', error)
+    console.error('[getPersonas] Erro ao buscar personas:', error)
     return []
   }
 
+  console.log('[getPersonas] Personas encontradas:', data?.length || 0)
   return data || []
 }
 
