@@ -15,48 +15,44 @@ const supabaseAdmin = createClient(
 )
 
 /**
- * Obtém o company_id do usuário autenticado (server-side)
+ * Obtém o company_id baseado no subdomínio (server-side)
  */
-async function getCompanyIdFromAuth(request: Request): Promise<string | null> {
+async function getCompanyIdFromSubdomain(request: Request): Promise<string | null> {
   try {
-    // Obtenha os cookies como string para usar com Supabase Auth
-    const cookieStore = cookies()
-    // Crie o cliente Supabase normalmente, sem a opção `cookies` (que não existe)
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    // Pegar hostname do header
+    const hostname = request.headers.get('host') || ''
+    console.log('🔵 Hostname recebido:', hostname)
 
-    // Em APIs route handlers Next.js, supabase-js já acessa cookies do ambiente do server corretamente via fetch
-    // Se desejar passar o token de autenticação manualmente:
-    // const access_token = cookieStore.get('sb-access-token')?.value;
-    // Se necessário, você pode usar: supabase.auth.setSession({ access_token, refresh_token }) aqui
+    let subdomain = ''
 
-
-    // Obter usuário autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      console.log('❌ Usuário não autenticado:', authError)
+    // Detectar subdomínio
+    if (hostname.includes('.ramppy.local')) {
+      // Desenvolvimento: assiny.ramppy.local:3000 -> "assiny"
+      subdomain = hostname.split('.')[0].split(':')[0]
+    } else if (hostname.includes('.ramppy.site')) {
+      // Produção: assiny.ramppy.site -> "assiny"
+      subdomain = hostname.split('.')[0]
+    } else {
+      console.log('❌ Domínio principal ou não reconhecido')
       return null
     }
 
-    console.log('✅ Usuário autenticado:', user.id)
+    console.log('🔵 Subdomínio detectado:', subdomain)
 
-    // Buscar company_id do employee
+    // Buscar company_id pelo subdomínio
     const { data, error } = await supabaseAdmin
-      .from('employees')
-      .select('company_id')
-      .eq('user_id', user.id)
+      .from('companies')
+      .select('id')
+      .eq('subdomain', subdomain)
       .single()
 
-    if (error || !data?.company_id) {
-      console.log('❌ company_id não encontrado para user:', user.id)
+    if (error || !data?.id) {
+      console.log('❌ Empresa não encontrada para subdomínio:', subdomain)
       return null
     }
 
-    console.log('✅ company_id encontrado:', data.company_id)
-    return data.company_id
+    console.log('✅ company_id encontrado:', data.id, 'para subdomínio:', subdomain)
+    return data.id
   } catch (error) {
     console.error('❌ Erro ao obter company_id:', error)
     return null
@@ -77,8 +73,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome, email e senha são obrigatórios' }, { status: 400 })
     }
 
-    // Obter company_id do usuário autenticado
-    const companyId = await getCompanyIdFromAuth(request)
+    // Obter company_id do subdomínio
+    const companyId = await getCompanyIdFromSubdomain(request)
 
     if (!companyId) {
       console.log('❌ company_id não encontrado na sessão')
