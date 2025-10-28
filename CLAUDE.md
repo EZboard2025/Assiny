@@ -4,7 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Assiny is an internal sales training platform with AI-powered roleplay, conversational AI assistant (Chat IA), administrative management hub, and employee tracking. The system integrates with N8N workflows for audio transcription, text-to-speech, automated performance evaluation, and persistent chat memory using LangChain + PostgreSQL.
+Assiny is a **multi-tenant SaaS** internal sales training platform with AI-powered roleplay, conversational AI assistant (Chat IA), administrative management hub, and employee tracking. The system uses **subdomain-based routing** for company isolation and integrates with N8N workflows for audio transcription, text-to-speech, automated performance evaluation, and persistent chat memory using LangChain + PostgreSQL.
+
+### Multi-Tenant Architecture
+
+**Subdomain Routing:**
+- Each company has a unique subdomain (e.g., `assiny.ramppy.local`, `maniafoods.ramppy.local`)
+- Middleware (`middleware.ts`) detects subdomain and sets `x-subdomain` header
+- Main domain without subdomain redirects to `/select-company` page
+- Development: `*.ramppy.local:3000` | Production: `*.ramppy.site`
+
+**Company Isolation:**
+- All core tables have `company_id` foreign key for data isolation
+- `getCompanyId()` prioritizes subdomain detection over user's company
+- Row Level Security (RLS) enforces company boundaries at database level
+- ConfigHub, personas, objections, company_data all use subdomain-based company detection
 
 ## Tech Stack
 
@@ -29,6 +43,28 @@ npm run start        # Run production build
 # Code quality
 npm run lint         # Run ESLint
 ```
+
+### Local Multi-Tenant Development
+
+**Setup /etc/hosts for subdomain testing:**
+```bash
+sudo nano /etc/hosts
+```
+
+Add these lines:
+```
+127.0.0.1 assiny.ramppy.local
+127.0.0.1 maniafoods.ramppy.local
+```
+
+**Access URLs:**
+- Assiny (B2B): `http://assiny.ramppy.local:3000`
+- Mania Foods (B2C): `http://maniafoods.ramppy.local:3000`
+- Main domain: `http://localhost:3000` (redirects to /select-company)
+
+**Production URLs:**
+- Assiny: `https://assiny.ramppy.site`
+- Mania Foods: `https://maniafoods.ramppy.site`
 
 ## Architecture Overview
 
@@ -63,8 +99,14 @@ npm run lint         # Run ESLint
 ### Database Schema
 
 **Key Tables:**
+- `companies` - **Multi-tenant company registry**
+  - Columns: `id`, `name`, `subdomain`, `created_at`, `updated_at`
+  - Each company has unique subdomain for URL routing
+  - All other tables reference `company_id` for data isolation
 - `users` - User profiles with roles (admin/vendedor)
 - `employees` - Employee records (synced with auth.users)
+  - Has `company_id` foreign key
+  - Users belong to one company
 - `roleplay_sessions` - Roleplay sessions with messages, config, evaluation
   - `messages` - JSONB array: `[{ role: "client"|"seller", text: "...", timestamp: "..." }]`
   - `config` - JSONB: `{ age, temperament, segment, objections[] }`
@@ -86,17 +128,20 @@ npm run lint         # Run ESLint
   - Has `created_at` timestamp for cooldown calculation (1 week between generations)
   - Only one active PDI per user at a time (deleted when generating new)
 - `personas` - B2B/B2C customer personas (linked to business_type)
+  - Has `company_id` foreign key for multi-tenant isolation
   - Has `evaluation_score` column (DECIMAL 0-10) for quality assessment
   - Score resets to NULL when persona is edited
 - `objections` - Sales objections library
+  - Has `company_id` foreign key for multi-tenant isolation
   - `name` - The objection text
   - `rebuttals` - JSONB array of rebuttal strategies
   - `evaluation_score` - DECIMAL(3,1) for quality assessment (0-10)
   - Score resets to NULL when objection or rebuttals are edited
   - Evaluation webhook: `https://ezboard.app.n8n.cloud/webhook/ed84cced-6bf5-4c4d-87e7-4ca3057be871`
 - `company_data` - **Company information for AI training**
+  - Has `company_id` foreign key (one record per company)
   - Stores 9 fields: nome, descricao, produtos_servicos, funcao_produtos, diferenciais, concorrentes, dados_metricas, erros_comuns, percepcao_desejada
-  - Single record per system (uses UPDATE not INSERT when exists)
+  - Uses UPDATE (not INSERT) when editing existing company data
   - Auto-generates embeddings on save/update via `/api/company/generate-embeddings`
 - `documents` - **Vector embeddings for company knowledge (pgvector, N8N compatible)**
   - Stores embeddings from `company_data` in chunks (8 chunks per company)
@@ -108,14 +153,18 @@ npm run lint         # Run ESLint
 - `knowledge_base` - SPIN/psychology content (category, title, content)
 - `customer_segments` - (Legacy, replaced by personas)
 - `company_type` - Business type configuration (B2B or B2C)
+  - Has `company_id` foreign key (one record per company)
+  - CRITICAL: Each company must have its own company_type record
 
 **Important Notes:**
-- All config tables have Row Level Security (RLS) enabled
-- `roleplay_sessions` has RLS - users only see their own sessions
+- **Multi-tenant Isolation**: All core tables (employees, personas, objections, company_data, company_type) have `company_id` foreign key
+- All config tables have Row Level Security (RLS) enabled for security enforcement at database level
+- `roleplay_sessions` has RLS - users only see their own sessions (filtered by `user_id`)
 - `user_performance_summaries` has RLS - users see only their own, service role has full access
 - `chat_sessions` has RLS by `user_id` - critical for multi-user isolation
 - First message in each chat session MUST include `user_id` from frontend
 - `evaluation` column added via `adicionar-coluna-evaluation.sql`
+- **CRITICAL**: When creating/updating data, always use `getCompanyId()` from `lib/utils/getCompanyFromSubdomain.ts` (NOT `getCompanyIdFromUser()`)
 
 ### API Routes
 
@@ -330,9 +379,43 @@ if (Array.isArray(result) && result[0]?.output) {
 **Libraries:**
 - `lib/roleplay.ts` - Session CRUD operations
 - `lib/config.ts` - Configuration management (personas, objections, etc.)
+  - All functions use `getCompanyId()` for subdomain-based company detection
+  - Functions: `addPersona()`, `addObjection()`, `setCompanyType()` all include `company_id`
 - `lib/supabase.ts` - Supabase client initialization
+- `lib/utils/getCompanyFromSubdomain.ts` - **Multi-tenant company detection**
+  - `getCompanyIdFromSubdomain()` - Detects company from URL subdomain
+  - `getCompanyId()` - Smart function that prioritizes subdomain over user's company
+  - Used throughout the app for data isolation
 
 ## Important Patterns
+
+### Multi-Tenant Company Detection Pattern
+
+**ALWAYS use `getCompanyId()` for data operations:**
+```typescript
+import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
+
+// Get company from subdomain (prioritized) or user (fallback)
+const companyId = await getCompanyId()
+
+if (!companyId) {
+  console.error('Company ID not found')
+  return null
+}
+
+// Use companyId in queries
+await supabase
+  .from('personas')
+  .insert({ ...data, company_id: companyId })
+```
+
+**How it works:**
+1. Browser: Detects subdomain from `window.location.hostname`
+2. Server: Extracts subdomain from request `headers.get('host')`
+3. Queries `companies` table to get `company_id` by subdomain
+4. Falls back to user's company if subdomain detection fails
+
+**NEVER use `getCompanyIdFromUser()` in ConfigHub or multi-tenant contexts** - it will use the logged-in user's company instead of the subdomain company, causing data to be saved to the wrong company.
 
 ### Creating Employees
 NEVER create auth users client-side. Always use the API route:
@@ -776,6 +859,18 @@ The persona evaluation results display in a side panel (500px width) that slides
    - Center should be at `(110, 110)` not `(100, 100)`
    - Label distance should be `radius + 25` (not `radius + 20`)
    - Applies to both `renderRadarChart()` and `renderEmptyRadarChart()`
+
+13. **Multi-tenant data isolation failures**:
+   - Verify all data creation functions use `getCompanyId()` not `getCompanyIdFromUser()`
+   - Check that ConfigHub uses subdomain-based detection (`lib/utils/getCompanyFromSubdomain`)
+   - Ensure RLS policies exist for all tables with `company_id`
+   - Execute SQL to enable RLS: `ALTER TABLE [table_name] ENABLE ROW LEVEL SECURITY`
+   - For roleplay_sessions, create RLS policy filtering by `user_id`:
+     ```sql
+     CREATE POLICY "Users can only see their own roleplay sessions"
+     ON roleplay_sessions FOR SELECT TO authenticated
+     USING (auth.uid() = user_id);
+     ```
 
 ## Environment Variables
 
