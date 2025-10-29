@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useToast, ToastContainer } from '@/components/Toast'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 interface Company {
   id: string
@@ -24,6 +26,14 @@ export default function CompaniesAdmin() {
   const [success, setSuccess] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState('')
+
+  // Delete modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+  // Toast system
+  const { toasts, showToast, removeToast } = useToast()
 
   // Form fields
   const [companyName, setCompanyName] = useState('')
@@ -48,8 +58,9 @@ export default function CompaniesAdmin() {
       setIsAuthenticated(true)
       sessionStorage.setItem('admin-companies-auth', 'admin123')
       loadCompanies()
+      showToast('success', 'Autenticado com sucesso!')
     } else {
-      alert('Senha incorreta!')
+      showToast('error', 'Senha incorreta', 'A senha informada está incorreta. Tente novamente.')
       setPassword('')
     }
   }
@@ -173,7 +184,7 @@ export default function CompaniesAdmin() {
         throw new Error(result.error || 'Erro ao criar empresa')
       }
 
-      setSuccess(`Empresa "${companyName}" criada com sucesso!`)
+      showToast('success', `Empresa "${companyName}" criada!`, 'Configure os dados da empresa no ConfigHub.')
 
       // Limpar formulário
       setCompanyName('')
@@ -186,39 +197,57 @@ export default function CompaniesAdmin() {
       // Recarregar lista
       await loadCompanies()
 
-      // Fechar modal após 2 segundos
-      setTimeout(() => {
-        setShowCreateModal(false)
-        setSuccess('')
-      }, 2000)
+      // Fechar modal
+      setShowCreateModal(false)
+      setSuccess('')
+      setError('')
 
     } catch (error: any) {
       console.error('Erro ao criar empresa:', error)
+      showToast('error', 'Erro ao criar empresa', error.message)
       setError(error.message || 'Erro ao criar empresa')
     } finally {
       setCreating(false)
     }
   }
 
-  const deleteCompany = async (companyId: string, companyName: string) => {
-    if (!confirm(`Tem certeza que deseja excluir a empresa "${companyName}"?\n\nTodos os dados serão perdidos permanentemente!`)) {
-      return
-    }
+  const handleDeleteClick = (company: Company) => {
+    setCompanyToDelete(company)
+    setDeleteConfirmText('')
+    setShowDeleteModal(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!companyToDelete) return
 
     try {
-      const { error } = await supabase
-        .from('companies')
-        .delete()
-        .eq('id', companyId)
+      // Chamar API de deletar empresa
+      const response = await fetch(`/api/admin/companies/delete?companyId=${companyToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
 
-      if (error) throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao deletar empresa')
+      }
+
+      showToast('success', 'Empresa deletada!', result.message)
+
+      // Fechar modal e limpar estados
+      setShowDeleteModal(false)
+      setCompanyToDelete(null)
+      setDeleteConfirmText('')
 
       // Recarregar lista
       await loadCompanies()
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir empresa:', error)
-      alert('Erro ao excluir empresa. Verifique se não há dados vinculados.')
+      showToast('error', 'Erro ao excluir empresa', error.message)
     }
   }
 
@@ -309,7 +338,7 @@ export default function CompaniesAdmin() {
                   </div>
 
                   <button
-                    onClick={() => deleteCompany(company.id, company.name)}
+                    onClick={() => handleDeleteClick(company)}
                     className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                     title="Excluir empresa"
                   >
@@ -522,6 +551,48 @@ export default function CompaniesAdmin() {
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false)
+            setCompanyToDelete(null)
+            setDeleteConfirmText('')
+          }}
+          onConfirm={confirmDelete}
+          title="Deletar Empresa"
+          message={
+            <div className="space-y-3">
+              <p>
+                Tem certeza que deseja excluir a empresa <strong className="text-white">{companyToDelete?.name}</strong>?
+              </p>
+              <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3 space-y-1">
+                <p className="text-sm font-semibold text-red-400">⚠️ Esta ação irá deletar PERMANENTEMENTE:</p>
+                <ul className="text-sm text-gray-300 space-y-1 ml-4">
+                  <li>• A empresa e todas as configurações</li>
+                  <li>• Todos os funcionários e usuários</li>
+                  <li>• Todas as personas e objeções</li>
+                  <li>• Todos os dados da empresa</li>
+                  <li>• Todos os históricos de roleplay</li>
+                  <li>• Todas as sessões de chat</li>
+                </ul>
+              </div>
+              <p className="text-sm text-yellow-400 font-semibold">
+                Esta ação NÃO pode ser desfeita!
+              </p>
+            </div>
+          }
+          confirmText="Deletar Empresa"
+          cancelText="Cancelar"
+          confirmButtonClass="bg-red-600 hover:bg-red-700"
+          requireTyping={companyToDelete?.name}
+          typedValue={deleteConfirmText}
+          onTypedValueChange={setDeleteConfirmText}
+        />
+
+        {/* Toast Container */}
+        <ToastContainer toasts={toasts} onClose={removeToast} />
       </div>
     </div>
   )
