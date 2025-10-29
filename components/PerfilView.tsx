@@ -540,33 +540,6 @@ export default function PerfilView() {
               )}
             </div>
 
-            {/* AI Feedback Card */}
-            <div className={`bg-gradient-to-br from-green-900/30 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl font-bold">AI</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-gray-300 leading-relaxed mb-4">
-                    Sua curva de aprendizado está estável. Continue fortereno perguntas de Implicação e treinino objeções de Confiança. Recomendamos um novo roleplay com foco em fechamento.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <button className="px-5 py-2.5 bg-green-600 hover:bg-green-500 rounded-xl font-medium flex items-center gap-2 transition-colors">
-                      <Play className="w-4 h-4" />
-                      Iniciar Roleplay
-                    </button>
-                    <button className="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl font-medium flex items-center gap-2 transition-colors">
-                      <BarChart3 className="w-4 h-4" />
-                      Ver Avaliações Detalhadas
-                    </button>
-                    <button className="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl font-medium flex items-center gap-2 transition-colors">
-                      <Target className="w-4 h-4" />
-                      Gerar PDI
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right Column - SPIN Metrics */}

@@ -1155,21 +1155,26 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         {/* Configuration Modal */}
         {showConfig && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 pt-24">
             <div className="relative max-w-2xl w-full">
               <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-3xl font-bold">Configuração da Sessão</h2>
+              <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 max-h-[80vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold">Configuração da Sessão</h2>
                   <button
-                    onClick={() => setShowConfig(false)}
-                    className="text-gray-400 hover:text-white transition-colors text-2xl"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowConfig(false);
+                    }}
+                    className="text-gray-400 hover:text-white transition-colors text-2xl z-50 cursor-pointer"
+                    type="button"
                   >
                     ×
                   </button>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Idade do Cliente */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-3">
@@ -1421,16 +1426,22 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-4 mt-8">
+                <div className="flex gap-4 mt-6">
                   <button
-                    onClick={() => setShowConfig(false)}
-                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-semibold hover:bg-gray-700/50 transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowConfig(false);
+                    }}
+                    type="button"
+                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-semibold hover:bg-gray-700/50 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleStartSimulation}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-semibold hover:scale-105 transition-transform glow-green"
+                    type="button"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-semibold hover:scale-105 transition-transform glow-green cursor-pointer"
                   >
                     Iniciar Roleplay
                   </button>
