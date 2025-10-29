@@ -8,7 +8,7 @@ import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Building2 } from 'lucide-react'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 
 interface DashboardProps {
@@ -226,13 +226,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
             {/* Right side buttons */}
             <div className="flex items-center gap-3">
-              <a
-                href="/admin/companies"
-                className="px-4 py-2 bg-purple-600/20 backdrop-blur-sm text-purple-300 rounded-full font-medium hover:bg-purple-600/30 transition-colors flex items-center gap-2 border border-purple-500/30"
-              >
-                <Building2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Empresas</span>
-              </a>
               <button
                 onClick={() => setShowConfigHub(true)}
                 className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
