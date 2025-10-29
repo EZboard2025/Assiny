@@ -26,9 +26,11 @@ export function middleware(request: NextRequest) {
   // Se não tem subdomínio (domínio principal), redirecionar para seleção de empresa
   const isMainDomain = !subdomain || subdomain === 'www' || subdomain === 'ramppy'
   const isSelectCompanyPage = request.nextUrl.pathname === '/select-company'
+  const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
 
-  if (isMainDomain && !isSelectCompanyPage) {
+  if (isMainDomain && !isSelectCompanyPage && !isAdminRoute) {
     // Domínio principal sem subdomínio -> redirecionar para seleção
+    // Exceto para rotas admin que não precisam de subdomínio
     const url = request.nextUrl.clone()
     url.pathname = '/select-company'
     return NextResponse.redirect(url)
