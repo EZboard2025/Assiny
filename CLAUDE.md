@@ -65,6 +65,12 @@ Add these lines:
 **Production URLs:**
 - Assiny: `https://assiny.ramppy.site`
 - Mania Foods: `https://maniafoods.ramppy.site`
+- Admin panel: `https://ramppy.site/admin/companies`
+
+**Admin Panel:**
+- URL: `/admin/companies` (accessible without subdomain)
+- Password: `admin123` (session-based authentication)
+- Features: Create/delete companies, view employee counts, manage multi-tenant instances
 
 ## Architecture Overview
 
@@ -280,6 +286,15 @@ if (Array.isArray(result) && result[0]?.output) {
   - Uses `useRef<ChatInterfaceHandle>` to intercept Chat IA navigation
   - `handleViewChange()` calls `chatRef.current.requestLeave()` when leaving Chat IA
   - Prevents data loss by showing confirmation modal before navigation
+  - Header does NOT include "Empresas" button (admin panel accessible only via direct URL)
+
+- `app/admin/companies/page.tsx` - **Company management admin panel**
+  - Password-protected interface (`admin123` stored in sessionStorage)
+  - Create new companies with subdomain, admin user, and business type
+  - Delete companies with CASCADE cleanup (removes all related data)
+  - IMPORTANT: Does NOT auto-create personas/objections/company_data (companies start empty)
+  - Shows warning about manual `/etc/hosts` configuration for subdomains
+  - Uses custom Toast and ConfirmModal components instead of browser alerts
 
 - `ChatInterface.tsx` - **Conversational AI assistant with session management**
   - Uses `forwardRef` to expose `requestLeave()` method to Dashboard
@@ -427,6 +442,94 @@ const response = await fetch('/api/employees/create', {
   body: JSON.stringify({ name, email, password })
 })
 ```
+
+### Creating Companies (Admin Panel)
+Companies are created via `/api/admin/companies/create` with service role:
+
+```typescript
+// POST /api/admin/companies/create
+{
+  companyName: string,
+  subdomain: string,
+  adminName: string,
+  adminEmail: string,
+  adminPassword: string,
+  businessType: 'B2B' | 'B2C'
+}
+```
+
+**What gets created:**
+- Company record in `companies` table
+- Admin user in Supabase Auth
+- Employee record linked to admin user
+- Company type (B2B/B2C) in `company_type` table
+
+**What does NOT get created:**
+- Personas (must be configured manually in ConfigHub)
+- Objections (must be configured manually in ConfigHub)
+- Company data (must be filled manually in ConfigHub)
+
+**Manual steps after creation:**
+1. Add subdomain to `/etc/hosts` (development) or DNS (production)
+2. Configure company data in ConfigHub
+3. Add personas and objections via ConfigHub
+
+### Deleting Companies
+Deletion via `/api/admin/companies/delete` handles CASCADE cleanup:
+
+```typescript
+// DELETE /api/admin/companies/delete?companyId={id}
+```
+
+**Automatic cleanup (CASCADE):**
+- Deletes auth users first (via `supabaseAdmin.auth.admin.deleteUser()`)
+- Deletes company record (triggers CASCADE)
+- All related data auto-deleted: employees, personas, objections, company_data, documents, roleplay_sessions, chat_sessions, pdis, user_performance_summaries
+
+**Manual cleanup required:**
+- Remove subdomain from `/etc/hosts` (development)
+- Remove DNS record (production)
+
+### Custom UI Components Pattern
+
+The app uses custom Toast and ConfirmModal components instead of browser alerts:
+
+```typescript
+// Import
+import { useToast, ToastContainer } from '@/components/Toast'
+import { ConfirmModal } from '@/components/ConfirmModal'
+
+// Usage
+const { toasts, showToast, removeToast } = useToast()
+
+// Show toast
+showToast('success', 'Title', 'Optional message', 5000)
+showToast('error', 'Error Title', 'Error details')
+showToast('warning', 'Warning', 'Important notice', 10000)
+
+// Confirm modal
+<ConfirmModal
+  isOpen={showModal}
+  onClose={() => setShowModal(false)}
+  onConfirm={handleAction}
+  title="Confirm Action"
+  message="Are you sure?"
+  confirmText="Yes"
+  cancelText="No"
+  requireTyping="company-name"  // Optional: user must type this to confirm
+  typedValue={inputValue}
+  onTypedValueChange={setInputValue}
+/>
+
+// Toast container (required)
+<ToastContainer toasts={toasts} onClose={removeToast} />
+```
+
+**Design:**
+- Matches site gradient theme (purple/pink for general, green for success, red for errors, yellow for warnings)
+- Animations: slide-in-right, scale-in, fade-out
+- Auto-dismiss with configurable duration
+- Stacked display (top-right corner)
 
 ### Chat IA Session Management Pattern
 
@@ -872,6 +975,22 @@ The persona evaluation results display in a side panel (500px width) that slides
      USING (auth.uid() = user_id);
      ```
 
+14. **Admin panel 404 error**:
+   - Ensure `/app/admin/layout.tsx` exists (required for admin routes)
+   - Verify middleware excludes `/admin` routes from redirect logic
+   - Check Next.js cache: `rm -rf .next && npm run dev`
+
+15. **Middleware "Cannot find the middleware module" error**:
+   - Clear Next.js cache: `rm -rf .next`
+   - Restart dev server
+   - Verify `middleware.ts` has no syntax errors
+
+16. **Subdomain still accessible after deleting company**:
+   - Company deleted from database but subdomain configuration persists
+   - Development: Manually remove from `/etc/hosts`
+   - Production: Manually remove DNS record
+   - SSL certificate renewal will fail for deleted subdomains (expected)
+
 ## Environment Variables
 
 Required in `.env.local`:
@@ -959,6 +1078,13 @@ pm2 restart assiny  # Must restart after env changes
 # Check Nginx configuration
 nginx -t
 
+# SSL Certificate Management
+sudo certbot certificates                    # List all certificates
+sudo certbot renew                           # Renew certificates manually
+sudo certbot renew --dry-run                 # Test renewal process
+sudo certbot --nginx -d subdomain.ramppy.site  # Add SSL for new subdomain
+sudo systemctl status certbot.timer          # Check auto-renewal timer
+
 # Restart Nginx
 systemctl restart nginx
 
@@ -990,3 +1116,6 @@ certbot renew
 - **VPS**: Ensure PM2 is running and configured to start on boot (`pm2 startup` + `pm2 save`)
 - **VPS**: Verify Nginx reverse proxy is configured for both HTTP and HTTPS
 - **VPS**: Confirm SSL certificate auto-renewal is enabled via Certbot
+- **SSL**: Configure SSL for all subdomains (see `docs/QUICK-SSL-SETUP.md`)
+- **DNS**: Ensure all subdomains point to VPS IP (31.97.84.130)
+- **Admin**: Change default admin password from `admin123` in production
