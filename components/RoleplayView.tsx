@@ -349,6 +349,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       setIsEvaluating(true);
 
       try {
+        // Primeiro, atualizar o status da sessão para 'completed'
+        console.log('📝 Finalizando sessão no banco de dados...');
+        await endRoleplaySession(sessionId, 'completed');
+
         // Obter mensagens
         const messages = await getRoleplaySession(sessionId);
 
@@ -366,20 +370,22 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         });
 
         if (evaluationResponse.ok) {
-          const evaluationData = await evaluationResponse.json();
+          const result = await evaluationResponse.json();
+          console.log('📦 Resposta da API:', result);
 
-          // Se o backend retornar o formato legado (com 'output'), fazer o parse
-          let parsedEvaluation = evaluationData;
-          if (evaluationData && typeof evaluationData === 'object' && 'output' in evaluationData) {
+          // A API retorna {success: true, evaluation: {...}}
+          let parsedEvaluation = result.evaluation || result;
+
+          // Se ainda tiver formato legado (com 'output'), fazer o parse
+          if (parsedEvaluation && typeof parsedEvaluation === 'object' && 'output' in parsedEvaluation) {
             try {
-              parsedEvaluation = JSON.parse(evaluationData.output);
+              parsedEvaluation = JSON.parse(parsedEvaluation.output);
             } catch (e) {
               console.error('Failed to parse evaluation:', e);
-              parsedEvaluation = evaluationData;
             }
           }
 
-          console.log('✅ Avaliação recebida:', parsedEvaluation);
+          console.log('✅ Avaliação processada:', parsedEvaluation);
           setEvaluation(parsedEvaluation);
 
           // Atualizar o resumo de performance após avaliação
