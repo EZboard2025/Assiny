@@ -515,25 +515,42 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       if (data.message.includes('Roleplay finalizado, aperte em finalizar sessão')) {
         console.log('🎯 Detectada mensagem de finalização do roleplay!')
 
-        // Iniciar countdown de finalização
-        setShowFinalizingMessage(true)
-        setFinalizingCountdown(5)
+        // Função para iniciar o countdown após o áudio terminar
+        const startFinalizationCountdown = () => {
+          console.log('⏰ Iniciando countdown de finalização...')
+          setShowFinalizingMessage(true)
+          setFinalizingCountdown(5)
 
-        // Criar interval para countdown
-        const interval = setInterval(() => {
-          setFinalizingCountdown(prev => {
-            if (prev <= 1) {
-              clearInterval(interval)
-              // Finalizar automaticamente
-              console.log('⏰ Finalizando automaticamente...')
-              handleEndSession()
-              return 0
-            }
-            return prev - 1
-          })
-        }, 1000)
+          // Criar interval para countdown
+          const interval = setInterval(() => {
+            setFinalizingCountdown(prev => {
+              if (prev <= 1) {
+                clearInterval(interval)
+                // Finalizar automaticamente
+                console.log('⏰ Finalizando automaticamente...')
+                handleEndSession()
+                return 0
+              }
+              return prev - 1
+            })
+          }, 1000)
 
-        finalizingIntervalRef.current = interval
+          finalizingIntervalRef.current = interval
+        }
+
+        // Se o áudio estiver tocando, esperar ele terminar
+        if (audioRef.current && !audioRef.current.ended) {
+          console.log('🎵 Aguardando áudio terminar antes de finalizar...')
+
+          // Adicionar listener para quando o áudio terminar
+          audioRef.current.addEventListener('ended', () => {
+            console.log('🔇 Áudio terminou, iniciando finalização...')
+            setTimeout(startFinalizationCountdown, 500) // Pequeno delay para garantir que o áudio realmente terminou
+          }, { once: true })
+        } else {
+          // Se não há áudio tocando, iniciar countdown após um pequeno delay
+          setTimeout(startFinalizationCountdown, 1000)
+        }
       }
 
       // Salvar mensagem do cliente no Supabase (roleplay_sessions)
@@ -1580,8 +1597,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         {/* Modal de Avaliação - Novo Design */}
         {showEvaluationSummary && evaluation && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-2 overflow-y-auto">
-            <div className="relative w-full max-w-3xl my-2 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-2 pt-20 overflow-y-auto">
+            <div className="relative w-full max-w-2xl my-2 max-h-[70vh] overflow-y-auto">
               {/* Close Button */}
               <button
                 onClick={() => setShowEvaluationSummary(false)}
@@ -1591,32 +1608,32 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </button>
 
               {/* Header com Tabs */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-4">
-                <h2 className="text-2xl font-bold text-center text-white mb-3">DESEMPENHO DO VENDEDOR</h2>
-                <div className="flex justify-center gap-2">
-                  <button className="px-4 py-1.5 bg-gray-800/50 text-gray-400 text-sm rounded-lg hover:bg-gray-700/50 transition-colors">
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-3">
+                <h2 className="text-xl font-bold text-center text-white mb-2">DESEMPENHO DO VENDEDOR</h2>
+                <div className="flex justify-center gap-1">
+                  <button className="px-3 py-1 bg-gray-800/50 text-gray-400 text-xs rounded-lg hover:bg-gray-700/50 transition-colors">
                     Conversa
                   </button>
-                  <button className="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg shadow-lg shadow-green-500/30">
+                  <button className="px-3 py-1 bg-green-600 text-white text-xs rounded-lg shadow-lg shadow-green-500/30">
                     Avaliação
                   </button>
-                  <button className="px-4 py-1.5 bg-gray-800/50 text-gray-400 text-sm rounded-lg hover:bg-gray-700/50 transition-colors">
+                  <button className="px-3 py-1 bg-gray-800/50 text-gray-400 text-xs rounded-lg hover:bg-gray-700/50 transition-colors">
                     Feedback
                   </button>
                 </div>
               </div>
 
               {/* Main Content */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
 
                   {/* Left Side - SPIN Radar Chart */}
-                  <div className="space-y-3">
-                    <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20">
-                      <h3 className="text-sm font-bold text-white mb-3 text-center">Métricas de Competências SPIN</h3>
+                  <div className="space-y-2">
+                    <div className="bg-gray-800/40 rounded-lg p-2 border border-green-500/20">
+                      <h3 className="text-xs font-bold text-white mb-2 text-center">Métricas SPIN</h3>
 
                       {/* Radar Chart Visual - Diamond Shape */}
-                      <div className="relative w-full aspect-square max-w-[200px] mx-auto mb-3">
+                      <div className="relative w-full aspect-square max-w-[150px] mx-auto mb-2">
                         <svg viewBox="0 0 240 240" className="w-full h-full">
                           {/* Background diamonds (losangos) - 10 níveis */}
                           {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
@@ -1734,12 +1751,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
 
                   {/* Right Side - Performance Metrics */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {/* Overall Score */}
-                    <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/30 rounded-xl p-3">
-                      <h3 className="text-center text-xs text-gray-400 mb-1">Performance Geral</h3>
+                    <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/30 rounded-lg p-2">
+                      <h3 className="text-center text-xs text-gray-400">Performance Geral</h3>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-white">
+                        <div className="text-lg font-bold text-white">
                           {evaluation.performance_level === 'legendary' && 'Lendário'}
                           {evaluation.performance_level === 'excellent' && 'Excelente'}
                           {evaluation.performance_level === 'very_good' && 'Muito Bom'}
@@ -1755,10 +1772,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mt-4">
+                <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => setShowEvaluationSummary(false)}
-                    className="flex-1 px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-gray-700/50 transition-colors text-white"
+                    className="flex-1 px-3 py-1.5 bg-gray-800/50 border border-green-500/20 rounded text-xs font-medium hover:bg-gray-700/50 transition-colors text-white"
                   >
                     Fechar
                   </button>
@@ -1771,7 +1788,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         window.location.href = '/?view=historico';
                       }
                     }}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-sm font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-green-500/30"
+                    className="flex-1 px-3 py-1.5 bg-gradient-to-r from-green-600 to-green-500 rounded text-xs font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-green-500/30"
                   >
                     Ver Análise Completa
                   </button>
