@@ -49,7 +49,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const audioContextRef = useRef<AudioContext | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
-  const [finalizingCountdown, setFinalizingCountdown] = useState(5) // Countdown de 5 segundos
+  const [finalizingCountdown, setFinalizingCountdown] = useState(7) // Countdown de 7 segundos
   const finalizingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -519,7 +519,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         const startFinalizationCountdown = () => {
           console.log('⏰ Iniciando countdown de finalização...')
           setShowFinalizingMessage(true)
-          setFinalizingCountdown(5)
+          setFinalizingCountdown(7) // Aumentado de 5 para 7 segundos
 
           // Criar interval para countdown
           const interval = setInterval(() => {
@@ -538,18 +538,27 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           finalizingIntervalRef.current = interval
         }
 
-        // Se o áudio estiver tocando, esperar ele terminar
-        if (audioRef.current && !audioRef.current.ended) {
+        // Se o áudio estiver tocando ou se estamos processando áudio, esperar
+        if (isPlayingAudio || (audioRef.current && !audioRef.current.ended && !audioRef.current.paused)) {
           console.log('🎵 Aguardando áudio terminar antes de finalizar...')
 
           // Adicionar listener para quando o áudio terminar
-          audioRef.current.addEventListener('ended', () => {
-            console.log('🔇 Áudio terminou, iniciando finalização...')
-            setTimeout(startFinalizationCountdown, 500) // Pequeno delay para garantir que o áudio realmente terminou
-          }, { once: true })
+          const audioEndHandler = () => {
+            console.log('🔇 Áudio terminou, aguardando 2 segundos antes de iniciar finalização...')
+            // Aumentar delay para 2 segundos para garantir que o usuário ouve o fim da mensagem
+            setTimeout(startFinalizationCountdown, 2000)
+          }
+
+          if (audioRef.current) {
+            audioRef.current.addEventListener('ended', audioEndHandler, { once: true })
+          } else {
+            // Se não temos referência ao áudio mas está tocando, aguardar mais
+            setTimeout(startFinalizationCountdown, 3000)
+          }
         } else {
-          // Se não há áudio tocando, iniciar countdown após um pequeno delay
-          setTimeout(startFinalizationCountdown, 1000)
+          // Se não há áudio tocando, ainda assim aguardar um pouco mais
+          console.log('⏳ Aguardando 2 segundos antes de iniciar finalização...')
+          setTimeout(startFinalizationCountdown, 2000)
         }
       }
 
