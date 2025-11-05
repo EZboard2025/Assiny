@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, type Persona, type PersonaB2B, type PersonaB2C, type Objection } from '@/lib/config'
-import { createRoleplaySession, addMessageToSession, endRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
+import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 
 interface RoleplayViewProps {
   onNavigateToHistory?: () => void
