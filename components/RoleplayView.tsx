@@ -48,6 +48,9 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const audioAnalyserRef = useRef<AnalyserNode | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
+  const [finalizingCountdown, setFinalizingCountdown] = useState(5) // Countdown de 5 segundos
+  const finalizingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -278,6 +281,149 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     }
   }
 
+  const handleEndSession = async () => {
+    console.log('🛑 Encerrando simulação...')
+
+    // Limpar interval de finalização se existir
+    if (finalizingIntervalRef.current) {
+      clearInterval(finalizingIntervalRef.current)
+      finalizingIntervalRef.current = null
+    }
+
+    // Parar gravação se estiver ativa
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+        }
+        mediaRecorderRef.current = null;
+      } catch (e) {
+        console.log('Erro ao parar gravação:', e);
+      }
+    }
+
+    // Limpar timer
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
+    // Fechar stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    // Parar áudio se estiver tocando
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // Limpar visualizador de áudio
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      await audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    setIsPlayingAudio(false);
+    setAudioVolume(0);
+
+    // Resetar estados
+    setIsSimulating(false);
+    setIsRecording(false);
+    setIsProcessingTranscription(false);
+    setCurrentTranscription('');
+    setLastUserMessage('');
+    setShowFinalizingMessage(false);
+    setFinalizingCountdown(5);
+
+    // Iniciar avaliação se tiver sessionId
+    if (sessionId && !isEvaluating) {
+      console.log('📊 Iniciando avaliação...');
+      setIsEvaluating(true);
+
+      try {
+        // Obter mensagens
+        const messages = await getRoleplaySession(sessionId);
+
+        // Enviar para avaliação
+        const evaluationResponse = await fetch('/api/roleplay/evaluate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sessionId,
+            messages: messages?.messages || [],
+            config: messages?.config || {}
+          }),
+        });
+
+        if (evaluationResponse.ok) {
+          const evaluationData = await evaluationResponse.json();
+
+          // Se o backend retornar o formato legado (com 'output'), fazer o parse
+          let parsedEvaluation = evaluationData;
+          if (evaluationData && typeof evaluationData === 'object' && 'output' in evaluationData) {
+            try {
+              parsedEvaluation = JSON.parse(evaluationData.output);
+            } catch (e) {
+              console.error('Failed to parse evaluation:', e);
+              parsedEvaluation = evaluationData;
+            }
+          }
+
+          console.log('✅ Avaliação recebida:', parsedEvaluation);
+          setEvaluation(parsedEvaluation);
+
+          // Atualizar o resumo de performance após avaliação
+          const { supabase } = await import('@/lib/supabase')
+          const { data: { user } } = await supabase.auth.getUser()
+
+          if (user) {
+            try {
+              await fetch('/api/performance-summary/update', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userId: user.id }),
+              })
+              console.log('✅ Resumo de performance atualizado')
+            } catch (error) {
+              console.error('Erro ao atualizar resumo de performance:', error)
+            }
+          }
+        } else {
+          console.error('Erro ao obter avaliação');
+        }
+      } catch (error) {
+        console.error('Erro durante avaliação:', error);
+      } finally {
+        setIsEvaluating(false);
+        setShowEvaluationSummary(true); // Mostrar modal de resumo
+      }
+    } else {
+      console.log('📊 Pulando avaliação - sem sessionId');
+    }
+  }
+
+  const cancelFinalization = () => {
+    // Cancelar o countdown
+    if (finalizingIntervalRef.current) {
+      clearInterval(finalizingIntervalRef.current)
+      finalizingIntervalRef.current = null
+    }
+    setShowFinalizingMessage(false)
+    setFinalizingCountdown(5)
+  }
+
   const handleSendMessage = async (messageToSend?: string) => {
     console.log('🔍 handleSendMessage chamada com:', messageToSend)
     console.log('🔍 inputMessage atual:', inputMessage)
@@ -358,6 +504,31 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       // Adicionar resposta do cliente
       setMessages(prev => [...prev, { role: 'client', text: data.message }])
+
+      // Verificar se a mensagem contém a frase de finalização
+      if (data.message.includes('Roleplay finalizado, aperte em finalizar sessão')) {
+        console.log('🎯 Detectada mensagem de finalização do roleplay!')
+
+        // Iniciar countdown de finalização
+        setShowFinalizingMessage(true)
+        setFinalizingCountdown(5)
+
+        // Criar interval para countdown
+        const interval = setInterval(() => {
+          setFinalizingCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(interval)
+              // Finalizar automaticamente
+              console.log('⏰ Finalizando automaticamente...')
+              handleEndSession()
+              return 0
+            }
+            return prev - 1
+          })
+        }, 1000)
+
+        finalizingIntervalRef.current = interval
+      }
 
       // Salvar mensagem do cliente no Supabase (roleplay_sessions)
       if (sessionId) {
@@ -976,6 +1147,42 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </div>
                   )}
 
+                  {/* Mensagem de Finalização Automática */}
+                  {showFinalizingMessage && (
+                    <div className="mx-4 animate-slide-up">
+                      <div className="p-4 rounded-xl border bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-yellow-500/40 shadow-lg shadow-yellow-500/20">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 text-yellow-400 animate-pulse" />
+                            <p className="text-sm font-semibold text-yellow-400">
+                              Roleplay Finalizado pela IA
+                            </p>
+                          </div>
+                          <p className="text-xs text-gray-300 text-center">
+                            A simulação será encerrada automaticamente em
+                          </p>
+                          <div className="text-2xl font-bold text-yellow-400 animate-pulse">
+                            {finalizingCountdown}
+                          </div>
+                          <button
+                            onClick={() => {
+                              // Cancelar finalização automática
+                              if (finalizingIntervalRef.current) {
+                                clearInterval(finalizingIntervalRef.current)
+                                finalizingIntervalRef.current = null
+                              }
+                              setShowFinalizingMessage(false)
+                              setFinalizingCountdown(5)
+                            }}
+                            className="mt-2 px-4 py-1 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 text-xs rounded-lg transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Empty state when no simulation */}
                   {!isSimulating && messages.length === 0 && (
                     <div className="flex items-center justify-center h-full">
@@ -1033,109 +1240,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         {/* Botão Finalizar Sessão - sempre visível ao lado do microfone */}
                         {sessionId && !isEvaluating && (
                           <button
-                            onClick={async () => {
-                            console.log('🛑 Encerrando simulação...')
-
-                            // Parar gravação se estiver ativa
-                            if (mediaRecorderRef.current) {
-                              try {
-                                if (mediaRecorderRef.current.state === 'recording') {
-                                  mediaRecorderRef.current.stop();
-                                }
-                                mediaRecorderRef.current = null;
-                              } catch (e) {
-                                console.log('Erro ao parar gravação:', e);
-                              }
-                            }
-
-                            // Limpar timer
-                            if (silenceTimerRef.current) {
-                              clearTimeout(silenceTimerRef.current);
-                              silenceTimerRef.current = null;
-                            }
-
-                            // Parar áudio
-                            if (audioRef.current) {
-                              try {
-                                audioRef.current.pause();
-                                audioRef.current = null;
-                              } catch (e) {
-                                console.log('Erro ao parar áudio:', e);
-                              }
-                            }
-
-                            // Fechar streams
-                            if (streamRef.current) {
-                              streamRef.current.getTracks().forEach(track => {
-                                try {
-                                  track.stop();
-                                } catch (e) {
-                                  console.log('Erro ao parar track:', e);
-                                }
-                              });
-                              streamRef.current = null;
-                            }
-
-                            // Finalizar sessão e avaliar
-                            if (sessionId) {
-                              console.log('📝 Finalizando sessão...');
-                              await endRoleplaySession(sessionId, 'completed');
-
-                              setIsEvaluating(true);
-                              try {
-                                const evalResponse = await fetch('/api/roleplay/evaluate', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ sessionId })
-                                });
-
-                                if (evalResponse.ok) {
-                                  const result = await evalResponse.json();
-                                  let { evaluation } = result;
-
-                                  if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
-                                    evaluation = JSON.parse(evaluation.output);
-                                  }
-
-                                  setEvaluation(evaluation);
-                                  setShowEvaluationSummary(true);
-
-                                  // Atualizar performance
-                                  const { supabase } = await import('@/lib/supabase')
-                                  const { data: { user } } = await supabase.auth.getUser()
-                                  if (user) {
-                                    await fetch('/api/performance-summary/update', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ userId: user.id })
-                                    });
-                                  }
-                                } else {
-                                  alert('Não foi possível gerar a avaliação. A sessão foi salva no histórico.');
-                                }
-                              } catch (error) {
-                                console.error('❌ Erro na avaliação:', error);
-                                alert('Erro ao processar avaliação. A sessão foi salva no histórico.');
-                              } finally {
-                                setIsEvaluating(false);
-                              }
-                            }
-
-                            // Resetar estados
-                            setIsRecording(false);
-                            setIsSimulating(false);
-                            setMessages([]);
-                            setSessionIdN8N(null);
-                            setIsPlayingAudio(false);
-                            setIsLoading(false);
-                            setCurrentTranscription('');
-                            setIsProcessingTranscription(false);
-                            setLastUserMessage('');
-                            setSessionId(null);
-                          }}
-                          className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-all flex items-center gap-2 text-sm"
-                          title="Encerrar e avaliar sessão"
-                        >
+                            onClick={handleEndSession}
+                            className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-all flex items-center gap-2 text-sm"
+                            title="Encerrar e avaliar sessão"
+                          >
                             <X className="w-4 h-4 text-red-400" />
                             <span className="text-red-400 font-medium">Finalizar Sessão</span>
                           </button>
