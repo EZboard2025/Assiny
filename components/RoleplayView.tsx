@@ -31,6 +31,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2C')
   const [personas, setPersonas] = useState<Persona[]>([])
   const [objections, setObjections] = useState<Objection[]>([])
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
 
   // Chat simulation
   const [messages, setMessages] = useState<Array<{ role: 'client' | 'seller', text: string }>>([])
@@ -99,6 +100,9 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       if (!companyId) {
         throw new Error('Company ID não encontrado')
       }
+
+      // Salvar companyId no estado para usar na transcrição
+      setCurrentCompanyId(companyId)
 
       // Buscar persona selecionada
       const selectedPersonaData = personas.find(p => p.id === selectedPersona)
@@ -678,6 +682,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     try {
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
+
+      // Adicionar companyId para melhorar a transcrição com contexto
+      if (currentCompanyId) {
+        formData.append('companyId', currentCompanyId)
+      }
 
       const response = await fetch('/api/roleplay/transcribe', {
         method: 'POST',
