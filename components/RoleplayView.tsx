@@ -1237,21 +1237,31 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         {!isPlayingAudio && !isRecording && !isLoading && (
                           <button
                             onClick={startRecording}
-                            className="p-4 bg-green-600/20 border border-green-500/30 rounded-full hover:bg-green-600/30 transition-all"
-                            title="Clique para começar a falar"
+                            disabled={showFinalizingMessage}
+                            className={`p-4 border rounded-full transition-all ${
+                              showFinalizingMessage
+                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
+                                : 'bg-green-600/20 border-green-500/30 hover:bg-green-600/30'
+                            }`}
+                            title={showFinalizingMessage ? "Finalizando sessão..." : "Clique para começar a falar"}
                           >
-                            <Mic className="w-6 h-6 text-green-400" />
+                            <Mic className={`w-6 h-6 ${showFinalizingMessage ? 'text-gray-500' : 'text-green-400'}`} />
                           </button>
                         )}
 
                         {isRecording && (
                           <button
                             onClick={stopRecording}
-                            className="px-6 py-3 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-all flex items-center gap-2"
-                            title="Clique para finalizar e enviar"
+                            disabled={showFinalizingMessage}
+                            className={`px-6 py-3 border rounded-xl transition-all flex items-center gap-2 ${
+                              showFinalizingMessage
+                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
+                                : 'bg-red-600/20 border-red-500/30 hover:bg-red-600/30'
+                            }`}
+                            title={showFinalizingMessage ? "Finalizando sessão..." : "Clique para finalizar e enviar"}
                           >
-                            <MicOff className="w-5 h-5 text-red-400" />
-                            <span className="text-sm font-medium text-red-400">Finalizar Fala</span>
+                            <MicOff className={`w-5 h-5 ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`} />
+                            <span className={`text-sm font-medium ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`}>Finalizar Fala</span>
                           </button>
                         )}
 
@@ -1259,11 +1269,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         {sessionId && !isEvaluating && (
                           <button
                             onClick={handleEndSession}
-                            className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-all flex items-center gap-2 text-sm"
-                            title="Encerrar e avaliar sessão"
+                            disabled={showFinalizingMessage}
+                            className={`px-4 py-2 border rounded-lg transition-all flex items-center gap-2 text-sm ${
+                              showFinalizingMessage
+                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
+                                : 'bg-red-600/20 border-red-500/30 hover:bg-red-600/30'
+                            }`}
+                            title={showFinalizingMessage ? "Finalizando automaticamente..." : "Encerrar e avaliar sessão"}
                           >
-                            <X className="w-4 h-4 text-red-400" />
-                            <span className="text-red-400 font-medium">Finalizar Sessão</span>
+                            <X className={`w-4 h-4 ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`} />
+                            <span className={`font-medium ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`}>Finalizar Sessão</span>
                           </button>
                         )}
                       </div>
