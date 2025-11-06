@@ -51,6 +51,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
   const [finalizingCountdown, setFinalizingCountdown] = useState(7) // Countdown de 7 segundos
   const finalizingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback'>('evaluation') // Aba ativa no modal de avaliação
 
   useEffect(() => {
     setMounted(true)
@@ -1620,13 +1621,31 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-5">
                 <h2 className="text-2xl font-bold text-center text-white mb-4">DESEMPENHO DO VENDEDOR</h2>
                 <div className="flex justify-center gap-2">
-                  <button className="px-5 py-2 bg-gray-800/50 text-gray-400 text-sm rounded-lg hover:bg-gray-700/50 transition-colors">
+                  <button
+                    onClick={() => setActiveEvaluationTab('conversation')}
+                    className={`px-5 py-2 text-sm rounded-lg transition-colors ${
+                      activeEvaluationTab === 'conversation'
+                        ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
+                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                    }`}>
                     Conversa
                   </button>
-                  <button className="px-5 py-2 bg-green-600 text-white text-sm rounded-lg shadow-lg shadow-green-500/30">
+                  <button
+                    onClick={() => setActiveEvaluationTab('evaluation')}
+                    className={`px-5 py-2 text-sm rounded-lg transition-colors ${
+                      activeEvaluationTab === 'evaluation'
+                        ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
+                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                    }`}>
                     Avaliação
                   </button>
-                  <button className="px-5 py-2 bg-gray-800/50 text-gray-400 text-sm rounded-lg hover:bg-gray-700/50 transition-colors">
+                  <button
+                    onClick={() => setActiveEvaluationTab('feedback')}
+                    className={`px-5 py-2 text-sm rounded-lg transition-colors ${
+                      activeEvaluationTab === 'feedback'
+                        ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
+                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                    }`}>
                     Feedback
                   </button>
                 </div>
@@ -1634,7 +1653,36 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
               {/* Main Content */}
               <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-5">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Aba Conversa */}
+                {activeEvaluationTab === 'conversation' && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white mb-4">Transcrição da Conversa</h3>
+                    <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20 max-h-[400px] overflow-y-auto">
+                      <div className="space-y-3">
+                        {messages.map((msg, index) => (
+                          <div key={index} className={`flex ${msg.role === 'seller' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] p-3 rounded-xl ${
+                              msg.role === 'seller'
+                                ? 'bg-green-600/20 border border-green-500/30'
+                                : 'bg-gray-700/50 border border-gray-600/30'
+                            }`}>
+                              <div className="text-xs text-gray-400 mb-1">
+                                {msg.role === 'seller' ? '👤 Vendedor (você)' : '🤖 Cliente (IA)'}
+                              </div>
+                              <div className="text-sm text-white">
+                                {msg.text}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Aba Avaliação */}
+                {activeEvaluationTab === 'evaluation' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
                   {/* Left Side - SPIN Radar Chart */}
                   <div className="space-y-4">
@@ -1779,6 +1827,88 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                   </div>
                 </div>
+                )}
+
+                {/* Aba Feedback */}
+                {activeEvaluationTab === 'feedback' && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white mb-4">Feedback Detalhado</h3>
+
+                    {/* Pontos Fortes */}
+                    {evaluation?.top_strengths && evaluation.top_strengths.length > 0 && (
+                      <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 rounded-xl p-4 border border-green-500/30">
+                        <h4 className="text-base font-bold text-green-400 mb-3 flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5" />
+                          Seus Pontos Fortes
+                        </h4>
+                        <ul className="space-y-2">
+                          {evaluation.top_strengths.map((strength: string, index: number) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="text-green-400 mt-1">•</span>
+                              <span className="text-sm text-gray-200">{strength}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Gaps Críticos */}
+                    {evaluation?.critical_gaps && evaluation.critical_gaps.length > 0 && (
+                      <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 rounded-xl p-4 border border-red-500/30">
+                        <h4 className="text-base font-bold text-red-400 mb-3 flex items-center gap-2">
+                          <AlertCircle className="w-5 h-5" />
+                          Áreas para Desenvolvimento
+                        </h4>
+                        <ul className="space-y-2">
+                          {evaluation.critical_gaps.map((gap: string, index: number) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="text-red-400 mt-1">•</span>
+                              <span className="text-sm text-gray-200">{gap}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Melhorias Prioritárias */}
+                    {evaluation?.priority_improvements && evaluation.priority_improvements.length > 0 && (
+                      <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 rounded-xl p-4 border border-purple-500/30">
+                        <h4 className="text-base font-bold text-purple-400 mb-3 flex items-center gap-2">
+                          <Zap className="w-5 h-5" />
+                          Melhorias Prioritárias
+                        </h4>
+                        <div className="space-y-3">
+                          {evaluation.priority_improvements.map((improvement: any, index: number) => (
+                            <div key={index} className="bg-gray-800/40 rounded-lg p-3">
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="text-sm font-semibold text-purple-300">{improvement.area}</span>
+                                <span className={`text-xs px-2 py-1 rounded ${
+                                  improvement.priority === 'high'
+                                    ? 'bg-red-500/20 text-red-300'
+                                    : improvement.priority === 'medium'
+                                    ? 'bg-yellow-500/20 text-yellow-300'
+                                    : 'bg-green-500/20 text-green-300'
+                                }`}>
+                                  {improvement.priority === 'high' ? 'Alta' : improvement.priority === 'medium' ? 'Média' : 'Baixa'} Prioridade
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-400 mb-2">Gap: {improvement.current_gap}</p>
+                              <p className="text-sm text-gray-200">{improvement.action_plan}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Resumo Executivo */}
+                    {evaluation?.executive_summary && (
+                      <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                        <h4 className="text-base font-bold text-white mb-3">Resumo Executivo</h4>
+                        <p className="text-sm text-gray-200 leading-relaxed">{evaluation.executive_summary}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-4 mt-6">
