@@ -428,7 +428,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       finalizingIntervalRef.current = null
     }
     setShowFinalizingMessage(false)
-    setFinalizingCountdown(5)
+    setFinalizingCountdown(7) // Resetar para 7 segundos
   }
 
   const handleSendMessage = async (messageToSend?: string) => {
@@ -513,54 +513,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       setMessages(prev => [...prev, { role: 'client', text: data.message }])
 
       // Verificar se a mensagem contém a frase de finalização
-      if (data.message.includes('Roleplay finalizado, aperte em finalizar sessão')) {
+      const isFinalizationMessage = data.message.includes('Roleplay finalizado, aperte em finalizar sessão')
+
+      if (isFinalizationMessage) {
         console.log('🎯 Detectada mensagem de finalização do roleplay!')
-
-        // Função para iniciar o countdown após o áudio terminar
-        const startFinalizationCountdown = () => {
-          console.log('⏰ Iniciando countdown de finalização...')
-          setShowFinalizingMessage(true)
-          setFinalizingCountdown(7) // Aumentado de 5 para 7 segundos
-
-          // Criar interval para countdown
-          const interval = setInterval(() => {
-            setFinalizingCountdown(prev => {
-              if (prev <= 1) {
-                clearInterval(interval)
-                // Finalizar automaticamente
-                console.log('⏰ Finalizando automaticamente...')
-                handleEndSession()
-                return 0
-              }
-              return prev - 1
-            })
-          }, 1000)
-
-          finalizingIntervalRef.current = interval
-        }
-
-        // Se o áudio estiver tocando ou se estamos processando áudio, esperar
-        if (isPlayingAudio || (audioRef.current && !audioRef.current.ended && !audioRef.current.paused)) {
-          console.log('🎵 Aguardando áudio terminar antes de finalizar...')
-
-          // Adicionar listener para quando o áudio terminar
-          const audioEndHandler = () => {
-            console.log('🔇 Áudio terminou, aguardando 2 segundos antes de iniciar finalização...')
-            // Aumentar delay para 2 segundos para garantir que o usuário ouve o fim da mensagem
-            setTimeout(startFinalizationCountdown, 2000)
-          }
-
-          if (audioRef.current) {
-            audioRef.current.addEventListener('ended', audioEndHandler, { once: true })
-          } else {
-            // Se não temos referência ao áudio mas está tocando, aguardar mais
-            setTimeout(startFinalizationCountdown, 3000)
-          }
-        } else {
-          // Se não há áudio tocando, ainda assim aguardar um pouco mais
-          console.log('⏳ Aguardando 2 segundos antes de iniciar finalização...')
-          setTimeout(startFinalizationCountdown, 2000)
-        }
       }
 
       // Salvar mensagem do cliente no Supabase (roleplay_sessions)
@@ -595,7 +551,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       )
 
       // Converter resposta em áudio e tocar
-      await textToSpeech(data.message)
+      await textToSpeech(data.message, isFinalizationMessage)
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error)
       alert('Erro ao enviar mensagem. Tente novamente.')
@@ -777,7 +733,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   }
 
   // Função para converter texto em áudio e tocar
-  const textToSpeech = async (text: string) => {
+  const textToSpeech = async (text: string, isFinalizationMessage: boolean = false) => {
     try {
       console.log('🔊 Enviando texto para TTS:', text)
       setIsPlayingAudio(true)
@@ -810,7 +766,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       // Configurar visualizador de áudio
       setupAudioVisualizer(audio)
 
-      // Quando o áudio terminar, limpar visualizador
+      // Quando o áudio terminar, limpar visualizador e possivelmente finalizar
       audio.onended = () => {
         setIsPlayingAudio(false)
         setAudioVolume(0)
@@ -822,7 +778,36 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           animationFrameRef.current = null
         }
 
-        console.log('🔊 Áudio do cliente finalizado - aguardando usuário clicar no microfone')
+        console.log('🔊 Áudio do cliente finalizado')
+
+        // Se for mensagem de finalização, iniciar processo de finalização
+        if (isFinalizationMessage) {
+          console.log('🎯 Iniciando processo de finalização automática...')
+
+          // Aguardar 3 segundos para garantir que o usuário processou o fim do áudio
+          setTimeout(() => {
+            console.log('⏰ Iniciando countdown de finalização...')
+            setShowFinalizingMessage(true)
+            setFinalizingCountdown(7)
+
+            // Criar interval para countdown
+            const interval = setInterval(() => {
+              setFinalizingCountdown(prev => {
+                if (prev <= 1) {
+                  clearInterval(interval)
+                  console.log('⏰ Finalizando automaticamente...')
+                  handleEndSession()
+                  return 0
+                }
+                return prev - 1
+              })
+            }, 1000)
+
+            finalizingIntervalRef.current = interval
+          }, 3000) // 3 segundos de delay após o áudio terminar
+        } else {
+          console.log('🔊 Aguardando usuário clicar no microfone')
+        }
       }
 
       // Tocar o áudio
