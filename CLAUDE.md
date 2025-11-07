@@ -11,7 +11,7 @@ Assiny is a **multi-tenant SaaS** internal sales training platform with AI-power
 **Subdomain Routing:**
 - Each company has a unique subdomain (e.g., `assiny.ramppy.local`, `maniafoods.ramppy.local`)
 - Middleware (`middleware.ts`) detects subdomain and sets `x-subdomain` header
-- Main domain without subdomain redirects to `/select-company` page
+- Main domain without subdomain shows default content (no company selection page)
 - Development: `*.ramppy.local:3000` | Production: `*.ramppy.site`
 
 **Company Isolation:**
@@ -60,7 +60,7 @@ Add these lines:
 **Access URLs:**
 - Assiny (B2B): `http://assiny.ramppy.local:3000`
 - Mania Foods (B2C): `http://maniafoods.ramppy.local:3000`
-- Main domain: `http://localhost:3000` (redirects to /select-company)
+- Main domain: `http://localhost:3000` (shows default login page)
 
 **Production URLs:**
 - Assiny: `https://assiny.ramppy.site`
