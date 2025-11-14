@@ -247,32 +247,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         await addMessageToSession(session.id, firstMessage)
       }
 
-      // Salvar contexto e primeira mensagem do cliente na roleplay_chat_memory
-      const { saveRoleplayChatMessage } = await import('@/lib/roleplayChatMemory')
-
-      // Salvar contexto inicial (mensagem do sistema)
-      await saveRoleplayChatMessage(
-        data.sessionId,
-        contextMessage,
-        'human',
-        userId,
-        companyId,
-        {
-          age,
-          temperament,
-          persona: personaData,
-          objections: objectionsWithRebuttals,
-        }
-      )
-
-      // Salvar resposta do cliente
-      await saveRoleplayChatMessage(
-        data.sessionId,
-        data.message,
-        'ai',
-        userId,
-        companyId
-      )
+      // N8N Postgres Chat Memory salva automaticamente as mensagens em roleplay_chat_memory
 
       // Converter a primeira mensagem em áudio e tocar
       await textToSpeech(data.message)
@@ -533,26 +508,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         await addMessageToSession(sessionId, clientMessage)
       }
 
-      // Salvar mensagem do vendedor e resposta do cliente na roleplay_chat_memory
-      const { saveRoleplayChatMessage } = await import('@/lib/roleplayChatMemory')
-
-      // Salvar mensagem do vendedor (human)
-      await saveRoleplayChatMessage(
-        sessionIdN8N!,
-        userMessage,
-        'human',
-        userId!,
-        companyId!
-      )
-
-      // Salvar resposta do cliente (ai)
-      await saveRoleplayChatMessage(
-        sessionIdN8N!,
-        data.message,
-        'ai',
-        userId!,
-        companyId!
-      )
+      // N8N Postgres Chat Memory salva automaticamente as mensagens em roleplay_chat_memory
 
       // Converter resposta em áudio e tocar
       await textToSpeech(data.message, isFinalizationMessage)
