@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2 } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -32,6 +32,12 @@ export default function CompaniesAdmin() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+  // Edit limit modal states
+  const [showEditLimitModal, setShowEditLimitModal] = useState(false)
+  const [companyToEditLimit, setCompanyToEditLimit] = useState<Company | null>(null)
+  const [newEmployeeLimit, setNewEmployeeLimit] = useState('')
+  const [updatingLimit, setUpdatingLimit] = useState(false)
 
   // Toast system
   const { toasts, showToast, removeToast } = useToast()
@@ -221,6 +227,53 @@ export default function CompaniesAdmin() {
     setShowDeleteModal(true)
   }
 
+  const handleEditLimitClick = (company: Company) => {
+    setCompanyToEditLimit(company)
+    setNewEmployeeLimit(company.employee_limit?.toString() || '')
+    setShowEditLimitModal(true)
+  }
+
+  const confirmUpdateLimit = async () => {
+    if (!companyToEditLimit) return
+
+    setUpdatingLimit(true)
+
+    try {
+      const response = await fetch(`/api/admin/companies/update-limit`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyId: companyToEditLimit.id,
+          employeeLimit: newEmployeeLimit ? parseInt(newEmployeeLimit) : null
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao atualizar limite')
+      }
+
+      showToast('success', 'Limite atualizado!', `Novo limite: ${newEmployeeLimit || 'Sem limite'}`)
+
+      // Fechar modal e limpar estados
+      setShowEditLimitModal(false)
+      setCompanyToEditLimit(null)
+      setNewEmployeeLimit('')
+
+      // Recarregar lista
+      await loadCompanies()
+
+    } catch (error: any) {
+      console.error('Erro ao atualizar limite:', error)
+      showToast('error', 'Erro ao atualizar limite', error.message)
+    } finally {
+      setUpdatingLimit(false)
+    }
+  }
+
   const confirmDelete = async () => {
     if (!companyToDelete) return
 
@@ -341,13 +394,23 @@ export default function CompaniesAdmin() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteClick(company)}
-                    className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                    title="Excluir empresa"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleEditLimitClick(company)}
+                      className="p-2 text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                      title="Editar limite de funcionários"
+                    >
+                      <UserCog className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteClick(company)}
+                      className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      title="Excluir empresa"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 text-sm">
@@ -571,6 +634,95 @@ export default function CompaniesAdmin() {
                     <>
                       <Check className="w-5 h-5" />
                       Criar Empresa
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Limit Modal */}
+        {showEditLimitModal && companyToEditLimit && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-md w-full border border-purple-500/30">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Editar Limite de Funcionários</h2>
+                <button
+                  onClick={() => {
+                    setShowEditLimitModal(false)
+                    setCompanyToEditLimit(null)
+                    setNewEmployeeLimit('')
+                  }}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-gray-300 mb-4">
+                    Empresa: <strong className="text-white">{companyToEditLimit.name}</strong>
+                  </p>
+                  <p className="text-sm text-gray-400 mb-4">
+                    Funcionários atuais: <strong className="text-purple-400">{companyToEditLimit._count?.employees || 0}</strong>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Novo Limite de Funcionários
+                  </label>
+                  <input
+                    type="number"
+                    value={newEmployeeLimit}
+                    onChange={(e) => setNewEmployeeLimit(e.target.value)}
+                    placeholder="Ex: 20"
+                    min="1"
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Deixe vazio para remover o limite (ilimitado)
+                  </p>
+                </div>
+
+                {companyToEditLimit._count && newEmployeeLimit && parseInt(newEmployeeLimit) < companyToEditLimit._count.employees && (
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                    <p className="text-sm text-yellow-400">
+                      ⚠️ <strong>Atenção:</strong> O novo limite é menor que a quantidade atual de funcionários.
+                      Os funcionários existentes não serão removidos, mas não será possível adicionar novos até reduzir a quantidade.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowEditLimitModal(false)
+                    setCompanyToEditLimit(null)
+                    setNewEmployeeLimit('')
+                  }}
+                  disabled={updatingLimit}
+                  className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmUpdateLimit}
+                  disabled={updatingLimit}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {updatingLimit ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-5 h-5" />
+                      Salvar Limite
                     </>
                   )}
                 </button>
