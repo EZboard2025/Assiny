@@ -112,7 +112,7 @@ export async function POST(request: Request) {
 
       console.log(`📊 Funcionários: ${count}/${company.employee_limit}`)
 
-      if (count >= company.employee_limit) {
+      if (count !== null && count >= company.employee_limit) {
         console.log('❌ Limite de funcionários atingido')
         return NextResponse.json({
           error: `Limite de funcionários atingido. Esta empresa pode ter no máximo ${company.employee_limit} funcionários.`,
