@@ -535,7 +535,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      const mediaRecorder = new MediaRecorder(stream)
+      // Configurar MediaRecorder com menor qualidade para reduzir tamanho
+      const options = {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 16000  // Taxa de bits baixa para reduzir tamanho
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
 
@@ -559,6 +565,15 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         console.log('📦 Blob de áudio criado, tamanho:', audioBlob.size, 'bytes')
+
+        // Verificar se o áudio não está muito grande (limite de 10MB)
+        const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+        if (audioBlob.size > MAX_SIZE) {
+          console.error('❌ Áudio muito grande:', (audioBlob.size / (1024 * 1024)).toFixed(2), 'MB')
+          alert('Gravação muito longa! Tente falar por menos tempo (máximo 2 minutos).')
+          setIsRecording(false)
+          return
+        }
 
         // Fechar stream
         stream.getTracks().forEach(track => {
