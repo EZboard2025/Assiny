@@ -2209,7 +2209,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
         showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
       }`}>
         <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-        <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-green-500/30 overflow-hidden">
+        <div className="relative bg-gray-900/70 backdrop-blur-xl rounded-3xl border border-green-500/30 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-green-500/20">
             <div className="flex items-center gap-3">
