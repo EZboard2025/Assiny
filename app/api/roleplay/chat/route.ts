@@ -42,13 +42,13 @@ export async function POST(request: NextRequest) {
       console.log('🏷️ Buscando company_type para company_id:', companyId)
       const { data: companyTypeData, error: companyTypeError } = await supabase
         .from('company_type')
-        .select('name')
+        .select('type')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
 
-      const companyType = companyTypeData?.name || 'B2C' // Default B2C
+      const companyType = companyTypeData?.type || 'B2C' // Default B2C
       if (companyTypeError) {
         console.warn('⚠️ Erro ao buscar company_type:', companyTypeError)
       } else {
@@ -120,8 +120,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           sessionId: newSessionId,
           userId: userId,
           companyId: companyId,
-          companyData: companyData || null, // Dados da empresa para o agente
-          companyType: companyType, // B2B ou B2C
+          // Dados da empresa separados para fácil acesso no N8N
+          companyName: companyData?.nome || null,
+          companyDescription: companyData?.descricao || null,
+          companyType: companyType
         }),
       })
 
@@ -174,13 +176,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       console.log('🏷️ Buscando company_type para company_id:', companyId)
       const { data: companyTypeData, error: companyTypeError } = await supabase
         .from('company_type')
-        .select('name')
+        .select('type')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
 
-      const companyType = companyTypeData?.name || 'B2C' // Default B2C
+      const companyType = companyTypeData?.type || 'B2C' // Default B2C
       if (companyTypeError) {
         console.warn('⚠️ Erro ao buscar company_type:', companyTypeError)
       } else {
@@ -199,8 +201,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           sessionId: sessionId,
           userId: userId,
           companyId: companyId,
-          companyData: companyData || null, // Dados da empresa para o agente
-          companyType: companyType, // B2B ou B2C
+          // Dados da empresa separados para fácil acesso no N8N
+          companyName: companyData?.nome || null,
+          companyDescription: companyData?.descricao || null,
+          companyType: companyType
         }),
       })
 
