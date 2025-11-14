@@ -12,6 +12,7 @@ interface Company {
   subdomain: string
   created_at: string
   updated_at: string
+  employee_limit: number | null
   _count?: {
     employees: number
   }
@@ -42,6 +43,7 @@ export default function CompaniesAdmin() {
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2B')
+  const [employeeLimit, setEmployeeLimit] = useState('10')
 
   useEffect(() => {
     // Verificar se já tem senha salva no sessionStorage
@@ -174,7 +176,8 @@ export default function CompaniesAdmin() {
           adminName,
           adminEmail,
           adminPassword,
-          businessType
+          businessType,
+          employeeLimit: parseInt(employeeLimit) || null
         })
       })
 
@@ -193,6 +196,7 @@ export default function CompaniesAdmin() {
       setAdminEmail('')
       setAdminPassword('')
       setBusinessType('B2B')
+      setEmployeeLimit('10')
 
       // Recarregar lista
       await loadCompanies()
@@ -349,7 +353,13 @@ export default function CompaniesAdmin() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-gray-300">
                     <Users className="w-4 h-4 text-purple-400" />
-                    <span>{company._count?.employees || 0} funcionários</span>
+                    <span>
+                      {company._count?.employees || 0}
+                      {company.employee_limit ? ` / ${company.employee_limit}` : ''} funcionários
+                    </span>
+                    {company.employee_limit && company._count && company._count.employees >= company.employee_limit && (
+                      <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full">Limite atingido</span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 text-gray-300">
@@ -461,6 +471,23 @@ export default function CompaniesAdmin() {
                         <option value="B2B">B2B (Empresa para Empresa)</option>
                         <option value="B2C">B2C (Empresa para Consumidor)</option>
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Limite de Funcionários
+                      </label>
+                      <input
+                        type="number"
+                        value={employeeLimit}
+                        onChange={(e) => setEmployeeLimit(e.target.value)}
+                        placeholder="10"
+                        min="1"
+                        className="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Deixe vazio para sem limite
+                      </p>
                     </div>
                   </div>
                 </div>

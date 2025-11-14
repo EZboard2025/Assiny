@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
       adminName,
       adminEmail,
       adminPassword,
-      businessType
+      businessType,
+      employeeLimit
     } = body
 
     // Validações
@@ -62,7 +63,8 @@ export async function POST(request: NextRequest) {
       .from('companies')
       .insert({
         name: companyName,
-        subdomain: subdomain
+        subdomain: subdomain,
+        employee_limit: employeeLimit || null
       })
       .select()
       .single()

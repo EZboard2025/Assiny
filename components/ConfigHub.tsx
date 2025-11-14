@@ -326,13 +326,23 @@ function ConfigurationInterface({
         const errorText = await response.text()
         console.error('❌ Erro completo:', errorText)
         let errorMsg = `Erro ${response.status}`
+        let limitInfo = null
         try {
           const errorJson = JSON.parse(errorText)
           errorMsg = errorJson.error || errorJson.message || errorText
+
+          // Verificar se é erro de limite
+          if (response.status === 403 && errorJson.limit) {
+            limitInfo = {
+              current: errorJson.currentCount,
+              limit: errorJson.limit
+            }
+            errorMsg = `Limite de funcionários atingido!\n\nSua empresa pode ter no máximo ${errorJson.limit} funcionários.\nAtualmente existem ${errorJson.currentCount} funcionários cadastrados.\n\nEntre em contato com o administrador para aumentar o limite.`
+          }
         } catch {
           errorMsg = errorText
         }
-        alert('Erro ao criar funcionário: ' + errorMsg)
+        alert(errorMsg)
         return
       }
 

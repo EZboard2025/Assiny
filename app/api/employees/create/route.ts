@@ -85,6 +85,43 @@ export async function POST(request: Request) {
 
     console.log('✅ Validação OK, company_id:', companyId)
 
+    // Verificar limite de funcionários da empresa
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from('companies')
+      .select('employee_limit')
+      .eq('id', companyId)
+      .single()
+
+    if (companyError) {
+      console.error('❌ Erro ao buscar dados da empresa:', companyError)
+      return NextResponse.json({ error: 'Erro ao verificar dados da empresa' }, { status: 500 })
+    }
+
+    // Se employee_limit for null, não há limite
+    if (company.employee_limit !== null) {
+      // Contar funcionários atuais da empresa
+      const { count, error: countError } = await supabaseAdmin
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', companyId)
+
+      if (countError) {
+        console.error('❌ Erro ao contar funcionários:', countError)
+        return NextResponse.json({ error: 'Erro ao verificar limite de funcionários' }, { status: 500 })
+      }
+
+      console.log(`📊 Funcionários: ${count}/${company.employee_limit}`)
+
+      if (count >= company.employee_limit) {
+        console.log('❌ Limite de funcionários atingido')
+        return NextResponse.json({
+          error: `Limite de funcionários atingido. Esta empresa pode ter no máximo ${company.employee_limit} funcionários.`,
+          currentCount: count,
+          limit: company.employee_limit
+        }, { status: 403 })
+      }
+    }
+
     // Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
