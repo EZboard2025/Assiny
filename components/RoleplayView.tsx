@@ -333,6 +333,29 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         console.log('📝 Finalizando sessão no banco de dados...');
         await endRoleplaySession(sessionId, 'completed');
 
+        // Enviar notificação de finalização para N8N
+        try {
+          const { supabase } = await import('@/lib/supabase')
+          const { data: { user } } = await supabase.auth.getUser()
+
+          if (sessionIdN8N && user) {
+            console.log('📤 Enviando notificação de finalização para N8N...');
+            await fetch('https://ezboard.app.n8n.cloud/webhook-test/4c3f5b96-aa78-4cac-b7ce-7596bd8f96a1', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                sessionId: sessionIdN8N,
+                userId: user.id
+              }),
+            });
+            console.log('✅ Notificação de finalização enviada');
+          }
+        } catch (notificationError) {
+          console.error('⚠️ Erro ao enviar notificação de finalização:', notificationError);
+        }
+
         // Obter mensagens
         const messages = await getRoleplaySession(sessionId);
 
