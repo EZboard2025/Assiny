@@ -531,40 +531,56 @@ export default function RoleplayLinksView() {
                   {objections.length === 0 ? (
                     <p className="text-gray-500 text-sm">Nenhuma objeção cadastrada</p>
                   ) : (
-                    objections.map(objection => (
-                      <label
-                        key={objection.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${
-                          editMode ? 'hover:bg-green-500/5 cursor-pointer' : 'cursor-not-allowed opacity-70'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={config.objection_ids.includes(objection.id)}
-                          disabled={!editMode}
-                          onChange={() => {
-                            if (config.objection_ids.includes(objection.id)) {
-                              setConfig({
-                                ...config,
-                                objection_ids: config.objection_ids.filter(id => id !== objection.id)
-                              })
-                            } else {
-                              setConfig({
-                                ...config,
-                                objection_ids: [...config.objection_ids, objection.id]
-                              })
-                            }
-                          }}
-                          className="w-5 h-5 text-green-600 bg-black border-green-500/30 rounded focus:ring-green-500 focus:ring-2"
-                        />
-                        <span className="text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
-                          {objection.name}
-                          {config.objection_ids.includes(objection.id) && (
-                            <CheckCircle className="w-4 h-4 text-green-400" />
+                    objections.map(objection => {
+                      const isSelected = config.objection_ids.includes(objection.id)
+                      const isSaved = configSaved && originalConfig.objection_ids.includes(objection.id)
+
+                      return (
+                        <label
+                          key={objection.id}
+                          className={`flex items-center gap-3 p-3 rounded-xl transition-all group relative ${
+                            editMode ? 'hover:bg-green-500/5 cursor-pointer' : 'cursor-not-allowed opacity-70'
+                          } ${
+                            isSaved && isSelected
+                              ? 'border-2 border-green-500/60 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
+                              : 'border border-transparent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={!editMode}
+                            onChange={() => {
+                              if (isSelected) {
+                                setConfig({
+                                  ...config,
+                                  objection_ids: config.objection_ids.filter(id => id !== objection.id)
+                                })
+                              } else {
+                                setConfig({
+                                  ...config,
+                                  objection_ids: [...config.objection_ids, objection.id]
+                                })
+                              }
+                            }}
+                            className="w-5 h-5 text-green-600 bg-black border-green-500/30 rounded focus:ring-green-500 focus:ring-2"
+                          />
+                          <span className={`group-hover:text-white transition-colors flex items-center gap-2 ${
+                            isSaved && isSelected ? 'text-green-300 font-medium' : 'text-gray-300'
+                          }`}>
+                            {objection.name}
+                            {isSelected && (
+                              <CheckCircle className={`w-4 h-4 ${isSaved ? 'text-green-400' : 'text-green-400'}`} />
+                            )}
+                          </span>
+                          {isSaved && isSelected && (
+                            <span className="absolute top-2 right-2 px-2 py-0.5 bg-green-500/20 text-green-400 text-[10px] font-bold rounded-full">
+                              SALVA
+                            </span>
                           )}
-                        </span>
-                      </label>
-                    ))
+                        </label>
+                      )
+                    })
                   )}
                 </div>
               </div>
