@@ -8,9 +8,8 @@ import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
-import RoleplayLinkManager from './RoleplayLinkManager'
-import RoleplayUnicoHistory from './RoleplayUnicoHistory'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, History } from 'lucide-react'
+import RoleplayLinksView from './RoleplayLinksView'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2 } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 
 interface DashboardProps {
@@ -20,7 +19,7 @@ interface DashboardProps {
 export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'roleplay-history'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -37,7 +36,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const view = params.get('view')
-      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links', 'roleplay-history'].includes(view)) {
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
     }
@@ -103,20 +102,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       return <PerfilView key={Date.now()} />
     }
 
-    if (currentView === 'roleplay-links' && companyId) {
-      return (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <RoleplayLinkManager companyId={companyId} />
-        </div>
-      )
-    }
-
-    if (currentView === 'roleplay-history' && companyId) {
-      return (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <RoleplayUnicoHistory companyId={companyId} />
-        </div>
-      )
+    if (currentView === 'roleplay-links') {
+      return <RoleplayLinksView />
     }
 
     // Home view
@@ -284,14 +271,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                     className={`hover:text-white transition-colors flex items-center gap-1.5 ${currentView === 'roleplay-links' ? 'text-white' : ''}`}
                   >
                     <Link2 className="w-4 h-4" />
-                    <span>Links</span>
-                  </button>
-                  <button
-                    onClick={() => handleViewChange('roleplay-history')}
-                    className={`hover:text-white transition-colors flex items-center gap-1.5 ${currentView === 'roleplay-history' ? 'text-white' : ''}`}
-                  >
-                    <History className="w-4 h-4" />
-                    <span>Histórico Público</span>
+                    <span>Roleplay Público</span>
                   </button>
                 </>
               )}
