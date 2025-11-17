@@ -84,7 +84,7 @@ export async function PUT(request: Request) {
       ? 'https://ramppy.site'
       : 'http://localhost:3000'
 
-    const fullUrl = `${baseUrl}/roleplay/${updatedLink.link_code}`
+    const fullUrl = `${baseUrl}/roleplay-publico?link=${updatedLink.link_code}`
 
     return NextResponse.json({
       success: true,

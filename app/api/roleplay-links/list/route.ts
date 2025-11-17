@@ -73,7 +73,7 @@ export async function GET(request: Request) {
         ? 'https://ramppy.site'
         : 'http://localhost:3000'
 
-      const fullUrl = `${baseUrl}/roleplay/${link.link_code}`
+      const fullUrl = `${baseUrl}/roleplay-publico?link=${link.link_code}`
 
       return {
         ...link,

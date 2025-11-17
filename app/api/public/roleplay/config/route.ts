@@ -15,44 +15,32 @@ const supabaseAdmin = createClient(
 
 export async function GET(request: Request) {
   try {
-    // Extrair subdomínio do header
-    const host = request.headers.get('host') || ''
-    const subdomain = host.split('.')[0].split(':')[0]
+    // Extrair linkCode da URL
+    const { searchParams } = new URL(request.url)
+    const linkCode = searchParams.get('link')
 
-    if (!subdomain || subdomain === 'localhost' || subdomain === 'www') {
+    if (!linkCode) {
       return NextResponse.json(
-        { error: 'Subdomínio não encontrado' },
+        { error: 'Código do link não fornecido' },
         { status: 400 }
       )
     }
 
-    // Buscar empresa pelo subdomínio
-    const { data: company, error: companyError } = await supabaseAdmin
-      .from('companies')
-      .select('id, name, subdomain')
-      .eq('subdomain', subdomain)
+    // Buscar link de roleplay pelo código
+    const { data: roleplayLink, error: linkError } = await supabaseAdmin
+      .from('roleplay_links')
+      .select('*, companies!inner(id, name, subdomain)')
+      .eq('link_code', linkCode)
       .single()
 
-    if (companyError || !company) {
+    if (linkError || !roleplayLink) {
       return NextResponse.json(
-        { error: 'Empresa não encontrada' },
+        { error: 'Link de roleplay não encontrado' },
         { status: 404 }
       )
     }
 
-    // Buscar ou criar configuração de roleplay da empresa
-    const { data: config, error: configError } = await supabaseAdmin
-      .rpc('get_or_create_roleplay_config', {
-        p_company_id: company.id
-      })
-
-    if (configError || !config) {
-      console.error('Erro ao buscar config:', configError)
-      return NextResponse.json(
-        { error: 'Erro ao buscar configuração' },
-        { status: 500 }
-      )
-    }
+    const company = roleplayLink.companies
 
     // Buscar personas e objeções da empresa
     const [personasResult, objectionsResult] = await Promise.all([
@@ -73,9 +61,12 @@ export async function GET(request: Request) {
         subdomain: company.subdomain
       },
       roleplayLink: {
-        is_active: config.is_active,
-        config: config.config,
-        usage_count: config.usage_count
+        id: roleplayLink.id,
+        link_code: roleplayLink.link_code,
+        name: roleplayLink.name,
+        is_active: roleplayLink.is_active,
+        config: roleplayLink.config,
+        usage_count: roleplayLink.usage_count
       },
       personas: personasResult.data || [],
       objections: objectionsResult.data || []

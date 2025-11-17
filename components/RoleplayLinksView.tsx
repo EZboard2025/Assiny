@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, ChevronRight } from 'lucide-react'
+import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 interface RoleplayLink {
@@ -10,7 +10,7 @@ interface RoleplayLink {
   company_id: string
   is_active: boolean
   config: {
-    age_range: string
+    age: string
     temperament: string
     persona_id: string | null
     objection_ids: string[]
@@ -49,6 +49,8 @@ export default function RoleplayLinksView() {
   const [company, setCompany] = useState<Company | null>(null)
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [configSaved, setConfigSaved] = useState(false)
+  const [editMode, setEditMode] = useState(false)
 
   // Opções disponíveis
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -56,7 +58,15 @@ export default function RoleplayLinksView() {
 
   // Configuração
   const [config, setConfig] = useState({
-    age_range: '25-34',
+    age: '25-34',
+    temperament: 'Analítico',
+    persona_id: null as string | null,
+    objection_ids: [] as string[]
+  })
+
+  // Configuração original (para cancelar edição)
+  const [originalConfig, setOriginalConfig] = useState({
+    age: '25-34',
     temperament: 'Analítico',
     persona_id: null as string | null,
     objection_ids: [] as string[]
@@ -116,8 +126,37 @@ export default function RoleplayLinksView() {
         })
 
       if (linkData) {
+        console.log('Link data carregado:', linkData)
         setRoleplayLink(linkData)
-        setConfig(linkData.config)
+
+        // Garantir que a configuração seja aplicada corretamente
+        const loadedConfig = linkData.config || {
+          age: '25-34',
+          temperament: 'Analítico',
+          persona_id: null,
+          objection_ids: []
+        }
+
+        // Garantir compatibilidade: converter age_range para age se existir
+        if (loadedConfig.age_range && !loadedConfig.age) {
+          loadedConfig.age = loadedConfig.age_range
+          delete loadedConfig.age_range
+        }
+
+        console.log('Config carregada:', loadedConfig)
+        setConfig(loadedConfig)
+        setOriginalConfig(JSON.parse(JSON.stringify(loadedConfig))) // Clone profundo
+
+        // Verificar se já tem configuração salva
+        if (loadedConfig.persona_id && loadedConfig.objection_ids?.length > 0) {
+          console.log('Configuração já existe, iniciando em modo visualização')
+          setConfigSaved(true)
+          setEditMode(false) // Iniciar em modo visualização se já tem config
+        } else {
+          console.log('Configuração vazia, iniciando em modo edição')
+          setConfigSaved(false)
+          setEditMode(true) // Iniciar em modo edição se não tem config
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -139,7 +178,7 @@ export default function RoleplayLinksView() {
           is_active: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('company_id', roleplayLink.company_id)
+        .eq('id', roleplayLink.id)  // ✅ Usar ID específico do link
 
       if (!error) {
         setRoleplayLink({
@@ -155,7 +194,14 @@ export default function RoleplayLinksView() {
   }
 
   const saveConfig = async () => {
-    if (!roleplayLink) return
+    console.log('🔵 saveConfig chamado')
+    console.log('🔵 roleplayLink:', roleplayLink)
+    console.log('🔵 config atual:', config)
+
+    if (!roleplayLink) {
+      console.error('❌ roleplayLink é null!')
+      return
+    }
 
     // Validar configuração
     if (!config.persona_id) {
@@ -170,27 +216,57 @@ export default function RoleplayLinksView() {
 
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('roleplay_links')
-        .update({
-          config,
-          updated_at: new Date().toISOString()
-        })
-        .eq('company_id', roleplayLink.company_id)
+      console.log('🔵 Chamando API para salvar config...')
+      console.log('🔵 roleplayLink.id:', roleplayLink.id)
+      console.log('🔵 config a salvar:', JSON.stringify(config, null, 2))
 
-      if (!error) {
-        setRoleplayLink({
-          ...roleplayLink,
+      // Usar API route com service role para bypass RLS
+      const response = await fetch('/api/roleplay-links/update-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          linkId: roleplayLink.id,
           config
         })
-        alert('Configuração salva com sucesso!')
+      })
+
+      const result = await response.json()
+
+      console.log('🔵 Resposta da API:')
+      console.log('  - result:', result)
+
+      if (!response.ok || !result.success) {
+        console.error('❌ Erro ao salvar:', result.error)
+        alert(`Erro ao salvar: ${result.error}`)
+        return
       }
+
+      console.log('✅ Configuração salva com sucesso:', config)
+      setRoleplayLink({
+        ...roleplayLink,
+        config
+      })
+      setOriginalConfig(JSON.parse(JSON.stringify(config))) // Clone profundo
+      setConfigSaved(true)
+      setEditMode(false) // Sair do modo de edição
+      alert(configSaved ? 'Configuração atualizada com sucesso!' : 'Configuração salva com sucesso!')
+
     } catch (error) {
-      console.error('Erro ao salvar configuração:', error)
+      console.error('❌ Erro ao salvar configuração:', error)
       alert('Erro ao salvar configuração')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleEdit = () => {
+    setEditMode(true)
+  }
+
+  const handleCancel = () => {
+    console.log('Cancelando edição, restaurando config original:', originalConfig)
+    setConfig(JSON.parse(JSON.stringify(originalConfig))) // Clone profundo para garantir que restaura
+    setEditMode(false)
   }
 
   const copyLink = () => {
@@ -336,13 +412,23 @@ export default function RoleplayLinksView() {
 
           {/* Configuração do Roleplay */}
           <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-green-500/20">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-xl flex items-center justify-center">
-                <Settings className="w-5 h-5 text-green-400" />
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-xl flex items-center justify-center">
+                  <Settings className="w-5 h-5 text-green-400" />
+                </div>
+                <h2 className="text-2xl font-semibold text-white">
+                  Configuração do Cenário
+                </h2>
               </div>
-              <h2 className="text-2xl font-semibold text-white">
-                Configuração do Cenário
-              </h2>
+              {editMode && (
+                <div className="px-4 py-2 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
+                  <p className="text-sm text-yellow-300 flex items-center gap-2">
+                    <Edit2 className="w-4 h-4" />
+                    Modo de Edição
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-6">
@@ -352,9 +438,14 @@ export default function RoleplayLinksView() {
                   Faixa Etária do Cliente
                 </label>
                 <select
-                  value={config.age_range}
-                  onChange={(e) => setConfig({ ...config, age_range: e.target.value })}
-                  className="w-full px-5 py-4 bg-black/60 border border-green-500/20 rounded-xl text-white focus:outline-none focus:border-green-500/40 transition-colors"
+                  value={config.age}
+                  onChange={(e) => setConfig({ ...config, age: e.target.value })}
+                  disabled={!editMode}
+                  className={`w-full px-5 py-4 border border-green-500/20 rounded-xl text-white transition-colors ${
+                    editMode
+                      ? 'bg-black/60 focus:outline-none focus:border-green-500/40 cursor-pointer'
+                      : 'bg-black/30 cursor-not-allowed opacity-70'
+                  }`}
                 >
                   <option value="18-24">18-24 anos</option>
                   <option value="25-34">25-34 anos</option>
@@ -371,7 +462,12 @@ export default function RoleplayLinksView() {
                 <select
                   value={config.temperament}
                   onChange={(e) => setConfig({ ...config, temperament: e.target.value })}
-                  className="w-full px-5 py-4 bg-black/60 border border-green-500/20 rounded-xl text-white focus:outline-none focus:border-green-500/40 transition-colors"
+                  disabled={!editMode}
+                  className={`w-full px-5 py-4 border border-green-500/20 rounded-xl text-white transition-colors ${
+                    editMode
+                      ? 'bg-black/60 focus:outline-none focus:border-green-500/40 cursor-pointer'
+                      : 'bg-black/30 cursor-not-allowed opacity-70'
+                  }`}
                 >
                   <option value="Analítico">Analítico</option>
                   <option value="Empático">Empático</option>
@@ -397,7 +493,12 @@ export default function RoleplayLinksView() {
                   <select
                     value={config.persona_id || ''}
                     onChange={(e) => setConfig({ ...config, persona_id: e.target.value || null })}
-                    className="w-full px-5 py-4 bg-black/60 border border-green-500/20 rounded-xl text-white focus:outline-none focus:border-green-500/40 transition-colors"
+                    disabled={!editMode}
+                    className={`w-full px-5 py-4 border border-green-500/20 rounded-xl text-white transition-colors ${
+                      editMode
+                        ? 'bg-black/60 focus:outline-none focus:border-green-500/40 cursor-pointer'
+                        : 'bg-black/30 cursor-not-allowed opacity-70'
+                    }`}
                   >
                     <option value="">Selecione uma persona</option>
                     {personas.map(persona => {
@@ -433,11 +534,14 @@ export default function RoleplayLinksView() {
                     objections.map(objection => (
                       <label
                         key={objection.id}
-                        className="flex items-center gap-3 p-3 hover:bg-green-500/5 rounded-xl cursor-pointer transition-all group"
+                        className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${
+                          editMode ? 'hover:bg-green-500/5 cursor-pointer' : 'cursor-not-allowed opacity-70'
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={config.objection_ids.includes(objection.id)}
+                          disabled={!editMode}
                           onChange={() => {
                             if (config.objection_ids.includes(objection.id)) {
                               setConfig({
@@ -473,7 +577,7 @@ export default function RoleplayLinksView() {
                     Cenário Configurado
                   </h3>
                   <p className="text-gray-300 leading-relaxed">
-                    Os participantes farão roleplay com um cliente de <span className="text-white font-medium">{config.age_range} anos</span>,
+                    Os participantes farão roleplay com um cliente de <span className="text-white font-medium">{config.age} anos</span>,
                     com temperamento <span className="text-white font-medium">{config.temperament.toLowerCase()}</span>,
                     representando <span className="text-white font-medium">{(() => {
                       const persona = personas.find(p => p.id === config.persona_id)
@@ -484,24 +588,48 @@ export default function RoleplayLinksView() {
                 </div>
               )}
 
-              {/* Botão Salvar */}
-              <button
-                onClick={saveConfig}
-                disabled={saving}
-                className="w-full py-4 bg-gradient-to-r from-green-600 to-lime-500 rounded-2xl font-semibold text-white hover:scale-[1.02] transition-all disabled:opacity-50 glow-green flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5" />
-                    Salvar Configuração
-                  </>
-                )}
-              </button>
+              {/* Botões de Ação */}
+              {editMode ? (
+                // Modo edição - mostrar Salvar e Cancelar
+                <div className="flex gap-4">
+                  <button
+                    onClick={saveConfig}
+                    disabled={saving}
+                    className="flex-1 py-4 bg-gradient-to-r from-green-600 to-lime-500 rounded-2xl font-semibold text-white hover:scale-[1.02] transition-all disabled:opacity-50 glow-green flex items-center justify-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        {configSaved ? 'Atualizando...' : 'Salvando...'}
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-5 h-5" />
+                        {configSaved ? 'Salvar Alterações' : 'Salvar Configuração'}
+                      </>
+                    )}
+                  </button>
+                  {configSaved && (
+                    <button
+                      onClick={handleCancel}
+                      disabled={saving}
+                      className="px-6 py-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-2xl font-semibold text-gray-300 transition-all flex items-center justify-center gap-2"
+                    >
+                      <X className="w-5 h-5" />
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              ) : (
+                // Modo visualização - mostrar botão Editar
+                <button
+                  onClick={handleEdit}
+                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl font-semibold text-white hover:scale-[1.02] transition-all glow-blue flex items-center justify-center gap-2"
+                >
+                  <Edit2 className="w-5 h-5" />
+                  Editar Configuração
+                </button>
+              )}
             </div>
           </div>
         </div>

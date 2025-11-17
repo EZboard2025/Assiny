@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       ? 'https://ramppy.site'
       : 'http://localhost:3000'
 
-    const fullUrl = `${baseUrl}/roleplay/${linkCode}`
+    const fullUrl = `${baseUrl}/roleplay-publico?link=${linkCode}`
 
     return NextResponse.json({
       success: true,

@@ -12,7 +12,7 @@ interface CompanyConfig {
   roleplayLink: {
     is_active: boolean
     config: {
-      age_range: string
+      age: string
       temperament: string
       persona_id: string | null
       objection_ids: string[]
@@ -55,7 +55,37 @@ export default function RoleplayPublico() {
 
   const loadCompanyConfig = async () => {
     try {
-      const response = await fetch('/api/public/roleplay/config')
+      // Buscar linkCode da URL
+      const urlParams = new URLSearchParams(window.location.search)
+      const linkCode = urlParams.get('link')
+
+      if (!linkCode) {
+        throw new Error('Link de roleplay não fornecido na URL')
+      }
+
+      // Tentar carregar configuração do localStorage primeiro
+      const cachedConfigKey = `roleplay_config_${linkCode}`
+      const cachedConfig = localStorage.getItem(cachedConfigKey)
+
+      if (cachedConfig) {
+        const data = JSON.parse(cachedConfig)
+        setCompanyConfig(data)
+
+        // Restaurar configurações salvas
+        if (data.roleplayLink?.config) {
+          const config = data.roleplayLink.config
+          setSelectedAge(config.age)
+          setSelectedTemperament(config.temperament)
+          setSelectedPersona(config.persona_id)
+          setSelectedObjections(config.objection_ids || [])
+        }
+
+        setLoading(false)
+        return
+      }
+
+      // Se não tiver cache, buscar da API
+      const response = await fetch(`/api/public/roleplay/config?link=${linkCode}`)
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Erro ao carregar configuração')
@@ -64,13 +94,16 @@ export default function RoleplayPublico() {
       const data = await response.json()
       setCompanyConfig(data)
 
+      // Salvar no localStorage
+      localStorage.setItem(cachedConfigKey, JSON.stringify(data))
+
       // Usar configuração pré-definida pelo gestor
       if (data.roleplayLink?.config) {
         const config = data.roleplayLink.config
-        setSelectedAge(config.age_range)
+        setSelectedAge(config.age)
         setSelectedTemperament(config.temperament)
         setSelectedPersona(config.persona_id)
-        setSelectedObjections(config.objection_ids)
+        setSelectedObjections(config.objection_ids || [])
       }
     } catch (error: any) {
       console.error('Erro ao carregar configuração:', error)
@@ -364,7 +397,7 @@ export default function RoleplayPublico() {
               <div className="space-y-2 text-sm text-gray-300">
                 <p>
                   <span className="text-gray-400">Cliente:</span>{' '}
-                  {companyConfig.roleplayLink.config.age_range} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}
+                  {companyConfig.roleplayLink.config.age} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}
                 </p>
                 <p>
                   <span className="text-gray-400">Cargo:</span>{' '}
