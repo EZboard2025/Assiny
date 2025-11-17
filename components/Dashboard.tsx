@@ -8,7 +8,9 @@ import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut } from 'lucide-react'
+import RoleplayLinkManager from './RoleplayLinkManager'
+import RoleplayUnicoHistory from './RoleplayUnicoHistory'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, History } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 
 interface DashboardProps {
@@ -18,8 +20,10 @@ interface DashboardProps {
 export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'roleplay-history'>('home')
   const [mounted, setMounted] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const chatRef = useRef<ChatInterfaceHandle>(null)
 
   // Sempre usar tema Ramppy (verde espacial) para TODAS as empresas
@@ -27,16 +31,48 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   useEffect(() => {
     setMounted(true)
+    checkUserRole()
 
     // Ler query string da URL para navegação direta
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const view = params.get('view')
-      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil'].includes(view)) {
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links', 'roleplay-history'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
     }
   }, [])
+
+  // Check if user is admin/gestor
+  const checkUserRole = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        // Check user's role from employees table
+        const { data: employee } = await supabase
+          .from('employees')
+          .select('role')
+          .eq('user_id', user.id)
+          .single()
+
+        if (employee) {
+          setUserRole(employee.role)
+        }
+      }
+
+      // Get company ID
+      const compId = await getCompanyId()
+      if (compId) {
+        setCompanyId(compId)
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error)
+    }
+  }
 
   const handleViewChange = async (newView: typeof currentView) => {
     // Se está saindo do chat, verificar se precisa confirmar
@@ -65,6 +101,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'perfil') {
       return <PerfilView key={Date.now()} />
+    }
+
+    if (currentView === 'roleplay-links' && companyId) {
+      return (
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <RoleplayLinkManager companyId={companyId} />
+        </div>
+      )
+    }
+
+    if (currentView === 'roleplay-history' && companyId) {
+      return (
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <RoleplayUnicoHistory companyId={companyId} />
+        </div>
+      )
     }
 
     // Home view
@@ -194,7 +246,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
 
             {/* Navigation */}
-            <nav className="hidden md:flex items-center space-x-8 text-gray-300">
+            <nav className="hidden md:flex items-center space-x-6 text-gray-300">
               <button
                 onClick={() => handleViewChange('home')}
                 className={`hover:text-white transition-colors ${currentView === 'home' ? 'text-white' : ''}`}
@@ -207,32 +259,65 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               >
                 Roleplays
               </button>
-              <span className="text-gray-500 cursor-not-allowed">
-                PDI <span className="text-xs text-yellow-500">(em breve)</span>
-              </span>
+              <button
+                onClick={() => handleViewChange('pdi')}
+                className={`hover:text-white transition-colors flex items-center gap-1 ${currentView === 'pdi' ? 'text-white' : ''}`}
+              >
+                PDI
+                <span className="text-xs text-yellow-400 font-normal ml-1">(em breve)</span>
+              </button>
               <button
                 onClick={() => handleViewChange('historico')}
                 className={`hover:text-white transition-colors ${currentView === 'historico' ? 'text-white' : ''}`}
               >
                 Histórico
               </button>
-              <button
-                onClick={() => handleViewChange('perfil')}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-full font-medium shadow-lg shadow-green-500/50 hover:shadow-green-500/70 hover:scale-105 transition-all"
-              >
-                Meu Perfil
-              </button>
+
+              {/* Admin/Gestor only menu items */}
+              {(userRole === 'Admin' || userRole === 'Gestor') && (
+                <>
+                  {/* Separator */}
+                  <div className="w-px h-6 bg-gray-600"></div>
+
+                  <button
+                    onClick={() => handleViewChange('roleplay-links')}
+                    className={`hover:text-white transition-colors flex items-center gap-1.5 ${currentView === 'roleplay-links' ? 'text-white' : ''}`}
+                  >
+                    <Link2 className="w-4 h-4" />
+                    <span>Links</span>
+                  </button>
+                  <button
+                    onClick={() => handleViewChange('roleplay-history')}
+                    className={`hover:text-white transition-colors flex items-center gap-1.5 ${currentView === 'roleplay-history' ? 'text-white' : ''}`}
+                  >
+                    <History className="w-4 h-4" />
+                    <span>Histórico Público</span>
+                  </button>
+                </>
+              )}
             </nav>
 
             {/* Right side buttons */}
             <div className="flex items-center gap-3">
+              {/* Meu Perfil button */}
               <button
-                onClick={() => setShowConfigHub(true)}
-                className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
+                onClick={() => handleViewChange('perfil')}
+                className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-full font-medium shadow-lg shadow-green-500/50 hover:shadow-green-500/70 hover:scale-105 transition-all flex items-center gap-2"
               >
-                <Settings className="w-4 h-4" />
-                <span className="hidden sm:inline">Config</span>
+                <User className="w-4 h-4" />
+                <span>Meu Perfil</span>
               </button>
+
+              {/* Config button - Admin only */}
+              {userRole === 'Admin' && (
+                <button
+                  onClick={() => setShowConfigHub(true)}
+                  className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="hidden sm:inline">Config</span>
+                </button>
+              )}
               <button
                 onClick={onLogout}
                 className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"

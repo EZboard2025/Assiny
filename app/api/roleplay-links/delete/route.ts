@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 
 // Criar cliente Supabase com service role
 const supabaseAdmin = createClient(
@@ -16,18 +15,10 @@ const supabaseAdmin = createClient(
 
 export async function DELETE(request: Request) {
   try {
-    // Verificar autenticação via cookies
-    const cookieStore = cookies()
+    // Usar cliente Supabase regular
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          }
-        }
-      }
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
 
     // Verificar se o usuário está autenticado

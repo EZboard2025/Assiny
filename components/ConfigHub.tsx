@@ -372,6 +372,36 @@ function ConfigurationInterface({
     }
   }
 
+  const handleRoleChange = async (employeeId: string, newRole: string) => {
+    try {
+      const response = await fetch('/api/employees/update-role', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employeeId,
+          role: newRole
+        })
+      })
+
+      if (response.ok) {
+        const { employee } = await response.json()
+        // Atualizar o estado local
+        setEmployees(employees.map(emp =>
+          emp.id === employeeId ? { ...emp, role: newRole } : emp
+        ))
+        alert(`Role atualizado para ${newRole} com sucesso!`)
+      } else {
+        const error = await response.json()
+        alert(`Erro ao atualizar role: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar role:', error)
+      alert('Erro ao atualizar role')
+    }
+  }
+
   // Processar fila de upload - envia um arquivo por vez
   const processUploadQueue = async (files: File[]) => {
     for (let i = 0; i < files.length; i++) {
@@ -1163,6 +1193,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       <tr className="text-left border-b border-green-500/20">
                         <th className="pb-3 text-sm font-medium text-gray-400">Nome</th>
                         <th className="pb-3 text-sm font-medium text-gray-400">Email</th>
+                        <th className="pb-3 text-sm font-medium text-gray-400">Cargo/Role</th>
                         <th className="pb-3 text-sm font-medium text-gray-400">Ações</th>
                       </tr>
                     </thead>
@@ -1171,6 +1202,17 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         <tr key={emp.id} className="border-b border-green-500/10">
                           <td className="py-3 text-sm text-gray-300">{emp.name}</td>
                           <td className="py-3 text-sm text-gray-300">{emp.email}</td>
+                          <td className="py-3">
+                            <select
+                              value={emp.role || 'Vendedor'}
+                              onChange={(e) => handleRoleChange(emp.id, e.target.value)}
+                              className="px-3 py-1.5 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/40"
+                            >
+                              <option value="Admin">Admin</option>
+                              <option value="Gestor">Gestor</option>
+                              <option value="Vendedor">Vendedor</option>
+                            </select>
+                          </td>
                           <td className="py-3">
                             <button
                               onClick={() => handleDeleteEmployee(emp.id, emp.email)}
@@ -2141,9 +2183,8 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
 }
 
 export default function ConfigHub({ onClose }: ConfigHubProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   // Estados para avaliação de persona
   const [personaEvaluation, setPersonaEvaluation] = useState<{
@@ -2199,21 +2240,37 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
   } | null>(null)
   const [showCompanyEvaluationModal, setShowCompanyEvaluationModal] = useState(false)
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  // Check user role on mount
+  useEffect(() => {
+    checkUserRole()
+  }, [])
 
-    // Senha temporária: "admin123"
-    if (password === 'admin123') {
-      setIsAuthenticated(true)
-      setError('')
-    } else {
-      setError('Senha incorreta')
+  const checkUserRole = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: employee } = await supabase
+          .from('employees')
+          .select('role')
+          .eq('user_id', user.id)
+          .single()
+
+        if (employee) {
+          setUserRole(employee.role)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <>
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className={`relative max-w-5xl w-full max-h-[90vh] overflow-hidden transition-transform duration-300 ${
         showPersonaEvaluationModal || showCompanyEvaluationModal ? 'sm:-translate-x-[250px]' :
         showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
@@ -2238,52 +2295,13 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
           {/* Content */}
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
-            {!isAuthenticated ? (
-              // Password Form
-              <div className="max-w-md mx-auto py-8">
-                <div className="text-center mb-8">
-                  <div className="w-20 h-20 bg-green-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Lock className="w-10 h-10 text-green-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">
-                    Acesso Administrativo
-                  </h3>
-                  <p className="text-gray-400">
-                    Digite a senha de administrador para continuar
-                  </p>
-                </div>
-
-                <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Senha de Acesso
-                    </label>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
-                      placeholder="••••••••"
-                      autoFocus
-                    />
-                  </div>
-
-                  {error && (
-                    <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm">
-                      {error}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-semibold hover:scale-105 transition-transform"
-                  >
-                    Acessar Configurações
-                  </button>
-                </form>
+            {loading ? (
+              // Loading state
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
               </div>
-            ) : (
-              // Configuration Interface
+            ) : userRole === 'Admin' ? (
+              // Configuration Interface - Admin only
               <ConfigurationInterface
                 personaEvaluation={personaEvaluation}
                 setPersonaEvaluation={setPersonaEvaluation}
@@ -2298,6 +2316,19 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 showCompanyEvaluationModal={showCompanyEvaluationModal}
                 setShowCompanyEvaluationModal={setShowCompanyEvaluationModal}
               />
+            ) : (
+              // Access denied - Not admin
+              <div className="max-w-md mx-auto py-8 text-center">
+                <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-10 h-10 text-red-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-white">
+                  Acesso Negado
+                </h3>
+                <p className="text-gray-400">
+                  Apenas administradores podem acessar as configurações.
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -2746,6 +2777,6 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
         </div>
       </div>
     )}
-  </>
+    </>
   )
 }
