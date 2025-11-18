@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     const {
       participantName,
       companyId,
+      linkId, // ID do roleplay_link usado
       config // age, temperament, personaId, objectionIds
     } = await request.json()
 
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('roleplays_unicos')
       .insert({
+        link_id: linkId, // Associar ao link usado
         company_id: companyId,
         participant_name: participantName,
         thread_id: thread.id,
@@ -84,12 +86,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Incrementar contador de uso
-    await supabaseAdmin.rpc('increment', {
-      table_name: 'roleplay_links',
-      column_name: 'usage_count',
-      row_id: companyId
-    })
+    // O trigger increment_usage_on_roleplay_create automaticamente incrementa usage_count
 
     return NextResponse.json({
       sessionId: session.id,

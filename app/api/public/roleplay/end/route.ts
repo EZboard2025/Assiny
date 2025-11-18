@@ -42,16 +42,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Incrementar contador de uso
-    if (session?.company_id) {
-      await supabaseAdmin
-        .from('roleplay_links')
-        .update({
-          usage_count: supabaseAdmin.raw('usage_count + 1'),
-          updated_at: new Date().toISOString()
-        })
-        .eq('company_id', session.company_id)
-    }
+    // O contador usage_count já foi incrementado pelo trigger no momento do INSERT
 
     return NextResponse.json({
       success: true,

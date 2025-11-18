@@ -269,25 +269,62 @@ export default function RoleplayLinksView() {
     setEditMode(false)
   }
 
-  const copyLink = () => {
-    if (!company) return
+  const copyLink = async () => {
+    if (!company || !roleplayLink?.link_code) return
 
-    const link = `https://${company.subdomain}.ramppy.site/roleplay-publico`
-    navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    // Gerar link completo (dev ou prod)
+    let link = ''
+    if (window.location.hostname.includes('localhost') || window.location.hostname.includes('ramppy.local')) {
+      link = `http://${company.subdomain}.ramppy.local:3000/roleplay-publico?link=${roleplayLink.link_code}`
+    } else {
+      link = `https://${company.subdomain}.ramppy.site/roleplay-publico?link=${roleplayLink.link_code}`
+    }
+
+    // Tentar copiar com clipboard API (só funciona em HTTPS ou localhost)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(link)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+        return
+      } catch (err) {
+        console.warn('Clipboard API falhou, usando fallback:', err)
+      }
+    }
+
+    // Fallback: criar input temporário e copiar
+    const textArea = document.createElement('textarea')
+    textArea.value = link
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    try {
+      document.execCommand('copy')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Erro ao copiar:', err)
+      // Último fallback: mostrar o link em um prompt
+      alert(`Copie o link abaixo:\n\n${link}`)
+    }
+
+    textArea.remove()
   }
 
   const getRoleplayUrl = () => {
-    if (!company) return ''
+    if (!company || !roleplayLink?.link_code) return ''
 
     // Em desenvolvimento
     if (window.location.hostname.includes('localhost') || window.location.hostname.includes('ramppy.local')) {
-      return `http://${company.subdomain}.ramppy.local:3000/roleplay-publico`
+      return `http://${company.subdomain}.ramppy.local:3000/roleplay-publico?link=${roleplayLink.link_code}`
     }
 
     // Em produção
-    return `https://${company.subdomain}.ramppy.site/roleplay-publico`
+    return `https://${company.subdomain}.ramppy.site/roleplay-publico?link=${roleplayLink.link_code}`
   }
 
   if (loading) {

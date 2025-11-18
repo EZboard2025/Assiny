@@ -33,6 +33,7 @@ export default function RoleplayPublico() {
   const [selectedTemperament, setSelectedTemperament] = useState('')
   const [selectedPersona, setSelectedPersona] = useState('')
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
+  const [linkId, setLinkId] = useState<string | null>(null) // ID do roleplay_link
 
   // Sessão de roleplay
   const [sessionStarted, setSessionStarted] = useState(false)
@@ -93,6 +94,9 @@ export default function RoleplayPublico() {
 
       const data = await response.json()
       setCompanyConfig(data)
+
+      // Salvar linkId para usar no startRoleplay
+      setLinkId(data.roleplayLink.id)
 
       // Salvar no localStorage
       localStorage.setItem(cachedConfigKey, JSON.stringify(data))
@@ -288,6 +292,7 @@ export default function RoleplayPublico() {
         body: JSON.stringify({
           participantName,
           companyId: companyConfig?.company.id,
+          linkId: linkId, // Passar o ID do link para associar à sessão
           config: {
             age: selectedAge,
             temperament: selectedTemperament,
