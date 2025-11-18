@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square } from 'lucide-react'
+import Image from 'next/image'
 
 interface CompanyConfig {
   company: {
@@ -320,16 +321,28 @@ export default function RoleplayPublico() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center">
+        {/* Fundo espacial verde */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse delay-700"></div>
+        </div>
+
+        <Loader2 className="w-12 h-12 text-green-400 animate-spin relative z-10" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
-        <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6 max-w-md w-full">
+      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+        {/* Fundo espacial verde */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+
+        <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
           <AlertCircle className="w-12 h-12 text-red-400 mb-4 mx-auto" />
           <h2 className="text-xl font-bold text-white text-center mb-2">Erro</h2>
           <p className="text-gray-300 text-center">{error}</p>
@@ -341,8 +354,12 @@ export default function RoleplayPublico() {
   // Verificar se o roleplay está ativo
   if (!companyConfig?.roleplayLink?.is_active) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
-        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 max-w-md w-full">
+      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+        {/* Fundo espacial verde */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+
+        <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
           <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
           <h2 className="text-xl font-bold text-white text-center mb-2">Roleplay Desativado</h2>
           <p className="text-gray-300 text-center">
@@ -357,8 +374,12 @@ export default function RoleplayPublico() {
   if (!companyConfig?.roleplayLink?.config?.persona_id ||
       !companyConfig?.roleplayLink?.config?.objection_ids?.length) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
-        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 max-w-md w-full">
+      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+        {/* Fundo espacial verde */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+
+        <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
           <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
           <h2 className="text-xl font-bold text-white text-center mb-2">Configuração Incompleta</h2>
           <p className="text-gray-300 text-center">
@@ -379,27 +400,42 @@ export default function RoleplayPublico() {
     )
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
-        <div className="bg-gray-800/50 backdrop-blur-xl rounded-3xl p-8 max-w-2xl w-full border border-purple-500/30">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Users className="w-10 h-10 text-purple-400" />
+      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+        {/* Fundo espacial verde Ramppy */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse delay-700"></div>
+        </div>
+
+        <div className="bg-gray-900/60 backdrop-blur-md rounded-3xl p-6 max-w-2xl w-full border border-green-500/30 shadow-2xl shadow-green-900/50 relative z-10">
+          <div className="text-center mb-5">
+            {/* Logo Ramppy */}
+            <div className="w-80 h-80 mx-auto -mb-8 relative -mt-8">
+              <Image
+                src="/images/ramppy-logo.png"
+                alt="Ramppy Logo"
+                width={320}
+                height={320}
+                className="drop-shadow-[0_0_50px_rgba(34,197,94,0.8)]"
+              />
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">
               Roleplay de Vendas - {companyConfig?.company.name}
             </h1>
-            <p className="text-gray-400">
+            <p className="text-base text-gray-300">
               Pratique suas habilidades de vendas com nosso simulador inteligente
             </p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Informações do Roleplay Configurado */}
-            <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-purple-300 mb-3">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl p-5">
+              <h3 className="text-base font-semibold text-green-400 mb-3">
                 Cenário do Roleplay
               </h3>
-              <div className="space-y-2 text-sm text-gray-300">
+              <div className="space-y-2 text-base text-gray-200">
                 <p>
                   <span className="text-gray-400">Cliente:</span>{' '}
                   {companyConfig.roleplayLink.config.age} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}
@@ -417,14 +453,14 @@ export default function RoleplayPublico() {
 
             {/* Nome */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-base font-semibold text-gray-200 mb-2">
                 Seu Nome
               </label>
               <input
                 type="text"
                 value={participantName}
                 onChange={(e) => setParticipantName(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-900/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/40"
+                className="w-full px-4 py-3.5 bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500/60 focus:bg-gray-800/70 transition-all text-lg"
                 placeholder="Digite seu nome para começar"
                 autoFocus
               />
@@ -434,7 +470,7 @@ export default function RoleplayPublico() {
             <button
               onClick={startRoleplay}
               disabled={isProcessing || !participantName.trim()}
-              className="w-full py-3 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl font-semibold text-white hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-4 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 text-lg"
             >
               {isProcessing ? (
                 <>
@@ -456,22 +492,30 @@ export default function RoleplayPublico() {
 
   // Interface de Roleplay
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-gray-800/50 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30">
+    <div className="min-h-screen relative overflow-hidden bg-black p-4">
+      {/* Fundo espacial verde Ramppy */}
+      <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse delay-700"></div>
+      </div>
+
+      <div className="max-w-4xl mx-auto relative z-10">
+        <div className="bg-gray-900/60 backdrop-blur-md rounded-3xl p-8 border border-green-500/30 shadow-2xl shadow-green-900/50">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-white mb-2">
               Roleplay em Andamento
             </h2>
-            <p className="text-gray-400">
+            <p className="text-gray-300">
               Olá {participantName}, converse com o cliente virtual
             </p>
           </div>
 
           {/* Área de mensagens */}
-          <div className="bg-gray-900/50 rounded-xl p-6 min-h-[400px] max-h-[600px] overflow-y-auto mb-6">
+          <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl p-6 min-h-[400px] max-h-[600px] overflow-y-auto mb-6 border border-green-500/20">
             {messages.length === 0 ? (
-              <p className="text-gray-500 text-center">
+              <p className="text-gray-400 text-center">
                 Clique no microfone para começar a conversa
               </p>
             ) : (
@@ -484,11 +528,11 @@ export default function RoleplayPublico() {
                     <div
                       className={`max-w-[70%] p-4 rounded-xl ${
                         msg.role === 'seller'
-                          ? 'bg-purple-600/20 border border-purple-500/30'
-                          : 'bg-gray-700/50 border border-gray-600/30'
+                          ? 'bg-gradient-to-r from-green-600 to-green-500 border border-green-400/30 shadow-lg shadow-green-500/20'
+                          : 'bg-gray-800/60 border border-green-500/30'
                       }`}
                     >
-                      <p className="text-sm text-gray-400 mb-1">
+                      <p className={`text-xs font-semibold mb-1 ${msg.role === 'seller' ? 'text-white/90' : 'text-green-400'}`}>
                         {msg.role === 'seller' ? 'Você' : 'Cliente'}
                       </p>
                       <p className="text-white">{msg.text}</p>
@@ -505,7 +549,7 @@ export default function RoleplayPublico() {
               <button
                 onClick={startRecording}
                 disabled={isProcessing || isPlayingAudio}
-                className="p-4 bg-purple-600 hover:bg-purple-700 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="p-4 bg-gradient-to-r from-green-600 to-green-500 hover:scale-110 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 shadow-xl shadow-green-500/50"
               >
                 <Mic className="w-6 h-6 text-white" />
                 {isProcessing && <Loader2 className="w-5 h-5 text-white animate-spin" />}
@@ -513,17 +557,17 @@ export default function RoleplayPublico() {
             ) : (
               <button
                 onClick={stopRecording}
-                className="p-4 bg-red-600 hover:bg-red-700 rounded-full transition-all animate-pulse flex items-center gap-2"
+                className="px-6 py-4 bg-red-500 hover:bg-red-600 rounded-full transition-all animate-pulse flex items-center gap-2 shadow-xl shadow-red-500/50"
               >
                 <Square className="w-6 h-6 text-white" />
-                <span className="text-white font-medium">Finalizar Fala</span>
+                <span className="text-white font-bold">Finalizar Fala</span>
               </button>
             )}
 
             <button
               onClick={endRoleplay}
               disabled={isProcessing}
-              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-gray-800/50 hover:bg-gray-800/70 backdrop-blur-sm border border-green-500/30 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Finalizar Roleplay
             </button>
@@ -532,8 +576,8 @@ export default function RoleplayPublico() {
           {/* Indicadores de estado */}
           {isPlayingAudio && (
             <div className="text-center mt-4">
-              <p className="text-purple-400 animate-pulse">
-                Cliente está falando...
+              <p className="text-green-400 font-semibold animate-pulse">
+                🔊 Cliente está falando...
               </p>
             </div>
           )}
