@@ -4,6 +4,22 @@ import { useState, useEffect, useRef } from 'react'
 import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square } from 'lucide-react'
 import Image from 'next/image'
 
+// Keyframes CSS globais para animação das estrelas
+const globalStyles = `
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+  @keyframes float {
+    from {
+      transform: translateY(0px) translateX(0px);
+    }
+    to {
+      transform: translateY(-150vh) translateX(var(--float-x));
+    }
+  }
+`
+
 interface CompanyConfig {
   company: {
     id: string
@@ -321,52 +337,120 @@ export default function RoleplayPublico() {
 
   if (loading) {
     return (
-      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center">
-        {/* Fundo espacial verde */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse delay-700"></div>
-        </div>
+      <>
+        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center">
+          {/* Fundo preto */}
+          <div className="absolute inset-0 bg-black"></div>
 
-        <Loader2 className="w-12 h-12 text-green-400 animate-spin relative z-10" />
-      </div>
+          {/* Estrelas */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(100)].map((_, i) => {
+              const duration = Math.random() * 20 + 15 // 15-35s
+              const delay = Math.random() * 5
+              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
+              return (
+                <div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    opacity: Math.random() * 0.7 + 0.3,
+                    ['--float-x' as any]: `${floatX}px`,
+                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <Loader2 className="w-12 h-12 text-green-400 animate-spin relative z-10" />
+        </div>
+      </>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-        {/* Fundo espacial verde */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+      <>
+        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+          {/* Fundo preto */}
+          <div className="absolute inset-0 bg-black"></div>
 
-        <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
-          <AlertCircle className="w-12 h-12 text-red-400 mb-4 mx-auto" />
-          <h2 className="text-xl font-bold text-white text-center mb-2">Erro</h2>
-          <p className="text-gray-300 text-center">{error}</p>
+          {/* Estrelas */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(100)].map((_, i) => {
+              const duration = Math.random() * 20 + 15
+              const delay = Math.random() * 5
+              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
+              return (
+                <div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    opacity: Math.random() * 0.7 + 0.3,
+                    ['--float-x' as any]: `${floatX}px`,
+                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
+            <AlertCircle className="w-12 h-12 text-red-400 mb-4 mx-auto" />
+            <h2 className="text-xl font-bold text-white text-center mb-2">Erro</h2>
+            <p className="text-gray-300 text-center">{error}</p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   // Verificar se o roleplay está ativo
   if (!companyConfig?.roleplayLink?.is_active) {
     return (
-      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-        {/* Fundo espacial verde */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+      <>
+        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+          {/* Fundo preto */}
+          <div className="absolute inset-0 bg-black"></div>
 
-        <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
-          <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
-          <h2 className="text-xl font-bold text-white text-center mb-2">Roleplay Desativado</h2>
-          <p className="text-gray-300 text-center">
-            O roleplay público desta empresa está temporariamente desativado.
-          </p>
+          {/* Estrelas */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(100)].map((_, i) => {
+              const duration = Math.random() * 20 + 15
+              const delay = Math.random() * 5
+              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
+              return (
+                <div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    opacity: Math.random() * 0.7 + 0.3,
+                    ['--float-x' as any]: `${floatX}px`,
+                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
+            <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
+            <h2 className="text-xl font-bold text-white text-center mb-2">Roleplay Desativado</h2>
+            <p className="text-gray-300 text-center">
+              O roleplay público desta empresa está temporariamente desativado.
+            </p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -374,19 +458,43 @@ export default function RoleplayPublico() {
   if (!companyConfig?.roleplayLink?.config?.persona_id ||
       !companyConfig?.roleplayLink?.config?.objection_ids?.length) {
     return (
-      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-        {/* Fundo espacial verde */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
+      <>
+        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+          {/* Fundo preto */}
+          <div className="absolute inset-0 bg-black"></div>
 
-        <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
-          <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
-          <h2 className="text-xl font-bold text-white text-center mb-2">Configuração Incompleta</h2>
-          <p className="text-gray-300 text-center">
-            O roleplay ainda não foi configurado pelo administrador.
-          </p>
+          {/* Estrelas */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(100)].map((_, i) => {
+              const duration = Math.random() * 20 + 15
+              const delay = Math.random() * 5
+              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
+              return (
+                <div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    opacity: Math.random() * 0.7 + 0.3,
+                    ['--float-x' as any]: `${floatX}px`,
+                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
+            <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
+            <h2 className="text-xl font-bold text-white text-center mb-2">Configuração Incompleta</h2>
+            <p className="text-gray-300 text-center">
+              O roleplay ainda não foi configurado pelo administrador.
+            </p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -400,14 +508,34 @@ export default function RoleplayPublico() {
     )
 
     return (
-      <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-        {/* Fundo espacial verde Ramppy */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse delay-700"></div>
-        </div>
+      <>
+        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
+          {/* Fundo preto */}
+          <div className="absolute inset-0 bg-black"></div>
+
+          {/* Estrelas animadas */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(100)].map((_, i) => {
+              const duration = Math.random() * 20 + 15
+              const delay = Math.random() * 5
+              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
+              return (
+                <div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    opacity: Math.random() * 0.7 + 0.3,
+                    ['--float-x' as any]: `${floatX}px`,
+                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
+                  }}
+                />
+              )
+            })}
+          </div>
+
 
         <div className="bg-gray-900/60 backdrop-blur-md rounded-3xl p-6 max-w-2xl w-full border border-green-500/30 shadow-2xl shadow-green-900/50 relative z-10">
           <div className="text-center mb-5">
@@ -487,19 +615,39 @@ export default function RoleplayPublico() {
           </div>
         </div>
       </div>
+      </>
     )
   }
 
   // Interface de Roleplay
   return (
-    <div className="min-h-screen relative overflow-hidden bg-black p-4">
-      {/* Fundo espacial verde Ramppy */}
-      <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 via-green-950/60 to-black"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse delay-700"></div>
-      </div>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+      <div className="min-h-screen relative overflow-hidden bg-black p-4">
+        {/* Fundo preto */}
+        <div className="absolute inset-0 bg-black"></div>
+
+        {/* Estrelas animadas */}
+        <div className="absolute inset-0 overflow-hidden">
+          {[...Array(100)].map((_, i) => {
+            const duration = Math.random() * 20 + 15
+            const delay = Math.random() * 5
+            const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
+            return (
+              <div
+                key={i}
+                className="absolute w-1 h-1 bg-white rounded-full"
+                style={{
+                  top: `${Math.random() * 100}%`,
+                  left: `${Math.random() * 100}%`,
+                  opacity: Math.random() * 0.7 + 0.3,
+                  ['--float-x' as any]: `${floatX}px`,
+                  animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
+                }}
+              />
+            )
+          })}
+        </div>
 
       <div className="max-w-4xl mx-auto relative z-10">
         <div className="bg-gray-900/60 backdrop-blur-md rounded-3xl p-8 border border-green-500/30 shadow-2xl shadow-green-900/50">
@@ -584,5 +732,6 @@ export default function RoleplayPublico() {
         </div>
       </div>
     </div>
+    </>
   )
 }
