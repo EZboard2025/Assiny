@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save } from 'lucide-react'
+import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save, History, Loader2 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 interface RoleplayLink {
@@ -51,6 +51,12 @@ export default function RoleplayLinksView() {
   const [saving, setSaving] = useState(false)
   const [configSaved, setConfigSaved] = useState(false)
   const [editMode, setEditMode] = useState(false)
+
+  // Ver Roleplays
+  const [showHistorico, setShowHistorico] = useState(false)
+  const [historico, setHistorico] = useState<any[]>([])
+  const [loadingHistorico, setLoadingHistorico] = useState(false)
+  const [selectedEvaluation, setSelectedEvaluation] = useState<any>(null)
 
   // Opções disponíveis
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -315,6 +321,30 @@ export default function RoleplayLinksView() {
     textArea.remove()
   }
 
+  const loadHistorico = async () => {
+    if (!roleplayLink?.id) {
+      console.error('Link ID não disponível')
+      return
+    }
+
+    setLoadingHistorico(true)
+    try {
+      const response = await fetch(`/api/public/roleplay/history?linkId=${roleplayLink.id}`)
+      if (!response.ok) {
+        throw new Error('Erro ao carregar histórico')
+      }
+
+      const data = await response.json()
+      console.log('📊 Histórico carregado:', data)
+      setHistorico(data.roleplays || [])
+    } catch (error) {
+      console.error('❌ Erro ao carregar histórico:', error)
+      alert('Erro ao carregar histórico')
+    } finally {
+      setLoadingHistorico(false)
+    }
+  }
+
   const getRoleplayUrl = () => {
     if (!company || !roleplayLink?.link_code) return ''
 
@@ -390,18 +420,32 @@ export default function RoleplayLinksView() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={toggleActive}
-                disabled={saving}
-                className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
-                  roleplayLink.is_active
-                    ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 glow-green'
-                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-                } disabled:opacity-50`}
-              >
-                <Power className="w-5 h-5" />
-                {roleplayLink.is_active ? 'Ativo' : 'Desativado'}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowHistorico(!showHistorico)
+                    if (!showHistorico && historico.length === 0) {
+                      loadHistorico()
+                    }
+                  }}
+                  className="px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white border border-gray-700"
+                >
+                  <History className="w-5 h-5" />
+                  Ver Roleplays
+                </button>
+                <button
+                  onClick={toggleActive}
+                  disabled={saving}
+                  className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                    roleplayLink.is_active
+                      ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 glow-green'
+                      : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                  } disabled:opacity-50`}
+                >
+                  <Power className="w-5 h-5" />
+                  {roleplayLink.is_active ? 'Ativo' : 'Desativado'}
+                </button>
+              </div>
             </div>
 
             {/* URL */}
@@ -447,8 +491,10 @@ export default function RoleplayLinksView() {
             </div>
           </div>
 
-          {/* Configuração do Roleplay */}
-          <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-green-500/20">
+          {/* Conteúdo Condicional */}
+          {!showHistorico ? (
+            /* Configuração do Roleplay */
+            <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-green-500/20">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-xl flex items-center justify-center">
@@ -685,8 +731,267 @@ export default function RoleplayLinksView() {
               )}
             </div>
           </div>
+          ) : (
+            /* Histórico de Roleplays */
+            <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-green-500/20">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-xl flex items-center justify-center">
+                  <History className="w-5 h-5 text-green-400" />
+                </div>
+                <h2 className="text-2xl font-semibold text-white">
+                  Roleplays Realizados
+                </h2>
+              </div>
+
+              {loadingHistorico ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-10 h-10 text-green-400 animate-spin" />
+                </div>
+              ) : historico.length === 0 ? (
+                <div className="text-center py-20">
+                  <History className="w-20 h-20 text-gray-700 mx-auto mb-4" />
+                  <p className="text-gray-400 text-xl font-medium">Nenhum roleplay realizado ainda</p>
+                  <p className="text-gray-500 mt-2">Compartilhe o link para começar</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="mb-6">
+                    <p className="text-gray-400">
+                      {historico.length} roleplay{historico.length !== 1 ? 's' : ''} realizad{historico.length !== 1 ? 'os' : 'o'}
+                    </p>
+                  </div>
+
+                  {historico.map((roleplay) => {
+                    const createdAt = new Date(roleplay.created_at)
+                    const formattedDate = createdAt.toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    })
+                    const formattedTime = createdAt.toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+
+                    const evaluation = roleplay.evaluation
+                    const overallScore = evaluation?.overall_score
+                    const performanceLevel = evaluation?.performance_level
+
+                    // Mapear performance_level para cor
+                    const getScoreColor = (level: string) => {
+                      switch (level) {
+                        case 'legendary': return 'text-purple-400'
+                        case 'excellent': return 'text-green-400'
+                        case 'very_good': return 'text-blue-400'
+                        case 'good': return 'text-yellow-400'
+                        case 'needs_improvement': return 'text-orange-400'
+                        case 'poor': return 'text-red-400'
+                        default: return 'text-gray-400'
+                      }
+                    }
+
+                    // Mapear performance_level para texto em português
+                    const getPerformanceLevelText = (level: string) => {
+                      switch (level) {
+                        case 'legendary': return 'Lendário'
+                        case 'excellent': return 'Excelente'
+                        case 'very_good': return 'Muito Bom'
+                        case 'good': return 'Bom'
+                        case 'needs_improvement': return 'Precisa Melhorar'
+                        case 'poor': return 'Fraco'
+                        default: return 'N/A'
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={roleplay.id}
+                        className="bg-black/60 border border-green-500/10 rounded-2xl p-6 hover:border-green-500/30 transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold text-white mb-3">
+                              {roleplay.participant_name}
+                            </h3>
+                            <div className="space-y-2 text-sm text-gray-400">
+                              <p>
+                                <span className="text-gray-500">Data:</span> {formattedDate} às {formattedTime}
+                              </p>
+                              {roleplay.config && (
+                                <>
+                                  <p>
+                                    <span className="text-gray-500">Cliente:</span>{' '}
+                                    {roleplay.config.age} anos, {roleplay.config.temperament}
+                                  </p>
+                                  {roleplay.config.persona && (
+                                    <p>
+                                      <span className="text-gray-500">Cargo:</span>{' '}
+                                      {roleplay.config.persona.cargo || roleplay.config.persona.job_title || 'N/A'}
+                                    </p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="ml-6 text-right">
+                            {overallScore !== null && overallScore !== undefined ? (
+                              <>
+                                <div className={`text-4xl font-bold ${getScoreColor(performanceLevel)}`}>
+                                  {overallScore.toFixed(1)}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {getPerformanceLevelText(performanceLevel)}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-sm text-gray-500">
+                                Sem avaliação
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {evaluation && (
+                          <button
+                            onClick={() => setSelectedEvaluation(roleplay)}
+                            className="mt-4 w-full py-3 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 hover:border-green-500/50 rounded-xl text-green-400 font-semibold transition-all"
+                          >
+                            Ver Avaliação Completa
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Modal de Avaliação Detalhada */}
+      {selectedEvaluation && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-4">
+          <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedEvaluation(null)}
+              className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+
+            {/* Header */}
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-5">
+              <h2 className="text-2xl font-bold text-center text-white mb-2">🎯 AVALIAÇÃO DETALHADA</h2>
+              <p className="text-center text-gray-400 text-sm">
+                {selectedEvaluation.participant_name} - {new Date(selectedEvaluation.created_at).toLocaleString('pt-BR')}
+              </p>
+
+              {/* Score Geral */}
+              <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20 mt-4">
+                <div className="text-center">
+                  <div className="text-5xl font-bold text-green-400 mb-2">
+                    {selectedEvaluation.evaluation?.overall_score?.toFixed(1) || '0.0'}/10
+                  </div>
+                  <div className="text-sm uppercase tracking-wider text-gray-400">
+                    {selectedEvaluation.evaluation?.performance_level || 'N/A'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-5 space-y-4">
+              {/* Resumo Executivo */}
+              {selectedEvaluation.evaluation?.executive_summary && (
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                  <h3 className="text-base font-bold text-green-400 mb-2">📋 Resumo Executivo</h3>
+                  <p className="text-sm text-gray-300 leading-relaxed">{selectedEvaluation.evaluation.executive_summary}</p>
+                </div>
+              )}
+
+              {/* SPIN Scores */}
+              {selectedEvaluation.evaluation?.spin_evaluation && (
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                  <h3 className="text-base font-bold text-green-400 mb-3">📊 Métricas SPIN</h3>
+                  <div className="grid grid-cols-4 gap-3">
+                    {['S', 'P', 'I', 'N'].map((key) => (
+                      <div key={key} className="text-center bg-gray-900/50 rounded-lg p-3 border border-green-500/10">
+                        <div className="text-xs text-gray-400 mb-1">{key}</div>
+                        <div className="text-2xl font-bold text-white">
+                          {selectedEvaluation.evaluation.spin_evaluation[key]?.final_score?.toFixed(1) || '0.0'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pontos Fortes */}
+              {selectedEvaluation.evaluation?.top_strengths && selectedEvaluation.evaluation.top_strengths.length > 0 && (
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                  <h3 className="text-base font-bold text-green-400 mb-2">✅ Pontos Fortes</h3>
+                  <ul className="space-y-2">
+                    {selectedEvaluation.evaluation.top_strengths.map((strength: string, index: number) => (
+                      <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
+                        <span className="text-green-400 mt-0.5">•</span>
+                        <span>{strength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Gaps Críticos */}
+              {selectedEvaluation.evaluation?.critical_gaps && selectedEvaluation.evaluation.critical_gaps.length > 0 && (
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-red-500/20">
+                  <h3 className="text-base font-bold text-red-400 mb-2">⚠️ Gaps Críticos</h3>
+                  <ul className="space-y-2">
+                    {selectedEvaluation.evaluation.critical_gaps.map((gap: string, index: number) => (
+                      <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
+                        <span className="text-red-400 mt-0.5">•</span>
+                        <span>{gap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Melhorias Prioritárias */}
+              {selectedEvaluation.evaluation?.priority_improvements && selectedEvaluation.evaluation.priority_improvements.length > 0 && (
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-yellow-500/20">
+                  <h3 className="text-base font-bold text-yellow-400 mb-3">🎯 Melhorias Prioritárias</h3>
+                  <div className="space-y-3">
+                    {selectedEvaluation.evaluation.priority_improvements.map((improvement: any, index: number) => (
+                      <div key={index} className="bg-gray-900/50 rounded-lg p-3 border border-yellow-500/10">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs uppercase font-bold text-yellow-400">
+                            {improvement.priority}
+                          </span>
+                          <span className="text-xs text-gray-400">•</span>
+                          <span className="text-xs text-gray-300">{improvement.area}</span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">{improvement.current_gap}</p>
+                        <p className="text-sm text-gray-300">{improvement.action_plan}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Botão Fechar */}
+              <button
+                onClick={() => setSelectedEvaluation(null)}
+                className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
