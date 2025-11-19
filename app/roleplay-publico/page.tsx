@@ -83,29 +83,14 @@ export default function RoleplayPublico() {
         throw new Error('Link de roleplay não fornecido na URL')
       }
 
-      // Tentar carregar configuração do localStorage primeiro
+      // IMPORTANTE: SEMPRE buscar do servidor para garantir dados atualizados
+      // (Desabilitado cache temporariamente para debug)
       const cachedConfigKey = `roleplay_config_${linkCode}`
-      const cachedConfig = localStorage.getItem(cachedConfigKey)
 
-      if (cachedConfig) {
-        const data = JSON.parse(cachedConfig)
-        setCompanyConfig(data)
+      // Limpar cache antigo
+      localStorage.removeItem(cachedConfigKey)
 
-        // IMPORTANTE: Salvar linkId mesmo quando usa cache
-        setLinkId(data.roleplayLink?.id)
-
-        // Restaurar configurações salvas
-        if (data.roleplayLink?.config) {
-          const config = data.roleplayLink.config
-          setSelectedAge(config.age)
-          setSelectedTemperament(config.temperament)
-          setSelectedPersona(config.persona_id)
-          setSelectedObjections(config.objection_ids || [])
-        }
-
-        setLoading(false)
-        return
-      }
+      console.log('🌐 Buscando configuração do servidor (cache desabilitado)')
 
       // Se não tiver cache, buscar da API
       const response = await fetch(`/api/public/roleplay/config?link=${linkCode}`)
