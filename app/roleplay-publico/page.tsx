@@ -60,7 +60,9 @@ export default function RoleplayPublico() {
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
+  const [isEvaluating, setIsEvaluating] = useState(false)
   const [evaluation, setEvaluation] = useState<any>(null)
+  const [showEvaluationModal, setShowEvaluationModal] = useState(false)
 
   // Referências para áudio
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -257,7 +259,7 @@ export default function RoleplayPublico() {
   const endRoleplay = async () => {
     if (!sessionId) return
 
-    setIsProcessing(true)
+    setIsEvaluating(true)
 
     try {
       const response = await fetch('/api/public/roleplay/end', {
@@ -270,24 +272,36 @@ export default function RoleplayPublico() {
         throw new Error('Erro ao finalizar roleplay')
       }
 
-      const { session } = await response.json()
+      const { evaluation } = await response.json()
 
-      // Mostrar resultado ou voltar ao início
-      alert('Roleplay finalizado com sucesso!')
+      // Parse evaluation se necessário
+      let parsedEvaluation = evaluation
+      if (parsedEvaluation && typeof parsedEvaluation === 'object' && 'output' in parsedEvaluation) {
+        try {
+          parsedEvaluation = JSON.parse(parsedEvaluation.output)
+        } catch (e) {
+          console.error('Erro ao fazer parse da avaliação:', e)
+        }
+      }
 
-      // Resetar estado
-      setSessionStarted(false)
-      setSessionId(null)
-      setThreadId(null)
-      setMessages([])
-      setParticipantName('')
-      setSelectedObjections([])
+      setEvaluation(parsedEvaluation)
+      setShowEvaluationModal(true)
     } catch (error) {
       console.error('Erro ao finalizar roleplay:', error)
       alert('Erro ao finalizar roleplay')
     } finally {
-      setIsProcessing(false)
+      setIsEvaluating(false)
     }
+  }
+
+  const closeEvaluationAndReset = () => {
+    setShowEvaluationModal(false)
+    setEvaluation(null)
+    setSessionStarted(false)
+    setSessionId(null)
+    setThreadId(null)
+    setMessages([])
+    setParticipantName('')
   }
 
   const startRoleplay = async () => {
@@ -326,6 +340,15 @@ export default function RoleplayPublico() {
       const data = await response.json()
       setSessionId(data.sessionId)
       setThreadId(data.threadId)
+
+      // Se tiver primeira mensagem do cliente, adicionar ao chat e reproduzir áudio
+      if (data.firstMessage) {
+        setMessages([{ role: 'client', text: data.firstMessage }])
+
+        // Reproduzir áudio da primeira mensagem
+        await playAudioResponse(data.firstMessage, data.sessionId)
+      }
+
       setSessionStarted(true)
     } catch (error) {
       console.error('Erro ao iniciar roleplay:', error)

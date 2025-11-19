@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import OpenAI from 'openai'
+
+const N8N_ROLEPLAY_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/d40a1fd9-bfb3-4588-bd45-7bcf2123725d/chat'
 
 // Cliente Supabase com service role
 const supabaseAdmin = createClient(
@@ -14,18 +15,11 @@ const supabaseAdmin = createClient(
   }
 )
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
-
-// ID do Assistant de Vendas
-const ASSISTANT_ID = 'asst_VZqff7anRma9K2vXcSa4hfNe'
-
 export async function POST(request: Request) {
   try {
     const { sessionId, threadId, message } = await request.json()
 
-    if (!sessionId || !threadId || !message) {
+    if (!sessionId || !message) {
       return NextResponse.json(
         { error: 'Dados incompletos' },
         { status: 400 }
@@ -37,7 +31,7 @@ export async function POST(request: Request) {
       .from('roleplays_unicos')
       .select('*')
       .eq('id', sessionId)
-      .eq('status', 'em_andamento')
+      .eq('status', 'in_progress')
       .single()
 
     if (sessionError || !session) {
@@ -47,34 +41,59 @@ export async function POST(request: Request) {
       )
     }
 
-    // Adicionar mensagem ao thread
-    await openai.beta.threads.messages.create(threadId, {
-      role: 'user',
-      content: message
+    // Buscar dados da empresa
+    const { data: companyData } = await supabaseAdmin
+      .from('company_data')
+      .select('*')
+      .eq('company_id', session.company_id)
+      .single()
+
+    // Buscar company_type
+    const { data: companyTypeData } = await supabaseAdmin
+      .from('company_type')
+      .select('type')
+      .eq('company_id', session.company_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    const companyType = companyTypeData?.type || 'B2C'
+
+    console.log('📤 Enviando para N8N:', {
+      sessionId: threadId,
+      chatInput: message.substring(0, 50) + '...',
+      companyId: session.company_id,
+      companyName: companyData?.nome
     })
 
-    // Executar o assistant
-    const run = await openai.beta.threads.runs.create(threadId, {
-      assistant_id: ASSISTANT_ID
+    // Enviar para N8N
+    const n8nResponse = await fetch(N8N_ROLEPLAY_WEBHOOK, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'sendMessage',
+        sessionId: threadId,
+        chatInput: message,
+        companyId: session.company_id,
+        companyName: companyData?.nome || null,
+        companyDescription: companyData?.descricao || null,
+        companyType: companyType
+      })
     })
 
-    // Aguardar resposta
-    let runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id)
-    while (runStatus.status !== 'completed' && runStatus.status !== 'failed') {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id)
+    if (!n8nResponse.ok) {
+      const errorText = await n8nResponse.text()
+      console.error('❌ Erro N8N:', n8nResponse.status, errorText)
+      throw new Error('Erro ao processar mensagem no N8N')
     }
 
-    if (runStatus.status === 'failed') {
-      throw new Error('Assistant failed to respond')
-    }
+    const n8nData = await n8nResponse.json()
+    console.log('📥 Resposta N8N:', n8nData)
 
-    // Obter mensagens
-    const messages = await openai.beta.threads.messages.list(threadId)
-    const lastMessage = messages.data[0]
-    const responseText = lastMessage.content[0]?.type === 'text'
-      ? lastMessage.content[0].text.value
-      : ''
+    const responseText = n8nData.output || n8nData[0]?.output || ''
+    console.log('💬 Texto extraído:', responseText.substring(0, 100))
 
     // Atualizar mensagens na sessão
     const updatedMessages = [

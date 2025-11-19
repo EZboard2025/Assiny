@@ -18,26 +18,28 @@ export async function POST(request: Request) {
   try {
     const { text, sessionId } = await request.json()
 
-    if (!text || !sessionId) {
+    if (!text) {
       return NextResponse.json(
-        { error: 'Dados incompletos' },
+        { error: 'Texto é obrigatório' },
         { status: 400 }
       )
     }
 
-    // Verificar se a sessão existe e está ativa
-    const { data: session, error: sessionError } = await supabaseAdmin
-      .from('roleplays_unicos')
-      .select('id')
-      .eq('id', sessionId)
-      .eq('status', 'em_andamento')
-      .single()
+    // Se tiver sessionId, verificar se a sessão existe e está ativa
+    if (sessionId) {
+      const { data: session, error: sessionError } = await supabaseAdmin
+        .from('roleplays_unicos')
+        .select('id')
+        .eq('id', sessionId)
+        .eq('status', 'in_progress')
+        .single()
 
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Sessão não encontrada ou já finalizada' },
-        { status: 404 }
-      )
+      if (sessionError || !session) {
+        return NextResponse.json(
+          { error: 'Sessão não encontrada ou já finalizada' },
+          { status: 404 }
+        )
+      }
     }
 
     // Enviar para N8N para TTS

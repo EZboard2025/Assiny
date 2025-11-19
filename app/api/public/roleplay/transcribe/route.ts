@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       .from('roleplays_unicos')
       .select('id')
       .eq('id', sessionId)
-      .eq('status', 'em_andamento')
+      .eq('status', 'in_progress')
       .single()
 
     if (sessionError || !session) {
