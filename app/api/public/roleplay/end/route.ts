@@ -58,22 +58,55 @@ export async function POST(request: Request) {
     const context = {
       age: config?.age || 'Não especificado',
       temperament: config?.temperament || 'Não especificado',
-      persona: config?.persona?.cargo || config?.persona?.profession || 'Não especificado',
+      persona: config?.persona?.cargo || config?.persona?.job_title || config?.persona?.profession || 'Não especificado',
       objections: config?.objections?.map((obj: any) => obj.name).join(', ') || 'Nenhuma'
     }
 
     console.log('📋 Contexto extraído:', context)
 
+    // Preparar perfil completo do cliente simulado (formato texto igual ao roleplay de treinamento)
+    let client_profile = `PERFIL DO CLIENTE SIMULADO
+
+DADOS DEMOGRÁFICOS:
+- Idade: ${config?.age || 'Não especificado'}
+- Temperamento: ${config?.temperament || 'Não especificado'}
+- Persona/Segmento: ${config?.persona?.cargo || config?.persona?.job_title || config?.persona?.profession || 'Não especificado'}
+
+OBJEÇÕES TRABALHADAS:`
+
+    if (config?.objections && config.objections.length > 0) {
+      config.objections.forEach((obj: any, index: number) => {
+        client_profile += `\n\n${index + 1}. ${obj.name}`
+        if (obj.rebuttals && obj.rebuttals.length > 0) {
+          client_profile += `\n   Formas de quebrar:`
+          obj.rebuttals.forEach((rebuttal: string, i: number) => {
+            client_profile += `\n   ${String.fromCharCode(97 + i)}) ${rebuttal}`
+          })
+        } else {
+          client_profile += `\n   Formas de quebrar: Não cadastradas`
+        }
+      })
+    } else {
+      client_profile += `\n\nNenhuma objeção específica foi configurada para este roleplay.`
+    }
+
+    console.log('👤 Perfil do Cliente:\n', client_profile)
+
     // Enviar para N8N para avaliação
     console.log('🚀 Enviando para N8N webhook...')
+    const n8nPayload = {
+      transcription,
+      context,
+      client_profile,
+      companyId: session.company_id
+    }
+
+    console.log('📡 Payload completo para N8N:', JSON.stringify(n8nPayload, null, 2))
+
     const n8nResponse = await fetch(N8N_EVALUATION_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        transcription,
-        context,
-        companyId: session.company_id
-      })
+      body: JSON.stringify(n8nPayload)
     })
 
     if (!n8nResponse.ok) {
@@ -100,6 +133,13 @@ export async function POST(request: Request) {
     const endedAt = new Date()
     const durationSeconds = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000)
 
+    // Converter overall_score de 0-100 para 0-10 (formato do banco)
+    let overallScoreConverted = null
+    if (evaluation?.overall_score !== undefined && evaluation?.overall_score !== null) {
+      overallScoreConverted = evaluation.overall_score / 10
+      console.log(`📊 Score convertido: ${evaluation.overall_score}/100 → ${overallScoreConverted}/10`)
+    }
+
     // Atualizar sessão com avaliação e status completed
     const { error: updateError } = await supabaseAdmin
       .from('roleplays_unicos')
@@ -108,7 +148,7 @@ export async function POST(request: Request) {
         ended_at: endedAt.toISOString(),
         duration_seconds: durationSeconds,
         evaluation: evaluation,
-        overall_score: evaluation?.overall_score || null,
+        overall_score: overallScoreConverted,
         performance_level: evaluation?.performance_level || null
       })
       .eq('id', sessionId)

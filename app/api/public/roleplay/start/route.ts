@@ -24,6 +24,8 @@ export async function POST(request: Request) {
       config // age, temperament, personaId, objectionIds
     } = await request.json()
 
+    console.log('🔍 Dados recebidos:', { participantName, companyId, linkId, config })
+
     if (!participantName || !companyId) {
       return NextResponse.json(
         { error: 'Nome e empresa são obrigatórios' },
@@ -60,10 +62,16 @@ export async function POST(request: Request) {
       .single()
 
     // Buscar objeções completas
-    const { data: objections } = await supabaseAdmin
+    console.log('🔍 Buscando objeções com IDs:', config.objectionIds)
+    const { data: objections, error: objectionsError } = await supabaseAdmin
       .from('objections')
       .select('*')
       .in('id', config.objectionIds)
+
+    console.log('📋 Objeções retornadas do banco:', objections)
+    if (objectionsError) {
+      console.error('❌ Erro ao buscar objeções:', objectionsError)
+    }
 
     // Montar texto das objeções
     let objectionsText = 'Nenhuma objeção específica'
@@ -144,22 +152,26 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     }
 
     // Criar sessão no banco de dados (sem salvar a primeira mensagem)
+    const sessionData = {
+      link_id: linkId,
+      company_id: companyId,
+      participant_name: participantName,
+      thread_id: threadId,
+      config: {
+        age: config.age,
+        temperament: config.temperament,
+        persona: persona,
+        objections: objections
+      },
+      messages: [],
+      status: 'in_progress'
+    }
+
+    console.log('💾 Salvando sessão com dados:', sessionData)
+
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('roleplays_unicos')
-      .insert({
-        link_id: linkId,
-        company_id: companyId,
-        participant_name: participantName,
-        thread_id: threadId,
-        config: {
-          age: config.age,
-          temperament: config.temperament,
-          persona: persona,
-          objections: objections
-        },
-        messages: [],
-        status: 'in_progress'
-      })
+      .insert(sessionData)
       .select()
       .single()
 

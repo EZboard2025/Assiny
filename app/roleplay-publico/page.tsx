@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square } from 'lucide-react'
+import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X } from 'lucide-react'
 import Image from 'next/image'
 
 // Keyframes CSS globais para animação das estrelas
@@ -90,6 +90,9 @@ export default function RoleplayPublico() {
       if (cachedConfig) {
         const data = JSON.parse(cachedConfig)
         setCompanyConfig(data)
+
+        // IMPORTANTE: Salvar linkId mesmo quando usa cache
+        setLinkId(data.roleplayLink?.id)
 
         // Restaurar configurações salvas
         if (data.roleplayLink?.config) {
@@ -257,38 +260,62 @@ export default function RoleplayPublico() {
   }
 
   const endRoleplay = async () => {
-    if (!sessionId) return
+    console.log('🛑 Finalizando roleplay...')
+    console.log('📋 Session ID:', sessionId)
+
+    if (!sessionId) {
+      console.error('❌ Session ID não encontrado!')
+      alert('Erro: Sessão não encontrada')
+      return
+    }
+
+    // Prevenir cliques múltiplos
+    if (isEvaluating) {
+      console.log('⚠️ Avaliação já está em andamento')
+      return
+    }
 
     setIsEvaluating(true)
 
     try {
+      console.log('📤 Enviando requisição para /api/public/roleplay/end')
       const response = await fetch('/api/public/roleplay/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId })
       })
 
+      console.log('📥 Resposta recebida:', response.status, response.statusText)
+
       if (!response.ok) {
-        throw new Error('Erro ao finalizar roleplay')
+        const errorData = await response.json()
+        console.error('❌ Erro na resposta:', errorData)
+        throw new Error(errorData.error || 'Erro ao finalizar roleplay')
       }
 
-      const { evaluation } = await response.json()
+      const data = await response.json()
+      console.log('✅ Dados recebidos:', data)
+
+      const { evaluation } = data
 
       // Parse evaluation se necessário
       let parsedEvaluation = evaluation
       if (parsedEvaluation && typeof parsedEvaluation === 'object' && 'output' in parsedEvaluation) {
+        console.log('🔄 Parseando evaluation.output...')
         try {
           parsedEvaluation = JSON.parse(parsedEvaluation.output)
         } catch (e) {
-          console.error('Erro ao fazer parse da avaliação:', e)
+          console.error('❌ Erro ao fazer parse da avaliação:', e)
         }
       }
 
+      console.log('📊 Evaluation final:', parsedEvaluation)
       setEvaluation(parsedEvaluation)
       setShowEvaluationModal(true)
+      console.log('✅ Modal de avaliação deve aparecer agora')
     } catch (error) {
-      console.error('Erro ao finalizar roleplay:', error)
-      alert('Erro ao finalizar roleplay')
+      console.error('❌ Erro ao finalizar roleplay:', error)
+      alert('Erro ao finalizar roleplay: ' + (error as Error).message)
     } finally {
       setIsEvaluating(false)
     }
@@ -317,20 +344,24 @@ export default function RoleplayPublico() {
 
     setIsProcessing(true)
     try {
+      const requestData = {
+        participantName,
+        companyId: companyConfig?.company.id,
+        linkId: linkId, // Passar o ID do link para associar à sessão
+        config: {
+          age: selectedAge,
+          temperament: selectedTemperament,
+          personaId: selectedPersona,
+          objectionIds: selectedObjections
+        }
+      }
+
+      console.log('🚀 Iniciando roleplay com dados:', requestData)
+
       const response = await fetch('/api/public/roleplay/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          participantName,
-          companyId: companyConfig?.company.id,
-          linkId: linkId, // Passar o ID do link para associar à sessão
-          config: {
-            age: selectedAge,
-            temperament: selectedTemperament,
-            personaId: selectedPersona,
-            objectionIds: selectedObjections
-          }
-        })
+        body: JSON.stringify(requestData)
       })
 
       if (!response.ok) {
@@ -737,10 +768,17 @@ export default function RoleplayPublico() {
 
             <button
               onClick={endRoleplay}
-              disabled={isProcessing}
-              className="px-6 py-3 bg-gray-800/50 hover:bg-gray-800/70 backdrop-blur-sm border border-green-500/30 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isProcessing || isEvaluating}
+              className="px-6 py-3 bg-gray-800/50 hover:bg-gray-800/70 backdrop-blur-sm border border-green-500/30 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Finalizar Roleplay
+              {isEvaluating ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Avaliando...
+                </>
+              ) : (
+                'Finalizar Roleplay'
+              )}
             </button>
           </div>
 
@@ -753,6 +791,126 @@ export default function RoleplayPublico() {
             </div>
           )}
         </div>
+
+        {/* Modal de Avaliação */}
+        {showEvaluationModal && evaluation && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-4">
+            <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+              {/* Close Button */}
+              <button
+                onClick={closeEvaluationAndReset}
+                className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+
+              {/* Header */}
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-5">
+                <h2 className="text-2xl font-bold text-center text-white mb-4">🎯 RESULTADO DA AVALIAÇÃO</h2>
+
+                {/* Score Geral */}
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                  <div className="text-center">
+                    <div className="text-5xl font-bold text-green-400 mb-2">
+                      {evaluation.overall_score || 0}/100
+                    </div>
+                    <div className="text-sm uppercase tracking-wider text-gray-400">
+                      {evaluation.performance_level || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-5 space-y-4">
+                {/* Resumo Executivo */}
+                {evaluation.executive_summary && (
+                  <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                    <h3 className="text-base font-bold text-green-400 mb-2">📋 Resumo Executivo</h3>
+                    <p className="text-sm text-gray-300 leading-relaxed">{evaluation.executive_summary}</p>
+                  </div>
+                )}
+
+                {/* SPIN Scores */}
+                {evaluation.spin_evaluation && (
+                  <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                    <h3 className="text-base font-bold text-green-400 mb-3">📊 Métricas SPIN</h3>
+                    <div className="grid grid-cols-4 gap-3">
+                      {['S', 'P', 'I', 'N'].map((key) => (
+                        <div key={key} className="text-center bg-gray-900/50 rounded-lg p-3 border border-green-500/10">
+                          <div className="text-xs text-gray-400 mb-1">{key}</div>
+                          <div className="text-2xl font-bold text-white">
+                            {evaluation.spin_evaluation[key]?.final_score?.toFixed(1) || '0.0'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pontos Fortes */}
+                {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
+                  <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
+                    <h3 className="text-base font-bold text-green-400 mb-2">✅ Pontos Fortes</h3>
+                    <ul className="space-y-2">
+                      {evaluation.top_strengths.map((strength: string, index: number) => (
+                        <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
+                          <span className="text-green-400 mt-0.5">•</span>
+                          <span>{strength}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Gaps Críticos */}
+                {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
+                  <div className="bg-gray-800/40 rounded-xl p-4 border border-red-500/20">
+                    <h3 className="text-base font-bold text-red-400 mb-2">⚠️ Gaps Críticos</h3>
+                    <ul className="space-y-2">
+                      {evaluation.critical_gaps.map((gap: string, index: number) => (
+                        <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
+                          <span className="text-red-400 mt-0.5">•</span>
+                          <span>{gap}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Melhorias Prioritárias */}
+                {evaluation.priority_improvements && evaluation.priority_improvements.length > 0 && (
+                  <div className="bg-gray-800/40 rounded-xl p-4 border border-yellow-500/20">
+                    <h3 className="text-base font-bold text-yellow-400 mb-3">🎯 Melhorias Prioritárias</h3>
+                    <div className="space-y-3">
+                      {evaluation.priority_improvements.map((improvement: any, index: number) => (
+                        <div key={index} className="bg-gray-900/50 rounded-lg p-3 border border-yellow-500/10">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs uppercase font-bold text-yellow-400">
+                              {improvement.priority}
+                            </span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-300">{improvement.area}</span>
+                          </div>
+                          <p className="text-sm text-gray-400 mb-2">{improvement.current_gap}</p>
+                          <p className="text-sm text-gray-300">{improvement.action_plan}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Botão Fechar */}
+                <button
+                  onClick={closeEvaluationAndReset}
+                  className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
+                >
+                  Fechar e Voltar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
     </>
