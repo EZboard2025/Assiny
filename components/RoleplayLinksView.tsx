@@ -431,7 +431,7 @@ export default function RoleplayLinksView() {
                   className="px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white border border-gray-700"
                 >
                   <History className="w-5 h-5" />
-                  Ver Roleplays
+                  {showHistorico ? 'Ver Configuração' : 'Ver Roleplays'}
                 </button>
                 <button
                   onClick={toggleActive}
