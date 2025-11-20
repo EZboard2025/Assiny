@@ -18,6 +18,22 @@ const globalStyles = `
       transform: translateY(-150vh) translateX(var(--float-x));
     }
   }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.5);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(34, 197, 94, 0.5);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(34, 197, 94, 0.7);
+  }
 `
 
 interface CompanyConfig {
@@ -546,6 +562,16 @@ export default function RoleplayPublico() {
       o => companyConfig.roleplayLink.config.objection_ids.includes(o.id)
     )
 
+    // Debug logs
+    console.log('🔍 Debug Persona:')
+    console.log('  - persona_id configurado:', companyConfig?.roleplayLink.config.persona_id)
+    console.log('  - Personas disponíveis:', companyConfig?.personas)
+    console.log('  - Persona selecionada:', selectedPersonaData)
+    console.log('🔍 Debug Objeções:')
+    console.log('  - objection_ids configurados:', companyConfig?.roleplayLink.config.objection_ids)
+    console.log('  - Objeções disponíveis:', companyConfig?.objections)
+    console.log('  - Objeções selecionadas:', selectedObjectionsData)
+
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
@@ -598,23 +624,46 @@ export default function RoleplayPublico() {
 
           <div className="space-y-5">
             {/* Informações do Roleplay Configurado */}
-            <div className="bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl p-5">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl p-5 max-h-[400px] overflow-y-auto custom-scrollbar">
               <h3 className="text-base font-semibold text-green-400 mb-3">
                 Cenário do Roleplay
               </h3>
-              <div className="space-y-2 text-base text-gray-200">
-                <p>
-                  <span className="text-gray-400">Cliente:</span>{' '}
-                  {companyConfig.roleplayLink.config.age} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}
-                </p>
-                <p>
-                  <span className="text-gray-400">Cargo:</span>{' '}
-                  {selectedPersonaData?.cargo}
-                </p>
-                <p>
-                  <span className="text-gray-400">Objeções:</span>{' '}
-                  {selectedObjectionsData?.length} preparadas
-                </p>
+              <div className="space-y-3 text-sm text-gray-200">
+                {/* Cliente (Idade + Temperamento) */}
+                <div>
+                  <p className="text-gray-400 font-semibold mb-1">Cliente:</p>
+                  <p className="text-gray-200">{companyConfig.roleplayLink.config.age} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}</p>
+                </div>
+
+                {/* Persona */}
+                <div>
+                  <p className="text-gray-400 font-semibold mb-1">Persona:</p>
+                  <p className="text-gray-200">
+                    {selectedPersonaData ? (
+                      selectedPersonaData.job_title ||
+                      selectedPersonaData.cargo ||
+                      selectedPersonaData.profession ||
+                      selectedPersonaData.profissao ||
+                      'Cliente'
+                    ) : (
+                      <span className="text-yellow-400 text-xs">Não configurada</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Objeções */}
+                {selectedObjectionsData && selectedObjectionsData.length > 0 && (
+                  <div>
+                    <p className="text-gray-400 font-semibold mb-1">Objeções ({selectedObjectionsData.length}):</p>
+                    <div className="bg-gray-900/50 rounded-lg p-3 space-y-2">
+                      {selectedObjectionsData.map((objection: any, index: number) => (
+                        <div key={index} className="text-xs">
+                          <p className="text-green-400 font-semibold">{index + 1}. {objection.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
