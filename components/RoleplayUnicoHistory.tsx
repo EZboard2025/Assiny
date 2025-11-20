@@ -395,8 +395,8 @@ export default function RoleplayUnicoHistory({ companyId }: RoleplayUnicoHistory
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`text-lg font-bold ${getScoreColor(roleplay.overall_score)}`}>
-                        {roleplay.overall_score ? roleplay.overall_score.toFixed(1) : '-'}
+                      <span className={`text-lg font-bold ${getScoreColor(roleplay.overall_score ? roleplay.overall_score / 10 : undefined)}`}>
+                        {roleplay.overall_score ? (roleplay.overall_score / 10).toFixed(1) : '-'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center text-sm text-gray-300">
@@ -520,19 +520,11 @@ export default function RoleplayUnicoHistory({ companyId }: RoleplayUnicoHistory
                 {roleplayDetails.evaluation && (
                   <div className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4">
                     <h3 className="text-lg font-semibold text-white mb-3">Avaliação</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-400 mb-1">Score Geral</p>
-                        <p className="text-3xl font-bold text-purple-400">
-                          {roleplayDetails.overall_score?.toFixed(1) || '-'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400 mb-1">Nível de Performance</p>
-                        <p className="text-lg font-semibold text-white">
-                          {roleplayDetails.performance_level || '-'}
-                        </p>
-                      </div>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 mb-1">Score Geral</p>
+                      <p className="text-5xl font-bold text-purple-400">
+                        {roleplayDetails.overall_score ? (roleplayDetails.overall_score / 10).toFixed(1) : '-'}/10
+                      </p>
                     </div>
                   </div>
                 )}

@@ -562,16 +562,6 @@ export default function RoleplayPublico() {
       o => companyConfig.roleplayLink.config.objection_ids.includes(o.id)
     )
 
-    // Debug logs
-    console.log('🔍 Debug Persona:')
-    console.log('  - persona_id configurado:', companyConfig?.roleplayLink.config.persona_id)
-    console.log('  - Personas disponíveis:', companyConfig?.personas)
-    console.log('  - Persona selecionada:', selectedPersonaData)
-    console.log('🔍 Debug Objeções:')
-    console.log('  - objection_ids configurados:', companyConfig?.roleplayLink.config.objection_ids)
-    console.log('  - Objeções disponíveis:', companyConfig?.objections)
-    console.log('  - Objeções selecionadas:', selectedObjectionsData)
-
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
@@ -848,10 +838,7 @@ export default function RoleplayPublico() {
                 <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
                   <div className="text-center">
                     <div className="text-5xl font-bold text-green-400 mb-2">
-                      {evaluation.overall_score || 0}/100
-                    </div>
-                    <div className="text-sm uppercase tracking-wider text-gray-400">
-                      {evaluation.performance_level || 'N/A'}
+                      {((evaluation.overall_score || 0) / 10).toFixed(1)}/10
                     </div>
                   </div>
                 </div>

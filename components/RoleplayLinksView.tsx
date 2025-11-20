@@ -873,30 +873,27 @@ export default function RoleplayLinksView() {
       {/* Modal de Avaliação Detalhada */}
       {selectedEvaluation && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-4">
-          <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+          <div className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => setSelectedEvaluation(null)}
-              className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
+              className="absolute top-2 right-2 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
             >
               <X className="w-5 h-5 text-gray-400" />
             </button>
 
             {/* Header */}
-            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-5">
-              <h2 className="text-2xl font-bold text-center text-white mb-2">🎯 AVALIAÇÃO DETALHADA</h2>
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-4">
+              <h2 className="text-xl font-bold text-center text-white mb-2">🎯 AVALIAÇÃO DETALHADA</h2>
               <p className="text-center text-gray-400 text-sm">
                 {selectedEvaluation.participant_name} - {new Date(selectedEvaluation.created_at).toLocaleString('pt-BR')}
               </p>
 
               {/* Score Geral */}
-              <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20 mt-4">
+              <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20 mt-3">
                 <div className="text-center">
-                  <div className="text-5xl font-bold text-green-400 mb-2">
-                    {selectedEvaluation.evaluation?.overall_score?.toFixed(1) || '0.0'}/10
-                  </div>
-                  <div className="text-sm uppercase tracking-wider text-gray-400">
-                    {selectedEvaluation.evaluation?.performance_level || 'N/A'}
+                  <div className="text-4xl font-bold text-green-400">
+                    {selectedEvaluation.evaluation?.overall_score ? (selectedEvaluation.evaluation.overall_score / 10).toFixed(1) : '0.0'}/10
                   </div>
                 </div>
               </div>
