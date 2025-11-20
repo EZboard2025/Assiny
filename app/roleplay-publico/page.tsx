@@ -632,13 +632,15 @@ export default function RoleplayPublico() {
                 {/* Cliente (Idade + Temperamento) */}
                 <div>
                   <p className="text-gray-400 font-semibold mb-1">Cliente:</p>
-                  <p className="text-gray-200">{companyConfig.roleplayLink.config.age} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}</p>
+                  <p className="text-green-400 font-semibold">
+                    {companyConfig.roleplayLink.config.age} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}
+                  </p>
                 </div>
 
                 {/* Persona */}
                 <div>
                   <p className="text-gray-400 font-semibold mb-1">Persona:</p>
-                  <p className="text-gray-200">
+                  <p className="text-green-400 font-semibold">
                     {selectedPersonaData ? (
                       selectedPersonaData.job_title ||
                       selectedPersonaData.cargo ||
