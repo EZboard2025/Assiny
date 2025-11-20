@@ -836,14 +836,9 @@ export default function RoleplayLinksView() {
 
                           <div className="ml-6 text-right">
                             {overallScore !== null && overallScore !== undefined ? (
-                              <>
-                                <div className={`text-4xl font-bold ${getScoreColor(performanceLevel)}`}>
-                                  {overallScore.toFixed(1)}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {getPerformanceLevelText(performanceLevel)}
-                                </div>
-                              </>
+                              <div className={`text-4xl font-bold ${getScoreColor(performanceLevel)}`}>
+                                {(overallScore / 10).toFixed(1)}/10
+                              </div>
                             ) : (
                               <div className="text-sm text-gray-500">
                                 Sem avaliação
