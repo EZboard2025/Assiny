@@ -49,6 +49,32 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       }
 
       if (data.user) {
+        // Verificar se o usuário pertence à empresa do subdomínio
+        const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+        const subdomainCompanyId = await getCompanyId()
+
+        // Buscar company_id do usuário
+        const { data: employee, error: employeeError } = await supabase
+          .from('employees')
+          .select('company_id')
+          .eq('user_id', data.user.id)
+          .single()
+
+        if (employeeError || !employee) {
+          await supabase.auth.signOut()
+          setError('Usuário não encontrado no sistema')
+          setLoading(false)
+          return
+        }
+
+        // Validar se o company_id do usuário corresponde ao subdomínio
+        if (subdomainCompanyId && employee.company_id !== subdomainCompanyId) {
+          await supabase.auth.signOut()
+          setError('Este usuário não tem acesso a esta empresa')
+          setLoading(false)
+          return
+        }
+
         // Login bem-sucedido
         onLogin()
       }
