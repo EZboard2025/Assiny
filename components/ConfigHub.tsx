@@ -2300,7 +2300,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
               </div>
-            ) : userRole === 'Admin' ? (
+            ) : userRole?.toLowerCase() === 'admin' ? (
               // Configuration Interface - Admin only
               <ConfigurationInterface
                 personaEvaluation={personaEvaluation}

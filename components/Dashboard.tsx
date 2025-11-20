@@ -261,7 +261,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </button>
 
               {/* Admin/Gestor only menu items */}
-              {(userRole === 'Admin' || userRole === 'Gestor') && (
+              {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
                 <>
                   {/* Separator */}
                   <div className="w-px h-6 bg-gray-600"></div>
@@ -289,7 +289,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </button>
 
               {/* Config button - Admin only */}
-              {userRole === 'Admin' && (
+              {userRole?.toLowerCase() === 'admin' && (
                 <button
                   onClick={() => setShowConfigHub(true)}
                   className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
