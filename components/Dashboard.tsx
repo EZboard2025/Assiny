@@ -133,72 +133,89 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           </div>
 
           {/* Features Section */}
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              Sessão de funcionalidades
-            </h2>
+          <div className="relative mb-16">
+            {/* Glow effect behind title */}
+            <div className="absolute inset-0 flex items-center justify-center -top-10">
+              <div className="w-96 h-32 bg-green-500/20 rounded-full blur-3xl"></div>
+            </div>
+
+            <div className="text-center mb-12 relative">
+              <span className="text-green-400 text-sm font-semibold tracking-widest uppercase mb-3 block">
+                Explore a plataforma
+              </span>
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">
+                O que você pode fazer
+              </h2>
+              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                Ferramentas poderosas para transformar sua equipe de vendas
+              </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Roleplay Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Roleplay Card - Featured */}
             <button
               onClick={() => handleViewChange('roleplay')}
-              className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`feature-card group text-left md:col-span-2 lg:col-span-1 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
-                    <Users className="w-7 h-7 text-green-400" />
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/30 via-lime-500/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl group-hover:from-green-500/40 transition-all duration-500"></div>
+              <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 hover:border-green-400/80 transition-all duration-300 h-full overflow-hidden">
+                {/* Decorative corner glow */}
+                <div className="absolute -top-20 -right-20 w-40 h-40 bg-green-500/30 rounded-full blur-3xl group-hover:bg-green-400/40 transition-all"></div>
+
+                <div className="relative">
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30 group-hover:shadow-green-500/50 group-hover:scale-110 transition-all duration-300">
+                      <Users className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">Roleplay</h3>
+                      <span className="text-green-400 text-sm font-medium">Treine agora</span>
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-bold">Roleplay</h3>
+                  <p className="text-gray-300 text-base leading-relaxed">
+                    Simule conversas reais de vendas com clientes gerados por IA. Receba feedback instantâneo baseado na metodologia SPIN.
+                  </p>
+                  <div className="mt-6 flex items-center text-green-400 font-medium group-hover:text-green-300 transition-colors">
+                    <span>Iniciar treino</span>
+                    <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </div>
                 </div>
-                <p className="text-gray-400 text-lg">
-                  Roleplays interativos simulando vendas com clientes reais de IA.
-                </p>
               </div>
             </button>
-
-            {/* PDI Card - Indisponível */}
-            <div
-              className={`feature-card group text-left opacity-50 cursor-not-allowed ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '200ms' }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-gray-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-gray-500/30">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-gray-600/20 rounded-2xl flex items-center justify-center">
-                    <Target className="w-7 h-7 text-gray-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-300">PDI</h3>
-                    <span className="text-xs text-yellow-500 font-semibold">Em breve</span>
-                  </div>
-                </div>
-                <p className="text-gray-500 text-lg">
-                  Plano de Desenvolvimento Individual personalizado para sua evolução.
-                </p>
-              </div>
-            </div>
 
             {/* Meu Perfil Card */}
             <button
               onClick={() => handleViewChange('perfil')}
               className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '300ms' }}
+              style={{ animationDelay: '200ms' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
-                    <User className="w-7 h-7 text-green-400" />
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/30 via-lime-500/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl group-hover:from-green-500/40 transition-all duration-500"></div>
+              <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 hover:border-green-400/80 transition-all duration-300 h-full overflow-hidden">
+                <div className="absolute -top-20 -right-20 w-40 h-40 bg-green-500/30 rounded-full blur-3xl group-hover:bg-green-400/40 transition-all"></div>
+                <div className="relative">
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30 group-hover:shadow-green-500/50 group-hover:scale-110 transition-all duration-300">
+                      <User className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">Meu Perfil</h3>
+                      <span className="text-green-400 text-sm font-medium">Suas métricas</span>
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-bold">Meu Perfil</h3>
+                  <p className="text-gray-300 text-base leading-relaxed">
+                    Acompanhe sua evolução, métricas SPIN e performance geral nas vendas.
+                  </p>
+                  <div className="mt-6 flex items-center text-green-400 font-medium group-hover:text-green-300 transition-colors">
+                    <span>Ver perfil</span>
+                    <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </div>
                 </div>
-                <p className="text-gray-400 text-lg">
-                  Acompanhe suas métricas, evolução e desempenho nas vendas.
-                </p>
               </div>
             </button>
 
@@ -206,40 +223,102 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <button
               onClick={() => handleViewChange('historico')}
               className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '400ms' }}
+              style={{ animationDelay: '300ms' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
-                    <Clock className="w-7 h-7 text-green-400" />
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/30 via-lime-500/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl group-hover:from-green-500/40 transition-all duration-500"></div>
+              <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 hover:border-green-400/80 transition-all duration-300 h-full overflow-hidden">
+                <div className="absolute -top-20 -right-20 w-40 h-40 bg-green-500/30 rounded-full blur-3xl group-hover:bg-green-400/40 transition-all"></div>
+                <div className="relative">
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30 group-hover:shadow-green-500/50 group-hover:scale-110 transition-all duration-300">
+                      <Clock className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">Histórico</h3>
+                      <span className="text-green-400 text-sm font-medium">Sessões anteriores</span>
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-bold">Histórico</h3>
+                  <p className="text-gray-300 text-base leading-relaxed">
+                    Revise sessões anteriores com transcrições completas e análises detalhadas.
+                  </p>
+                  <div className="mt-6 flex items-center text-green-400 font-medium group-hover:text-green-300 transition-colors">
+                    <span>Ver histórico</span>
+                    <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </div>
                 </div>
-                <p className="text-gray-400 text-lg">
-                  Revise suas sessões anteriores com transcrições e análises detalhadas.
-                </p>
               </div>
             </button>
+
+            {/* PDI Card - Em breve */}
+            <div
+              className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '400ms' }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-600/20 via-gray-500/10 to-transparent rounded-3xl blur-xl"></div>
+              <div className="relative bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-xl rounded-3xl p-8 border border-gray-600/40 h-full overflow-hidden">
+                <div className="absolute -top-20 -right-20 w-40 h-40 bg-gray-600/20 rounded-full blur-3xl"></div>
+                <div className="absolute top-4 right-4">
+                  <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded-full border border-yellow-500/30">
+                    Em breve
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-700 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-600/20">
+                      <Target className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-400">PDI</h3>
+                      <span className="text-gray-500 text-sm font-medium">Plano personalizado</span>
+                    </div>
+                  </div>
+                  <p className="text-gray-500 text-base leading-relaxed">
+                    Plano de Desenvolvimento Individual personalizado baseado na sua performance.
+                  </p>
+                  <div className="mt-6 flex items-center text-gray-500 font-medium">
+                    <span>Disponível em breve</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
                 onClick={() => handleViewChange('roleplay-links')}
                 className={`feature-card group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '700ms' }}
+                style={{ animationDelay: '500ms' }}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl transition-all"></div>
-                <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 hover:border-green-500/60 transition-all">
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-14 h-14 bg-green-600/20 rounded-2xl flex items-center justify-center">
-                      <Link2 className="w-7 h-7 text-green-400" />
-                    </div>
-                    <h3 className="text-2xl font-bold">Roleplay Público</h3>
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500/30 via-lime-500/20 to-transparent rounded-3xl blur-xl group-hover:blur-2xl group-hover:from-green-500/40 transition-all duration-500"></div>
+                <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 hover:border-green-400/80 transition-all duration-300 h-full overflow-hidden">
+                  <div className="absolute -top-20 -right-20 w-40 h-40 bg-green-500/30 rounded-full blur-3xl group-hover:bg-green-400/40 transition-all"></div>
+                  <div className="absolute top-4 right-4">
+                    <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs font-semibold rounded-full border border-green-500/30">
+                      Admin
+                    </span>
                   </div>
-                  <p className="text-gray-400 text-lg">
-                    Gere links públicos para roleplays e acompanhe os resultados.
-                  </p>
+                  <div className="relative">
+                    <div className="flex items-center gap-4 mb-5">
+                      <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30 group-hover:shadow-green-500/50 group-hover:scale-110 transition-all duration-300">
+                        <Link2 className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-white">Roleplay Público</h3>
+                        <span className="text-green-400 text-sm font-medium">Links externos</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-300 text-base leading-relaxed">
+                      Gere links públicos para roleplays externos e acompanhe os resultados.
+                    </p>
+                    <div className="mt-6 flex items-center text-green-400 font-medium group-hover:text-green-300 transition-colors">
+                      <span>Gerenciar links</span>
+                      <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </button>
             )}
