@@ -146,9 +146,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               <h2 className="text-4xl md:text-5xl font-bold mb-4">
                 O que você pode fazer
               </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                Ferramentas poderosas para transformar sua equipe de vendas
-              </p>
             </div>
           </div>
 

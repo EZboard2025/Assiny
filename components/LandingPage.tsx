@@ -23,7 +23,7 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <Logo />
-              <span className="text-xl font-bold text-gray-900">Assiny Training</span>
+              <span className="text-xl font-bold text-gray-900">Ramppy</span>
             </div>
             <button
               onClick={onOpenLogin}
@@ -46,7 +46,7 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Desenvolva suas habilidades de vendas com nosso assistente de IA
-              especializado em metodologias e estratégias da Assiny
+              especializado em metodologias e estratégias da Ramppy
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
               <button
@@ -128,7 +128,7 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             Pronto para evoluir suas vendas?
           </h2>
           <p className="text-xl text-white/90 mb-8">
-            Junte-se ao time de vendedores de alta performance da Assiny
+            Junte-se ao time de vendedores de alta performance da Ramppy
           </p>
           <button
             onClick={onOpenLogin}
@@ -145,10 +145,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Logo className="w-8 h-8" />
-            <span className="text-white font-medium">Assiny Training</span>
+            <span className="text-white font-medium">Ramppy</span>
           </div>
           <p className="text-gray-400 text-sm">
-            © 2024 Assiny. Plataforma Interna de Treinamento.
+            © 2024 Ramppy. Plataforma de Treinamento com IA.
           </p>
         </div>
       </footer>

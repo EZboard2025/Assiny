@@ -1,7 +1,7 @@
 import { supabase } from '../supabase'
 import type { MCPRequest, MCPResponse, TrainingModule, UserProgressContext, AIAgent } from './types'
 
-class AssinyAIAgent implements AIAgent {
+class RamppyAIAgent implements AIAgent {
   /**
    * Processa mensagens do usuário e retorna resposta contextualizada
    */
@@ -91,7 +91,7 @@ class AssinyAIAgent implements AIAgent {
    * Constrói o prompt de sistema para a IA
    */
   private buildSystemPrompt(context: any): string {
-    return `Você é um assistente de treinamento especializado em vendas da Assiny.
+    return `Você é um assistente de treinamento especializado em vendas da Ramppy.
 
 Seu papel é:
 - Ajudar vendedores a desenvolver suas habilidades
@@ -157,4 +157,4 @@ Seja sempre profissional, motivador e focado em resultados práticos.`
 }
 
 // Exportar instância singleton
-export const aiAgent = new AssinyAIAgent()
+export const aiAgent = new RamppyAIAgent()

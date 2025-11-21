@@ -178,7 +178,7 @@ RESUMO DE PERFORMANCE - ${userName}
 
 DADOS GERAIS:
 - Nome: ${userName}
-- Empresa: Assiny
+- Empresa: Ramppy
 - Total de Sessões: ${performanceSummary.total_sessions}
 - Nota Média Geral: ${performanceSummary.overall_average?.toFixed(1) || 'N/A'}
 
@@ -241,7 +241,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
       if (!parsedPDI.vendedor) {
         parsedPDI.vendedor = {
           nome: userName,
-          empresa: 'Assiny',
+          empresa: 'Ramppy',
           total_sessoes: performanceSummary.total_sessions
         }
       }
@@ -670,7 +670,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
         {/* Footer */}
         <div className="text-center py-6">
           <p className="text-gray-500 text-sm">
-            PDI gerado automaticamente pela plataforma Assiny • Foco em resultados em 7 dias
+            PDI gerado automaticamente pela plataforma Ramppy • Foco em resultados em 7 dias
           </p>
         </div>
         </div>
