@@ -595,17 +595,17 @@ export default function RoleplayPublico() {
         <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-5 max-w-lg w-full border border-green-500/30 shadow-2xl shadow-green-900/50 relative z-10">
           <div className="text-center mb-4">
             {/* Logo Ramppy */}
-            <div className="w-56 h-56 mx-auto -mb-6 relative -mt-6">
+            <div className="w-40 h-40 mx-auto -mb-2 relative">
               <Image
                 src="/images/ramppy-logo.png"
                 alt="Ramppy Logo"
-                width={224}
-                height={224}
+                width={160}
+                height={160}
                 className="drop-shadow-[0_0_40px_rgba(34,197,94,0.8)]"
               />
             </div>
             <h1 className="text-2xl font-bold text-white mb-1">
-              Roleplay de Vendas - {companyConfig?.company.name}
+              Roleplay de Vendas - <span className="text-green-400 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]">{companyConfig?.company.name}</span>
             </h1>
             <p className="text-sm text-gray-300">
               Pratique suas habilidades de vendas com nosso simulador inteligente
