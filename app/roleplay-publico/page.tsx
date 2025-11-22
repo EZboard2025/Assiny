@@ -592,33 +592,33 @@ export default function RoleplayPublico() {
           </div>
 
 
-        <div className="bg-gray-900/60 backdrop-blur-md rounded-3xl p-6 max-w-2xl w-full border border-green-500/30 shadow-2xl shadow-green-900/50 relative z-10">
-          <div className="text-center mb-5">
+        <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-5 max-w-lg w-full border border-green-500/30 shadow-2xl shadow-green-900/50 relative z-10">
+          <div className="text-center mb-4">
             {/* Logo Ramppy */}
-            <div className="w-80 h-80 mx-auto -mb-8 relative -mt-8">
+            <div className="w-56 h-56 mx-auto -mb-6 relative -mt-6">
               <Image
                 src="/images/ramppy-logo.png"
                 alt="Ramppy Logo"
-                width={320}
-                height={320}
-                className="drop-shadow-[0_0_50px_rgba(34,197,94,0.8)]"
+                width={224}
+                height={224}
+                className="drop-shadow-[0_0_40px_rgba(34,197,94,0.8)]"
               />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-2xl font-bold text-white mb-1">
               Roleplay de Vendas - {companyConfig?.company.name}
             </h1>
-            <p className="text-base text-gray-300">
+            <p className="text-sm text-gray-300">
               Pratique suas habilidades de vendas com nosso simulador inteligente
             </p>
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Informações do Roleplay Configurado */}
-            <div className="bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl p-5 max-h-[400px] overflow-y-auto custom-scrollbar">
-              <h3 className="text-base font-semibold text-green-400 mb-3">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl p-4 max-h-[180px] overflow-y-auto custom-scrollbar">
+              <h3 className="text-sm font-semibold text-green-400 mb-2">
                 Cenário do Roleplay
               </h3>
-              <div className="space-y-3 text-sm text-gray-200">
+              <div className="space-y-2 text-sm text-gray-200">
                 {/* Cliente (Idade + Temperamento) */}
                 <div>
                   <p className="text-gray-400 font-semibold mb-1">Cliente:</p>
@@ -661,14 +661,14 @@ export default function RoleplayPublico() {
 
             {/* Nome */}
             <div>
-              <label className="block text-base font-semibold text-gray-200 mb-2">
+              <label className="block text-sm font-semibold text-gray-200 mb-1.5">
                 Seu Nome
               </label>
               <input
                 type="text"
                 value={participantName}
                 onChange={(e) => setParticipantName(e.target.value)}
-                className="w-full px-4 py-3.5 bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500/60 focus:bg-gray-800/70 transition-all text-lg"
+                className="w-full px-4 py-3 bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500/60 focus:bg-gray-800/70 transition-all"
                 placeholder="Digite seu nome para começar"
                 autoFocus
               />
@@ -678,7 +678,7 @@ export default function RoleplayPublico() {
             <button
               onClick={startRoleplay}
               disabled={isProcessing || !participantName.trim()}
-              className="w-full py-4 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 text-lg"
+              className="w-full py-3.5 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
             >
               {isProcessing ? (
                 <>
