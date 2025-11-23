@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, type Persona, type PersonaB2B, type PersonaB2C, type Objection } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 
@@ -52,6 +52,10 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [personas, setPersonas] = useState<Persona[]>([])
   const [objections, setObjections] = useState<Objection[]>([])
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
+
+  // Estados de expansão individual
+  const [expandedPersonaId, setExpandedPersonaId] = useState<string | null>(null)
+  const [expandedObjectionId, setExpandedObjectionId] = useState<string | null>(null)
 
   // Chat simulation
   const [messages, setMessages] = useState<Array<{ role: 'client' | 'seller', text: string }>>([])
@@ -1463,32 +1467,68 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                             .map((persona) => (
                               <div
                                 key={persona.id}
-                                onClick={() => setSelectedPersona(persona.id!)}
-                                className={`cursor-pointer bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
+                                className={`bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
                                   selectedPersona === persona.id
                                     ? 'border-green-500 shadow-lg shadow-green-500/20'
                                     : 'border-green-500/30 hover:border-green-500/50'
                                 }`}
                               >
                                 <div className="flex items-start gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
+                                  <div
+                                    onClick={() => setSelectedPersona(persona.id!)}
+                                    className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0 cursor-pointer"
+                                  >
                                     <UserCircle2 className="w-6 h-6 text-white" />
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-white text-sm">
+                                  <div className="flex-1 min-w-0" onClick={() => setSelectedPersona(persona.id!)}>
+                                    <h4 className="font-semibold text-white text-sm cursor-pointer">
                                       {persona.business_type === 'B2B'
                                         ? (persona as PersonaB2B).job_title
                                         : (persona as PersonaB2C).profession}
                                     </h4>
-                                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                                      {persona.business_type === 'B2B'
-                                        ? (persona as PersonaB2B).company_type
-                                        : (persona as PersonaB2C).what_seeks}
-                                    </p>
+                                    {expandedPersonaId === persona.id ? (
+                                      <div className="text-xs text-gray-400 mt-2 space-y-1">
+                                        {persona.business_type === 'B2B' ? (
+                                          <>
+                                            <p><span className="text-green-400 font-medium">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
+                                            <p><span className="text-green-400 font-medium">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
+                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2B).company_goals}</p>
+                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2B).prior_knowledge}</p>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
+                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
+                                            <p><span className="text-green-400 font-medium">Conhecimento:</span> {(persona as PersonaB2C).prior_knowledge}</p>
+                                          </>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-gray-400 mt-1 line-clamp-1 cursor-pointer">
+                                        {persona.business_type === 'B2B'
+                                          ? (persona as PersonaB2B).company_type
+                                          : (persona as PersonaB2C).what_seeks}
+                                      </p>
+                                    )}
                                   </div>
-                                  {selectedPersona === persona.id && (
-                                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                                  )}
+                                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                                    {selectedPersona === persona.id && (
+                                      <CheckCircle className="w-5 h-5 text-green-500" />
+                                    )}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!)
+                                      }}
+                                      className="text-green-400 hover:text-green-300 transition-colors p-1"
+                                    >
+                                      {expandedPersonaId === persona.id ? (
+                                        <ChevronUp className="w-4 h-4" />
+                                      ) : (
+                                        <ChevronDown className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -1499,27 +1539,73 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     {/* Objeções */}
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Objeções <span className="text-gray-500 text-xs">({selectedObjections.length} selecionadas)</span>
+                        Objeções <span className="text-green-400 text-xs font-semibold">({selectedObjections.length} selecionadas)</span>
                       </label>
                       {objections.length === 0 ? (
                         <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
                           Nenhuma objeção cadastrada.
                         </div>
                       ) : (
-                        <div style={{ maxHeight: '250px', overflowY: 'auto' }} className="space-y-2 pr-2 custom-scrollbar">
+                        <div
+                          className="space-y-2 pr-2 overflow-y-auto"
+                          style={{ height: '200px', maxHeight: '200px', overflowY: 'scroll' }}
+                        >
                           {objections.map((objection) => (
-                            <label
+                            <div
                               key={objection.id}
-                              className="flex items-center gap-3 bg-gray-800/50 border border-green-500/20 rounded-xl px-3 py-2.5 cursor-pointer hover:border-green-500/40 transition-colors"
+                              className={`group border rounded-xl px-4 py-2.5 transition-all duration-200 ${
+                                selectedObjections.includes(objection.id)
+                                  ? 'bg-gradient-to-r from-green-900/40 to-green-800/20 border-green-500 shadow-md shadow-green-500/10'
+                                  : 'bg-gray-800/40 border-green-500/20 hover:border-green-500/40 hover:bg-gray-800/60'
+                              }`}
                             >
-                              <input
-                                type="checkbox"
-                                checked={selectedObjections.includes(objection.id)}
-                                onChange={() => toggleObjection(objection.id)}
-                                className="w-4 h-4 rounded border-green-500/30 text-green-600 focus:ring-green-500 focus:ring-offset-0"
-                              />
-                              <span className="text-gray-300 text-sm">{objection.name}</span>
-                            </label>
+                              <div className="flex items-start gap-3">
+                                <div
+                                  onClick={() => toggleObjection(objection.id)}
+                                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 mt-0.5 cursor-pointer ${
+                                    selectedObjections.includes(objection.id)
+                                      ? 'bg-green-500 border-green-500'
+                                      : 'border-green-500/40 group-hover:border-green-500/60'
+                                  }`}
+                                >
+                                  {selectedObjections.includes(objection.id) && (
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleObjection(objection.id)}>
+                                  <span className={`text-sm transition-colors duration-200 ${
+                                    expandedObjectionId === objection.id ? '' : 'truncate block'
+                                  } ${
+                                    selectedObjections.includes(objection.id)
+                                      ? 'text-white font-medium'
+                                      : 'text-gray-300 group-hover:text-gray-200'
+                                  }`}>{objection.name}</span>
+                                  {expandedObjectionId === objection.id && objection.rebuttals && objection.rebuttals.length > 0 && (
+                                    <div className="mt-2 pl-2 border-l-2 border-green-500/30 space-y-1">
+                                      <p className="text-xs text-green-400 font-medium">Rebatidas:</p>
+                                      {objection.rebuttals.map((rebuttal, idx) => (
+                                        <p key={idx} className="text-xs text-gray-400">• {rebuttal}</p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setExpandedObjectionId(expandedObjectionId === objection.id ? null : objection.id)
+                                  }}
+                                  className="text-green-400 hover:text-green-300 transition-colors p-1 flex-shrink-0"
+                                >
+                                  {expandedObjectionId === objection.id ? (
+                                    <ChevronUp className="w-4 h-4" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
