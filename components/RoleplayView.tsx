@@ -10,6 +10,26 @@ interface RoleplayViewProps {
 }
 
 export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps = {}) {
+  // CSS for custom scrollbar
+  const scrollbarStyles = `
+    <style>
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(31, 41, 55, 0.5);
+        border-radius: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(34, 197, 94, 0.5);
+        border-radius: 4px;
+        transition: background 0.2s;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(34, 197, 94, 0.7);
+      }
+    </style>
+  `;
   const [showConfig, setShowConfig] = useState(false)
   const [isSimulating, setIsSimulating] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -845,7 +865,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   }
 
   return (
-    <div className="min-h-screen py-20 px-6 relative z-10">
+    <>
+      <div dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
+      <div className="min-h-screen py-20 px-6 relative z-10">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className={`text-center mb-12 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
@@ -1276,7 +1298,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         {/* Configuration Modal */}
         {showConfig && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 pt-24">
             <div className="relative max-w-5xl w-full">
               <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
               <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
@@ -1432,44 +1454,47 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           Nenhuma persona {businessType} cadastrada.
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
-                        {personas
-                          .filter(p => p.business_type === businessType)
-                          .map((persona) => (
-                            <div
-                              key={persona.id}
-                              onClick={() => setSelectedPersona(persona.id!)}
-                              className={`cursor-pointer bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
-                                selectedPersona === persona.id
-                                  ? 'border-green-500 shadow-lg shadow-green-500/20'
-                                  : 'border-green-500/30 hover:border-green-500/50'
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
-                                  <UserCircle2 className="w-6 h-6 text-white" />
+                        <div
+                          className="space-y-2 overflow-y-auto pr-2"
+                          style={{ height: '200px', maxHeight: '200px', overflowY: 'scroll' }}
+                        >
+                          {personas
+                            .filter(p => p.business_type === businessType)
+                            .map((persona) => (
+                              <div
+                                key={persona.id}
+                                onClick={() => setSelectedPersona(persona.id!)}
+                                className={`cursor-pointer bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
+                                  selectedPersona === persona.id
+                                    ? 'border-green-500 shadow-lg shadow-green-500/20'
+                                    : 'border-green-500/30 hover:border-green-500/50'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
+                                    <UserCircle2 className="w-6 h-6 text-white" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-semibold text-white text-sm">
+                                      {persona.business_type === 'B2B'
+                                        ? (persona as PersonaB2B).job_title
+                                        : (persona as PersonaB2C).profession}
+                                    </h4>
+                                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                                      {persona.business_type === 'B2B'
+                                        ? (persona as PersonaB2B).company_type
+                                        : (persona as PersonaB2C).what_seeks}
+                                    </p>
+                                  </div>
+                                  {selectedPersona === persona.id && (
+                                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                                  )}
                                 </div>
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-white text-sm">
-                                    {persona.business_type === 'B2B'
-                                      ? (persona as PersonaB2B).job_title
-                                      : (persona as PersonaB2C).profession}
-                                  </h4>
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    {persona.business_type === 'B2B'
-                                      ? (persona as PersonaB2B).company_type
-                                      : (persona as PersonaB2C).what_seeks}
-                                  </p>
-                                </div>
-                                {selectedPersona === persona.id && (
-                                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                                )}
                               </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Objeções */}
                     <div>
@@ -1481,7 +1506,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           Nenhuma objeção cadastrada.
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                        <div style={{ maxHeight: '250px', overflowY: 'auto' }} className="space-y-2 pr-2 custom-scrollbar">
                           {objections.map((objection) => (
                             <label
                               key={objection.id}
@@ -1874,5 +1899,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         )}
       </div>
     </div>
+    </>
   )
 }
