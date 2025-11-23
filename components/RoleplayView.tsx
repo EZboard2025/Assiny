@@ -1276,10 +1276,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         {/* Configuration Modal */}
         {showConfig && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 pt-24">
-            <div className="relative max-w-2xl w-full">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="relative max-w-5xl w-full">
               <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 max-h-[80vh] overflow-y-auto">
+              <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold">Configuração da Sessão</h2>
                   <button
@@ -1295,146 +1295,151 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  {/* Idade do Cliente */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-3">
-                      Idade do Cliente: <span className="text-green-400 text-lg font-bold">{age} anos</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="18"
-                      max="60"
-                      value={age}
-                      onChange={(e) => setAge(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-purple"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>18</span>
-                      <span>60</span>
-                    </div>
-
-                    {/* Caixa de Comportamento por Faixa Etária */}
-                    <div className="mt-4 bg-gradient-to-br from-blue-900/20 to-green-900/20 border border-blue-500/30 rounded-xl p-4">
-                      {age >= 18 && age <= 24 && (
-                        <div>
-                          <p className="text-sm font-semibold text-blue-400 mb-2">18 a 24 anos</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Informal e moderno</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Mano", "Tipo assim", "Na moral", "Vi isso no Instagram"</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Aceita novidades facilmente • Teme risco operacional • Referências digitais e trends</p>
-                        </div>
-                      )}
-                      {age >= 25 && age <= 34 && (
-                        <div>
-                          <p className="text-sm font-semibold text-green-400 mb-2">25 a 34 anos</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Pragmático e orientado a resultados</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Preciso ver o retorno disso", "Quanto isso impacta no CPA?"</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em ROI e métricas • Aceita risco calculado • Profissional mas não engessado</p>
-                        </div>
-                      )}
-                      {age >= 35 && age <= 44 && (
-                        <div>
-                          <p className="text-sm font-semibold text-yellow-400 mb-2">35 a 44 anos</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Preciso garantir que isso não quebra nada", "Como fica a parte de compliance?"</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Valoriza compliance e previsibilidade • Cauteloso com promessas • Exige validação prática</p>
-                        </div>
-                      )}
-                      {age >= 45 && age <= 60 && (
-                        <div>
-                          <p className="text-sm font-semibold text-orange-400 mb-2">45 a 60 anos</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Tom:</span> Conservador e formal</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Vocabulário:</span> "Não posso me dar ao luxo de instabilidade", "Quem garante que isso funciona?"</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em segurança e governança • Avesso a riscos • Exige suporte dedicado e validação ampla</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Temperamento */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-3">
-                      Temperamento
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {temperaments.map((temp) => (
-                        <button
-                          key={temp}
-                          onClick={() => setTemperament(temp)}
-                          className={`px-4 py-3 rounded-xl font-medium transition-all ${
-                            temperament === temp
-                              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                              : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
-                          }`}
-                        >
-                          {temp}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Caixa de Descrição do Temperamento */}
-                    <div className="mt-4 bg-gradient-to-br from-green-900/20 to-pink-900/20 border border-green-500/30 rounded-xl p-4">
-                      {temperament === 'Analítico' && (
-                        <div>
-                          <p className="text-sm font-semibold text-green-400 mb-2">Analítico</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Tom formal e lógico • Faz perguntas técnicas • Desconfia de argumentos subjetivos • Cobra detalhes quando vendedor é vago</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Formal, racional, calmo e preciso</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Dados concretos, estatísticas, provas de eficácia, garantias</p>
-                        </div>
-                      )}
-                      {temperament === 'Empático' && (
-                        <div>
-                          <p className="text-sm font-semibold text-pink-400 mb-2">Empático</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Demonstra empatia genuína • Compartilha experiências pessoais • Pergunta sobre impacto humano • Usa expressões emocionais • Reage positivamente a atenção</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Afável, próximo, gentil e emocional</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Histórias reais, propósito, apoio humano, relacionamento</p>
-                        </div>
-                      )}
-                      {temperament === 'Determinado' && (
-                        <div>
-                          <p className="text-sm font-semibold text-red-400 mb-2">Determinado</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Postura firme e objetiva • Corta rodeios • Perguntas estratégicas • Demonstra impaciência se vendedor demora • Mostra pressa e decisão rápida</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Soluções rápidas, eficiência, autoridade, resultado imediato</p>
-                        </div>
-                      )}
-                      {temperament === 'Indeciso' && (
-                        <div>
-                          <p className="text-sm font-semibold text-yellow-400 mb-2">Indeciso</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Demonstra insegurança e dúvida • Faz perguntas repetidas • Expressa medo ("não sei se é o momento certo") • Busca garantias constantemente • Muda de opinião facilmente</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Hesitante, cauteloso e questionador</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Depoimentos, garantias, segurança, prova social</p>
-                        </div>
-                      )}
-                      {temperament === 'Sociável' && (
-                        <div>
-                          <p className="text-sm font-semibold text-cyan-400 mb-2">Sociável</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Comportamento:</span> Animado e espontâneo • Usa humor leve e linguagem descontraída • Faz comentários fora do tema • Mostra tédio se vendedor for frio ou formal</p>
-                          <p className="text-xs text-gray-300 mb-2"><span className="font-semibold">Estilo:</span> Leve, animado, entusiasmado e informal</p>
-                          <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Amizade, humor, interesse genuíno, energia positiva</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Persona */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-3">
-                      Persona
-                    </label>
-                    {personas.filter(p => p.business_type === businessType).length === 0 ? (
-                      <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-4 text-gray-400 text-sm">
-                        Nenhuma persona {businessType} cadastrada. Configure no Hub de Configuração.
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Coluna Esquerda */}
+                  <div className="space-y-4">
+                    {/* Idade do Cliente */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Idade do Cliente: <span className="text-green-400 text-lg font-bold">{age} anos</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="18"
+                        max="60"
+                        value={age}
+                        onChange={(e) => setAge(Number(e.target.value))}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-purple"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>18</span>
+                        <span>60</span>
                       </div>
-                    ) : (
-                      <div className="space-y-3">
+
+                      {/* Caixa de Comportamento por Faixa Etária */}
+                      <div className="mt-3 bg-gradient-to-br from-blue-900/20 to-green-900/20 border border-blue-500/30 rounded-xl p-3">
+                        {age >= 18 && age <= 24 && (
+                          <div>
+                            <p className="text-sm font-semibold text-blue-400 mb-2">18 a 24 anos</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Informal e moderno</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Preciso ver o retorno disso", "Quanto isso impacta no CPA?"</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Aceita novidades • Referências digitais • Trends</p>
+                          </div>
+                        )}
+                        {age >= 25 && age <= 34 && (
+                          <div>
+                            <p className="text-sm font-semibold text-green-400 mb-2">25 a 34 anos</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Pragmático e orientado a resultados</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Preciso ver o retorno disso", "Quanto isso impacta no CPA?"</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em ROI • Aceita risco calculado • Profissional</p>
+                          </div>
+                        )}
+                        {age >= 35 && age <= 44 && (
+                          <div>
+                            <p className="text-sm font-semibold text-yellow-400 mb-2">35 a 44 anos</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Preciso garantir que isso não quebra nada"</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Valoriza compliance • Cauteloso • Validação prática</p>
+                          </div>
+                        )}
+                        {age >= 45 && age <= 60 && (
+                          <div>
+                            <p className="text-sm font-semibold text-orange-400 mb-2">45 a 60 anos</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Conservador e formal</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Não posso me dar ao luxo de instabilidade"</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em segurança • Avesso a riscos • Suporte dedicado</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Temperamento */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Temperamento
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {temperaments.map((temp) => (
+                          <button
+                            key={temp}
+                            onClick={() => setTemperament(temp)}
+                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                              temperament === temp
+                                ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                                : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
+                            }`}
+                          >
+                            {temp}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Caixa de Descrição do Temperamento */}
+                      <div className="mt-3 bg-gradient-to-br from-green-900/20 to-pink-900/20 border border-green-500/30 rounded-xl p-3">
+                        {temperament === 'Analítico' && (
+                          <div>
+                            <p className="text-sm font-semibold text-green-400 mb-2">Analítico</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Tom formal e lógico • Faz perguntas técnicas • Desconfia de argumentos subjetivos</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Formal, racional, calmo e preciso</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Dados concretos, estatísticas, provas de eficácia, garantias</p>
+                          </div>
+                        )}
+                        {temperament === 'Empático' && (
+                          <div>
+                            <p className="text-sm font-semibold text-pink-400 mb-2">Empático</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Demonstra empatia genuína • Compartilha experiências pessoais • Pergunta sobre impacto humano</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Afável, próximo, gentil e emocional</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Histórias reais, propósito, apoio humano, relacionamento</p>
+                          </div>
+                        )}
+                        {temperament === 'Determinado' && (
+                          <div>
+                            <p className="text-sm font-semibold text-red-400 mb-2">Determinado</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Postura firme e objetiva • Corta rodeios • Perguntas estratégicas • Demonstra impaciência</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Soluções rápidas, eficiência, autoridade, resultado imediato</p>
+                          </div>
+                        )}
+                        {temperament === 'Indeciso' && (
+                          <div>
+                            <p className="text-sm font-semibold text-yellow-400 mb-2">Indeciso</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Demonstra insegurança e dúvida • Faz perguntas repetidas • Expressa medo • Busca garantias</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Hesitante, cauteloso e questionador</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Depoimentos, garantias, segurança, prova social</p>
+                          </div>
+                        )}
+                        {temperament === 'Sociável' && (
+                          <div>
+                            <p className="text-sm font-semibold text-cyan-400 mb-2">Sociável</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Animado e espontâneo • Usa humor leve • Faz comentários fora do tema • Mostra tédio se vendedor for frio</p>
+                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Leve, animado, entusiasmado e informal</p>
+                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Amizade, humor, interesse genuíno, energia positiva</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coluna Direita */}
+                  <div className="space-y-4">
+                    {/* Persona */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Persona
+                      </label>
+                      {personas.filter(p => p.business_type === businessType).length === 0 ? (
+                        <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
+                          Nenhuma persona {businessType} cadastrada.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
                         {personas
                           .filter(p => p.business_type === businessType)
                           .map((persona) => (
                             <div
                               key={persona.id}
                               onClick={() => setSelectedPersona(persona.id!)}
-                              className={`cursor-pointer bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-4 transition-all ${
+                              className={`cursor-pointer bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
                                 selectedPersona === persona.id
                                   ? 'border-green-500 shadow-lg shadow-green-500/20'
                                   : 'border-green-500/30 hover:border-green-500/50'
@@ -1444,70 +1449,20 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
                                   <UserCircle2 className="w-6 h-6 text-white" />
                                 </div>
-                                <div className="flex-1 space-y-2">
-                                  <h4 className="font-bold text-white">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-white text-sm">
                                     {persona.business_type === 'B2B'
                                       ? (persona as PersonaB2B).job_title
                                       : (persona as PersonaB2C).profession}
                                   </h4>
-
-                                  {persona.business_type === 'B2B' && (
-                                    <>
-                                      {(persona as PersonaB2B).company_type && (
-                                        <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-green-400">Tipo de Empresa:</span>{' '}
-                                          {(persona as PersonaB2B).company_type}
-                                        </p>
-                                      )}
-                                      {(persona as PersonaB2B).company_goals && (
-                                        <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-green-400">Busca:</span>{' '}
-                                          {(persona as PersonaB2B).company_goals}
-                                        </p>
-                                      )}
-                                      {(persona as PersonaB2B).business_challenges && (
-                                        <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-green-400">Desafios:</span>{' '}
-                                          {(persona as PersonaB2B).business_challenges}
-                                        </p>
-                                      )}
-                                      {(persona as PersonaB2B).prior_knowledge && (
-                                        <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
-                                          {(persona as PersonaB2B).prior_knowledge}
-                                        </p>
-                                      )}
-                                    </>
-                                  )}
-
-                                  {persona.business_type === 'B2C' && (
-                                    <>
-                                      {(persona as PersonaB2C).what_seeks && (
-                                        <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-green-400">Busca:</span>{' '}
-                                          {(persona as PersonaB2C).what_seeks}
-                                        </p>
-                                      )}
-                                      {(persona as PersonaB2C).main_pains && (
-                                        <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-green-400">Dores:</span>{' '}
-                                          {(persona as PersonaB2C).main_pains}
-                                        </p>
-                                      )}
-                                      {(persona as PersonaB2C).prior_knowledge && (
-                                        <p className="text-xs text-gray-300">
-                                          <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
-                                          {(persona as PersonaB2C).prior_knowledge}
-                                        </p>
-                                      )}
-                                    </>
-                                  )}
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    {persona.business_type === 'B2B'
+                                      ? (persona as PersonaB2B).company_type
+                                      : (persona as PersonaB2C).what_seeks}
+                                  </p>
                                 </div>
-
                                 {selectedPersona === persona.id && (
-                                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                    <CheckCircle className="w-4 h-4 text-white" />
-                                  </div>
+                                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                                 )}
                               </div>
                             </div>
@@ -1516,38 +1471,39 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     )}
                   </div>
 
-                  {/* Objeções */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-3">
-                      Objeções (selecione as que deseja praticar)
-                    </label>
-                    {objections.length === 0 ? (
-                      <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-4 text-gray-400 text-sm">
-                        Nenhuma objeção cadastrada. Configure no Hub de Configuração.
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                        {objections.map((objection) => (
-                          <label
-                            key={objection.id}
-                            className="flex items-center gap-3 bg-gray-800/50 border border-green-500/20 rounded-xl px-4 py-3 cursor-pointer hover:border-green-500/40 transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedObjections.includes(objection.id)}
-                              onChange={() => toggleObjection(objection.id)}
-                              className="w-5 h-5 rounded border-green-500/30 text-green-600 focus:ring-green-500 focus:ring-offset-0"
-                            />
-                            <span className="text-gray-300">{objection.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                    {/* Objeções */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Objeções <span className="text-gray-500 text-xs">({selectedObjections.length} selecionadas)</span>
+                      </label>
+                      {objections.length === 0 ? (
+                        <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
+                          Nenhuma objeção cadastrada.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                          {objections.map((objection) => (
+                            <label
+                              key={objection.id}
+                              className="flex items-center gap-3 bg-gray-800/50 border border-green-500/20 rounded-xl px-3 py-2.5 cursor-pointer hover:border-green-500/40 transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedObjections.includes(objection.id)}
+                                onChange={() => toggleObjection(objection.id)}
+                                className="w-4 h-4 rounded border-green-500/30 text-green-600 focus:ring-green-500 focus:ring-offset-0"
+                              />
+                              <span className="text-gray-300 text-sm">{objection.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-4 mt-6">
+                <div className="flex gap-4 mt-5">
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -1555,14 +1511,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       setShowConfig(false);
                     }}
                     type="button"
-                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-semibold hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-base font-semibold hover:bg-gray-700/50 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleStartSimulation}
                     type="button"
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-semibold hover:scale-105 transition-transform glow-green cursor-pointer"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl text-base font-semibold hover:scale-105 transition-transform glow-green cursor-pointer"
                   >
                     Iniciar Roleplay
                   </button>
