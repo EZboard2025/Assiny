@@ -18,6 +18,13 @@ interface Company {
   }
 }
 
+interface UserWithRoleplays {
+  id: string
+  name: string
+  email: string
+  roleplayCount: number
+}
+
 interface CompanyMetrics {
   companyId: string
   companyName: string
@@ -36,6 +43,7 @@ interface CompanyMetrics {
     objectionsCount: number
   }
   isFullyConfigured: boolean
+  usersWithRoleplays: UserWithRoleplays[]
 }
 
 interface MetricsTotals {
@@ -76,6 +84,7 @@ export default function CompaniesAdmin() {
   const [loadingMetrics, setLoadingMetrics] = useState(false)
   const [showMetrics, setShowMetrics] = useState(false)
   const [expandedMetricId, setExpandedMetricId] = useState<string | null>(null)
+  const [showUsersForCompany, setShowUsersForCompany] = useState<string | null>(null)
 
   const loadMetrics = async () => {
     setLoadingMetrics(true)
@@ -526,47 +535,88 @@ export default function CompaniesAdmin() {
 
                         {/* Expanded Details */}
                         {expandedMetricId === metric.companyId && (
-                          <div className="mt-4 pt-4 border-t border-gray-700/50 grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="flex items-center gap-2">
-                              {metric.configStatus.hasPersonas ? (
-                                <CheckCircle className="w-4 h-4 text-green-400" />
-                              ) : (
-                                <AlertCircle className="w-4 h-4 text-yellow-400" />
-                              )}
-                              <span className="text-sm text-gray-300">
-                                Personas: {metric.configStatus.personasCount}
-                              </span>
+                          <div className="mt-4 pt-4 border-t border-gray-700/50 space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="flex items-center gap-2">
+                                {metric.configStatus.hasPersonas ? (
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                ) : (
+                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                )}
+                                <span className="text-sm text-gray-300">
+                                  Personas: {metric.configStatus.personasCount}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {metric.configStatus.hasObjections ? (
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                ) : (
+                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                )}
+                                <span className="text-sm text-gray-300">
+                                  Objeções: {metric.configStatus.objectionsCount}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {metric.configStatus.hasCompanyData ? (
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                ) : (
+                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                )}
+                                <span className="text-sm text-gray-300">
+                                  Dados da Empresa
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {metric.configStatus.hasBusinessType ? (
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                ) : (
+                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                )}
+                                <span className="text-sm text-gray-300">
+                                  Tipo de Negócio
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {metric.configStatus.hasObjections ? (
-                                <CheckCircle className="w-4 h-4 text-green-400" />
-                              ) : (
-                                <AlertCircle className="w-4 h-4 text-yellow-400" />
-                              )}
-                              <span className="text-sm text-gray-300">
-                                Objeções: {metric.configStatus.objectionsCount}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {metric.configStatus.hasCompanyData ? (
-                                <CheckCircle className="w-4 h-4 text-green-400" />
-                              ) : (
-                                <AlertCircle className="w-4 h-4 text-yellow-400" />
-                              )}
-                              <span className="text-sm text-gray-300">
-                                Dados da Empresa
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {metric.configStatus.hasBusinessType ? (
-                                <CheckCircle className="w-4 h-4 text-green-400" />
-                              ) : (
-                                <AlertCircle className="w-4 h-4 text-yellow-400" />
-                              )}
-                              <span className="text-sm text-gray-300">
-                                Tipo de Negócio
-                              </span>
-                            </div>
+
+                            {/* Botão Ver Usuários */}
+                            {metric.usersWithRoleplays.length > 0 && (
+                              <div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setShowUsersForCompany(showUsersForCompany === metric.companyId ? null : metric.companyId)
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                  <Users className="w-4 h-4" />
+                                  {showUsersForCompany === metric.companyId ? 'Ocultar' : 'Ver'} Usuários ({metric.usersWithRoleplays.length})
+                                </button>
+
+                                {/* Lista de Usuários */}
+                                {showUsersForCompany === metric.companyId && (
+                                  <div className="mt-3 bg-gray-800/50 rounded-xl p-3 space-y-2">
+                                    {metric.usersWithRoleplays.map((user) => (
+                                      <div key={user.id} className="flex items-center justify-between py-2 px-3 bg-gray-900/50 rounded-lg">
+                                        <div>
+                                          <p className="text-sm font-medium text-white">{user.name}</p>
+                                          <p className="text-xs text-gray-400">{user.email}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <PlayCircle className="w-4 h-4 text-purple-400" />
+                                          <span className="text-sm font-semibold text-purple-300">{user.roleplayCount}</span>
+                                          <span className="text-xs text-gray-500">roleplays</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {metric.usersWithRoleplays.length === 0 && metric.roleplays.training > 0 && (
+                              <p className="text-sm text-gray-500 italic">Nenhum usuário identificado nos roleplays</p>
+                            )}
                           </div>
                         )}
                       </div>
