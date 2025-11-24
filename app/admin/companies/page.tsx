@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -16,6 +16,34 @@ interface Company {
   _count?: {
     employees: number
   }
+}
+
+interface CompanyMetrics {
+  companyId: string
+  companyName: string
+  subdomain: string
+  roleplays: {
+    training: number
+    public: number
+    total: number
+  }
+  configStatus: {
+    hasPersonas: boolean
+    hasObjections: boolean
+    hasCompanyData: boolean
+    hasBusinessType: boolean
+    personasCount: number
+    objectionsCount: number
+  }
+  isFullyConfigured: boolean
+}
+
+interface MetricsTotals {
+  trainingRoleplays: number
+  publicRoleplays: number
+  totalRoleplays: number
+  fullyConfiguredCompanies: number
+  totalCompanies: number
 }
 
 export default function CompaniesAdmin() {
@@ -41,6 +69,38 @@ export default function CompaniesAdmin() {
 
   // Toast system
   const { toasts, showToast, removeToast } = useToast()
+
+  // Metrics states
+  const [metrics, setMetrics] = useState<CompanyMetrics[]>([])
+  const [metricsTotals, setMetricsTotals] = useState<MetricsTotals | null>(null)
+  const [loadingMetrics, setLoadingMetrics] = useState(false)
+  const [showMetrics, setShowMetrics] = useState(false)
+  const [expandedMetricId, setExpandedMetricId] = useState<string | null>(null)
+
+  const loadMetrics = async () => {
+    setLoadingMetrics(true)
+    try {
+      const response = await fetch('/api/admin/companies/metrics')
+      const data = await response.json()
+
+      if (!response.ok) throw new Error(data.error)
+
+      setMetrics(data.metrics)
+      setMetricsTotals(data.totals)
+    } catch (error) {
+      console.error('Erro ao carregar métricas:', error)
+      showToast('error', 'Erro ao carregar métricas')
+    } finally {
+      setLoadingMetrics(false)
+    }
+  }
+
+  const handleToggleMetrics = () => {
+    if (!showMetrics && metrics.length === 0) {
+      loadMetrics()
+    }
+    setShowMetrics(!showMetrics)
+  }
 
   // Form fields
   const [companyName, setCompanyName] = useState('')
@@ -359,14 +419,164 @@ export default function CompaniesAdmin() {
             <p className="text-gray-400">Administre as empresas do sistema multi-tenant</p>
           </div>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30"
-          >
-            <Plus className="w-5 h-5" />
-            Nova Empresa
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleToggleMetrics}
+              className={`px-6 py-3 ${showMetrics ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-gray-700 hover:bg-gray-600'} text-white rounded-xl font-medium transition-all flex items-center gap-2`}
+            >
+              <BarChart3 className="w-5 h-5" />
+              {showMetrics ? 'Ocultar Métricas' : 'Ver Métricas'}
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30"
+            >
+              <Plus className="w-5 h-5" />
+              Nova Empresa
+            </button>
+          </div>
         </div>
+
+        {/* Metrics Section */}
+        {showMetrics && (
+          <div className="mb-8 space-y-6">
+            {/* Totals Cards */}
+            {loadingMetrics ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+              </div>
+            ) : metricsTotals && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/30 rounded-2xl p-5 border border-blue-500/30">
+                    <div className="flex items-center gap-3 mb-2">
+                      <PlayCircle className="w-6 h-6 text-blue-400" />
+                      <span className="text-sm text-gray-400">Total de Roleplays</span>
+                    </div>
+                    <p className="text-3xl font-bold text-white">{metricsTotals.totalRoleplays}</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 rounded-2xl p-5 border border-purple-500/30">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Users className="w-6 h-6 text-purple-400" />
+                      <span className="text-sm text-gray-400">Treinamento</span>
+                    </div>
+                    <p className="text-3xl font-bold text-white">{metricsTotals.trainingRoleplays}</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-green-900/50 to-green-800/30 rounded-2xl p-5 border border-green-500/30">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Globe className="w-6 h-6 text-green-400" />
+                      <span className="text-sm text-gray-400">Públicos</span>
+                    </div>
+                    <p className="text-3xl font-bold text-white">{metricsTotals.publicRoleplays}</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-orange-900/50 to-orange-800/30 rounded-2xl p-5 border border-orange-500/30">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Settings className="w-6 h-6 text-orange-400" />
+                      <span className="text-sm text-gray-400">Empresas Configuradas</span>
+                    </div>
+                    <p className="text-3xl font-bold text-white">
+                      {metricsTotals.fullyConfiguredCompanies}/{metricsTotals.totalCompanies}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Per Company Metrics */}
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-2xl border border-gray-700 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-700 bg-gray-800/50">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-blue-400" />
+                      Métricas por Empresa
+                    </h3>
+                  </div>
+
+                  <div className="divide-y divide-gray-700">
+                    {metrics.map((metric) => (
+                      <div key={metric.companyId} className="p-4">
+                        <div
+                          className="flex items-center justify-between cursor-pointer"
+                          onClick={() => setExpandedMetricId(expandedMetricId === metric.companyId ? null : metric.companyId)}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`w-3 h-3 rounded-full ${metric.isFullyConfigured ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                            <div>
+                              <p className="font-medium text-white">{metric.companyName}</p>
+                              <p className="text-sm text-gray-400">{metric.subdomain}.ramppy.site</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-6">
+                            <div className="text-right">
+                              <p className="text-sm text-gray-400">Roleplays</p>
+                              <p className="font-semibold text-white">{metric.roleplays.total}</p>
+                            </div>
+                            <div className="text-right hidden sm:block">
+                              <p className="text-sm text-gray-400">Treinamento / Público</p>
+                              <p className="font-semibold text-white">{metric.roleplays.training} / {metric.roleplays.public}</p>
+                            </div>
+                            {expandedMetricId === metric.companyId ? (
+                              <ChevronUp className="w-5 h-5 text-gray-400" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5 text-gray-400" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expanded Details */}
+                        {expandedMetricId === metric.companyId && (
+                          <div className="mt-4 pt-4 border-t border-gray-700/50 grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="flex items-center gap-2">
+                              {metric.configStatus.hasPersonas ? (
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-yellow-400" />
+                              )}
+                              <span className="text-sm text-gray-300">
+                                Personas: {metric.configStatus.personasCount}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {metric.configStatus.hasObjections ? (
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-yellow-400" />
+                              )}
+                              <span className="text-sm text-gray-300">
+                                Objeções: {metric.configStatus.objectionsCount}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {metric.configStatus.hasCompanyData ? (
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-yellow-400" />
+                              )}
+                              <span className="text-sm text-gray-300">
+                                Dados da Empresa
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {metric.configStatus.hasBusinessType ? (
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-yellow-400" />
+                              )}
+                              <span className="text-sm text-gray-300">
+                                Tipo de Negócio
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Companies Grid */}
         {loading ? (

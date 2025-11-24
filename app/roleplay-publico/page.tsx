@@ -378,7 +378,7 @@ export default function RoleplayPublico() {
         setMessages([{ role: 'client', text: data.firstMessage }])
 
         // Reproduzir áudio da primeira mensagem
-        await playAudioResponse(data.firstMessage, data.sessionId)
+        await playAudioResponse(data.firstMessage)
       }
 
       setSessionStarted(true)

@@ -8,6 +8,7 @@ import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 interface RoleplayLink {
   id: string
   company_id: string
+  link_code: string
   is_active: boolean
   config: {
     age: string
