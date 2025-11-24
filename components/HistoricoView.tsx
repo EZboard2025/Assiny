@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, User, MessageCircle, Calendar, ChevronRight, Trash2, Eye, Download, Filter } from 'lucide-react'
+import { Clock, User, MessageCircle, Calendar, ChevronRight, Trash2, Eye, Download } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 
 export default function HistoricoView() {
@@ -9,7 +9,6 @@ export default function HistoricoView() {
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in_progress' | 'abandoned'>('all')
 
   useEffect(() => {
     setMounted(true)
@@ -55,23 +54,7 @@ export default function HistoricoView() {
     })
   }
 
-  const getStatusBadge = (status: string) => {
-    const badges = {
-      completed: { text: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-      in_progress: { text: 'Em andamento', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-      abandoned: { text: 'Abandonado', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' }
-    }
-    const badge = badges[status as keyof typeof badges] || badges.completed
-    return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
-        {badge.text}
-      </span>
-    )
-  }
-
-  const filteredSessions = filterStatus === 'all'
-    ? sessions
-    : sessions.filter(s => s.status === filterStatus)
+  const filteredSessions = sessions
 
   // Processar evaluation antes de usar
   const getProcessedEvaluation = (session: RoleplaySession) => {
@@ -105,42 +88,6 @@ export default function HistoricoView() {
           </p>
         </div>
 
-        {/* Filtros e Resumo */}
-        <div className={`mb-8 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
-          <div className="flex flex-wrap gap-3 justify-center items-center">
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-6 py-2 rounded-xl font-medium transition-all ${
-                filterStatus === 'all'
-                  ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                  : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
-              }`}
-            >
-              Todas ({sessions.length})
-            </button>
-            <button
-              onClick={() => setFilterStatus('completed')}
-              className={`px-6 py-2 rounded-xl font-medium transition-all ${
-                filterStatus === 'completed'
-                  ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                  : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
-              }`}
-            >
-              Concluídas ({sessions.filter(s => s.status === 'completed').length})
-            </button>
-            <button
-              onClick={() => setFilterStatus('in_progress')}
-              className={`px-6 py-2 rounded-xl font-medium transition-all ${
-                filterStatus === 'in_progress'
-                  ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                  : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
-              }`}
-            >
-              Em andamento ({sessions.filter(s => s.status === 'in_progress').length})
-            </button>
-
-          </div>
-        </div>
 
         {/* Grid de Sessões vs Detalhes */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -175,30 +122,54 @@ export default function HistoricoView() {
                       <button
                         key={session.id}
                         onClick={() => setSelectedSession(session)}
-                        className={`w-full text-left p-4 rounded-xl transition-all ${
+                        className={`relative w-full text-left p-4 rounded-2xl transition-all duration-300 group overflow-hidden ${
                           selectedSession?.id === session.id
-                            ? 'bg-green-600/20 border-2 border-green-500/60'
-                            : 'bg-gray-800/50 border-2 border-green-500/20 hover:border-green-500/40'
+                            ? 'bg-gradient-to-r from-green-600/40 to-emerald-500/30 border-2 border-green-400/70 shadow-xl shadow-green-500/30'
+                            : 'bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-green-500/30 hover:border-green-400/60 hover:shadow-lg hover:shadow-green-500/20'
                         }`}
                       >
-                        <div className="flex items-start justify-between mb-2">
+                        {/* Glow effect */}
+                        <div className={`absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                          selectedSession?.id === session.id ? 'opacity-100' : ''
+                        }`}></div>
+
+                        <div className="relative flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              {getStatusBadge(session.status)}
-                              <span className="text-xs text-gray-500">
-                                {session.messages.length} mensagens
-                              </span>
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                                selectedSession?.id === session.id
+                                  ? 'bg-gradient-to-br from-green-500/50 to-emerald-500/40 shadow-lg shadow-green-500/30'
+                                  : 'bg-gradient-to-br from-green-500/20 to-emerald-500/10 group-hover:from-green-500/30 group-hover:to-emerald-500/20 group-hover:shadow-md group-hover:shadow-green-500/20'
+                              }`}>
+                                <MessageCircle className={`w-5 h-5 transition-colors ${
+                                  selectedSession?.id === session.id ? 'text-green-300' : 'text-green-400'
+                                }`} />
+                              </div>
+                              <div>
+                                <p className={`font-semibold transition-colors ${
+                                  selectedSession?.id === session.id ? 'text-green-100' : 'text-white'
+                                }`}>
+                                  {session.messages.length} mensagens
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {formatDuration(session.duration_seconds) !== 'N/A'
+                                    ? `Duração: ${formatDuration(session.duration_seconds)}`
+                                    : 'Sessão de treino'}
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-sm text-gray-400 flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
+                            <div className="flex items-center gap-2 text-sm text-gray-400 ml-14">
+                              <Calendar className={`w-4 h-4 ${
+                                selectedSession?.id === session.id ? 'text-green-400' : 'text-green-500/60'
+                              }`} />
                               {formatDate(session.created_at)}
-                            </p>
+                            </div>
                           </div>
-                          <ChevronRight className="w-5 h-5 text-gray-500" />
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <Clock className="w-3 h-3" />
-                          Duração: {formatDuration(session.duration_seconds)}
+                          <ChevronRight className={`w-5 h-5 transition-all duration-300 ${
+                            selectedSession?.id === session.id
+                              ? 'text-green-300 translate-x-1'
+                              : 'text-gray-500 group-hover:text-green-400 group-hover:translate-x-1'
+                          }`} />
                         </div>
                       </button>
                     ))}
@@ -225,8 +196,7 @@ export default function HistoricoView() {
                     {/* Header da Sessão */}
                     <div className="flex items-start justify-between pb-4 border-b border-green-500/20">
                       <div>
-                        <h3 className="text-2xl font-bold mb-2">Detalhes da Sessão</h3>
-                        {getStatusBadge(selectedSession.status)}
+                        <h3 className="text-2xl font-bold">Detalhes da Sessão</h3>
                       </div>
                       <button
                         onClick={() => handleDelete(selectedSession.id)}
