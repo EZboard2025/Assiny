@@ -39,6 +39,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
+
+      // Abrir ConfigHub se parâmetro estiver presente
+      const openConfigHub = params.get('openConfigHub')
+      if (openConfigHub === 'true') {
+        setShowConfigHub(true)
+      }
     }
   }, [])
 

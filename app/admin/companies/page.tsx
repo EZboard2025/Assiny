@@ -693,7 +693,7 @@ export default function CompaniesAdmin() {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-700">
+                <div className="mt-4 pt-4 border-t border-gray-700 space-y-2">
                   <div className="flex gap-2">
                     <a
                       href={`http://${company.subdomain}.ramppy.local:3000`}
@@ -712,6 +712,15 @@ export default function CompaniesAdmin() {
                       Acessar Produção
                     </a>
                   </div>
+                  <a
+                    href={`https://${company.subdomain}.ramppy.site?openConfigHub=true`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-sm font-medium text-center transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Ver Configurações
+                  </a>
                 </div>
               </div>
             ))}
