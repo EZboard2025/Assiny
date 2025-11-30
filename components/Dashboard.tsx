@@ -119,7 +119,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       <div className="py-12 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           {/* Welcome Section */}
-          <div className="mb-12">
+          <div className="mb-12 text-center">
             <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
                 Bem-vindo de volta, {userName || 'Vendedor'}!
@@ -130,36 +130,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 backdrop-blur-sm rounded-2xl border border-green-500/20 p-6 mb-12">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-green-400" />
-              Ações Rápidas
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={() => handleViewChange('roleplay')}
-                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-semibold text-white hover:scale-[1.02] transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
-              >
-                <Users className="w-5 h-5" />
-                Iniciar Roleplay
-              </button>
-              <button
-                onClick={() => handleViewChange('perfil')}
-                className="px-6 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl font-semibold text-white hover:bg-gray-800/70 transition-all flex items-center justify-center gap-2"
-              >
-                <User className="w-5 h-5" />
-                Ver Meu Desempenho
-              </button>
-              <button
-                onClick={() => handleViewChange('historico')}
-                className="px-6 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl font-semibold text-white hover:bg-gray-800/70 transition-all flex items-center justify-center gap-2"
-              >
-                <Clock className="w-5 h-5" />
-                Revisar Sessões
-              </button>
-            </div>
-          </div>
 
           {/* Features Grid Title */}
           <div className="mb-8">
@@ -178,7 +148,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full">
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
                     <Users className="w-6 h-6 text-green-400" />
@@ -206,20 +176,20 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '200ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full">
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-xl flex items-center justify-center border border-blue-500/30">
-                    <User className="w-6 h-6 text-blue-400" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                    <User className="w-6 h-6 text-green-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Meu Perfil</h3>
-                    <span className="text-xs text-blue-400">Análise de desempenho</span>
+                    <span className="text-xs text-green-400">Análise de desempenho</span>
                   </div>
                 </div>
                 <p className="text-gray-400 text-sm">
                   Acompanhe sua evolução, métricas SPIN e performance geral nas vendas.
                 </p>
-                <div className="mt-4 flex items-center text-blue-400 text-sm font-medium group-hover:text-blue-300 transition-colors">
+                <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
                   <span>Ver perfil</span>
                   <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -234,20 +204,20 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '300ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full">
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30">
-                    <Clock className="w-6 h-6 text-purple-400" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                    <Clock className="w-6 h-6 text-green-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Histórico</h3>
-                    <span className="text-xs text-purple-400">Sessões anteriores</span>
+                    <span className="text-xs text-green-400">Sessões anteriores</span>
                   </div>
                 </div>
                 <p className="text-gray-400 text-sm">
                   Revise sessões anteriores com transcrições completas e análises detalhadas.
                 </p>
-                <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-purple-300 transition-colors">
+                <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
                   <span>Ver histórico</span>
                   <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -256,88 +226,61 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </button>
 
-            {/* PDI Card */}
-            <button
-              onClick={() => handleViewChange('pdi')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+            {/* PDI Card - Desabilitado */}
+            <div
+              className={`text-left ${mounted ? 'animate-slide-up' : 'opacity-0'} opacity-60 cursor-not-allowed`}
               style={{ animationDelay: '400ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full">
+              <div className="relative bg-gradient-to-br from-gray-900/40 to-gray-800/40 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20 h-full">
+                <div className="absolute top-3 right-3">
+                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-[10px] font-semibold rounded-full border border-yellow-500/30">
+                    Em breve
+                  </span>
+                </div>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-yellow-500/20 to-orange-600/20 rounded-xl flex items-center justify-center border border-yellow-500/30">
-                    <Target className="w-6 h-6 text-yellow-400" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-gray-600/20 to-gray-700/20 rounded-xl flex items-center justify-center border border-gray-600/30">
+                    <Target className="w-6 h-6 text-gray-500" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">PDI</h3>
-                    <span className="text-xs text-yellow-400">Plano de desenvolvimento</span>
+                    <h3 className="text-lg font-bold text-gray-400">PDI</h3>
+                    <span className="text-xs text-gray-500">Plano de desenvolvimento</span>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-500 text-sm">
                   Plano personalizado baseado na sua performance e áreas de melhoria.
                 </p>
-                <div className="mt-4 flex items-center text-yellow-400 text-sm font-medium group-hover:text-yellow-300 transition-colors">
-                  <span>Ver plano</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                <div className="mt-4 flex items-center text-gray-500 text-sm font-medium">
+                  <span>Disponível em breve</span>
                 </div>
               </div>
-            </button>
-
-            {/* Chat IA Card */}
-            <button
-              onClick={() => handleViewChange('chat')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '500ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-xl flex items-center justify-center border border-cyan-500/30">
-                    <MessageCircle className="w-6 h-6 text-cyan-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Chat IA</h3>
-                    <span className="text-xs text-cyan-400">Assistente inteligente</span>
-                  </div>
-                </div>
-                <p className="text-gray-400 text-sm">
-                  Converse com o assistente de IA para tirar dúvidas e receber orientações.
-                </p>
-                <div className="mt-4 flex items-center text-cyan-400 text-sm font-medium group-hover:text-cyan-300 transition-colors">
-                  <span>Abrir chat</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </button>
+            </div>
 
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
                 onClick={() => handleViewChange('roleplay-links')}
                 className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '600ms' }}
+                style={{ animationDelay: '500ms' }}
               >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full">
+                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
                   <div className="absolute top-3 right-3">
                     <span className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
                       Admin
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mb-4 pr-12">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-emerald-500/30">
-                      <Link2 className="w-6 h-6 text-emerald-400" />
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                      <Link2 className="w-6 h-6 text-green-400" />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-white">Roleplay Público</h3>
-                      <span className="text-xs text-emerald-400">Links externos</span>
+                      <span className="text-xs text-green-400">Links externos</span>
                     </div>
                   </div>
                   <p className="text-gray-400 text-sm">
                     Gere links públicos para roleplays externos e acompanhe os resultados.
                   </p>
-                  <div className="mt-4 flex items-center text-emerald-400 text-sm font-medium group-hover:text-emerald-300 transition-colors">
+                  <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
                     <span>Gerenciar links</span>
                     <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
