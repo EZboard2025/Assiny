@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X } from 'lucide-react'
 import Image from 'next/image'
 
@@ -59,6 +59,21 @@ export default function RoleplayPublico() {
   const [loading, setLoading] = useState(true)
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Gerar estrelas uma única vez (memoizado para evitar re-render)
+  const stars = useMemo(() => {
+    return [...Array(100)].map((_, i) => ({
+      id: i,
+      top: Math.random() * 100,
+      left: Math.random() * 100,
+      opacity: Math.random() * 0.7 + 0.3,
+      duration: Math.random() * 20 + 15,
+      delay: Math.random() * 5,
+      floatX: (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100,
+      twinkleDuration: Math.random() * 2 + 1,
+      twinkleDelay: Math.random() * 3
+    }))
+  }, [])
 
   // Formulário inicial
   const [participantName, setParticipantName] = useState('')
@@ -400,24 +415,19 @@ export default function RoleplayPublico() {
 
           {/* Estrelas */}
           <div className="absolute inset-0 overflow-hidden">
-            {[...Array(100)].map((_, i) => {
-              const duration = Math.random() * 20 + 15 // 15-35s
-              const delay = Math.random() * 5
-              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
-              return (
-                <div
-                  key={i}
-                  className="absolute w-1 h-1 bg-white rounded-full"
-                  style={{
-                    top: `${Math.random() * 100}%`,
-                    left: `${Math.random() * 100}%`,
-                    opacity: Math.random() * 0.7 + 0.3,
-                    ['--float-x' as any]: `${floatX}px`,
-                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
-                  }}
-                />
-              )
-            })}
+            {stars.map((star) => (
+              <div
+                key={star.id}
+                className="absolute w-1 h-1 bg-white rounded-full"
+                style={{
+                  top: `${star.top}%`,
+                  left: `${star.left}%`,
+                  opacity: star.opacity,
+                  ['--float-x' as any]: `${star.floatX}px`,
+                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
+                }}
+              />
+            ))}
           </div>
 
           <Loader2 className="w-12 h-12 text-green-400 animate-spin relative z-10" />
@@ -436,24 +446,19 @@ export default function RoleplayPublico() {
 
           {/* Estrelas */}
           <div className="absolute inset-0 overflow-hidden">
-            {[...Array(100)].map((_, i) => {
-              const duration = Math.random() * 20 + 15
-              const delay = Math.random() * 5
-              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
-              return (
-                <div
-                  key={i}
-                  className="absolute w-1 h-1 bg-white rounded-full"
-                  style={{
-                    top: `${Math.random() * 100}%`,
-                    left: `${Math.random() * 100}%`,
-                    opacity: Math.random() * 0.7 + 0.3,
-                    ['--float-x' as any]: `${floatX}px`,
-                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
-                  }}
-                />
-              )
-            })}
+            {stars.map((star) => (
+              <div
+                key={star.id}
+                className="absolute w-1 h-1 bg-white rounded-full"
+                style={{
+                  top: `${star.top}%`,
+                  left: `${star.left}%`,
+                  opacity: star.opacity,
+                  ['--float-x' as any]: `${star.floatX}px`,
+                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
+                }}
+              />
+            ))}
           </div>
 
           <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
@@ -477,24 +482,19 @@ export default function RoleplayPublico() {
 
           {/* Estrelas */}
           <div className="absolute inset-0 overflow-hidden">
-            {[...Array(100)].map((_, i) => {
-              const duration = Math.random() * 20 + 15
-              const delay = Math.random() * 5
-              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
-              return (
-                <div
-                  key={i}
-                  className="absolute w-1 h-1 bg-white rounded-full"
-                  style={{
-                    top: `${Math.random() * 100}%`,
-                    left: `${Math.random() * 100}%`,
-                    opacity: Math.random() * 0.7 + 0.3,
-                    ['--float-x' as any]: `${floatX}px`,
-                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
-                  }}
-                />
-              )
-            })}
+            {stars.map((star) => (
+              <div
+                key={star.id}
+                className="absolute w-1 h-1 bg-white rounded-full"
+                style={{
+                  top: `${star.top}%`,
+                  left: `${star.left}%`,
+                  opacity: star.opacity,
+                  ['--float-x' as any]: `${star.floatX}px`,
+                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
+                }}
+              />
+            ))}
           </div>
 
           <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
@@ -521,24 +521,19 @@ export default function RoleplayPublico() {
 
           {/* Estrelas */}
           <div className="absolute inset-0 overflow-hidden">
-            {[...Array(100)].map((_, i) => {
-              const duration = Math.random() * 20 + 15
-              const delay = Math.random() * 5
-              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
-              return (
-                <div
-                  key={i}
-                  className="absolute w-1 h-1 bg-white rounded-full"
-                  style={{
-                    top: `${Math.random() * 100}%`,
-                    left: `${Math.random() * 100}%`,
-                    opacity: Math.random() * 0.7 + 0.3,
-                    ['--float-x' as any]: `${floatX}px`,
-                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
-                  }}
-                />
-              )
-            })}
+            {stars.map((star) => (
+              <div
+                key={star.id}
+                className="absolute w-1 h-1 bg-white rounded-full"
+                style={{
+                  top: `${star.top}%`,
+                  left: `${star.left}%`,
+                  opacity: star.opacity,
+                  ['--float-x' as any]: `${star.floatX}px`,
+                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
+                }}
+              />
+            ))}
           </div>
 
           <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
@@ -571,37 +566,32 @@ export default function RoleplayPublico() {
 
           {/* Estrelas animadas */}
           <div className="absolute inset-0 overflow-hidden">
-            {[...Array(100)].map((_, i) => {
-              const duration = Math.random() * 20 + 15
-              const delay = Math.random() * 5
-              const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
-              return (
-                <div
-                  key={i}
-                  className="absolute w-1 h-1 bg-white rounded-full"
-                  style={{
-                    top: `${Math.random() * 100}%`,
-                    left: `${Math.random() * 100}%`,
-                    opacity: Math.random() * 0.7 + 0.3,
-                    ['--float-x' as any]: `${floatX}px`,
-                    animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
-                  }}
-                />
-              )
-            })}
+            {stars.map((star) => (
+              <div
+                key={star.id}
+                className="absolute w-1 h-1 bg-white rounded-full"
+                style={{
+                  top: `${star.top}%`,
+                  left: `${star.left}%`,
+                  opacity: star.opacity,
+                  ['--float-x' as any]: `${star.floatX}px`,
+                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
+                }}
+              />
+            ))}
           </div>
 
 
         <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-5 max-w-lg w-full border border-green-500/30 shadow-2xl shadow-green-900/50 relative z-10">
           <div className="text-center mb-4">
             {/* Logo Ramppy */}
-            <div className="w-40 h-40 mx-auto -mb-2 relative">
+            <div className="w-52 h-52 mx-auto -mb-4 relative">
               <Image
                 src="/images/ramppy-logo.png"
                 alt="Ramppy Logo"
-                width={160}
-                height={160}
-                className="drop-shadow-[0_0_40px_rgba(34,197,94,0.8)]"
+                width={208}
+                height={208}
+                className="drop-shadow-[0_0_50px_rgba(34,197,94,0.9)]"
               />
             </div>
             <h1 className="text-2xl font-bold text-white mb-1">
@@ -709,24 +699,19 @@ export default function RoleplayPublico() {
 
         {/* Estrelas animadas */}
         <div className="absolute inset-0 overflow-hidden">
-          {[...Array(100)].map((_, i) => {
-            const duration = Math.random() * 20 + 15
-            const delay = Math.random() * 5
-            const floatX = (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100
-            return (
-              <div
-                key={i}
-                className="absolute w-1 h-1 bg-white rounded-full"
-                style={{
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`,
-                  opacity: Math.random() * 0.7 + 0.3,
-                  ['--float-x' as any]: `${floatX}px`,
-                  animation: `twinkle ${Math.random() * 2 + 1}s ease-in-out ${Math.random() * 3}s infinite, float ${duration}s linear ${delay}s infinite`
-                }}
-              />
-            )
-          })}
+          {stars.map((star) => (
+            <div
+              key={star.id}
+              className="absolute w-1 h-1 bg-white rounded-full"
+              style={{
+                top: `${star.top}%`,
+                left: `${star.left}%`,
+                opacity: star.opacity,
+                ['--float-x' as any]: `${star.floatX}px`,
+                animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
+              }}
+            />
+          ))}
         </div>
 
       <div className="max-w-4xl mx-auto relative z-10">
