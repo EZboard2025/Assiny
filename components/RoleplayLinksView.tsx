@@ -482,7 +482,11 @@ export default function RoleplayLinksView() {
                       loadHistorico()
                     }
                   }}
-                  className="px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white border border-gray-700"
+                  className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                    showHistorico
+                      ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 shadow-lg shadow-green-500/30'
+                      : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white border border-gray-700'
+                  }`}
                 >
                   <History className="w-5 h-5" />
                   {showHistorico ? 'Ver Configuração' : 'Ver Roleplays'}
