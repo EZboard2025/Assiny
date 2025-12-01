@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save, History, Loader2 } from 'lucide-react'
+import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save, History, Loader2, ArrowUpDown, Calendar, Trophy } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 interface RoleplayLink {
@@ -58,6 +58,10 @@ export default function RoleplayLinksView() {
   const [historico, setHistorico] = useState<any[]>([])
   const [loadingHistorico, setLoadingHistorico] = useState(false)
   const [selectedEvaluation, setSelectedEvaluation] = useState<any>(null)
+
+  // Estados para ordenação
+  const [sortBy, setSortBy] = useState<'date' | 'score'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   // Opções disponíveis
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -358,6 +362,26 @@ export default function RoleplayLinksView() {
     return `https://${company.subdomain}.ramppy.site/roleplay-publico?link=${roleplayLink.link_code}`
   }
 
+  // Função para ordenar o histórico
+  const getSortedHistorico = () => {
+    if (!historico || historico.length === 0) return []
+
+    const sorted = [...historico].sort((a, b) => {
+      if (sortBy === 'date') {
+        const dateA = new Date(a.created_at).getTime()
+        const dateB = new Date(b.created_at).getTime()
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB
+      } else {
+        // Ordenar por nota
+        const scoreA = a.evaluation?.overall_score || 0
+        const scoreB = b.evaluation?.overall_score || 0
+        return sortOrder === 'desc' ? scoreB - scoreA : scoreA - scoreB
+      }
+    })
+
+    return sorted
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -389,9 +413,6 @@ export default function RoleplayLinksView() {
         <div className="max-w-5xl mx-auto">
           {/* Cabeçalho */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-full mb-6">
-              <Target className="w-10 h-10 text-green-400" />
-            </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               Configure o <span className="text-gradient-green">Roleplay Público</span>
             </h1>
@@ -756,13 +777,57 @@ export default function RoleplayLinksView() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="mb-6">
+                  {/* Controles de ordenação e estatísticas */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                     <p className="text-gray-400">
                       {historico.length} roleplay{historico.length !== 1 ? 's' : ''} realizad{historico.length !== 1 ? 'os' : 'o'}
                     </p>
+
+                    {/* Controles de Ordenação */}
+                    <div className="flex flex-wrap gap-2">
+                      {/* Botões de tipo de ordenação */}
+                      <div className="flex bg-black/60 rounded-xl p-1 border border-green-500/20">
+                        <button
+                          onClick={() => setSortBy('date')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                            sortBy === 'date'
+                              ? 'bg-green-600/30 text-green-400 border border-green-500/30'
+                              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                          }`}
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Data
+                        </button>
+                        <button
+                          onClick={() => setSortBy('score')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                            sortBy === 'score'
+                              ? 'bg-green-600/30 text-green-400 border border-green-500/30'
+                              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                          }`}
+                        >
+                          <Trophy className="w-4 h-4" />
+                          Nota
+                        </button>
+                      </div>
+
+                      {/* Botão de direção de ordenação */}
+                      <button
+                        onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                        className="px-4 py-2 bg-black/60 hover:bg-gray-800/50 rounded-xl text-sm font-medium text-gray-400 hover:text-white transition-all flex items-center gap-2 border border-green-500/20"
+                        title={sortOrder === 'desc' ? 'Ordem decrescente' : 'Ordem crescente'}
+                      >
+                        <ArrowUpDown className="w-4 h-4" />
+                        {sortBy === 'date' ? (
+                          sortOrder === 'desc' ? 'Mais recente' : 'Mais antigo'
+                        ) : (
+                          sortOrder === 'desc' ? 'Maior nota' : 'Menor nota'
+                        )}
+                      </button>
+                    </div>
                   </div>
 
-                  {historico.map((roleplay) => {
+                  {getSortedHistorico().map((roleplay) => {
                     const createdAt = new Date(roleplay.created_at)
                     const formattedDate = createdAt.toLocaleDateString('pt-BR', {
                       day: '2-digit',
