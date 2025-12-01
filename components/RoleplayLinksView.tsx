@@ -1018,12 +1018,15 @@ export default function RoleplayLinksView() {
 
       {/* Modal de Avaliação Detalhada */}
       {selectedEvaluation && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] overflow-hidden flex items-center justify-center p-4">
           <div className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto">
             {/* Close Button */}
             <button
-              onClick={() => setSelectedEvaluation(null)}
-              className="absolute top-2 right-2 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
+              onClick={(e) => {
+                e.stopPropagation()
+                setSelectedEvaluation(null)
+              }}
+              className="absolute top-2 right-2 z-[160] w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
             >
               <X className="w-5 h-5 text-gray-400" />
             </button>
@@ -1152,14 +1155,15 @@ export default function RoleplayLinksView() {
                 </h2>
               </div>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation()
                   setShowComparison(false)
                   setSelectedForComparison([])
                   setCompareMode(false)
                 }}
-                className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
+                className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30 hover:border-green-500/50"
               >
-                <X className="w-4 h-4 text-gray-400" />
+                <X className="w-4 h-4 text-gray-400 hover:text-white" />
               </button>
             </div>
 
@@ -1215,44 +1219,47 @@ export default function RoleplayLinksView() {
                         </div>
                       )}
 
-                      {/* Resumo */}
+                      {/* Resumo Compacto */}
                       {evaluation?.executive_summary && (
-                        <div className="mb-3">
+                        <div className="mb-2">
                           <h4 className="text-xs font-bold text-green-400 mb-1">Resumo</h4>
-                          <p className="text-[10px] text-gray-300 leading-relaxed line-clamp-3">
+                          <p className="text-[10px] text-gray-300 leading-relaxed line-clamp-2">
                             {evaluation.executive_summary}
                           </p>
                         </div>
                       )}
 
-                      {/* Pontos Fortes */}
+                      {/* Pontos Fortes - Apenas 1 */}
                       {evaluation?.top_strengths && evaluation.top_strengths.length > 0 && (
-                        <div className="mb-3">
-                          <h4 className="text-xs font-bold text-green-400 mb-1">✅ Fortes</h4>
-                          <ul className="space-y-0.5">
-                            {evaluation.top_strengths.slice(0, 2).map((strength: string, index: number) => (
-                              <li key={index} className="text-[10px] text-gray-300 flex items-start gap-1">
-                                <span className="text-green-400">•</span>
-                                <span className="line-clamp-1">{strength}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="mb-2">
+                          <h4 className="text-xs font-bold text-green-400 mb-1">✅ Principal Forte</h4>
+                          <p className="text-[10px] text-gray-300 line-clamp-1">
+                            • {evaluation.top_strengths[0]}
+                          </p>
                         </div>
                       )}
 
-                      {/* Gaps */}
+                      {/* Gap Principal - Apenas 1 */}
                       {evaluation?.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-bold text-red-400 mb-1">⚠️ Gaps</h4>
-                          <ul className="space-y-0.5">
-                            {evaluation.critical_gaps.slice(0, 2).map((gap: string, index: number) => (
-                              <li key={index} className="text-[10px] text-gray-300 flex items-start gap-1">
-                                <span className="text-red-400">•</span>
-                                <span className="line-clamp-1">{gap}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="mb-2">
+                          <h4 className="text-xs font-bold text-red-400 mb-1">⚠️ Principal Gap</h4>
+                          <p className="text-[10px] text-gray-300 line-clamp-1">
+                            • {evaluation.critical_gaps[0]}
+                          </p>
                         </div>
+                      )}
+
+                      {/* Botão Ver Detalhes */}
+                      {evaluation && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedEvaluation(roleplay)
+                          }}
+                          className="w-full mt-2 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 hover:border-green-500/50 rounded-lg text-[10px] text-green-400 font-semibold transition-all"
+                        >
+                          Ver Detalhes
+                        </button>
                       )}
                     </div>
                   )
