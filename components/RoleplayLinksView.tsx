@@ -1018,28 +1018,37 @@ export default function RoleplayLinksView() {
 
       {/* Modal de Avaliação Detalhada */}
       {selectedEvaluation && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] overflow-hidden flex items-center justify-center p-4">
-          <div className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto">
-            {/* Close Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setSelectedEvaluation(null)
-              }}
-              className="absolute top-2 right-2 z-[160] w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
-            >
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[80vh] flex flex-col bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-3xl border border-green-500/30">
+            {/* Header - sem position sticky ou relative */}
+            <div className="rounded-t-3xl border-b border-green-500/30 p-4 bg-gradient-to-br from-gray-900 to-gray-800">
+              {/* Botão simples sem containers extras */}
+              <div className="text-right mb-4 mt-6">
+                <button
+                  onClick={() => setSelectedEvaluation(null)}
+                  className="inline-block px-6 py-2 rounded-lg text-xs font-bold text-white shadow-lg"
+                  style={{
+                    background: 'linear-gradient(to right, #22c55e, #a3e635)',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
+                  }}
+                >
+                  FECHAR
+                </button>
+              </div>
 
-            {/* Header */}
-            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-4">
               <h2 className="text-xl font-bold text-center text-white mb-2">🎯 AVALIAÇÃO DETALHADA</h2>
-              <p className="text-center text-gray-400 text-sm">
+              <p className="text-center text-gray-400 text-sm mb-3">
                 {selectedEvaluation.participant_name} - {new Date(selectedEvaluation.created_at).toLocaleString('pt-BR')}
               </p>
 
               {/* Score Geral */}
-              <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20 mt-3">
+              <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20">
                 <div className="text-center">
                   <div className="text-4xl font-bold text-green-400">
                     {selectedEvaluation.evaluation?.overall_score ? (selectedEvaluation.evaluation.overall_score / 10).toFixed(1) : '0.0'}/10
@@ -1048,8 +1057,8 @@ export default function RoleplayLinksView() {
               </div>
             </div>
 
-            {/* Content */}
-            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-5 space-y-4">
+            {/* Content - scrollable area */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {/* Resumo Executivo */}
               {selectedEvaluation.evaluation?.executive_summary && (
                 <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
@@ -1130,9 +1139,19 @@ export default function RoleplayLinksView() {
               {/* Botão Fechar */}
               <button
                 onClick={() => setSelectedEvaluation(null)}
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
+                className="w-full py-3 rounded-xl font-bold text-white shadow-xl"
+                style={{
+                  background: 'linear-gradient(to right, #22c55e, #a3e635)',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
+                }}
               >
-                Fechar
+                FECHAR AVALIAÇÃO
               </button>
             </div>
           </div>
@@ -1141,30 +1160,41 @@ export default function RoleplayLinksView() {
 
       {/* Modal de Comparação */}
       {showComparison && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-6">
-          <div className="relative w-full max-w-6xl h-[80vh] flex flex-col bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-2xl border border-green-500/30">
-            {/* Header com Close Button */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-green-500/30">
-              <div className="flex-1">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <GitCompare className="w-5 h-5 text-green-400" />
-                  Comparação de Roleplays
-                  <span className="text-sm text-gray-400 font-normal">
-                    ({selectedForComparison.length} selecionados)
-                  </span>
-                </h2>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+          <div className="w-full max-w-6xl h-[80vh] flex flex-col bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-2xl border border-green-500/30">
+            {/* Header simples */}
+            <div className="px-4 py-3 border-b border-green-500/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <GitCompare className="w-5 h-5 text-green-400" />
+                    Comparação de Roleplays
+                    <span className="text-sm text-gray-400 font-normal">
+                      ({selectedForComparison.length} selecionados)
+                    </span>
+                  </h2>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowComparison(false)
+                    setSelectedForComparison([])
+                    setCompareMode(false)
+                  }}
+                  className="px-6 py-1.5 rounded-lg text-xs font-bold text-white shadow-lg mt-4"
+                  style={{
+                    background: 'linear-gradient(to right, #22c55e, #a3e635)',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
+                  }}
+                >
+                  FECHAR
+                </button>
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowComparison(false)
-                  setSelectedForComparison([])
-                  setCompareMode(false)
-                }}
-                className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30 hover:border-green-500/50"
-              >
-                <X className="w-4 h-4 text-gray-400 hover:text-white" />
-              </button>
             </div>
 
             {/* Content com scroll */}
@@ -1324,9 +1354,19 @@ export default function RoleplayLinksView() {
                   setSelectedForComparison([])
                   setCompareMode(false)
                 }}
-                className="w-full mt-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium text-sm text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
+                className="w-full mt-4 py-2 rounded-xl font-bold text-sm text-white shadow-xl"
+                style={{
+                  background: 'linear-gradient(to right, #22c55e, #a3e635)',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
+                }}
               >
-                Fechar Comparação
+                FECHAR COMPARAÇÃO
               </button>
             </div>
           </div>
