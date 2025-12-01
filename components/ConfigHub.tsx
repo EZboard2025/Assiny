@@ -1211,7 +1211,6 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                               className="px-3 py-1.5 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/40"
                             >
                               <option value="Admin">Admin</option>
-                              <option value="Gestor">Gestor</option>
                               <option value="Vendedor">Vendedor</option>
                             </select>
                           </td>
