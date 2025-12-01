@@ -121,15 +121,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           {/* Welcome Section */}
           <div className="mb-12 text-center">
             <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-              <h1 className="text-3xl md:text-4xl font-bold mb-3">
+              <h1 className="text-3xl md:text-4xl font-bold">
                 <span className="text-white">Bem-vindo de volta,</span>{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-lime-400">
                   {userName || 'Vendedor'}!
                 </span>
               </h1>
-              <p className="text-gray-400 text-lg">
-                Escolha uma ação para continuar seu desenvolvimento
-              </p>
             </div>
           </div>
 
