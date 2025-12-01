@@ -25,6 +25,13 @@ interface UserWithRoleplays {
   roleplayCount: number
 }
 
+interface CompanyUser {
+  user_id: string
+  name: string
+  email: string
+  role: string
+}
+
 interface CompanyMetrics {
   companyId: string
   companyName: string
@@ -74,6 +81,12 @@ export default function CompaniesAdmin() {
   const [companyToEditLimit, setCompanyToEditLimit] = useState<Company | null>(null)
   const [newEmployeeLimit, setNewEmployeeLimit] = useState('')
   const [updatingLimit, setUpdatingLimit] = useState(false)
+
+  // Manage users modal states
+  const [showManageUsersModal, setShowManageUsersModal] = useState(false)
+  const [companyToManageUsers, setCompanyToManageUsers] = useState<Company | null>(null)
+  const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Toast system
   const { toasts, showToast, removeToast } = useToast()
@@ -300,6 +313,53 @@ export default function CompaniesAdmin() {
     setCompanyToEditLimit(company)
     setNewEmployeeLimit(company.employee_limit?.toString() || '')
     setShowEditLimitModal(true)
+  }
+
+  const handleManageUsersClick = async (company: Company) => {
+    setCompanyToManageUsers(company)
+    setShowManageUsersModal(true)
+    await loadCompanyUsers(company.id)
+  }
+
+  const loadCompanyUsers = async (companyId: string) => {
+    setLoadingUsers(true)
+    try {
+      const response = await fetch(`/api/admin/companies/users?companyId=${companyId}`)
+      const data = await response.json()
+
+      if (!response.ok) throw new Error(data.error)
+
+      setCompanyUsers(data.users || [])
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error)
+      showToast('error', 'Erro ao carregar usuários', 'Tente novamente')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      const response = await fetch('/api/admin/companies/update-role', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) throw new Error(result.error)
+
+      // Atualizar localmente
+      setCompanyUsers(users =>
+        users.map(u => u.user_id === userId ? { ...u, role: newRole } : u)
+      )
+
+      showToast('success', 'Role atualizado!', `Novo role: ${newRole}`)
+    } catch (error: any) {
+      console.error('Erro ao atualizar role:', error)
+      showToast('error', 'Erro ao atualizar role', error.message)
+    }
   }
 
   const confirmUpdateLimit = async () => {
@@ -655,6 +715,14 @@ export default function CompaniesAdmin() {
                   </div>
 
                   <div className="flex gap-1">
+                    <button
+                      onClick={() => handleManageUsersClick(company)}
+                      className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                      title="Gerenciar usuários"
+                    >
+                      <Users className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => handleEditLimitClick(company)}
                       className="p-2 text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
@@ -1038,6 +1106,77 @@ export default function CompaniesAdmin() {
           typedValue={deleteConfirmText}
           onTypedValueChange={setDeleteConfirmText}
         />
+
+        {/* Manage Users Modal */}
+        {showManageUsersModal && companyToManageUsers && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-4xl w-full border border-purple-500/30 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Gerenciar Usuários</h2>
+                  <p className="text-sm text-gray-400 mt-1">Empresa: {companyToManageUsers.name}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowManageUsersModal(false)
+                    setCompanyToManageUsers(null)
+                    setCompanyUsers([])
+                  }}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {loadingUsers ? (
+                <div className="py-12 text-center">
+                  <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-400">Carregando usuários...</p>
+                </div>
+              ) : companyUsers.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Users className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">Nenhum usuário encontrado</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {companyUsers.map(user => (
+                    <div
+                      key={user.user_id}
+                      className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4 flex items-center justify-between"
+                    >
+                      <div className="flex-1">
+                        <h4 className="text-white font-medium">{user.name}</h4>
+                        <p className="text-sm text-gray-400">{user.email}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <select
+                          value={user.role}
+                          onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
+                          className="px-4 py-2 bg-gray-700/50 border border-purple-500/30 rounded-lg text-white focus:border-purple-500/50 focus:outline-none"
+                        >
+                          <option value="Admin">Admin</option>
+                          <option value="Vendedor">Vendedor</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-6 pt-6 border-t border-gray-700">
+                <div className="text-sm text-gray-400">
+                  <p className="mb-2">📌 Notas:</p>
+                  <ul className="space-y-1 ml-4">
+                    <li>• <strong className="text-purple-400">Admin:</strong> Acesso total, incluindo ConfigHub</li>
+                    <li>• <strong className="text-purple-400">Vendedor:</strong> Acesso apenas aos treinamentos</li>
+                    <li>• As alterações são aplicadas imediatamente</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Toast Container */}
         <ToastContainer toasts={toasts} onClose={removeToast} />
