@@ -1,0 +1,269 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Users, TrendingUp, Award, Target, ArrowLeft, Loader2 } from 'lucide-react'
+
+interface SellerPerformance {
+  user_id: string
+  user_name: string
+  user_email: string
+  total_sessions: number
+  overall_average: number
+  spin_s_average: number
+  spin_p_average: number
+  spin_i_average: number
+  spin_n_average: number
+  top_strengths: Array<{ text: string; count: number }>
+  critical_gaps: Array<{ text: string; count: number }>
+  trend: string
+}
+
+interface SalesDashboardProps {
+  onClose: () => void
+}
+
+export default function SalesDashboard({ onClose }: SalesDashboardProps) {
+  const [loading, setLoading] = useState(true)
+  const [sellers, setSellers] = useState<SellerPerformance[]>([])
+  const [selectedSeller, setSelectedSeller] = useState<SellerPerformance | null>(null)
+
+  useEffect(() => {
+    loadSellersData()
+  }, [])
+
+  const loadSellersData = async () => {
+    try {
+      setLoading(true)
+
+      // Usar API route com service role key para acessar dados de todos os usuários
+      const response = await fetch('/api/admin/sellers-performance')
+
+      if (!response.ok) {
+        console.error('Erro ao buscar dados:', response.statusText)
+        setLoading(false)
+        return
+      }
+
+      const { data: performanceData } = await response.json()
+
+      if (!performanceData || performanceData.length === 0) {
+        setSellers([])
+        setLoading(false)
+        return
+      }
+
+      setSellers(performanceData)
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getPerformanceColor = (score: number | null) => {
+    if (!score) return 'text-gray-400'
+    if (score >= 8) return 'text-green-400'
+    if (score >= 6) return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
+  const getPerformanceBadge = (score: number | null) => {
+    if (!score) return { text: 'Sem Dados', color: 'bg-gray-600' }
+    if (score >= 8) return { text: 'Excelente', color: 'bg-green-600' }
+    if (score >= 6) return { text: 'Bom', color: 'bg-yellow-600' }
+    return { text: 'Precisa Melhorar', color: 'bg-red-600' }
+  }
+
+  // Calcular estatísticas gerais
+  const totalSellers = sellers.length
+  const avgGeneralPerformance = sellers.length > 0
+    ? sellers.reduce((sum, s) => sum + (s.overall_average || 0), 0) / sellers.length
+    : 0
+  const topPerformer = sellers.length > 0 ? sellers[0] : null
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-green-400 animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Carregando dados dos vendedores...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-gray-900 via-black to-gray-900 p-6 overflow-y-auto">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Voltar ao Dashboard
+          </button>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            📊 Dashboard dos Vendedores
+          </h1>
+          <p className="text-gray-400">Visão geral do desempenho de toda a equipe</p>
+        </div>
+
+        {/* Cards de Estatísticas Gerais */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-green-500/20 rounded-xl">
+                <Users className="w-6 h-6 text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Total de Vendedores</p>
+                <p className="text-3xl font-bold text-white">{totalSellers}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-500/20 rounded-xl">
+                <TrendingUp className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Média Geral do Time</p>
+                <p className="text-3xl font-bold text-white">{avgGeneralPerformance.toFixed(1)}/10</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-yellow-500/20 rounded-xl">
+                <Award className="w-6 h-6 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Top Performer</p>
+                <p className="text-lg font-bold text-white truncate">
+                  {topPerformer?.user_name || 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de Vendedores */}
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl border border-green-500/20 overflow-hidden">
+          <div className="p-6 border-b border-green-500/20">
+            <h2 className="text-xl font-bold text-white">Performance Individual</h2>
+          </div>
+
+          {sellers.length === 0 ? (
+            <div className="p-12 text-center">
+              <Target className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">Nenhum vendedor com dados de performance ainda</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-green-500/10">
+              {sellers.map((seller) => {
+                const badge = getPerformanceBadge(seller.overall_average)
+
+                return (
+                  <div
+                    key={seller.user_id}
+                    className="p-6 hover:bg-gray-800/30 transition-colors cursor-pointer"
+                    onClick={() => setSelectedSeller(selectedSeller?.user_id === seller.user_id ? null : seller)}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-white mb-1">{seller.user_name}</h3>
+                        <p className="text-sm text-gray-400">{seller.user_email}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-3xl font-bold ${getPerformanceColor(seller.overall_average)}`}>
+                          {seller.overall_average ? seller.overall_average.toFixed(1) : 'N/A'}/10
+                        </div>
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${badge.color} mt-2`}>
+                          {badge.text}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Métricas SPIN */}
+                    <div className="grid grid-cols-4 gap-3 mb-4">
+                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+                        <p className="text-xs text-gray-400 mb-1">S</p>
+                        <p className="text-lg font-bold text-white">
+                          {seller.spin_s_average ? seller.spin_s_average.toFixed(1) : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+                        <p className="text-xs text-gray-400 mb-1">P</p>
+                        <p className="text-lg font-bold text-white">
+                          {seller.spin_p_average ? seller.spin_p_average.toFixed(1) : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+                        <p className="text-xs text-gray-400 mb-1">I</p>
+                        <p className="text-lg font-bold text-white">
+                          {seller.spin_i_average ? seller.spin_i_average.toFixed(1) : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+                        <p className="text-xs text-gray-400 mb-1">N</p>
+                        <p className="text-lg font-bold text-white">
+                          {seller.spin_n_average ? seller.spin_n_average.toFixed(1) : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400">Total de Sessões: <span className="text-white font-medium">{seller.total_sessions}</span></span>
+                      <span className="text-gray-400">Tendência: <span className="text-white font-medium capitalize">{seller.trend || 'N/A'}</span></span>
+                    </div>
+
+                    {/* Detalhes expandidos */}
+                    {selectedSeller?.user_id === seller.user_id && (
+                      <div className="mt-6 pt-6 border-t border-green-500/20">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Pontos Fortes */}
+                          {seller.top_strengths && seller.top_strengths.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-bold text-green-400 mb-3">✅ Pontos Fortes</h4>
+                              <ul className="space-y-2">
+                                {seller.top_strengths.map((strength, idx) => (
+                                  <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                                    <span className="text-green-400 mt-0.5">•</span>
+                                    <span>{strength.text} <span className="text-xs text-gray-500">({strength.count}x)</span></span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Gaps Críticos */}
+                          {seller.critical_gaps && seller.critical_gaps.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-bold text-red-400 mb-3">⚠️ Gaps Críticos</h4>
+                              <ul className="space-y-2">
+                                {seller.critical_gaps.map((gap, idx) => (
+                                  <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                                    <span className="text-red-400 mt-0.5">•</span>
+                                    <span>{gap.text} <span className="text-xs text-gray-500">({gap.count}x)</span></span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

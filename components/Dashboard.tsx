@@ -9,6 +9,7 @@ import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
 import RoleplayLinksView from './RoleplayLinksView'
+import SalesDashboard from './SalesDashboard'
 import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 
@@ -19,6 +20,7 @@ interface DashboardProps {
 export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
+  const [showSalesDashboard, setShowSalesDashboard] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -292,6 +294,41 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </button>
             )}
+
+            {/* Dashboard dos Vendedores Card - Admin only */}
+            {userRole?.toLowerCase() === 'admin' && (
+              <button
+                onClick={() => setShowSalesDashboard(true)}
+                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                style={{ animationDelay: '600ms' }}
+              >
+                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
+                      Admin
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                      <Users className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Dashboard dos Vendedores</h3>
+                      <span className="text-xs text-green-400">Performance da equipe</span>
+                    </div>
+                  </div>
+                  <p className="text-gray-400 text-sm">
+                    Visualize métricas, performance SPIN e evolução de todos os vendedores.
+                  </p>
+                  <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
+                    <span>Ver dashboard</span>
+                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -376,6 +413,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       {/* Config Hub Modal */}
       {showConfigHub && (
         <ConfigHub onClose={() => setShowConfigHub(false)} />
+      )}
+
+      {/* Sales Dashboard Modal */}
+      {showSalesDashboard && (
+        <SalesDashboard onClose={() => setShowSalesDashboard(false)} />
       )}
     </div>
   )
