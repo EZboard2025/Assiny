@@ -121,8 +121,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           {/* Welcome Section */}
           <div className="mb-12 text-center">
             <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                Bem-vindo de volta, {userName || 'Vendedor'}!
+              <h1 className="text-3xl md:text-4xl font-bold mb-3">
+                <span className="text-white">Bem-vindo de volta,</span>{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-lime-400">
+                  {userName || 'Vendedor'}!
+                </span>
               </h1>
               <p className="text-gray-400 text-lg">
                 Escolha uma ação para continuar seu desenvolvimento
@@ -133,8 +136,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
           {/* Features Grid Title */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white">
-              Funcionalidades Disponíveis
+            <h2 className="text-2xl font-bold">
+              <span className="text-white">Funcionalidades</span>{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-lime-400">
+                Disponíveis
+              </span>
             </h2>
             <p className="text-gray-400 mt-1">
               Explore todas as ferramentas para melhorar suas vendas

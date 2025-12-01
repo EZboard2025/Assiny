@@ -148,6 +148,24 @@
     }
   }
 
+  @keyframes glow {
+    0%, 100% {
+      filter: brightness(1) drop-shadow(0 0 60px rgba(34,197,94,0.8));
+    }
+    50% {
+      filter: brightness(1.1) drop-shadow(0 0 80px rgba(34,197,94,1));
+    }
+  }
+
+  @keyframes scan {
+    0% {
+      transform: translateX(-100%) skewX(-12deg);
+    }
+    100% {
+      transform: translateX(200%) skewX(-12deg);
+    }
+  }
+
   /* Animations */
   @keyframes fade-in {
     from {
