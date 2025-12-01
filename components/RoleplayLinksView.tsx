@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save, History, Loader2, ArrowUpDown, Calendar, Trophy } from 'lucide-react'
+import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save, History, Loader2, ArrowUpDown, Calendar, Trophy, GitCompare, Check } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 interface RoleplayLink {
@@ -62,6 +62,11 @@ export default function RoleplayLinksView() {
   // Estados para ordenação
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  // Estados para comparação
+  const [compareMode, setCompareMode] = useState(false)
+  const [selectedForComparison, setSelectedForComparison] = useState<string[]>([])
+  const [showComparison, setShowComparison] = useState(false)
 
   // Opções disponíveis
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -380,6 +385,33 @@ export default function RoleplayLinksView() {
     })
 
     return sorted
+  }
+
+  // Funções de comparação
+  const toggleCompareMode = () => {
+    setCompareMode(!compareMode)
+    setSelectedForComparison([])
+    setShowComparison(false)
+  }
+
+  const toggleSelectForComparison = (roleplayId: string) => {
+    if (selectedForComparison.includes(roleplayId)) {
+      setSelectedForComparison(selectedForComparison.filter(id => id !== roleplayId))
+    } else {
+      if (selectedForComparison.length < 4) { // Limitar a 4 comparações
+        setSelectedForComparison([...selectedForComparison, roleplayId])
+      } else {
+        alert('Você pode comparar no máximo 4 roleplays por vez')
+      }
+    }
+  }
+
+  const startComparison = () => {
+    if (selectedForComparison.length < 2) {
+      alert('Selecione pelo menos 2 roleplays para comparar')
+      return
+    }
+    setShowComparison(true)
   }
 
   if (loading) {
@@ -779,11 +811,18 @@ export default function RoleplayLinksView() {
                 <div className="space-y-4">
                   {/* Controles de ordenação e estatísticas */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <p className="text-gray-400">
-                      {historico.length} roleplay{historico.length !== 1 ? 's' : ''} realizad{historico.length !== 1 ? 'os' : 'o'}
-                    </p>
+                    <div className="flex items-center gap-4">
+                      <p className="text-gray-400">
+                        {historico.length} roleplay{historico.length !== 1 ? 's' : ''} realizad{historico.length !== 1 ? 'os' : 'o'}
+                      </p>
+                      {selectedForComparison.length > 0 && compareMode && (
+                        <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-full border border-green-500/30">
+                          {selectedForComparison.length} selecionado{selectedForComparison.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
 
-                    {/* Controles de Ordenação */}
+                    {/* Controles de Ordenação e Comparação */}
                     <div className="flex flex-wrap gap-2">
                       {/* Botões de tipo de ordenação */}
                       <div className="flex bg-black/60 rounded-xl p-1 border border-green-500/20">
@@ -824,6 +863,30 @@ export default function RoleplayLinksView() {
                           sortOrder === 'desc' ? 'Maior nota' : 'Menor nota'
                         )}
                       </button>
+
+                      {/* Botão de Comparação */}
+                      <button
+                        onClick={toggleCompareMode}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 border ${
+                          compareMode
+                            ? 'bg-green-600/30 text-green-400 border-green-500/30'
+                            : 'bg-black/60 hover:bg-gray-800/50 text-gray-400 hover:text-white border-green-500/20'
+                        }`}
+                      >
+                        <GitCompare className="w-4 h-4" />
+                        {compareMode ? 'Cancelar Comparação' : 'Comparar'}
+                      </button>
+
+                      {/* Botão de Iniciar Comparação */}
+                      {compareMode && selectedForComparison.length >= 2 && (
+                        <button
+                          onClick={startComparison}
+                          className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 rounded-xl text-sm font-medium text-white hover:scale-105 transition-all flex items-center gap-2"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Comparar {selectedForComparison.length} Selecionados
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -872,9 +935,31 @@ export default function RoleplayLinksView() {
                     return (
                       <div
                         key={roleplay.id}
-                        className="bg-black/60 border border-green-500/10 rounded-2xl p-6 hover:border-green-500/30 transition-all"
+                        className={`bg-black/60 border rounded-2xl p-6 transition-all relative ${
+                          selectedForComparison.includes(roleplay.id)
+                            ? 'border-green-500/50 bg-green-500/5'
+                            : 'border-green-500/10 hover:border-green-500/30'
+                        }`}
                       >
-                        <div className="flex items-start justify-between">
+                        {/* Checkbox de seleção */}
+                        {compareMode && (
+                          <div className="absolute top-4 left-4">
+                            <button
+                              onClick={() => toggleSelectForComparison(roleplay.id)}
+                              className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
+                                selectedForComparison.includes(roleplay.id)
+                                  ? 'bg-green-500 border-green-500'
+                                  : 'border-green-500/30 hover:border-green-500/50'
+                              }`}
+                            >
+                              {selectedForComparison.includes(roleplay.id) && (
+                                <Check className="w-4 h-4 text-white" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+
+                        <div className={`flex items-start justify-between ${compareMode ? 'pl-10' : ''}`}>
                           <div className="flex-1">
                             <h3 className="text-xl font-bold text-white mb-3">
                               {roleplay.participant_name}
@@ -1045,6 +1130,196 @@ export default function RoleplayLinksView() {
                 className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Comparação */}
+      {showComparison && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-4">
+          <div className="relative w-full max-w-7xl max-h-[90vh] overflow-y-auto">
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowComparison(false)
+                setSelectedForComparison([])
+                setCompareMode(false)
+              }}
+              className="absolute top-2 right-2 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+
+            {/* Header */}
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-6">
+              <h2 className="text-2xl font-bold text-center text-white mb-2 flex items-center justify-center gap-2">
+                <GitCompare className="w-6 h-6 text-green-400" />
+                Comparação de Roleplays
+              </h2>
+              <p className="text-center text-gray-400">
+                Comparando {selectedForComparison.length} roleplays selecionados
+              </p>
+            </div>
+
+            {/* Content */}
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-6">
+              {/* Grid de Comparação */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {selectedForComparison.map(roleplayId => {
+                  const roleplay = historico.find(r => r.id === roleplayId)
+                  if (!roleplay) return null
+
+                  const evaluation = roleplay.evaluation
+                  const overallScore = evaluation?.overall_score
+                  const spinScores = evaluation?.spin_evaluation
+
+                  return (
+                    <div key={roleplayId} className="bg-black/60 border border-green-500/20 rounded-2xl p-4">
+                      {/* Header do Card */}
+                      <div className="mb-4 pb-3 border-b border-green-500/20">
+                        <h3 className="font-bold text-white text-lg mb-1">
+                          {roleplay.participant_name}
+                        </h3>
+                        <p className="text-xs text-gray-400">
+                          {new Date(roleplay.created_at).toLocaleString('pt-BR')}
+                        </p>
+                        <div className="mt-2">
+                          {overallScore !== null && overallScore !== undefined ? (
+                            <div className="text-3xl font-bold text-green-400">
+                              {(overallScore / 10).toFixed(1)}/10
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">
+                              Sem avaliação
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* SPIN Scores */}
+                      {spinScores && (
+                        <div className="mb-4">
+                          <h4 className="text-sm font-bold text-green-400 mb-2">SPIN</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {['S', 'P', 'I', 'N'].map((key) => (
+                              <div key={key} className="bg-gray-900/50 rounded-lg p-2 text-center">
+                                <div className="text-[10px] text-gray-400">{key}</div>
+                                <div className="text-lg font-bold text-white">
+                                  {spinScores[key]?.final_score?.toFixed(1) || '0.0'}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Resumo */}
+                      {evaluation?.executive_summary && (
+                        <div className="mb-4">
+                          <h4 className="text-sm font-bold text-green-400 mb-2">Resumo</h4>
+                          <p className="text-xs text-gray-300 leading-relaxed line-clamp-4">
+                            {evaluation.executive_summary}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Pontos Fortes */}
+                      {evaluation?.top_strengths && evaluation.top_strengths.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="text-sm font-bold text-green-400 mb-2">✅ Fortes</h4>
+                          <ul className="space-y-1">
+                            {evaluation.top_strengths.slice(0, 3).map((strength: string, index: number) => (
+                              <li key={index} className="text-xs text-gray-300 flex items-start gap-1">
+                                <span className="text-green-400">•</span>
+                                <span className="line-clamp-2">{strength}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Gaps */}
+                      {evaluation?.critical_gaps && evaluation.critical_gaps.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-bold text-red-400 mb-2">⚠️ Gaps</h4>
+                          <ul className="space-y-1">
+                            {evaluation.critical_gaps.slice(0, 3).map((gap: string, index: number) => (
+                              <li key={index} className="text-xs text-gray-300 flex items-start gap-1">
+                                <span className="text-red-400">•</span>
+                                <span className="line-clamp-2">{gap}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Tabela Comparativa de Métricas */}
+              <div className="mt-6 overflow-x-auto">
+                <h3 className="text-lg font-bold text-white mb-4">📊 Comparação de Métricas</h3>
+                <table className="w-full bg-black/40 rounded-xl overflow-hidden">
+                  <thead className="bg-green-500/10 border-b border-green-500/20">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-green-400">Participante</th>
+                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">Nota</th>
+                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">S</th>
+                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">P</th>
+                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">I</th>
+                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">N</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-green-500/10">
+                    {selectedForComparison.map(roleplayId => {
+                      const roleplay = historico.find(r => r.id === roleplayId)
+                      if (!roleplay) return null
+
+                      const evaluation = roleplay.evaluation
+                      const spinScores = evaluation?.spin_evaluation
+
+                      return (
+                        <tr key={roleplayId} className="hover:bg-green-500/5 transition-colors">
+                          <td className="px-4 py-3 text-sm text-white font-medium">
+                            {roleplay.participant_name}
+                          </td>
+                          <td className="text-center px-3 py-3">
+                            <span className="text-lg font-bold text-green-400">
+                              {evaluation?.overall_score ? (evaluation.overall_score / 10).toFixed(1) : '0.0'}
+                            </span>
+                          </td>
+                          <td className="text-center px-3 py-3 text-sm text-white">
+                            {spinScores?.S?.final_score?.toFixed(1) || '0.0'}
+                          </td>
+                          <td className="text-center px-3 py-3 text-sm text-white">
+                            {spinScores?.P?.final_score?.toFixed(1) || '0.0'}
+                          </td>
+                          <td className="text-center px-3 py-3 text-sm text-white">
+                            {spinScores?.I?.final_score?.toFixed(1) || '0.0'}
+                          </td>
+                          <td className="text-center px-3 py-3 text-sm text-white">
+                            {spinScores?.N?.final_score?.toFixed(1) || '0.0'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Botão Fechar */}
+              <button
+                onClick={() => {
+                  setShowComparison(false)
+                  setSelectedForComparison([])
+                  setCompareMode(false)
+                }}
+                className="w-full mt-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
+              >
+                Fechar Comparação
               </button>
             </div>
           </div>
