@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff } from 'lucide-react'
 import {
   getEmployees,
   addEmployee as addEmployeeDB,
@@ -63,6 +63,7 @@ function ConfigurationInterface({
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
   const [newEmployeePassword, setNewEmployeePassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [addingEmployee, setAddingEmployee] = useState(false)
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2C')
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -355,6 +356,7 @@ function ConfigurationInterface({
       setNewEmployeeName('')
       setNewEmployeeEmail('')
       setNewEmployeePassword('')
+      setShowPassword(false)
       setAddingEmployee(false)
 
       alert('Funcionário criado com sucesso!')
@@ -1263,17 +1265,33 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">Senha</label>
-                      <input
-                        type="password"
-                        value={newEmployeePassword}
-                        onChange={(e) => setNewEmployeePassword(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
-                        placeholder="••••••••"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={newEmployeePassword}
+                          onChange={(e) => setNewEmployeePassword(e.target.value)}
+                          className="w-full px-4 py-3 pr-12 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          placeholder="••••••••"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-400 transition-colors"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-5 h-5" />
+                          ) : (
+                            <Eye className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setAddingEmployee(false)}
+                        onClick={() => {
+                          setAddingEmployee(false)
+                          setShowPassword(false)
+                        }}
                         className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
                       >
                         Cancelar
