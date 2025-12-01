@@ -1138,33 +1138,33 @@ export default function RoleplayLinksView() {
 
       {/* Modal de Comparação */}
       {showComparison && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-4">
-          <div className="relative w-full max-w-7xl max-h-[90vh] overflow-y-auto">
-            {/* Close Button */}
-            <button
-              onClick={() => {
-                setShowComparison(false)
-                setSelectedForComparison([])
-                setCompareMode(false)
-              }}
-              className="absolute top-2 right-2 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
-            >
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
-
-            {/* Header */}
-            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-6">
-              <h2 className="text-2xl font-bold text-center text-white mb-2 flex items-center justify-center gap-2">
-                <GitCompare className="w-6 h-6 text-green-400" />
-                Comparação de Roleplays
-              </h2>
-              <p className="text-center text-gray-400">
-                Comparando {selectedForComparison.length} roleplays selecionados
-              </p>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-6">
+          <div className="relative w-full max-w-6xl h-[80vh] flex flex-col bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-2xl border border-green-500/30">
+            {/* Header com Close Button */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-green-500/30">
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <GitCompare className="w-5 h-5 text-green-400" />
+                  Comparação de Roleplays
+                  <span className="text-sm text-gray-400 font-normal">
+                    ({selectedForComparison.length} selecionados)
+                  </span>
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowComparison(false)
+                  setSelectedForComparison([])
+                  setCompareMode(false)
+                }}
+                className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
+              >
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
             </div>
 
-            {/* Content */}
-            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-6">
+            {/* Content com scroll */}
+            <div className="flex-1 overflow-y-auto p-4">
               {/* Grid de Comparação */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {selectedForComparison.map(roleplayId => {
@@ -1176,22 +1176,22 @@ export default function RoleplayLinksView() {
                   const spinScores = evaluation?.spin_evaluation
 
                   return (
-                    <div key={roleplayId} className="bg-black/60 border border-green-500/20 rounded-2xl p-4">
+                    <div key={roleplayId} className="bg-black/60 border border-green-500/20 rounded-xl p-3">
                       {/* Header do Card */}
-                      <div className="mb-4 pb-3 border-b border-green-500/20">
-                        <h3 className="font-bold text-white text-lg mb-1">
+                      <div className="mb-3 pb-2 border-b border-green-500/20">
+                        <h3 className="font-bold text-white text-base mb-1">
                           {roleplay.participant_name}
                         </h3>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-[10px] text-gray-400">
                           {new Date(roleplay.created_at).toLocaleString('pt-BR')}
                         </p>
-                        <div className="mt-2">
+                        <div className="mt-1">
                           {overallScore !== null && overallScore !== undefined ? (
-                            <div className="text-3xl font-bold text-green-400">
+                            <div className="text-2xl font-bold text-green-400">
                               {(overallScore / 10).toFixed(1)}/10
                             </div>
                           ) : (
-                            <div className="text-sm text-gray-500">
+                            <div className="text-xs text-gray-500">
                               Sem avaliação
                             </div>
                           )}
@@ -1200,13 +1200,13 @@ export default function RoleplayLinksView() {
 
                       {/* SPIN Scores */}
                       {spinScores && (
-                        <div className="mb-4">
-                          <h4 className="text-sm font-bold text-green-400 mb-2">SPIN</h4>
-                          <div className="grid grid-cols-2 gap-2">
+                        <div className="mb-3">
+                          <h4 className="text-xs font-bold text-green-400 mb-1">SPIN</h4>
+                          <div className="grid grid-cols-2 gap-1">
                             {['S', 'P', 'I', 'N'].map((key) => (
-                              <div key={key} className="bg-gray-900/50 rounded-lg p-2 text-center">
-                                <div className="text-[10px] text-gray-400">{key}</div>
-                                <div className="text-lg font-bold text-white">
+                              <div key={key} className="bg-gray-900/50 rounded p-1 text-center">
+                                <div className="text-[9px] text-gray-400">{key}</div>
+                                <div className="text-sm font-bold text-white">
                                   {spinScores[key]?.final_score?.toFixed(1) || '0.0'}
                                 </div>
                               </div>
@@ -1217,9 +1217,9 @@ export default function RoleplayLinksView() {
 
                       {/* Resumo */}
                       {evaluation?.executive_summary && (
-                        <div className="mb-4">
-                          <h4 className="text-sm font-bold text-green-400 mb-2">Resumo</h4>
-                          <p className="text-xs text-gray-300 leading-relaxed line-clamp-4">
+                        <div className="mb-3">
+                          <h4 className="text-xs font-bold text-green-400 mb-1">Resumo</h4>
+                          <p className="text-[10px] text-gray-300 leading-relaxed line-clamp-3">
                             {evaluation.executive_summary}
                           </p>
                         </div>
@@ -1227,13 +1227,13 @@ export default function RoleplayLinksView() {
 
                       {/* Pontos Fortes */}
                       {evaluation?.top_strengths && evaluation.top_strengths.length > 0 && (
-                        <div className="mb-4">
-                          <h4 className="text-sm font-bold text-green-400 mb-2">✅ Fortes</h4>
-                          <ul className="space-y-1">
-                            {evaluation.top_strengths.slice(0, 3).map((strength: string, index: number) => (
-                              <li key={index} className="text-xs text-gray-300 flex items-start gap-1">
+                        <div className="mb-3">
+                          <h4 className="text-xs font-bold text-green-400 mb-1">✅ Fortes</h4>
+                          <ul className="space-y-0.5">
+                            {evaluation.top_strengths.slice(0, 2).map((strength: string, index: number) => (
+                              <li key={index} className="text-[10px] text-gray-300 flex items-start gap-1">
                                 <span className="text-green-400">•</span>
-                                <span className="line-clamp-2">{strength}</span>
+                                <span className="line-clamp-1">{strength}</span>
                               </li>
                             ))}
                           </ul>
@@ -1243,12 +1243,12 @@ export default function RoleplayLinksView() {
                       {/* Gaps */}
                       {evaluation?.critical_gaps && evaluation.critical_gaps.length > 0 && (
                         <div>
-                          <h4 className="text-sm font-bold text-red-400 mb-2">⚠️ Gaps</h4>
-                          <ul className="space-y-1">
-                            {evaluation.critical_gaps.slice(0, 3).map((gap: string, index: number) => (
-                              <li key={index} className="text-xs text-gray-300 flex items-start gap-1">
+                          <h4 className="text-xs font-bold text-red-400 mb-1">⚠️ Gaps</h4>
+                          <ul className="space-y-0.5">
+                            {evaluation.critical_gaps.slice(0, 2).map((gap: string, index: number) => (
+                              <li key={index} className="text-[10px] text-gray-300 flex items-start gap-1">
                                 <span className="text-red-400">•</span>
-                                <span className="line-clamp-2">{gap}</span>
+                                <span className="line-clamp-1">{gap}</span>
                               </li>
                             ))}
                           </ul>
@@ -1260,17 +1260,17 @@ export default function RoleplayLinksView() {
               </div>
 
               {/* Tabela Comparativa de Métricas */}
-              <div className="mt-6 overflow-x-auto">
-                <h3 className="text-lg font-bold text-white mb-4">📊 Comparação de Métricas</h3>
-                <table className="w-full bg-black/40 rounded-xl overflow-hidden">
+              <div className="mt-4 overflow-x-auto">
+                <h3 className="text-base font-bold text-white mb-3">📊 Comparação de Métricas</h3>
+                <table className="w-full bg-black/40 rounded-xl overflow-hidden text-sm">
                   <thead className="bg-green-500/10 border-b border-green-500/20">
                     <tr>
-                      <th className="text-left px-4 py-3 text-sm font-medium text-green-400">Participante</th>
-                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">Nota</th>
-                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">S</th>
-                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">P</th>
-                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">I</th>
-                      <th className="text-center px-3 py-3 text-sm font-medium text-green-400">N</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-green-400">Participante</th>
+                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">Nota</th>
+                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">S</th>
+                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">P</th>
+                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">I</th>
+                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">N</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-green-500/10">
@@ -1283,24 +1283,24 @@ export default function RoleplayLinksView() {
 
                       return (
                         <tr key={roleplayId} className="hover:bg-green-500/5 transition-colors">
-                          <td className="px-4 py-3 text-sm text-white font-medium">
+                          <td className="px-3 py-2 text-xs text-white font-medium">
                             {roleplay.participant_name}
                           </td>
-                          <td className="text-center px-3 py-3">
-                            <span className="text-lg font-bold text-green-400">
+                          <td className="text-center px-2 py-2">
+                            <span className="text-sm font-bold text-green-400">
                               {evaluation?.overall_score ? (evaluation.overall_score / 10).toFixed(1) : '0.0'}
                             </span>
                           </td>
-                          <td className="text-center px-3 py-3 text-sm text-white">
+                          <td className="text-center px-2 py-2 text-xs text-white">
                             {spinScores?.S?.final_score?.toFixed(1) || '0.0'}
                           </td>
-                          <td className="text-center px-3 py-3 text-sm text-white">
+                          <td className="text-center px-2 py-2 text-xs text-white">
                             {spinScores?.P?.final_score?.toFixed(1) || '0.0'}
                           </td>
-                          <td className="text-center px-3 py-3 text-sm text-white">
+                          <td className="text-center px-2 py-2 text-xs text-white">
                             {spinScores?.I?.final_score?.toFixed(1) || '0.0'}
                           </td>
-                          <td className="text-center px-3 py-3 text-sm text-white">
+                          <td className="text-center px-2 py-2 text-xs text-white">
                             {spinScores?.N?.final_score?.toFixed(1) || '0.0'}
                           </td>
                         </tr>
@@ -1317,7 +1317,7 @@ export default function RoleplayLinksView() {
                   setSelectedForComparison([])
                   setCompareMode(false)
                 }}
-                className="w-full mt-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
+                className="w-full mt-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium text-sm text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
               >
                 Fechar Comparação
               </button>
