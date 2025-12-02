@@ -35,8 +35,22 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
     try {
       setLoading(true)
 
-      // Usar API route com service role key para acessar dados de todos os usuários
-      const response = await fetch('/api/admin/sellers-performance')
+      // Obter company_id usando a função utilitária
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+      const companyId = await getCompanyId()
+
+      if (!companyId) {
+        console.error('Company ID não encontrado')
+        setLoading(false)
+        return
+      }
+
+      // Usar API route com company_id no header
+      const response = await fetch('/api/admin/sellers-performance', {
+        headers: {
+          'x-company-id': companyId
+        }
+      })
 
       if (!response.ok) {
         console.error('Erro ao buscar dados:', response.statusText)
