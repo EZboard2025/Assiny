@@ -189,6 +189,53 @@ export async function GET(request: Request) {
         else if (firstScore < lastScore - 0.5) trend = 'declining'
       }
 
+      // Criar timeline de sessões
+      const timeline = metrics.sessions
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .map((session: any) => {
+          let evaluation = session.evaluation
+
+          // Parse se necessário
+          if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+            try {
+              evaluation = JSON.parse(evaluation.output)
+            } catch (e) {
+              return null
+            }
+          }
+
+          // Calcular overall score e SPIN scores
+          const spinScores = { S: 0, P: 0, I: 0, N: 0 }
+          let overallScore = 0
+
+          if (evaluation?.spin_evaluation) {
+            const spinEval = evaluation.spin_evaluation
+
+            if (spinEval.S?.final_score !== undefined) spinScores.S = spinEval.S.final_score
+            if (spinEval.P?.final_score !== undefined) spinScores.P = spinEval.P.final_score
+            if (spinEval.I?.final_score !== undefined) spinScores.I = spinEval.I.final_score
+            if (spinEval.N?.final_score !== undefined) spinScores.N = spinEval.N.final_score
+
+            const scores = []
+            if (spinScores.S) scores.push(spinScores.S)
+            if (spinScores.P) scores.push(spinScores.P)
+            if (spinScores.I) scores.push(spinScores.I)
+            if (spinScores.N) scores.push(spinScores.N)
+
+            if (scores.length > 0) {
+              overallScore = scores.reduce((sum, s) => sum + s, 0) / scores.length
+            }
+          }
+
+          return {
+            session_id: session.id,
+            created_at: session.created_at,
+            overall_score: overallScore,
+            spin_scores: spinScores
+          }
+        })
+        .filter((s: any) => s !== null)
+
       return {
         user_id: metrics.user_id,
         user_name: user?.name || 'Usuário Desconhecido',
@@ -201,7 +248,8 @@ export async function GET(request: Request) {
         spin_n_average: metrics.counts.N > 0 ? metrics.totals.N / metrics.counts.N : 0,
         top_strengths: topStrengths,
         critical_gaps: criticalGaps,
-        trend
+        trend,
+        timeline
       }
     })
 

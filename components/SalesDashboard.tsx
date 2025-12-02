@@ -3,6 +3,18 @@
 import { useState, useEffect } from 'react'
 import { Users, TrendingUp, Award, Target, ArrowLeft, Loader2 } from 'lucide-react'
 
+interface SessionTimeline {
+  session_id: string
+  created_at: string
+  overall_score: number
+  spin_scores: {
+    S: number
+    P: number
+    I: number
+    N: number
+  }
+}
+
 interface SellerPerformance {
   user_id: string
   user_name: string
@@ -16,6 +28,7 @@ interface SellerPerformance {
   top_strengths: Array<{ text: string; count: number }>
   critical_gaps: Array<{ text: string; count: number }>
   trend: string
+  timeline: SessionTimeline[]
 }
 
 interface SalesDashboardProps {
@@ -237,7 +250,93 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
                     {/* Detalhes expandidos */}
                     {selectedSeller?.user_id === seller.user_id && (
-                      <div className="mt-6 pt-6 border-t border-green-500/20">
+                      <div className="mt-6 pt-6 border-t border-green-500/20 space-y-6">
+                        {/* Timeline de Evolução */}
+                        {seller.timeline && seller.timeline.length > 0 && (
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-sm font-bold text-purple-400">📊 Timeline de Evolução</h4>
+                              <span className="text-xs text-gray-500">
+                                {seller.timeline.length} {seller.timeline.length === 1 ? 'sessão' : 'sessões'} no total
+                              </span>
+                            </div>
+
+                            {/* Container scrollável */}
+                            <div className="relative max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                              {/* Linha de conexão */}
+                              <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-gradient-to-b from-purple-500/50 via-purple-500/30 to-transparent"></div>
+
+                              {/* Sessões */}
+                              <div className="space-y-4 pb-4">
+                                {seller.timeline.map((session, idx) => (
+                                  <div key={session.session_id} className="flex items-start gap-4">
+                                    {/* Indicador */}
+                                    <div className="relative">
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                                        session.overall_score >= 8 ? 'bg-green-500/20 text-green-400 ring-2 ring-green-500/50' :
+                                        session.overall_score >= 6 ? 'bg-yellow-500/20 text-yellow-400 ring-2 ring-yellow-500/50' :
+                                        'bg-red-500/20 text-red-400 ring-2 ring-red-500/50'
+                                      }`}>
+                                        {session.overall_score.toFixed(1)}
+                                      </div>
+                                    </div>
+
+                                    {/* Informações da sessão */}
+                                    <div className="flex-1 bg-gray-800/30 rounded-lg p-3">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs text-gray-400">
+                                          {new Date(session.created_at).toLocaleDateString('pt-BR', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </span>
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                          session.overall_score >= 8 ? 'bg-green-500/20 text-green-400' :
+                                          session.overall_score >= 6 ? 'bg-yellow-500/20 text-yellow-400' :
+                                          'bg-red-500/20 text-red-400'
+                                        }`}>
+                                          Sessão #{seller.timeline.length - idx}
+                                        </span>
+                                      </div>
+
+                                      {/* SPIN Scores em miniatura */}
+                                      <div className="grid grid-cols-4 gap-2 text-center">
+                                        <div className="bg-gray-900/50 rounded p-1">
+                                          <p className="text-[10px] text-gray-500 mb-0.5">S</p>
+                                          <p className="text-xs font-bold text-blue-400">
+                                            {session.spin_scores.S.toFixed(1)}
+                                          </p>
+                                        </div>
+                                        <div className="bg-gray-900/50 rounded p-1">
+                                          <p className="text-[10px] text-gray-500 mb-0.5">P</p>
+                                          <p className="text-xs font-bold text-purple-400">
+                                            {session.spin_scores.P.toFixed(1)}
+                                          </p>
+                                        </div>
+                                        <div className="bg-gray-900/50 rounded p-1">
+                                          <p className="text-[10px] text-gray-500 mb-0.5">I</p>
+                                          <p className="text-xs font-bold text-pink-400">
+                                            {session.spin_scores.I.toFixed(1)}
+                                          </p>
+                                        </div>
+                                        <div className="bg-gray-900/50 rounded p-1">
+                                          <p className="text-[10px] text-gray-500 mb-0.5">N</p>
+                                          <p className="text-xs font-bold text-orange-400">
+                                            {session.spin_scores.N.toFixed(1)}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Pontos Fortes */}
                           {seller.top_strengths && seller.top_strengths.length > 0 && (
