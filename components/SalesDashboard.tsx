@@ -262,16 +262,16 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                             </div>
 
                             {/* Container scrollável */}
-                            <div className="relative max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                              {/* Linha de conexão */}
-                              <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-gradient-to-b from-purple-500/50 via-purple-500/30 to-transparent"></div>
+                            <div className="relative max-h-[400px] overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar">
+                              {/* Linha de conexão - ajustada para não sobrepor os círculos */}
+                              <div className="absolute left-5 top-6 bottom-0 w-0.5 bg-gradient-to-b from-purple-500/50 via-purple-500/30 to-transparent"></div>
 
                               {/* Sessões */}
-                              <div className="space-y-4 pb-4">
+                              <div className="space-y-4 pt-2 pb-4 pl-1">
                                 {seller.timeline.map((session, idx) => (
                                   <div key={session.session_id} className="flex items-start gap-4">
                                     {/* Indicador */}
-                                    <div className="relative">
+                                    <div className="relative z-10 flex-shrink-0">
                                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                                         session.overall_score >= 8 ? 'bg-green-500/20 text-green-400 ring-2 ring-green-500/50' :
                                         session.overall_score >= 6 ? 'bg-yellow-500/20 text-yellow-400 ring-2 ring-yellow-500/50' :
