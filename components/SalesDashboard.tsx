@@ -218,25 +218,25 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                     {/* Métricas SPIN */}
                     <div className="grid grid-cols-4 gap-3 mb-4">
                       <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-gray-400 mb-1">S</p>
+                        <p className="text-xs text-green-400 mb-1 font-bold">S</p>
                         <p className="text-lg font-bold text-white">
                           {seller.spin_s_average ? seller.spin_s_average.toFixed(1) : 'N/A'}
                         </p>
                       </div>
                       <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-gray-400 mb-1">P</p>
+                        <p className="text-xs text-green-400 mb-1 font-bold">P</p>
                         <p className="text-lg font-bold text-white">
                           {seller.spin_p_average ? seller.spin_p_average.toFixed(1) : 'N/A'}
                         </p>
                       </div>
                       <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-gray-400 mb-1">I</p>
+                        <p className="text-xs text-green-400 mb-1 font-bold">I</p>
                         <p className="text-lg font-bold text-white">
                           {seller.spin_i_average ? seller.spin_i_average.toFixed(1) : 'N/A'}
                         </p>
                       </div>
                       <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-gray-400 mb-1">N</p>
+                        <p className="text-xs text-green-400 mb-1 font-bold">N</p>
                         <p className="text-lg font-bold text-white">
                           {seller.spin_n_average ? seller.spin_n_average.toFixed(1) : 'N/A'}
                         </p>
