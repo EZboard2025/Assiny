@@ -74,8 +74,6 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const audioContextRef = useRef<AudioContext | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
-  const [finalizingCountdown, setFinalizingCountdown] = useState(7) // Countdown de 7 segundos
-  const finalizingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback'>('evaluation') // Aba ativa no modal de avaliação
 
   useEffect(() => {
@@ -288,12 +286,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   const handleEndSession = async () => {
     console.log('🛑 Encerrando simulação...')
 
-    // Limpar interval de finalização se existir
-    if (finalizingIntervalRef.current) {
-      clearInterval(finalizingIntervalRef.current)
-      finalizingIntervalRef.current = null
-    }
-
     // Parar gravação se estiver ativa
     if (mediaRecorderRef.current) {
       try {
@@ -345,7 +337,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     setCurrentTranscription('');
     setLastUserMessage('');
     setShowFinalizingMessage(false);
-    setFinalizingCountdown(5);
 
     // Iniciar avaliação se tiver sessionId
     if (sessionId && !isEvaluating) {
@@ -424,15 +415,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     }
   }
 
-  const cancelFinalization = () => {
-    // Cancelar o countdown
-    if (finalizingIntervalRef.current) {
-      clearInterval(finalizingIntervalRef.current)
-      finalizingIntervalRef.current = null
-    }
-    setShowFinalizingMessage(false)
-    setFinalizingCountdown(7) // Resetar para 7 segundos
-  }
 
   const handleSendMessage = async (messageToSend?: string) => {
     console.log('🔍 handleSendMessage chamada com:', messageToSend)
@@ -784,31 +766,15 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         console.log('🔊 Áudio do cliente finalizado')
 
-        // Se for mensagem de finalização, iniciar processo de finalização
+        // Se for mensagem de finalização, finalizar automaticamente
         if (isFinalizationMessage) {
-          console.log('🎯 Iniciando processo de finalização automática...')
+          console.log('🎯 Finalizando roleplay automaticamente...')
+          setShowFinalizingMessage(true)
 
-          // Aguardar 3 segundos para garantir que o usuário processou o fim do áudio
+          // Aguardar 2 segundos após o áudio terminar
           setTimeout(() => {
-            console.log('⏰ Iniciando countdown de finalização...')
-            setShowFinalizingMessage(true)
-            setFinalizingCountdown(7)
-
-            // Criar interval para countdown
-            const interval = setInterval(() => {
-              setFinalizingCountdown(prev => {
-                if (prev <= 1) {
-                  clearInterval(interval)
-                  console.log('⏰ Finalizando automaticamente...')
-                  handleEndSession()
-                  return 0
-                }
-                return prev - 1
-              })
-            }, 1000)
-
-            finalizingIntervalRef.current = interval
-          }, 3000) // 3 segundos de delay após o áudio terminar
+            handleEndSession()
+          }, 2000)
         } else {
           console.log('🔊 Aguardando usuário clicar no microfone')
         }
@@ -1038,25 +1004,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                             </p>
                           </div>
                           <p className="text-xs text-gray-300 text-center">
-                            A simulação será encerrada automaticamente em
+                            Finalizando automaticamente...
                           </p>
-                          <div className="text-2xl font-bold text-yellow-400 animate-pulse">
-                            {finalizingCountdown}
-                          </div>
-                          <button
-                            onClick={() => {
-                              // Cancelar finalização automática
-                              if (finalizingIntervalRef.current) {
-                                clearInterval(finalizingIntervalRef.current)
-                                finalizingIntervalRef.current = null
-                              }
-                              setShowFinalizingMessage(false)
-                              setFinalizingCountdown(5)
-                            }}
-                            className="mt-2 px-4 py-1 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 text-xs rounded-lg transition-colors"
-                          >
-                            Cancelar
-                          </button>
                         </div>
                       </div>
                     </div>
