@@ -2420,15 +2420,18 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-3">
                 <h3 className="text-sm font-bold text-white mb-3">Scores por Campo</h3>
                 <div className="space-y-2">
-                  {personaEvaluation.score_detalhado && Object.entries(personaEvaluation.score_detalhado).map(([campo, score]: [string, any]) => {
+                  {personaEvaluation.score_detalhado && Object.entries(personaEvaluation.score_detalhado).map(([campo, scoreData]: [string, any]) => {
                     // Mapeamento de nomes para exibição
                     const fieldNames: Record<string, string> = {
-                      'cargo': 'Cargo',
-                      'tipo_empresa_faturamento': 'Tipo Empresa/Faturamento',
+                      'cargo_perfil': 'Cargo/Perfil',
+                      'tipo_empresa_faturamento_perfil_socioeconomico': 'Tipo Empresa/Perfil',
                       'contexto': 'Contexto',
                       'busca': 'O que Busca',
                       'dores': 'Dores/Desafios'
                     }
+
+                    // Extrair o score numérico do objeto
+                    const scoreValue = typeof scoreData === 'object' ? (scoreData.score || 0) : scoreData;
 
                     return (
                       <div key={campo}>
@@ -2436,17 +2439,17 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                           <span className="text-xs text-gray-300">
                             {fieldNames[campo] || campo}
                           </span>
-                          <span className="text-xs font-bold text-green-400">{score}/10</span>
+                          <span className="text-xs font-bold text-green-400">{scoreValue}/10</span>
                         </div>
                         <div className="w-full bg-gray-800 rounded-full h-1.5">
                           <div
                             className={`h-1.5 rounded-full transition-all ${
-                              score >= 9 ? 'bg-green-500' :
-                              score >= 7 ? 'bg-blue-500' :
-                              score >= 5 ? 'bg-yellow-500' :
+                              scoreValue >= 9 ? 'bg-green-500' :
+                              scoreValue >= 7 ? 'bg-blue-500' :
+                              scoreValue >= 5 ? 'bg-yellow-500' :
                               'bg-orange-500'
                             }`}
-                            style={{ width: `${(score / 10) * 100}%` }}
+                            style={{ width: `${(scoreValue / 10) * 100}%` }}
                           ></div>
                         </div>
                       </div>
@@ -2484,24 +2487,29 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(personaEvaluation.spin_readiness)
                     .filter(([key]) => key !== 'score_spin_total')
-                    .map(([etapa, status]) => (
-                      <div key={etapa} className="bg-gray-800/50 rounded-lg p-2">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-medium text-gray-400 uppercase">
-                            {etapa.replace(/_/g, ' ')}
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold text-center ${
-                            status === 'pronto' ? 'bg-green-500/20 text-green-400' :
-                            status === 'precisa_ajuste' ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-red-500/20 text-red-400'
-                          }`}>
-                            {status === 'pronto' ? '✓ Pronto' :
-                             status === 'precisa_ajuste' ? '⚠ Ajustar' :
-                             '✗ Insuf.'}
-                          </span>
+                    .map(([etapa, statusData]) => {
+                      // Extrair o status do objeto
+                      const statusValue = typeof statusData === 'object' ? (statusData.status || 'insuficiente') : statusData;
+
+                      return (
+                        <div key={etapa} className="bg-gray-800/50 rounded-lg p-2">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-medium text-gray-400 uppercase">
+                              {etapa.replace(/_/g, ' ')}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold text-center ${
+                              statusValue === 'pronto' ? 'bg-green-500/20 text-green-400' :
+                              statusValue === 'precisa_ajuste' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {statusValue === 'pronto' ? '✓ Pronto' :
+                               statusValue === 'precisa_ajuste' ? '⚠ Ajustar' :
+                               '✗ Insuf.'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               </div>
 
