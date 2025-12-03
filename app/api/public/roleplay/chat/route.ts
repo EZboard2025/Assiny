@@ -59,14 +59,55 @@ export async function POST(request: Request) {
 
     const companyType = companyTypeData?.type || 'B2C'
 
+    // Extrair dados da configuração da sessão para manter consistência
+    const sessionConfig = session.config || {}
+    const clientName = sessionConfig.clientName || 'Cliente'
+    const age = sessionConfig.age || 30
+    const temperament = sessionConfig.temperament || 'Analítico'
+
+    // Formatar persona e objeções
+    let personaFormatted = ''
+    if (sessionConfig.persona) {
+      const p = sessionConfig.persona
+      if (p.business_type === 'B2B') {
+        personaFormatted = `
+PERFIL DO CLIENTE B2B:
+- Cargo: ${p.cargo || 'Não especificado'}
+- Empresa: ${p.tipo_empresa_faturamento || 'Não especificado'}
+- Contexto: ${p.contexto || 'Não especificado'}
+- O que busca: ${p.busca || 'Não especificado'}
+- Principais desafios: ${p.dores || 'Não especificado'}`
+      } else if (p.business_type === 'B2C') {
+        personaFormatted = `
+PERFIL DO CLIENTE B2C:
+- Profissão: ${p.cargo || 'Não especificado'}
+- Contexto: ${p.contexto || 'Não especificado'}
+- O que busca: ${p.busca || 'Não especificado'}
+- Principais dores: ${p.dores || 'Não especificado'}`
+      }
+    }
+
+    let objectionsFormatted = 'Nenhuma objeção específica'
+    if (sessionConfig.objections && sessionConfig.objections.length > 0) {
+      objectionsFormatted = sessionConfig.objections.map((obj: any, index: number) => {
+        let text = `OBJEÇÃO ${index + 1}:\n${obj.name || obj}`
+        if (obj.rebuttals && obj.rebuttals.length > 0) {
+          text += `\n\nFormas de quebrar esta objeção:`
+          text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
+        }
+        return text
+      }).join('\n\n---\n\n')
+    }
+
     console.log('📤 Enviando para N8N:', {
       sessionId: threadId,
       chatInput: message.substring(0, 50) + '...',
       companyId: session.company_id,
-      companyName: companyData?.nome
+      companyName: companyData?.nome,
+      clientName: clientName
     })
 
-    // Enviar para N8N
+    // Enviar para N8N com variáveis separadas para System Prompt
     const n8nResponse = await fetch(N8N_ROLEPLAY_WEBHOOK, {
       method: 'POST',
       headers: {
@@ -77,9 +118,16 @@ export async function POST(request: Request) {
         sessionId: threadId,
         chatInput: message,
         companyId: session.company_id,
+        // Dados da empresa
         companyName: companyData?.nome || null,
         companyDescription: companyData?.descricao || null,
-        companyType: companyType
+        companyType: companyType,
+        // Variáveis para o System Prompt do agente N8N:
+        nome: clientName,
+        idade: age,
+        temperamento: temperament,
+        persona: personaFormatted.trim(),
+        objecoes: objectionsFormatted
       })
     })
 

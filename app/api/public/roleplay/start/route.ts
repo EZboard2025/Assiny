@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getRandomMaleClientName } from '@/lib/utils/randomNames'
 
 const N8N_ROLEPLAY_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/d40a1fd9-bfb3-4588-bd45-7bcf2123725d/chat'
 
@@ -35,6 +36,10 @@ export async function POST(request: Request) {
 
     // Gerar threadId único para o N8N
     const threadId = `roleplay_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+
+    // Gerar nome aleatório para o cliente virtual
+    const clientName = getRandomMaleClientName()
+    console.log('👤 Nome do cliente gerado:', clientName)
 
     // Buscar dados da empresa
     const { data: companyData } = await supabaseAdmin
@@ -76,14 +81,14 @@ export async function POST(request: Request) {
     // Montar texto das objeções
     let objectionsText = 'Nenhuma objeção específica'
     if (objections && objections.length > 0) {
-      objectionsText = objections.map((obj: any) => {
-        let text = obj.name
+      objectionsText = objections.map((obj: any, index: number) => {
+        let text = `OBJEÇÃO ${index + 1}:\n${obj.name}`
         if (obj.rebuttals && obj.rebuttals.length > 0) {
-          text += `\n  Formas de quebrar esta objeção:\n`
-          text += obj.rebuttals.map((r: string, i: number) => `  ${i + 1}. ${r}`).join('\n')
+          text += `\n\nFormas de quebrar esta objeção:`
+          text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
         }
         return text
-      }).join('\n\n')
+      }).join('\n\n---\n\n')
     }
 
     // Montar informações da persona
@@ -107,18 +112,7 @@ PERFIL DO CLIENTE B2C:
       }
     }
 
-    // Montar mensagem de contexto
-    const contextMessage = `Você está em uma simulação de venda. Características do cliente:
-- Idade: ${config.age} anos
-- Temperamento: ${config.temperament}
-${personaInfo}
-
-Objeções que o cliente pode usar:
-${objectionsText}
-
-Interprete este personagem de forma realista e consistente com todas as características acima. Inicie a conversa como cliente.`
-
-    // Enviar contexto para N8N e obter primeira resposta
+    // Enviar contexto para N8N com variáveis separadas para System Prompt
     const n8nResponse = await fetch(N8N_ROLEPLAY_WEBHOOK, {
       method: 'POST',
       headers: {
@@ -126,12 +120,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       },
       body: JSON.stringify({
         action: 'sendMessage',
-        chatInput: contextMessage,
+        chatInput: 'Inicie a conversa como cliente',  // Mensagem simplificada
         sessionId: threadId,
         companyId: companyId,
+        // Dados da empresa
         companyName: companyData?.nome || null,
         companyDescription: companyData?.descricao || null,
-        companyType: companyType
+        companyType: companyType,
+        // Variáveis para o System Prompt do agente N8N:
+        nome: clientName,
+        idade: config.age,
+        temperamento: config.temperament,
+        persona: personaInfo.trim(),
+        objecoes: objectionsText
       }),
     })
 
@@ -161,7 +162,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         age: config.age,
         temperament: config.temperament,
         persona: persona,
-        objections: objections
+        objections: objections,
+        clientName: clientName  // Armazenar o nome do cliente para uso nas próximas mensagens
       },
       messages: [],
       status: 'in_progress'
@@ -186,7 +188,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     return NextResponse.json({
       sessionId: session.id,
       threadId: threadId,
-      firstMessage: firstMessage
+      firstMessage: firstMessage,
+      clientName: clientName  // Retornar o nome para o frontend
     })
   } catch (error) {
     console.error('Erro ao iniciar roleplay:', error)

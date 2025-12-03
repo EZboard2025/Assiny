@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getRandomMaleClientName } from '@/lib/utils/randomNames'
 
 const N8N_ROLEPLAY_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/d40a1fd9-bfb3-4588-bd45-7bcf2123725d/chat'
 
@@ -11,9 +12,9 @@ const supabase = createClient(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { sessionId, message, config, userId, companyId } = body
+    const { sessionId, message, config, userId, companyId, clientName, age, temperament, persona, objections } = body
 
-    console.log('📨 Requisição recebida:', { sessionId, hasMessage: !!message, hasConfig: !!config, userId, companyId })
+    console.log('📨 Requisição recebida:', { sessionId, hasMessage: !!message, hasConfig: !!config, userId, companyId, clientName })
 
     // CASO 1: Criar nova sessão (início do roleplay)
     if (!sessionId && config) {
@@ -23,6 +24,10 @@ export async function POST(request: NextRequest) {
       // Gerar sessionId único
       const newSessionId = `roleplay_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
       console.log('✅ SessionId gerado:', newSessionId)
+
+      // Gerar nome aleatório para o cliente virtual
+      const clientName = getRandomMaleClientName()
+      console.log('👤 Nome do cliente gerado:', clientName)
 
       // Buscar dados da empresa (filtrado por company_id)
       console.log('🏢 Buscando dados da empresa para company_id:', companyId)
@@ -58,18 +63,18 @@ export async function POST(request: NextRequest) {
       // Montar mensagem de contexto
       let objectionsText = 'Nenhuma objeção específica'
       if (config.objections?.length > 0) {
-        objectionsText = config.objections.map((obj: any) => {
+        objectionsText = config.objections.map((obj: any, index: number) => {
           if (typeof obj === 'string') {
-            return obj
+            return `OBJEÇÃO ${index + 1}:\n${obj}`
           }
           // Formato novo: { name: string, rebuttals: string[] }
-          let text = obj.name
+          let text = `OBJEÇÃO ${index + 1}:\n${obj.name}`
           if (obj.rebuttals && obj.rebuttals.length > 0) {
-            text += `\n  Formas de quebrar esta objeção:\n`
-            text += obj.rebuttals.map((r: string, i: number) => `  ${i + 1}. ${r}`).join('\n')
+            text += `\n\nFormas de quebrar esta objeção:`
+            text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
           }
           return text
-        }).join('\n\n')
+        }).join('\n\n---\n\n')
       }
 
       // Montar informações da persona
@@ -96,19 +101,9 @@ PERFIL DO CLIENTE B2C:
         }
       }
 
-      const contextMessage = `Você está em uma simulação de venda. Características do cliente:
-- Idade: ${config.age} anos
-- Temperamento: ${config.temperament}
-${personaInfo}
-
-Objeções que o cliente pode usar:
-${objectionsText}
-
-Interprete este personagem de forma realista e consistente com todas as características acima. Inicie a conversa como cliente.`
-
       console.log('📝 Enviando contexto para N8N...')
 
-      // Enviar para N8N com dados da empresa
+      // Enviar para N8N com variáveis separadas para System Prompt
       const response = await fetch(N8N_ROLEPLAY_WEBHOOK, {
         method: 'POST',
         headers: {
@@ -116,14 +111,20 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         },
         body: JSON.stringify({
           action: 'sendMessage',
-          chatInput: contextMessage,
+          chatInput: 'Inicie a conversa como cliente',  // Mensagem simplificada
           sessionId: newSessionId,
           userId: userId,
           companyId: companyId,
-          // Dados da empresa separados para fácil acesso no N8N
+          // Dados da empresa
           companyName: companyData?.nome || null,
           companyDescription: companyData?.descricao || null,
-          companyType: companyType
+          companyType: companyType,
+          // Variáveis para o System Prompt do agente N8N:
+          nome: clientName,
+          idade: config.age,
+          temperamento: config.temperament,
+          persona: personaInfo.trim(),
+          objecoes: objectionsText
         }),
       })
 
@@ -151,6 +152,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       return NextResponse.json({
         sessionId: newSessionId,
         message: responseText,
+        clientName: clientName  // Retornar o nome para o frontend armazenar
       })
     }
 
@@ -189,7 +191,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         console.log('✅ Company type encontrado:', companyType)
       }
 
-      // Enviar mensagem para N8N com dados da empresa
+      // Enviar mensagem para N8N com variáveis separadas para System Prompt
       const response = await fetch(N8N_ROLEPLAY_WEBHOOK, {
         method: 'POST',
         headers: {
@@ -201,10 +203,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           sessionId: sessionId,
           userId: userId,
           companyId: companyId,
-          // Dados da empresa separados para fácil acesso no N8N
+          // Dados da empresa
           companyName: companyData?.nome || null,
           companyDescription: companyData?.descricao || null,
-          companyType: companyType
+          companyType: companyType,
+          // Variáveis para o System Prompt do agente N8N (mantém consistência):
+          nome: clientName,
+          idade: age,
+          temperamento: temperament,
+          persona: persona,
+          objecoes: objections
         }),
       })
 
