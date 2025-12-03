@@ -94,6 +94,7 @@ export default function RoleplayPublico() {
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [evaluation, setEvaluation] = useState<any>(null)
   const [showEvaluationModal, setShowEvaluationModal] = useState(false)
+  const [showAutoFinalizingMessage, setShowAutoFinalizingMessage] = useState(false)
 
   // Referências para áudio
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -233,8 +234,24 @@ export default function RoleplayPublico() {
       // Atualizar mensagens
       setMessages(updatedMessages)
 
+      // Verificar se a mensagem contém a frase de finalização
+      const isFinalizationMessage = response.includes('Roleplay finalizado, aperte em finalizar sessão')
+
       // Reproduzir resposta em áudio
       await playAudioResponse(response)
+
+      // Se for mensagem de finalização, chamar automaticamente endRoleplay
+      if (isFinalizationMessage) {
+        console.log('🎯 Detectada mensagem de finalização do roleplay!')
+        console.log('⏳ Aguardando 2 segundos antes de finalizar...')
+
+        // Mostrar mensagem de finalização automática
+        setShowAutoFinalizingMessage(true)
+
+        setTimeout(() => {
+          endRoleplay()
+        }, 2000)
+      }
     } catch (error) {
       console.error('Erro ao processar áudio:', error)
       alert('Erro ao processar sua mensagem')
@@ -327,11 +344,13 @@ export default function RoleplayPublico() {
 
       console.log('📊 Evaluation final:', parsedEvaluation)
       setEvaluation(parsedEvaluation)
+      setShowAutoFinalizingMessage(false) // Esconder mensagem de finalização
       setShowEvaluationModal(true)
       console.log('✅ Modal de avaliação deve aparecer agora')
     } catch (error) {
       console.error('❌ Erro ao finalizar roleplay:', error)
       alert('Erro ao finalizar roleplay: ' + (error as Error).message)
+      setShowAutoFinalizingMessage(false) // Esconder mensagem em caso de erro
     } finally {
       setIsEvaluating(false)
     }
@@ -799,6 +818,18 @@ export default function RoleplayPublico() {
               <p className="text-green-400 font-semibold animate-pulse">
                 🔊 Cliente está falando...
               </p>
+            </div>
+          )}
+
+          {/* Mensagem de finalização automática */}
+          {showAutoFinalizingMessage && (
+            <div className="text-center mt-4">
+              <div className="inline-block bg-yellow-500/20 border border-yellow-500/50 rounded-lg px-6 py-3 animate-pulse">
+                <p className="text-yellow-400 font-bold text-sm flex items-center gap-2 justify-center">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Finalizando roleplay automaticamente...
+                </p>
+              </div>
             </div>
           )}
         </div>
