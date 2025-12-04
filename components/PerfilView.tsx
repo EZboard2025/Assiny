@@ -1,10 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
+import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History } from 'lucide-react'
 import { getUserRoleplaySessions, type RoleplaySession } from '@/lib/roleplay'
 
-export default function PerfilView() {
+interface PerfilViewProps {
+  onViewChange?: (view: string) => void
+}
+
+export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
   const [mounted, setMounted] = useState(false)
   const [spinAverages, setSpinAverages] = useState({
     S: 0,
@@ -116,29 +120,26 @@ export default function PerfilView() {
           }
         }
 
-        // Calcular overall_score como média das 4 notas SPIN
-        if (evaluation?.spin_evaluation) {
-          const spinEval = evaluation.spin_evaluation
-          const scores = []
+        // Usar overall_score REAL da avaliação (convertendo de 0-100 para 0-10)
+        if (evaluation?.overall_score !== undefined) {
+          let scoreValue = parseFloat(evaluation.overall_score)
 
-          if (spinEval.S?.final_score !== undefined) scores.push(spinEval.S.final_score)
-          if (spinEval.P?.final_score !== undefined) scores.push(spinEval.P.final_score)
-          if (spinEval.I?.final_score !== undefined) scores.push(spinEval.I.final_score)
-          if (spinEval.N?.final_score !== undefined) scores.push(spinEval.N.final_score)
-
-          if (scores.length > 0) {
-            const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length
-            totalOverallScore += avgScore
-            countOverallScore++
-
-            const sessionDate = new Date(session.created_at)
-            const label = `#${completedSessions.length - index}`
-            evolutionPoints.push({
-              label,
-              score: avgScore,
-              date: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-            })
+          // Converter de 0-100 para 0-10 se necessário
+          if (scoreValue > 10) {
+            scoreValue = scoreValue / 10
           }
+
+          console.log(`📊 Sessão ${index + 1}: overall_score = ${evaluation.overall_score} → ${scoreValue}/10`)
+          totalOverallScore += scoreValue
+          countOverallScore++
+
+          const sessionDate = new Date(session.created_at)
+          const label = `#${completedSessions.length - index}`
+          evolutionPoints.push({
+            label,
+            score: scoreValue,
+            date: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+          })
         }
       })
 
@@ -152,6 +153,7 @@ export default function PerfilView() {
 
       // Calcular média geral
       const avgOverall = countOverallScore > 0 ? totalOverallScore / countOverallScore : 0
+      console.log(`📈 Cálculo da média: Total = ${totalOverallScore}, Count = ${countOverallScore}, Média = ${avgOverall}`)
       setOverallAverage(avgOverall)
       setTotalSessions(countOverallScore)
 
@@ -207,23 +209,21 @@ export default function PerfilView() {
     const allEvaluations = completedSessions.map(s => getProcessedEvaluation(s)).filter(e => e !== null)
 
     // Calcular médias gerais (usando todas as sessões)
-    // Calcular overall como média das 4 notas SPIN
+    // Usar overall_score REAL da avaliação (não média SPIN)
     let totalScore = 0
     let countScore = 0
 
     allEvaluations.forEach(e => {
-      if (e?.spin_evaluation) {
-        const spin = e.spin_evaluation
-        const scores = []
-        if (spin.S?.final_score !== undefined) scores.push(spin.S.final_score)
-        if (spin.P?.final_score !== undefined) scores.push(spin.P.final_score)
-        if (spin.I?.final_score !== undefined) scores.push(spin.I.final_score)
-        if (spin.N?.final_score !== undefined) scores.push(spin.N.final_score)
+      if (e?.overall_score !== undefined) {
+        let scoreValue = e.overall_score
 
-        if (scores.length > 0) {
-          totalScore += scores.reduce((sum, s) => sum + s, 0) / scores.length
-          countScore++
+        // Converter de 0-100 para 0-10 se necessário
+        if (scoreValue > 10) {
+          scoreValue = scoreValue / 10
         }
+
+        totalScore += scoreValue
+        countScore++
       }
     })
 
@@ -370,17 +370,32 @@ export default function PerfilView() {
                     </div>
                   </div>
 
-                  {/* Botão Resumo Geral */}
-                  <button
-                    onClick={generateSummary}
-                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-green-500/30 h-fit"
-                  >
-                    <FileText className="w-5 h-5" />
-                    <span>
-                      Resumo<br />
-                      <span className="text-xs opacity-90">Detalhado</span>
-                    </span>
-                  </button>
+                  {/* Botões de Ação */}
+                  <div className="flex flex-col gap-3">
+                    {/* Botão Resumo Geral */}
+                    <button
+                      onClick={generateSummary}
+                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-green-500/30"
+                    >
+                      <FileText className="w-5 h-5" />
+                      <span>
+                        Resumo<br />
+                        <span className="text-xs opacity-90">Detalhado</span>
+                      </span>
+                    </button>
+
+                    {/* Botão Histórico */}
+                    <button
+                      onClick={() => onViewChange?.('historico')}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30"
+                    >
+                      <History className="w-5 h-5" />
+                      <span>
+                        Histórico<br />
+                        <span className="text-xs opacity-90">Roleplays</span>
+                      </span>
+                    </button>
+                  </div>
                 </>
               )}
             </div>

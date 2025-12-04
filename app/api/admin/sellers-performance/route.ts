@@ -109,22 +109,23 @@ export async function GET(request: Request) {
           metrics.counts.N += 1
         }
 
-        // Calcular overall score como média SPIN
-        const scores = []
-        if (spinEval.S?.final_score !== undefined) scores.push(spinEval.S.final_score)
-        if (spinEval.P?.final_score !== undefined) scores.push(spinEval.P.final_score)
-        if (spinEval.I?.final_score !== undefined) scores.push(spinEval.I.final_score)
-        if (spinEval.N?.final_score !== undefined) scores.push(spinEval.N.final_score)
+      }
 
-        if (scores.length > 0) {
-          const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length
-          metrics.totalOverallScore += avgScore
-          metrics.countOverallScore++
+      // Usar overall_score REAL da avaliação (convertendo de 0-100 para 0-10)
+      if (evaluation?.overall_score !== undefined) {
+        let scoreValue = evaluation.overall_score
 
-          // Guardar última pontuação
-          if (!metrics.latestScore || new Date(session.created_at) > new Date(metrics.latestScore.date)) {
-            metrics.latestScore = { score: avgScore, date: session.created_at }
-          }
+        // Converter de 0-100 para 0-10 se necessário
+        if (scoreValue > 10) {
+          scoreValue = scoreValue / 10
+        }
+
+        metrics.totalOverallScore += scoreValue
+        metrics.countOverallScore++
+
+        // Guardar última pontuação
+        if (!metrics.latestScore || new Date(session.created_at) > new Date(metrics.latestScore.date)) {
+          metrics.latestScore = { score: scoreValue, date: session.created_at }
         }
       }
 
@@ -204,9 +205,14 @@ export async function GET(request: Request) {
             }
           }
 
-          // Calcular overall score e SPIN scores
+          // Usar overall_score REAL da avaliação e extrair SPIN scores
           const spinScores = { S: 0, P: 0, I: 0, N: 0 }
-          let overallScore = 0
+          let overallScore = evaluation?.overall_score || 0
+
+          // Converter de 0-100 para 0-10 se necessário
+          if (overallScore > 10) {
+            overallScore = overallScore / 10
+          }
 
           if (evaluation?.spin_evaluation) {
             const spinEval = evaluation.spin_evaluation
@@ -215,16 +221,6 @@ export async function GET(request: Request) {
             if (spinEval.P?.final_score !== undefined) spinScores.P = spinEval.P.final_score
             if (spinEval.I?.final_score !== undefined) spinScores.I = spinEval.I.final_score
             if (spinEval.N?.final_score !== undefined) spinScores.N = spinEval.N.final_score
-
-            const scores = []
-            if (spinScores.S) scores.push(spinScores.S)
-            if (spinScores.P) scores.push(spinScores.P)
-            if (spinScores.I) scores.push(spinScores.I)
-            if (spinScores.N) scores.push(spinScores.N)
-
-            if (scores.length > 0) {
-              overallScore = scores.reduce((sum, s) => sum + s, 0) / scores.length
-            }
           }
 
           return {

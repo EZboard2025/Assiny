@@ -110,8 +110,14 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        {/* Starfield background */}
+        <div className="fixed inset-0 z-0">
+          <div className="stars"></div>
+          <div className="stars2"></div>
+          <div className="stars3"></div>
+        </div>
+        <div className="text-center relative z-10">
           <Loader2 className="w-12 h-12 text-green-400 animate-spin mx-auto mb-4" />
           <p className="text-gray-400">Carregando dados dos vendedores...</p>
         </div>
@@ -120,8 +126,15 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gradient-to-br from-gray-900 via-black to-gray-900 p-6 overflow-y-auto">
-      <div className="max-w-7xl mx-auto">
+    <div className="fixed inset-0 z-[100] bg-black p-6 overflow-y-auto">
+      {/* Starfield background */}
+      <div className="fixed inset-0 z-0">
+        <div className="stars"></div>
+        <div className="stars2"></div>
+        <div className="stars3"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
         <div className="mb-8">
           <button
@@ -131,8 +144,8 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
             <ArrowLeft className="w-5 h-5" />
             Voltar ao Dashboard
           </button>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            📊 Dashboard dos Vendedores
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-purple-500 mb-2">
+            Dashboard dos Vendedores
           </h1>
           <p className="text-gray-400">Visão geral do desempenho de toda a equipe</p>
         </div>
@@ -215,37 +228,39 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                       </div>
                     </div>
 
-                    {/* Métricas SPIN */}
-                    <div className="grid grid-cols-4 gap-3 mb-4">
-                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-green-400 mb-1 font-bold">S</p>
-                        <p className="text-lg font-bold text-white">
-                          {seller.spin_s_average ? seller.spin_s_average.toFixed(1) : 'N/A'}
-                        </p>
-                      </div>
-                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-green-400 mb-1 font-bold">P</p>
-                        <p className="text-lg font-bold text-white">
-                          {seller.spin_p_average ? seller.spin_p_average.toFixed(1) : 'N/A'}
-                        </p>
-                      </div>
-                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-green-400 mb-1 font-bold">I</p>
-                        <p className="text-lg font-bold text-white">
-                          {seller.spin_i_average ? seller.spin_i_average.toFixed(1) : 'N/A'}
-                        </p>
-                      </div>
-                      <div className="bg-gray-900/50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-green-400 mb-1 font-bold">N</p>
-                        <p className="text-lg font-bold text-white">
-                          {seller.spin_n_average ? seller.spin_n_average.toFixed(1) : 'N/A'}
-                        </p>
+                    {/* Métricas SPIN - Com mais destaque */}
+                    <div className="mb-4">
+                      <p className="text-sm text-green-400 font-semibold uppercase tracking-wider mb-3">Detalhamento SPIN</p>
+                      <div className="grid grid-cols-4 gap-4">
+                        <div className="bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 rounded-xl p-4 text-center hover:scale-105 transition-transform">
+                          <p className="text-sm text-green-400 mb-2 font-bold">Situação</p>
+                          <p className="text-2xl font-bold text-white">
+                            {seller.spin_s_average ? seller.spin_s_average.toFixed(1) : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 rounded-xl p-4 text-center hover:scale-105 transition-transform">
+                          <p className="text-sm text-green-400 mb-2 font-bold">Problema</p>
+                          <p className="text-2xl font-bold text-white">
+                            {seller.spin_p_average ? seller.spin_p_average.toFixed(1) : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 rounded-xl p-4 text-center hover:scale-105 transition-transform">
+                          <p className="text-sm text-green-400 mb-2 font-bold">Implicação</p>
+                          <p className="text-2xl font-bold text-white">
+                            {seller.spin_i_average ? seller.spin_i_average.toFixed(1) : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 rounded-xl p-4 text-center hover:scale-105 transition-transform">
+                          <p className="text-sm text-green-400 mb-2 font-bold">Necessidade</p>
+                          <p className="text-2xl font-bold text-white">
+                            {seller.spin_n_average ? seller.spin_n_average.toFixed(1) : 'N/A'}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-center text-sm">
                       <span className="text-gray-400">Total de Sessões: <span className="text-white font-medium">{seller.total_sessions}</span></span>
-                      <span className="text-gray-400">Tendência: <span className="text-white font-medium capitalize">{seller.trend || 'N/A'}</span></span>
                     </div>
 
                     {/* Detalhes expandidos */}
@@ -255,7 +270,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                         {seller.timeline && seller.timeline.length > 0 && (
                           <div>
                             <div className="flex items-center justify-between mb-4">
-                              <h4 className="text-sm font-bold text-purple-400">📊 Timeline de Evolução</h4>
+                              <h4 className="text-sm font-bold text-green-400">Timeline de Evolução</h4>
                               <span className="text-xs text-gray-500">
                                 {seller.timeline.length} {seller.timeline.length === 1 ? 'sessão' : 'sessões'} no total
                               </span>
@@ -264,7 +279,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                             {/* Container scrollável */}
                             <div className="relative max-h-[400px] overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar">
                               {/* Linha de conexão - ajustada para não sobrepor os círculos */}
-                              <div className="absolute left-5 top-6 bottom-0 w-0.5 bg-gradient-to-b from-purple-500/50 via-purple-500/30 to-transparent"></div>
+                              <div className="absolute left-5 top-6 bottom-0 w-0.5 bg-gradient-to-b from-green-500/50 via-green-500/30 to-transparent"></div>
 
                               {/* Sessões */}
                               <div className="space-y-4 pt-2 pb-4 pl-1">
@@ -306,25 +321,25 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                                       <div className="grid grid-cols-4 gap-2 text-center">
                                         <div className="bg-gray-900/50 rounded p-1">
                                           <p className="text-[10px] text-gray-500 mb-0.5">S</p>
-                                          <p className="text-xs font-bold text-blue-400">
+                                          <p className="text-xs font-bold text-green-400">
                                             {session.spin_scores.S.toFixed(1)}
                                           </p>
                                         </div>
                                         <div className="bg-gray-900/50 rounded p-1">
                                           <p className="text-[10px] text-gray-500 mb-0.5">P</p>
-                                          <p className="text-xs font-bold text-purple-400">
+                                          <p className="text-xs font-bold text-green-400">
                                             {session.spin_scores.P.toFixed(1)}
                                           </p>
                                         </div>
                                         <div className="bg-gray-900/50 rounded p-1">
                                           <p className="text-[10px] text-gray-500 mb-0.5">I</p>
-                                          <p className="text-xs font-bold text-pink-400">
+                                          <p className="text-xs font-bold text-green-400">
                                             {session.spin_scores.I.toFixed(1)}
                                           </p>
                                         </div>
                                         <div className="bg-gray-900/50 rounded p-1">
                                           <p className="text-[10px] text-gray-500 mb-0.5">N</p>
-                                          <p className="text-xs font-bold text-orange-400">
+                                          <p className="text-xs font-bold text-green-400">
                                             {session.spin_scores.N.toFixed(1)}
                                           </p>
                                         </div>
@@ -356,11 +371,11 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                           {/* Gaps Críticos */}
                           {seller.critical_gaps && seller.critical_gaps.length > 0 && (
                             <div>
-                              <h4 className="text-sm font-bold text-red-400 mb-3">⚠️ Gaps Críticos</h4>
+                              <h4 className="text-sm font-bold text-yellow-400 mb-3">Gaps Críticos</h4>
                               <ul className="space-y-2">
                                 {seller.critical_gaps.map((gap, idx) => (
                                   <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                                    <span className="text-red-400 mt-0.5">•</span>
+                                    <span className="text-yellow-400 mt-0.5">•</span>
                                     <span>{gap.text} <span className="text-xs text-gray-500">({gap.count}x)</span></span>
                                   </li>
                                 ))}
