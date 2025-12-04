@@ -159,6 +159,14 @@ PERFIL DO CLIENTE B2C:
     // CASO 2: Continuar conversa existente
     if (sessionId && message) {
       console.log('💬 Continuando conversa:', sessionId)
+      console.log('📋 Dados recebidos do frontend:', {
+        clientName,
+        age,
+        temperament,
+        personaType: persona?.business_type || 'não definido',
+        objectionsCount: objections?.length || 0
+      })
+      console.log('🔍 BODY COMPLETO recebido:', JSON.stringify(body, null, 2))
 
       // Buscar dados da empresa (filtrado por company_id)
       console.log('🏢 Buscando dados da empresa para company_id:', companyId)
@@ -218,10 +226,24 @@ PERFIL DO CLIENTE B2C:
         if (typeof persona === 'string') {
           personaText = persona
         } else if (typeof persona === 'object') {
-          // Se for um objeto de persona, formatar como texto
-          personaText = JSON.stringify(persona)
+          // Se for um objeto de persona, formatar como texto detalhado
+          if (persona.business_type === 'B2B') {
+            personaText = `Cargo: ${persona.job_title || 'Não especificado'}
+Tipo de empresa: ${persona.company_type || 'Não especificado'}
+Contexto: ${persona.context || 'Não especificado'}
+O que busca: ${persona.company_goals || 'Não especificado'}
+Principais dores: ${persona.business_challenges || 'Não especificado'}
+O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada ainda'}`
+          } else if (persona.business_type === 'B2C') {
+            personaText = `Perfil: ${persona.profile_type || 'Não especificado'}
+Motivações: ${persona.motivations || 'Não especificado'}
+Estilo de compra: ${persona.shopping_style || 'Não especificado'}
+Objeções comuns: ${persona.common_objections || 'Não especificado'}
+Canais preferidos: ${persona.preferred_channels || 'Não especificado'}`
+          }
         }
       }
+      console.log('📝 Persona formatada:', personaText.substring(0, 100) + '...')
 
       // Enviar mensagem para N8N com variáveis separadas para System Prompt
       const response = await fetch(N8N_ROLEPLAY_WEBHOOK, {

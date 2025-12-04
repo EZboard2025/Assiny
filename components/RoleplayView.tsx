@@ -77,6 +77,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
   const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback'>('evaluation') // Aba ativa no modal de avaliação
   const [clientName, setClientName] = useState<string>('Cliente') // Nome do cliente virtual
+  const [roleplayConfig, setRoleplayConfig] = useState<any>(null) // Armazena toda a configuração do roleplay
 
   useEffect(() => {
     setMounted(true)
@@ -165,6 +166,20 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         rebuttals: o.rebuttals || []
       }))
 
+      // Salvar configuração completa para usar em todas as mensagens
+      const fullConfig = {
+        age,
+        temperament,
+        selectedPersona: selectedPersonaData,
+        objections: objectionsWithRebuttals,
+        personaData: personaData
+      }
+      setRoleplayConfig(fullConfig)
+      console.log('💾 Configuração do roleplay salva:', fullConfig)
+
+      // Salvar também no sessionStorage como backup
+      sessionStorage.setItem('roleplayConfig', JSON.stringify(fullConfig))
+
       // Montar mensagem de contexto (igual ao backend)
       let objectionsText = 'Nenhuma objeção específica'
       if (objectionsWithRebuttals.length > 0) {
@@ -236,6 +251,17 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       setSessionIdN8N(data.sessionId)
       if (data.clientName) {
         setClientName(data.clientName)
+        console.log('✅ ClientName salvo no estado:', data.clientName)
+        // Também salvar no sessionStorage como backup
+        sessionStorage.setItem('roleplayClientName', data.clientName)
+      } else {
+        console.warn('⚠️ ClientName não retornado do backend')
+        // Tentar recuperar do sessionStorage se existir
+        const storedClientName = sessionStorage.getItem('roleplayClientName')
+        if (storedClientName) {
+          console.log('📦 Recuperando clientName do sessionStorage:', storedClientName)
+          setClientName(storedClientName)
+        }
       }
 
       // Criar descrição resumida para o banco (campo segment)
@@ -253,6 +279,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         temperament,
         segment: segmentDescription,
         objections: objectionsWithRebuttals,
+        client_name: data.clientName, // Salvar o nome do cliente
       })
 
       if (session) {
@@ -338,6 +365,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     // Resetar estados
     setIsSimulating(false);
     setIsRecording(false);
+    setClientName('Cliente'); // Reset clientName
+    setRoleplayConfig(null); // Limpar configuração do roleplay
+    sessionStorage.removeItem('roleplayClientName'); // Limpar sessionStorage
+    sessionStorage.removeItem('roleplayConfig'); // Limpar configuração do roleplay
     setIsProcessingTranscription(false);
     setCurrentTranscription('');
     setLastUserMessage('');
@@ -427,6 +458,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     console.log('🔍 isLoading:', isLoading)
     console.log('🔍 sessionIdN8N:', sessionIdN8N)
     console.log('🔍 isSimulating:', isSimulating)
+    console.log('🔍 roleplayConfig atual:', roleplayConfig)
+    console.log('🔍 Estados atuais - age:', age, 'temperament:', temperament, 'selectedPersona:', selectedPersona)
 
     // Verificar se a simulação ainda está ativa
     if (!isSimulating) {
@@ -478,34 +511,95 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     }
 
     try {
-      // Buscar persona selecionada e objeções para enviar junto
-      const selectedPersonaData = personas.find(p => p.id === selectedPersona)
-      const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
+      // Tentar recuperar configuração do estado ou sessionStorage
+      let currentConfig = roleplayConfig
+      if (!currentConfig) {
+        const storedConfig = sessionStorage.getItem('roleplayConfig')
+        if (storedConfig) {
+          console.log('📦 Recuperando configuração do sessionStorage')
+          currentConfig = JSON.parse(storedConfig)
+        }
+      }
 
-      // Formatar objeções com suas formas de quebra
-      const objectionsWithRebuttals = selectedObjectionsData.map(o => ({
-        name: o.name,
-        rebuttals: o.rebuttals || []
-      }))
+      // Usar configuração salva do roleplay ou buscar dados atuais
+      let selectedPersonaData = currentConfig?.selectedPersona
+      let objectionsWithRebuttals = currentConfig?.objections
+      let savedAge = currentConfig?.age || age
+      let savedTemperament = currentConfig?.temperament || temperament
+
+      // Se não tiver configuração salva, buscar dados atuais (fallback)
+      if (!currentConfig) {
+        console.warn('⚠️ Configuração do roleplay não encontrada, buscando dados atuais...')
+        selectedPersonaData = personas.find(p => p.id === selectedPersona)
+        const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
+
+        // Formatar objeções com suas formas de quebra
+        objectionsWithRebuttals = selectedObjectionsData.map(o => ({
+          name: o.name,
+          rebuttals: o.rebuttals || []
+        }))
+
+        savedAge = age
+        savedTemperament = temperament
+      }
+
+      // Debug do clientName e outros estados
+      console.log('🔍 Estado atual antes de enviar:', {
+        clientName,
+        age: savedAge,
+        temperament: savedTemperament,
+        selectedPersona,
+        sessionIdN8N,
+        personaData: selectedPersonaData?.job_title || selectedPersonaData?.profile_type,
+        selectedObjections,
+        objectionsWithRebuttals
+      })
+
+      console.log('🔍 Valores que serão enviados ao N8N:', {
+        clientName,
+        age: savedAge,
+        temperament: savedTemperament,
+        persona: selectedPersonaData,
+        objections: objectionsWithRebuttals
+      })
+
+      // Garantir que temos um clientName válido - tentar recuperar do sessionStorage se necessário
+      let currentClientName = clientName
+      if (!currentClientName || currentClientName === 'Cliente') {
+        const storedClientName = sessionStorage.getItem('roleplayClientName')
+        if (storedClientName) {
+          console.log('🔄 Recuperando clientName perdido do sessionStorage:', storedClientName)
+          currentClientName = storedClientName
+          // Atualizar o estado também
+          setClientName(storedClientName)
+        } else {
+          currentClientName = 'Cliente'
+        }
+      }
+      console.log('📤 Enviando com clientName:', currentClientName)
 
       // Enviar para API (N8N)
+      const payload = {
+        sessionId: sessionIdN8N,
+        message: userMessage,
+        userId: userId,
+        companyId: companyId,
+        // Enviar também os dados de contexto para manter consistência
+        clientName: currentClientName,
+        age: savedAge,
+        temperament: savedTemperament,
+        persona: selectedPersonaData,
+        objections: objectionsWithRebuttals
+      }
+
+      console.log('📦 PAYLOAD COMPLETO sendo enviado:', JSON.stringify(payload, null, 2))
+
       const response = await fetch('/api/roleplay/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          sessionId: sessionIdN8N,
-          message: userMessage,
-          userId: userId,
-          companyId: companyId,
-          // Enviar também os dados de contexto para manter consistência
-          clientName: clientName,
-          age: age,
-          temperament: temperament,
-          persona: selectedPersonaData,
-          objections: objectionsWithRebuttals
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
