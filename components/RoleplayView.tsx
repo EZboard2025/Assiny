@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
-import { getPersonas, getObjections, getCompanyType, type Persona, type PersonaB2B, type PersonaB2C, type Objection } from '@/lib/config'
+import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 
@@ -53,6 +53,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [personas, setPersonas] = useState<Persona[]>([])
   const [objections, setObjections] = useState<Objection[]>([])
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
+  const [tags, setTags] = useState<Tag[]>([])
+  const [personaTags, setPersonaTags] = useState<Map<string, Tag[]>>(new Map())
 
   // Estados de expansão individual
   const [expandedPersonaId, setExpandedPersonaId] = useState<string | null>(null)
@@ -85,14 +87,26 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }, [])
 
   const loadData = async () => {
-    const [businessTypeData, personasData, objectionsData] = await Promise.all([
+    const [businessTypeData, personasData, objectionsData, tagsData] = await Promise.all([
       getCompanyType(),
       getPersonas(),
       getObjections(),
+      getTags(),
     ])
     setBusinessType(businessTypeData)
     setPersonas(personasData)
     setObjections(objectionsData)
+    setTags(tagsData)
+
+    // Carregar tags de cada persona
+    const newPersonaTags = new Map<string, Tag[]>()
+    for (const persona of personasData) {
+      if (persona.id) {
+        const personaTagsData = await getPersonaTags(persona.id)
+        newPersonaTags.set(persona.id, personaTagsData)
+      }
+    }
+    setPersonaTags(newPersonaTags)
 
     // Filtrar personas pelo tipo de empresa e selecionar a primeira
     const filteredPersonas = personasData.filter(p => p.business_type === businessTypeData)
@@ -102,6 +116,42 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }
 
   const temperaments = ['Analítico', 'Empático', 'Determinado', 'Indeciso', 'Sociável']
+
+  // Função para agrupar e ordenar personas por tags
+  const getGroupedPersonas = () => {
+    const filtered = personas.filter(p => p.business_type === businessType)
+
+    // Agrupar por tags
+    const tagGroups = new Map<string, Persona[]>()
+    const noTagPersonas: Persona[] = []
+
+    filtered.forEach(persona => {
+      const tags = personaTags.get(persona.id!) || []
+
+      if (tags.length === 0) {
+        noTagPersonas.push(persona)
+      } else {
+        // Agrupar pela primeira tag (pode ter múltiplas tags, mas vamos usar a primeira)
+        const firstTag = tags[0]
+        const tagKey = firstTag.id
+
+        if (!tagGroups.has(tagKey)) {
+          tagGroups.set(tagKey, [])
+        }
+        tagGroups.get(tagKey)!.push(persona)
+      }
+    })
+
+    // Ordenar os grupos de tags alfabeticamente pelo nome da tag
+    const sortedGroups = Array.from(tagGroups.entries())
+      .map(([tagId, personas]) => {
+        const tag = tags.find(t => t.id === tagId)!
+        return { tag, personas }
+      })
+      .sort((a, b) => a.tag.name.localeCompare(b.tag.name))
+
+    return { sortedGroups, noTagPersonas }
+  }
 
   const handleStartSimulation = async () => {
     setShowConfig(false)
@@ -1400,12 +1450,31 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         </div>
                       ) : (
                         <div
-                          className="space-y-2 overflow-y-auto pr-2"
+                          className="space-y-3 overflow-y-auto pr-2"
                           style={{ height: '200px', maxHeight: '200px', overflowY: 'scroll' }}
                         >
-                          {personas
-                            .filter(p => p.business_type === businessType)
-                            .map((persona) => (
+                          {(() => {
+                            const { sortedGroups, noTagPersonas } = getGroupedPersonas()
+
+                            return (
+                              <>
+                                {/* Personas agrupadas por tag */}
+                                {sortedGroups.map(({ tag, personas: groupPersonas }) => (
+                                  <div key={tag.id} className="space-y-2">
+                                    {/* Separador de tag */}
+                                    <div className="flex items-center gap-2 px-2 py-1">
+                                      <div
+                                        className="w-2 h-2 rounded-full"
+                                        style={{ backgroundColor: tag.color }}
+                                      />
+                                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        {tag.name}
+                                      </span>
+                                      <div className="flex-1 h-px bg-gray-700/50" />
+                                    </div>
+
+                                    {/* Personas do grupo */}
+                                    {groupPersonas.map((persona) => (
                               <div
                                 key={persona.id}
                                 className={`bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
@@ -1427,6 +1496,20 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                         ? (persona as PersonaB2B).job_title
                                         : (persona as PersonaB2C).profession}
                                     </h4>
+                                    {/* Tags da persona */}
+                                    {personaTags.get(persona.id!)?.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {personaTags.get(persona.id!)!.map((tag) => (
+                                          <span
+                                            key={tag.id}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-white"
+                                            style={{ backgroundColor: tag.color }}
+                                          >
+                                            {tag.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                     {expandedPersonaId === persona.id ? (
                                       <div className="text-xs text-gray-400 mt-2 space-y-1">
                                         {persona.business_type === 'B2B' ? (
@@ -1472,7 +1555,111 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                   </div>
                                 </div>
                               </div>
-                            ))}
+                                    ))}
+                                  </div>
+                                ))}
+
+                                {/* Personas sem tag */}
+                                {noTagPersonas.length > 0 && (
+                                  <div className="space-y-2">
+                                    {/* Separador "Sem Etiqueta" */}
+                                    {sortedGroups.length > 0 && (
+                                      <div className="flex items-center gap-2 px-2 py-1">
+                                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Sem Etiqueta
+                                        </span>
+                                        <div className="flex-1 h-px bg-gray-700/50" />
+                                      </div>
+                                    )}
+
+                                    {/* Personas sem tag */}
+                                    {noTagPersonas.map((persona) => (
+                              <div
+                                key={persona.id}
+                                className={`bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
+                                  selectedPersona === persona.id
+                                    ? 'border-green-500 shadow-lg shadow-green-500/20'
+                                    : 'border-green-500/30 hover:border-green-500/50'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div
+                                    onClick={() => setSelectedPersona(persona.id!)}
+                                    className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0 cursor-pointer"
+                                  >
+                                    <UserCircle2 className="w-6 h-6 text-white" />
+                                  </div>
+                                  <div className="flex-1 min-w-0" onClick={() => setSelectedPersona(persona.id!)}>
+                                    <h4 className="font-semibold text-white text-sm cursor-pointer">
+                                      {persona.business_type === 'B2B'
+                                        ? (persona as PersonaB2B).job_title
+                                        : (persona as PersonaB2C).profession}
+                                    </h4>
+                                    {/* Tags da persona */}
+                                    {personaTags.get(persona.id!)?.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {personaTags.get(persona.id!)!.map((tag) => (
+                                          <span
+                                            key={tag.id}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-white"
+                                            style={{ backgroundColor: tag.color }}
+                                          >
+                                            {tag.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {expandedPersonaId === persona.id ? (
+                                      <div className="text-xs text-gray-400 mt-2 space-y-1">
+                                        {persona.business_type === 'B2B' ? (
+                                          <>
+                                            <p><span className="text-green-400 font-medium">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
+                                            <p><span className="text-green-400 font-medium">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
+                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2B).company_goals}</p>
+                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2B).prior_knowledge}</p>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
+                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
+                                            <p><span className="text-green-400 font-medium">Conhecimento:</span> {(persona as PersonaB2C).prior_knowledge}</p>
+                                          </>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-gray-400 mt-1 line-clamp-1 cursor-pointer">
+                                        {persona.business_type === 'B2B'
+                                          ? (persona as PersonaB2B).company_type
+                                          : (persona as PersonaB2C).what_seeks}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                                    {selectedPersona === persona.id && (
+                                      <CheckCircle className="w-5 h-5 text-green-500" />
+                                    )}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!)
+                                      }}
+                                      className="text-green-400 hover:text-green-300 transition-colors p-1"
+                                    >
+                                      {expandedPersonaId === persona.id ? (
+                                        <ChevronUp className="w-4 h-4" />
+                                      ) : (
+                                        <ChevronDown className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            )
+                          })()}
                         </div>
                       )}
                     </div>
