@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
+import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,8 +53,24 @@ export async function POST(request: Request) {
       language: 'pt'
     })
 
+    // Validar e processar a transcrição
+    const processed = processWhisperTranscription(transcription.text)
+
+    if (processed.hasRepetition) {
+      console.warn('⚠️ Repetições detectadas no roleplay público:', {
+        original: transcription.text,
+        cleaned: processed.text,
+        confidence: processed.confidence
+      })
+    }
+
+    // Retornar tanto o texto processado quanto metadados
     return NextResponse.json({
-      text: transcription.text
+      text: processed.text,
+      originalText: transcription.text,
+      isValid: processed.isValid,
+      confidence: processed.confidence,
+      hasRepetition: processed.hasRepetition
     })
   } catch (error) {
     console.error('Erro na transcrição:', error)

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, type Persona, type PersonaB2B, type PersonaB2C, type Objection } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
+import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 
 interface RoleplayViewProps {
   onNavigateToHistory?: () => void
@@ -541,10 +542,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      // Configurar MediaRecorder com menor qualidade para reduzir tamanho
+      // Configurar MediaRecorder com qualidade otimizada para Whisper
       const options = {
         mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 16000  // Taxa de bits baixa para reduzir tamanho
+        audioBitsPerSecond: 32000  // Taxa aumentada para melhor qualidade (era 16000)
       }
 
       const mediaRecorder = new MediaRecorder(stream, options)
@@ -679,22 +680,44 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       console.log('✅ Texto transcrito:', data.text)
 
-      // Mostrar a transcrição na tela com destaque
-      if (data.text) {
-        setCurrentTranscription(`✅ Entendi: "${data.text}"`)
-        setLastUserMessage(data.text)
+      // Validar e processar a transcrição
+      const processed = processWhisperTranscription(data.text)
+
+      if (!processed.isValid) {
+        console.warn('⚠️ Transcrição inválida detectada:', data.text)
+        setCurrentTranscription('❌ Não consegui entender. Tente falar novamente.')
+        setLastUserMessage('')
+        // Aguardar antes de limpar a mensagem de erro
+        setTimeout(() => setCurrentTranscription(''), 3000)
+        return
+      }
+
+      if (processed.hasRepetition) {
+        console.warn('⚠️ Repetições detectadas e corrigidas:', {
+          original: data.text,
+          cleaned: processed.text
+        })
+      }
+
+      // Mostrar a transcrição processada na tela
+      if (processed.text) {
+        // Adicionar indicador de confiança
+        const confidenceIcon = processed.confidence === 'high' ? '✅' :
+                               processed.confidence === 'medium' ? '⚠️' : '❓'
+        setCurrentTranscription(`${confidenceIcon} Entendi: "${processed.text}"`)
+        setLastUserMessage(processed.text)
 
         // Aguardar um momento para o usuário ver antes de enviar
         await new Promise(resolve => setTimeout(resolve, 800))
       }
 
-      // Enviar automaticamente após transcrever se houver texto
-      if (data.text && data.text.trim()) {
+      // Enviar automaticamente após transcrever se houver texto válido
+      if (processed.text && processed.text.trim()) {
         console.log('📤 Enviando mensagem transcrita...')
         setCurrentTranscription('📤 Enviando sua mensagem...')
 
-        // Chamar handleSendMessage diretamente com o texto
-        await handleSendMessage(data.text.trim())
+        // Chamar handleSendMessage diretamente com o texto processado
+        await handleSendMessage(processed.text.trim())
 
         // Mostrar confirmação de envio
         setCurrentTranscription('✅ Mensagem enviada!')

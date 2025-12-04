@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X } from 'lucide-react'
 import Image from 'next/image'
+import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 
 // Keyframes CSS globais para animação das estrelas
 const globalStyles = `
@@ -60,19 +61,28 @@ export default function RoleplayPublico() {
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Gerar estrelas uma única vez (memoizado para evitar re-render)
+  // Função pseudo-aleatória determinística baseada em seed
+  const seededRandom = (seed: number) => {
+    const x = Math.sin(seed * 10000) * 10000
+    return x - Math.floor(x)
+  }
+
+  // Gerar estrelas de forma determinística (evita hydration mismatch)
   const stars = useMemo(() => {
-    return [...Array(100)].map((_, i) => ({
-      id: i,
-      top: Math.random() * 100,
-      left: Math.random() * 100,
-      opacity: Math.random() * 0.7 + 0.3,
-      duration: Math.random() * 20 + 15,
-      delay: Math.random() * 5,
-      floatX: (Math.random() > 0.5 ? 1 : -1) * Math.random() * 100,
-      twinkleDuration: Math.random() * 2 + 1,
-      twinkleDelay: Math.random() * 3
-    }))
+    return [...Array(100)].map((_, i) => {
+      const seed = i + 1
+      return {
+        id: i,
+        top: seededRandom(seed) * 100,
+        left: seededRandom(seed * 2) * 100,
+        opacity: seededRandom(seed * 3) * 0.7 + 0.3,
+        duration: seededRandom(seed * 4) * 20 + 15,
+        delay: seededRandom(seed * 5) * 5,
+        floatX: (seededRandom(seed * 6) > 0.5 ? 1 : -1) * seededRandom(seed * 7) * 100,
+        twinkleDuration: seededRandom(seed * 8) * 2 + 1,
+        twinkleDelay: seededRandom(seed * 9) * 3
+      }
+    })
   }, [])
 
   // Formulário inicial
@@ -209,19 +219,35 @@ export default function RoleplayPublico() {
         throw new Error('Erro ao transcrever áudio')
       }
 
-      const { text } = await transcribeResponse.json()
+      const transcriptionData = await transcribeResponse.json()
 
-      // Adicionar mensagem do vendedor
-      setMessages(prev => [...prev, { role: 'seller', text }])
+      // Validar a transcrição no frontend também
+      const processed = processWhisperTranscription(transcriptionData.text)
 
-      // Enviar para o chat
+      if (!processed.isValid) {
+        console.warn('⚠️ Transcrição inválida no roleplay público:', transcriptionData.text)
+        setError('Não consegui entender. Por favor, fale novamente de forma mais clara.')
+        return
+      }
+
+      if (processed.hasRepetition) {
+        console.warn('⚠️ Repetições corrigidas no roleplay público:', {
+          original: transcriptionData.text,
+          cleaned: processed.text
+        })
+      }
+
+      // Adicionar mensagem do vendedor com texto processado
+      setMessages(prev => [...prev, { role: 'seller', text: processed.text }])
+
+      // Enviar para o chat com texto processado
       const chatResponse = await fetch('/api/public/roleplay/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
           threadId,
-          message: text
+          message: processed.text
         })
       })
 
@@ -671,14 +697,14 @@ export default function RoleplayPublico() {
             {/* Nome */}
             <div>
               <label className="block text-sm font-semibold text-gray-200 mb-1.5">
-                Seu Nome
+                Seu Nome Completo
               </label>
               <input
                 type="text"
                 value={participantName}
                 onChange={(e) => setParticipantName(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500/60 focus:bg-gray-800/70 transition-all"
-                placeholder="Digite seu nome para começar"
+                placeholder="Digite seu nome completo para começar"
                 autoFocus
               />
             </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
+import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -87,7 +88,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ text: '', warning: 'Transcrição vazia' })
     }
 
-    return NextResponse.json({ text: transcription.text })
+    // Validar e processar a transcrição
+    const processed = processWhisperTranscription(transcription.text)
+
+    if (processed.hasRepetition) {
+      console.warn('⚠️ Repetições detectadas no backend:', {
+        original: transcription.text,
+        cleaned: processed.text,
+        confidence: processed.confidence
+      })
+    }
+
+    // Retornar tanto o texto original quanto o processado para debug
+    return NextResponse.json({
+      text: processed.text,
+      originalText: transcription.text,
+      isValid: processed.isValid,
+      confidence: processed.confidence,
+      hasRepetition: processed.hasRepetition
+    })
 
   } catch (error: any) {
     console.error('❌ Erro ao transcrever:', error)
