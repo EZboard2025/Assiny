@@ -2091,7 +2091,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                   {tags.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Etiquetas (opcional)
+                        Etiqueta (opcional - apenas uma por persona)
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {tags.map((tag) => (
@@ -2100,9 +2100,9 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                             type="button"
                             onClick={() => {
                               if (selectedPersonaTags.includes(tag.id)) {
-                                setSelectedPersonaTags(selectedPersonaTags.filter(id => id !== tag.id))
+                                setSelectedPersonaTags([])
                               } else {
-                                setSelectedPersonaTags([...selectedPersonaTags, tag.id])
+                                setSelectedPersonaTags([tag.id])
                               }
                             }}
                             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
