@@ -2489,7 +2489,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                     .filter(([key]) => key !== 'score_spin_total')
                     .map(([etapa, statusData]) => {
                       // Extrair o status do objeto
-                      const statusValue = typeof statusData === 'object' ? (statusData.status || 'insuficiente') : statusData;
+                      const statusValue = typeof statusData === 'object' ? ((statusData as any).status || 'insuficiente') : statusData;
 
                       return (
                         <div key={etapa} className="bg-gray-800/50 rounded-lg p-2">

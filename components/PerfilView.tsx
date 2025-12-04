@@ -5,7 +5,7 @@ import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, Chevr
 import { getUserRoleplaySessions, type RoleplaySession } from '@/lib/roleplay'
 
 interface PerfilViewProps {
-  onViewChange?: (view: string) => void
+  onViewChange?: (view: 'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links') => void | Promise<void>
 }
 
 export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
