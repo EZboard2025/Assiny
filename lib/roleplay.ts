@@ -11,6 +11,7 @@ export interface RoleplayConfig {
   temperament: string
   segment: string
   objections: string[] | { name: string; rebuttals: string[] }[]
+  client_name?: string // Nome do cliente virtual gerado
 }
 
 export interface RoleplaySession {
