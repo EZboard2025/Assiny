@@ -76,6 +76,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const animationFrameRef = useRef<number | null>(null)
   const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
   const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback'>('evaluation') // Aba ativa no modal de avaliação
+  const [clientName, setClientName] = useState<string>('Cliente') // Nome do cliente virtual
 
   useEffect(() => {
     setMounted(true)
@@ -233,6 +234,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       }
 
       setSessionIdN8N(data.sessionId)
+      if (data.clientName) {
+        setClientName(data.clientName)
+      }
 
       // Criar descrição resumida para o banco (campo segment)
       let segmentDescription = 'Não especificado'
@@ -474,6 +478,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     }
 
     try {
+      // Buscar persona selecionada e objeções para enviar junto
+      const selectedPersonaData = personas.find(p => p.id === selectedPersona)
+      const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
+
+      // Formatar objeções com suas formas de quebra
+      const objectionsWithRebuttals = selectedObjectionsData.map(o => ({
+        name: o.name,
+        rebuttals: o.rebuttals || []
+      }))
+
       // Enviar para API (N8N)
       const response = await fetch('/api/roleplay/chat', {
         method: 'POST',
@@ -485,6 +499,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           message: userMessage,
           userId: userId,
           companyId: companyId,
+          // Enviar também os dados de contexto para manter consistência
+          clientName: clientName,
+          age: age,
+          temperament: temperament,
+          persona: selectedPersonaData,
+          objections: objectionsWithRebuttals
         }),
       })
 

@@ -191,6 +191,38 @@ PERFIL DO CLIENTE B2C:
         console.log('✅ Company type encontrado:', companyType)
       }
 
+      // Formatar objeções como texto se vierem como array/objeto
+      let objectionsText = 'Nenhuma objeção específica'
+      if (objections) {
+        if (typeof objections === 'string') {
+          objectionsText = objections
+        } else if (Array.isArray(objections) && objections.length > 0) {
+          objectionsText = objections.map((obj: any, index: number) => {
+            if (typeof obj === 'string') {
+              return `OBJEÇÃO ${index + 1}:\n${obj}`
+            }
+            // Formato novo: { name: string, rebuttals: string[] }
+            let text = `OBJEÇÃO ${index + 1}:\n${obj.name}`
+            if (obj.rebuttals && obj.rebuttals.length > 0) {
+              text += `\n\nFormas de quebrar esta objeção:`
+              text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
+            }
+            return text
+          }).join('\n\n')
+        }
+      }
+
+      // Formatar persona como texto se vier como objeto
+      let personaText = ''
+      if (persona) {
+        if (typeof persona === 'string') {
+          personaText = persona
+        } else if (typeof persona === 'object') {
+          // Se for um objeto de persona, formatar como texto
+          personaText = JSON.stringify(persona)
+        }
+      }
+
       // Enviar mensagem para N8N com variáveis separadas para System Prompt
       const response = await fetch(N8N_ROLEPLAY_WEBHOOK, {
         method: 'POST',
@@ -208,11 +240,11 @@ PERFIL DO CLIENTE B2C:
           companyDescription: companyData?.descricao || null,
           companyType: companyType,
           // Variáveis para o System Prompt do agente N8N (mantém consistência):
-          nome: clientName,
-          idade: age,
-          temperamento: temperament,
-          persona: persona,
-          objecoes: objections
+          nome: clientName || 'Cliente',
+          idade: age || '35',
+          temperamento: temperament || 'Analítico',
+          persona: personaText,
+          objecoes: objectionsText
         }),
       })
 
