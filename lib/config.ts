@@ -451,3 +451,174 @@ export async function deletePersona(id: string): Promise<boolean> {
 
   return true
 }
+
+// Tags
+export interface Tag {
+  id: string
+  company_id: string
+  name: string
+  color: string
+  created_at: string
+  updated_at: string
+}
+
+export async function getTags(): Promise<Tag[]> {
+  const companyId = await getCompanyId()
+
+  if (!companyId) {
+    console.error('[getTags] Company ID não encontrado')
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from('tags')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('[getTags] Erro ao buscar tags:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function createTag(name: string, color: string = '#6B46C1'): Promise<Tag | null> {
+  const companyId = await getCompanyId()
+
+  if (!companyId) {
+    console.error('[createTag] Company ID não encontrado')
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('tags')
+    .insert({
+      company_id: companyId,
+      name,
+      color
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[createTag] Erro ao criar tag:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function updateTag(id: string, name: string, color: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('tags')
+    .update({
+      name,
+      color,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('[updateTag] Erro ao atualizar tag:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function deleteTag(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('tags')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('[deleteTag] Erro ao deletar tag:', error)
+    return false
+  }
+
+  return true
+}
+
+// Personas Tags (relacionamento)
+export async function getPersonaTags(personaId: string): Promise<Tag[]> {
+  const { data, error } = await supabase
+    .from('personas_tags')
+    .select('tags(*)')
+    .eq('persona_id', personaId)
+
+  if (error) {
+    console.error('[getPersonaTags] Erro ao buscar tags da persona:', error)
+    return []
+  }
+
+  return data?.map(item => item.tags).filter(Boolean) || []
+}
+
+export async function addTagToPersona(personaId: string, tagId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('personas_tags')
+    .insert({
+      persona_id: personaId,
+      tag_id: tagId
+    })
+
+  if (error) {
+    console.error('[addTagToPersona] Erro ao adicionar tag à persona:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function removeTagFromPersona(personaId: string, tagId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('personas_tags')
+    .delete()
+    .eq('persona_id', personaId)
+    .eq('tag_id', tagId)
+
+  if (error) {
+    console.error('[removeTagFromPersona] Erro ao remover tag da persona:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function updatePersonaTags(personaId: string, tagIds: string[]): Promise<boolean> {
+  // Primeiro remove todas as tags existentes
+  const { error: deleteError } = await supabase
+    .from('personas_tags')
+    .delete()
+    .eq('persona_id', personaId)
+
+  if (deleteError) {
+    console.error('[updatePersonaTags] Erro ao remover tags existentes:', deleteError)
+    return false
+  }
+
+  // Se não houver novas tags, termina aqui
+  if (tagIds.length === 0) {
+    return true
+  }
+
+  // Adiciona as novas tags
+  const inserts = tagIds.map(tagId => ({
+    persona_id: personaId,
+    tag_id: tagId
+  }))
+
+  const { error: insertError } = await supabase
+    .from('personas_tags')
+    .insert(inserts)
+
+  if (insertError) {
+    console.error('[updatePersonaTags] Erro ao adicionar novas tags:', insertError)
+    return false
+  }
+
+  return true
+}

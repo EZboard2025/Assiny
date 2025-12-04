@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag, Filter } from 'lucide-react'
 import {
   getEmployees,
   addEmployee as addEmployeeDB,
@@ -17,11 +17,18 @@ import {
   getPersonas,
   addPersona,
   deletePersona,
+  getTags,
+  createTag,
+  updateTag,
+  deleteTag,
+  getPersonaTags,
+  updatePersonaTags,
   type Employee,
   type Objection,
   type Persona,
   type PersonaB2B,
-  type PersonaB2C
+  type PersonaB2C,
+  type Tag
 } from '@/lib/config'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 
@@ -77,6 +84,34 @@ function ConfigurationInterface({
   const [expandedObjections, setExpandedObjections] = useState<Set<string>>(new Set())
   const [evaluatingObjection, setEvaluatingObjection] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Estados para Tags
+  const [tags, setTags] = useState<Tag[]>([])
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState('#6B46C1')
+  const [editingTagId, setEditingTagId] = useState<string | null>(null)
+  const [editingTagName, setEditingTagName] = useState('')
+  const [editingTagColor, setEditingTagColor] = useState('')
+  const [selectedPersonaTags, setSelectedPersonaTags] = useState<string[]>([])
+  const [personaTags, setPersonaTags] = useState<Map<string, string[]>>(new Map())
+  const [filterTag, setFilterTag] = useState<string>('')
+  const [showTagForm, setShowTagForm] = useState(false)
+
+  // Paleta de cores para tags
+  const tagColorPalette = [
+    '#6B46C1', // Roxo
+    '#EC4899', // Rosa
+    '#F59E0B', // Amarelo/Laranja
+    '#10B981', // Verde
+    '#3B82F6', // Azul
+    '#EF4444', // Vermelho
+    '#8B5CF6', // Violeta
+    '#14B8A6', // Teal
+    '#F97316', // Laranja
+    '#06B6D4', // Ciano
+    '#84CC16', // Lima
+    '#A855F7', // Púrpura
+  ]
   const [uploadingFile, setUploadingFile] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const [uploadQueue, setUploadQueue] = useState<File[]>([])
@@ -111,7 +146,26 @@ function ConfigurationInterface({
   useEffect(() => {
     loadData()
     loadCompanyData()
+    loadTags()
   }, [])
+
+  // Recarregar tags das personas quando as personas mudarem
+  useEffect(() => {
+    const loadPersonaTags = async () => {
+      const newPersonaTags = new Map<string, string[]>()
+      for (const persona of personas) {
+        if (persona.id) {
+          const tags = await getPersonaTags(persona.id)
+          newPersonaTags.set(persona.id, tags.map(t => t.id))
+        }
+      }
+      setPersonaTags(newPersonaTags)
+    }
+
+    if (personas.length > 0) {
+      loadPersonaTags()
+    }
+  }, [personas])
 
   // Carregar dados da empresa
   const loadCompanyData = async () => {
@@ -287,6 +341,106 @@ function ConfigurationInterface({
       console.error('Erro ao carregar dados:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Funções para Tags
+  const loadTags = async () => {
+    try {
+      const tagsData = await getTags()
+      setTags(tagsData)
+
+      // Carregar tags de cada persona
+      const newPersonaTags = new Map<string, string[]>()
+      for (const persona of personas) {
+        if (persona.id) {
+          const tags = await getPersonaTags(persona.id)
+          newPersonaTags.set(persona.id, tags.map(t => t.id))
+        }
+      }
+      setPersonaTags(newPersonaTags)
+    } catch (error) {
+      console.error('Erro ao carregar tags:', error)
+    }
+  }
+
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) {
+      alert('Digite o nome da etiqueta')
+      return
+    }
+
+    try {
+      const newTag = await createTag(newTagName, newTagColor)
+      if (newTag) {
+        setTags([...tags, newTag])
+        setNewTagName('')
+        setNewTagColor('#6B46C1')
+        setShowTagForm(false)
+      }
+    } catch (error) {
+      console.error('Erro ao criar tag:', error)
+      alert('Erro ao criar etiqueta')
+    }
+  }
+
+  const handleUpdateTag = async (tagId: string) => {
+    if (!editingTagName.trim()) {
+      alert('Digite o nome da etiqueta')
+      return
+    }
+
+    try {
+      const success = await updateTag(tagId, editingTagName, editingTagColor)
+      if (success) {
+        setTags(tags.map(t =>
+          t.id === tagId
+            ? { ...t, name: editingTagName, color: editingTagColor }
+            : t
+        ))
+        setEditingTagId(null)
+        setEditingTagName('')
+        setEditingTagColor('')
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar tag:', error)
+      alert('Erro ao atualizar etiqueta')
+    }
+  }
+
+  const handleDeleteTag = async (tagId: string) => {
+    if (!confirm('Tem certeza que deseja deletar esta etiqueta?')) return
+
+    try {
+      const success = await deleteTag(tagId)
+      if (success) {
+        setTags(tags.filter(t => t.id !== tagId))
+        // Remover tag das personas
+        const newPersonaTags = new Map(personaTags)
+        newPersonaTags.forEach((tagIds, personaId) => {
+          newPersonaTags.set(personaId, tagIds.filter(id => id !== tagId))
+        })
+        setPersonaTags(newPersonaTags)
+      }
+    } catch (error) {
+      console.error('Erro ao deletar tag:', error)
+      alert('Erro ao deletar etiqueta')
+    }
+  }
+
+  const handlePersonaTagsUpdate = async (personaId: string, tagIds: string[]) => {
+    try {
+      const success = await updatePersonaTags(personaId, tagIds)
+      if (success) {
+        setPersonaTags(prev => {
+          const newMap = new Map(prev)
+          newMap.set(personaId, tagIds)
+          return newMap
+        })
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar tags da persona:', error)
+      alert('Erro ao atualizar etiquetas da persona')
     }
   }
 
@@ -500,17 +654,25 @@ function ConfigurationInterface({
         // Marcar persona como editada (permite reavaliação)
         if (editingPersonaId) {
           setEditedPersonaIds(prev => new Set(prev).add(editingPersonaId))
+          // Atualizar tags da persona
+          await handlePersonaTagsUpdate(editingPersonaId, selectedPersonaTags)
         }
         setNewPersona({})
         setShowPersonaForm(false)
         setEditingPersonaId(null)
+        setSelectedPersonaTags([])
       } else {
         // Criar nova persona
         const result = await addPersona({ ...persona, business_type: 'B2B' })
         if (result) {
           setPersonas([...personas, result])
+          // Adicionar tags à nova persona
+          if (result.id && selectedPersonaTags.length > 0) {
+            await handlePersonaTagsUpdate(result.id, selectedPersonaTags)
+          }
           setNewPersona({})
           setShowPersonaForm(false)
+          setSelectedPersonaTags([])
         }
       }
     } else {
@@ -540,17 +702,25 @@ function ConfigurationInterface({
         // Marcar persona como editada (permite reavaliação)
         if (editingPersonaId) {
           setEditedPersonaIds(prev => new Set(prev).add(editingPersonaId))
+          // Atualizar tags da persona
+          await handlePersonaTagsUpdate(editingPersonaId, selectedPersonaTags)
         }
         setNewPersona({})
         setShowPersonaForm(false)
         setEditingPersonaId(null)
+        setSelectedPersonaTags([])
       } else {
         // Criar nova persona
         const result = await addPersona({ ...persona, business_type: 'B2C' })
         if (result) {
           setPersonas([...personas, result])
+          // Adicionar tags à nova persona
+          if (result.id && selectedPersonaTags.length > 0) {
+            await handlePersonaTagsUpdate(result.id, selectedPersonaTags)
+          }
           setNewPersona({})
           setShowPersonaForm(false)
+          setSelectedPersonaTags([])
         }
       }
     }
@@ -1346,17 +1516,35 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold">Personas {businessType}</h3>
-                <button
-                  onClick={() => {
-                    setShowPersonaForm(true)
-                    setNewPersona({})
-                    setEditingPersonaId(null)
-                  }}
-                  className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nova Persona {businessType}
-                </button>
+                <div className="flex items-center gap-3">
+                  {/* Filtro por Tag */}
+                  {tags.length > 0 && (
+                    <select
+                      value={filterTag}
+                      onChange={(e) => setFilterTag(e.target.value)}
+                      className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:outline-none focus:border-green-500/40"
+                    >
+                      <option value="">Todas as etiquetas</option>
+                      {tags.map((tag) => (
+                        <option key={tag.id} value={tag.id}>
+                          {tag.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowPersonaForm(true)
+                      setNewPersona({})
+                      setEditingPersonaId(null)
+                      setSelectedPersonaTags([])
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Nova Persona {businessType}
+                  </button>
+                </div>
               </div>
 
               {/* Aviso de Qualidade */}
@@ -1371,10 +1559,202 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                 </div>
               </div>
 
+              {/* Seção de Gerenciar Etiquetas */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-green-400" />
+                    Etiquetas
+                  </h4>
+                  {!showTagForm && (
+                    <button
+                      onClick={() => setShowTagForm(true)}
+                      className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-gray-800/70 transition-colors flex items-center gap-2"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Nova Etiqueta
+                    </button>
+                  )}
+                </div>
+
+                {/* Formulário para adicionar nova etiqueta */}
+                {showTagForm && (
+                  <div className="mb-4 bg-gray-900/50 border border-green-500/20 rounded-xl p-4 space-y-3">
+                    <input
+                      type="text"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      placeholder="Nome da etiqueta"
+                      className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                    />
+
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2">Escolha uma cor:</p>
+                      <div className="grid grid-cols-6 gap-2">
+                        {tagColorPalette.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setNewTagColor(color)}
+                            className={`w-10 h-10 rounded-lg transition-all ${
+                              newTagColor === color
+                                ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-110'
+                                : 'hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={handleCreateTag}
+                        className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-sm font-medium hover:scale-105 transition-transform"
+                      >
+                        Criar Etiqueta
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowTagForm(false)
+                          setNewTagName('')
+                          setNewTagColor('#6B46C1')
+                        }}
+                        className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-gray-800/70 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de etiquetas existentes */}
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <div
+                        key={tag.id}
+                        className="group relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white transition-all hover:ring-2 hover:ring-offset-2 hover:ring-offset-gray-900"
+                        style={{
+                          backgroundColor: tag.color,
+                          ...(editingTagId === tag.id && { ringColor: tag.color })
+                        }}
+                      >
+                        {editingTagId === tag.id ? (
+                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => {
+                            setEditingTagId(null)
+                            setEditingTagName('')
+                            setEditingTagColor('')
+                          }}>
+                            <div className="bg-gray-900 border border-green-500/30 rounded-xl p-5 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
+                              <h4 className="text-lg font-semibold text-white">Editar Etiqueta</h4>
+
+                              <input
+                                type="text"
+                                value={editingTagName}
+                                onChange={(e) => setEditingTagName(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm text-white placeholder-white/60 focus:outline-none focus:border-green-500/40"
+                                autoFocus
+                              />
+
+                              <div>
+                                <p className="text-xs text-gray-400 mb-2">Escolha uma cor:</p>
+                                <div className="grid grid-cols-6 gap-2">
+                                  {tagColorPalette.map((color) => (
+                                    <button
+                                      key={color}
+                                      type="button"
+                                      onClick={() => setEditingTagColor(color)}
+                                      className={`w-10 h-10 rounded-lg transition-all ${
+                                        editingTagColor === color
+                                          ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-110'
+                                          : 'hover:scale-105'
+                                      }`}
+                                      style={{ backgroundColor: color }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="flex gap-3">
+                                <button
+                                  onClick={() => handleUpdateTag(tag.id)}
+                                  className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-sm font-medium hover:scale-105 transition-transform"
+                                >
+                                  Salvar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingTagId(null)
+                                    setEditingTagName('')
+                                    setEditingTagColor('')
+                                  }}
+                                  className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-gray-800/70 transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <span>{tag.name}</span>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => {
+                                  setEditingTagId(tag.id)
+                                  setEditingTagName(tag.name)
+                                  setEditingTagColor(tag.color)
+                                }}
+                                className="text-white/80 hover:text-white"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTag(tag.id)}
+                                className="text-white/80 hover:text-white"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {tags.length === 0 && !showTagForm && (
+                  <p className="text-gray-400 text-sm">Nenhuma etiqueta criada ainda. Crie etiquetas para organizar suas personas.</p>
+                )}
+              </div>
+
               {/* Lista de personas */}
-              {!showPersonaForm && personas.filter(p => p.business_type === businessType).length > 0 && (
+              {!showPersonaForm && personas.filter(p => {
+                // Filtrar por tipo de negócio
+                if (p.business_type !== businessType) return false
+
+                // Filtrar por tag se selecionada
+                if (filterTag && p.id) {
+                  const personaTagIds = personaTags.get(p.id) || []
+                  if (!personaTagIds.includes(filterTag)) return false
+                }
+
+                return true
+              }).length > 0 && (
                 <div className="mb-4 space-y-4">
-                  {personas.filter(p => p.business_type === businessType).map((persona) => (
+                  {personas.filter(p => {
+                    // Filtrar por tipo de negócio
+                    if (p.business_type !== businessType) return false
+
+                    // Filtrar por tag se selecionada
+                    if (filterTag && p.id) {
+                      const personaTagIds = personaTags.get(p.id) || []
+                      if (!personaTagIds.includes(filterTag)) return false
+                    }
+
+                    return true
+                  }).map((persona) => (
                     <div
                       key={persona.id}
                       className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-green-500/30 rounded-xl p-5 hover:border-green-500/50 transition-all shadow-lg"
@@ -1456,6 +1836,25 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                               )}
                             </div>
                           )}
+
+                          {/* Tags da Persona */}
+                          {persona.id && personaTags.get(persona.id)?.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {personaTags.get(persona.id)?.map(tagId => {
+                                const tag = tags.find(t => t.id === tagId)
+                                if (!tag) return null
+                                return (
+                                  <span
+                                    key={tag.id}
+                                    className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                                    style={{ backgroundColor: tag.color }}
+                                  >
+                                    {tag.name}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         {/* Botões de ação */}
@@ -1492,10 +1891,15 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                               : 'AVALIAR PERSONA'}
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               setEditingPersonaId(persona.id!)
                               setNewPersona(persona)
                               setShowPersonaForm(true)
+                              // Carregar tags da persona
+                              if (persona.id) {
+                                const tags = personaTags.get(persona.id) || []
+                                setSelectedPersonaTags(tags)
+                              }
                             }}
                             className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 p-2 rounded-lg transition-all"
                             title="Editar persona"
@@ -1528,6 +1932,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                         setShowPersonaForm(false)
                         setNewPersona({})
                         setEditingPersonaId(null)
+                        setSelectedPersonaTags([])
                       }}
                       className="text-gray-400 hover:text-gray-300"
                     >
@@ -1682,12 +2087,50 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     <strong>Lembre-se:</strong> Nome, idade, temperamento e objeções serão configurados antes de iniciar cada roleplay.
                   </div>
 
+                  {/* Seletor de Tags */}
+                  {tags.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Etiquetas (opcional)
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {tags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => {
+                              if (selectedPersonaTags.includes(tag.id)) {
+                                setSelectedPersonaTags(selectedPersonaTags.filter(id => id !== tag.id))
+                              } else {
+                                setSelectedPersonaTags([...selectedPersonaTags, tag.id])
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                              selectedPersonaTags.includes(tag.id)
+                                ? 'text-white ring-2 ring-offset-2 ring-offset-gray-900'
+                                : 'text-white opacity-60 hover:opacity-100'
+                            }`}
+                            style={{
+                              backgroundColor: tag.color,
+                              ...(selectedPersonaTags.includes(tag.id) && {
+                                ringColor: tag.color
+                              })
+                            }}
+                          >
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-3">
                     <button
                       onClick={() => {
                         setShowPersonaForm(false)
                         setNewPersona({})
                         setEditingPersonaId(null)
+                        setSelectedPersonaTags([])
                       }}
                       className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:border-green-500/40 transition-all"
                     >
