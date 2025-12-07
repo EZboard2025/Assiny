@@ -554,7 +554,7 @@ export async function getPersonaTags(personaId: string): Promise<Tag[]> {
     return []
   }
 
-  return data?.map(item => item.tags).filter(Boolean) || []
+  return data?.map(item => item.tags).filter(Boolean).flat() as Tag[] || []
 }
 
 export async function addTagToPersona(personaId: string, tagId: string): Promise<boolean> {
