@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag, Filter } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter } from 'lucide-react'
 import {
   getEmployees,
   addEmployee as addEmployeeDB,
@@ -1563,7 +1563,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <Tag className="w-5 h-5 text-green-400" />
+                    <TagIcon className="w-5 h-5 text-green-400" />
                     Etiquetas
                   </h4>
                   {!showTagForm && (
