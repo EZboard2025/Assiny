@@ -1497,7 +1497,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                         : (persona as PersonaB2C).profession}
                                     </h4>
                                     {/* Tags da persona */}
-                                    {personaTags.get(persona.id!)?.length > 0 && (
+                                    {personaTags.get(persona.id!) && personaTags.get(persona.id!)!.length > 0 && (
                                       <div className="flex flex-wrap gap-1 mt-1.5">
                                         {personaTags.get(persona.id!)!.map((tag) => (
                                           <span
@@ -1596,7 +1596,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                         : (persona as PersonaB2C).profession}
                                     </h4>
                                     {/* Tags da persona */}
-                                    {personaTags.get(persona.id!)?.length > 0 && (
+                                    {personaTags.get(persona.id!) && personaTags.get(persona.id!)!.length > 0 && (
                                       <div className="flex flex-wrap gap-1 mt-1.5">
                                         {personaTags.get(persona.id!)!.map((tag) => (
                                           <span
