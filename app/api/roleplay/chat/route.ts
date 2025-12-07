@@ -235,11 +235,11 @@ O que busca: ${persona.company_goals || 'Não especificado'}
 Principais dores: ${persona.business_challenges || 'Não especificado'}
 O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada ainda'}`
           } else if (persona.business_type === 'B2C') {
-            personaText = `Perfil: ${persona.profile_type || 'Não especificado'}
-Motivações: ${persona.motivations || 'Não especificado'}
-Estilo de compra: ${persona.shopping_style || 'Não especificado'}
-Objeções comuns: ${persona.common_objections || 'Não especificado'}
-Canais preferidos: ${persona.preferred_channels || 'Não especificado'}`
+            personaText = `Profissão: ${persona.profession || 'Não especificado'}
+Contexto: ${persona.context || 'Não especificado'}
+O que busca/valoriza: ${persona.what_seeks || 'Não especificado'}
+Principais dores/problemas: ${persona.main_pains || 'Não especificado'}
+O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada ainda'}`
           }
         }
       }
