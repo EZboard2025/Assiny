@@ -1838,7 +1838,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                           )}
 
                           {/* Tags da Persona */}
-                          {persona.id && personaTags.get(persona.id)?.length > 0 && (
+                          {persona.id && personaTags.get(persona.id) && personaTags.get(persona.id)!.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {personaTags.get(persona.id)?.map(tagId => {
                                 const tag = tags.find(t => t.id === tagId)
