@@ -232,9 +232,17 @@ export default function RoleplayLinksView() {
 
     setSaving(true)
     try {
+      // Normalizar config para garantir tipos corretos
+      const normalizedConfig = {
+        age: config.age || '25-34',
+        temperament: config.temperament || 'Analítico',
+        persona_id: config.persona_id || null,
+        objection_ids: Array.isArray(config.objection_ids) ? config.objection_ids : []
+      }
+
       console.log('🔵 Chamando API para salvar config...')
       console.log('🔵 roleplayLink.id:', roleplayLink.id)
-      console.log('🔵 config a salvar:', JSON.stringify(config, null, 2))
+      console.log('🔵 config normalizado a salvar:', JSON.stringify(normalizedConfig, null, 2))
 
       // Usar API route com service role para bypass RLS
       const response = await fetch('/api/roleplay-links/update-config', {
@@ -242,7 +250,7 @@ export default function RoleplayLinksView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           linkId: roleplayLink.id,
-          config
+          config: normalizedConfig
         })
       })
 
@@ -257,12 +265,13 @@ export default function RoleplayLinksView() {
         return
       }
 
-      console.log('✅ Configuração salva com sucesso:', config)
+      console.log('✅ Configuração salva com sucesso:', normalizedConfig)
       setRoleplayLink({
         ...roleplayLink,
-        config
+        config: normalizedConfig
       })
-      setOriginalConfig(JSON.parse(JSON.stringify(config))) // Clone profundo
+      setConfig(normalizedConfig) // Atualizar estado com config normalizado
+      setOriginalConfig(JSON.parse(JSON.stringify(normalizedConfig))) // Clone profundo
       setConfigSaved(true)
       setEditMode(false) // Sair do modo de edição
       alert(configSaved ? 'Configuração atualizada com sucesso!' : 'Configuração salva com sucesso!')

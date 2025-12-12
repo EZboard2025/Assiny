@@ -405,6 +405,14 @@ export default function RoleplayPublico() {
 
     setIsProcessing(true)
     try {
+      // Debug: verificar valores antes de enviar
+      console.log('🔍 Debug - valores selecionados:')
+      console.log('  selectedAge:', selectedAge)
+      console.log('  selectedTemperament:', selectedTemperament)
+      console.log('  selectedPersona:', selectedPersona)
+      console.log('  selectedObjections:', selectedObjections)
+      console.log('  companyConfig?.roleplayLink?.config:', companyConfig?.roleplayLink?.config)
+
       const requestData = {
         participantName,
         companyId: companyConfig?.company.id,

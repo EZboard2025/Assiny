@@ -60,11 +60,26 @@ export async function POST(request: Request) {
     const companyType = companyTypeData?.type || 'B2C'
 
     // Buscar persona completa
-    const { data: persona } = await supabaseAdmin
-      .from('personas')
-      .select('*')
-      .eq('id', config.personaId)
-      .single()
+    console.log('🔍 Config completo recebido:', JSON.stringify(config, null, 2))
+    console.log('🔍 Buscando persona com ID:', config.personaId)
+    console.log('🔍 Tipo do personaId:', typeof config.personaId, '| Valor:', config.personaId)
+
+    let persona = null
+    if (config.personaId && config.personaId !== 'null' && config.personaId !== '') {
+      const { data: personaData, error: personaError } = await supabaseAdmin
+        .from('personas')
+        .select('*')
+        .eq('id', config.personaId)
+        .single()
+
+      persona = personaData
+      console.log('👤 Persona retornada:', JSON.stringify(persona, null, 2))
+      if (personaError) {
+        console.error('❌ Erro ao buscar persona:', personaError)
+      }
+    } else {
+      console.warn('⚠️ personaId está vazio, null ou inválido:', config.personaId)
+    }
 
     // Buscar objeções completas
     console.log('🔍 Buscando objeções com IDs:', config.objectionIds)
@@ -91,25 +106,27 @@ export async function POST(request: Request) {
       }).join('\n\n---\n\n')
     }
 
-    // Montar informações da persona
+    // Montar informações da persona - USANDO OS MESMOS CAMPOS DO ROLEPLAY DE TREINO
     let personaInfo = ''
     if (persona) {
+      console.log('📊 Campos disponíveis na persona:', Object.keys(persona))
       if (persona.business_type === 'B2B') {
         personaInfo = `
 PERFIL DO CLIENTE B2B:
-- Cargo: ${persona.cargo || 'Não especificado'}
-- Empresa: ${persona.tipo_empresa_faturamento || 'Não especificado'}
-- Contexto: ${persona.contexto || 'Não especificado'}
-- O que busca para a empresa: ${persona.busca || 'Não especificado'}
-- Principais desafios do negócio: ${persona.dores || 'Não especificado'}`
+- Cargo: ${persona.job_title || persona.cargo || 'Não especificado'}
+- Empresa: ${persona.company_type || persona.tipo_empresa_faturamento || 'Não especificado'}
+- Contexto: ${persona.context || persona.contexto || 'Não especificado'}
+- O que busca para a empresa: ${persona.company_goals || persona.busca || 'Não especificado'}
+- Principais desafios do negócio: ${persona.business_challenges || persona.dores || 'Não especificado'}`
       } else if (persona.business_type === 'B2C') {
         personaInfo = `
 PERFIL DO CLIENTE B2C:
-- Profissão: ${persona.cargo || 'Não especificado'}
-- Contexto: ${persona.contexto || 'Não especificado'}
-- O que busca/valoriza: ${persona.busca || 'Não especificado'}
-- Principais dores/problemas: ${persona.dores || 'Não especificado'}`
+- Profissão: ${persona.profession || persona.cargo || 'Não especificado'}
+- Contexto: ${persona.context || persona.contexto || 'Não especificado'}
+- O que busca/valoriza: ${persona.what_seeks || persona.busca || 'Não especificado'}
+- Principais dores/problemas: ${persona.main_pains || persona.dores || 'Não especificado'}`
       }
+      console.log('📝 PersonaInfo montada:', personaInfo)
     }
 
     // Enviar contexto para N8N com variáveis separadas para System Prompt
