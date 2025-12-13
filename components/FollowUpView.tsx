@@ -433,25 +433,34 @@ export default function FollowUpView() {
         {analysis && (
           <div className="space-y-8 animate-fadeIn">
             {/* Overall Score Card - Redesigned */}
-            <div className={`relative overflow-hidden rounded-3xl p-8 shadow-2xl ${
-              analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-500 via-green-600 to-emerald-700' :
-              analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600' :
-              analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-500 via-orange-600 to-red-600' :
-              'bg-gradient-to-br from-red-500 via-red-600 to-red-700'
+            <div className={`relative overflow-hidden rounded-2xl p-6 border ${
+              analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-500/30' :
+              analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-900/20 to-amber-900/20 border-yellow-500/30' :
+              analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-900/20 to-red-900/20 border-orange-500/30' :
+              'bg-gradient-to-br from-red-900/20 to-red-950/20 border-red-500/30'
             }`}>
-              {/* Animated background pattern */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute -top-4 -right-4 w-40 h-40 bg-white rounded-full blur-3xl animate-pulse" />
-                <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-white rounded-full blur-2xl animate-pulse animation-delay-1000" />
-              </div>
-
               <div className="relative">
                 <div>
-                  <p className="text-white/80 text-sm font-medium mb-2 uppercase tracking-wider">Nota Final</p>
-                  <div className="flex items-baseline gap-4">
-                    <p className="text-7xl font-black text-white">{analysis.nota_final.toFixed(1)}</p>
+                  <p className={`text-xs font-medium mb-2 uppercase tracking-wider ${
+                    analysis.nota_final >= 8 ? 'text-green-400/70' :
+                    analysis.nota_final >= 6 ? 'text-yellow-400/70' :
+                    analysis.nota_final >= 4 ? 'text-orange-400/70' :
+                    'text-red-400/70'
+                  }`}>Nota Final</p>
+                  <div className="flex items-baseline gap-3">
+                    <p className={`text-5xl font-bold ${
+                      analysis.nota_final >= 8 ? 'text-green-400' :
+                      analysis.nota_final >= 6 ? 'text-yellow-400' :
+                      analysis.nota_final >= 4 ? 'text-orange-400' :
+                      'text-red-400'
+                    }`}>{analysis.nota_final.toFixed(1)}</p>
                     <div>
-                      <span className={`px-4 py-2 rounded-full text-sm font-bold bg-white/20 backdrop-blur-sm text-white border border-white/30`}>
+                      <span className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                        analysis.nota_final >= 8 ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                        analysis.nota_final >= 6 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                        analysis.nota_final >= 4 ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                        'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}>
                         {analysis.classificacao.toUpperCase()}
                       </span>
                     </div>
