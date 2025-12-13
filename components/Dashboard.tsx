@@ -119,7 +119,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     // Home view
     return (
       <div className="py-12 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1600px] mx-auto">
           {/* Welcome Section */}
           <div className="mb-12 text-center">
             <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
@@ -146,11 +146,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Grid Container com ajuste para centralizar últimos elementos */}
+          <div className="flex flex-wrap justify-center gap-6">
             {/* Roleplay Card */}
             <button
               onClick={() => handleViewChange('roleplay')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -178,7 +179,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Meu Perfil Card */}
             <button
               onClick={() => handleViewChange('perfil')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '200ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -206,7 +207,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Histórico Card */}
             <button
               onClick={() => handleViewChange('historico')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '300ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -233,7 +234,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
             {/* PDI Card - Desabilitado */}
             <div
-              className={`text-left ${mounted ? 'animate-slide-up' : 'opacity-0'} opacity-60 cursor-not-allowed`}
+              className={`text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'} opacity-60 cursor-not-allowed`}
               style={{ animationDelay: '400ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/40 to-gray-800/40 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20 h-full">
@@ -264,7 +265,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
                 onClick={() => handleViewChange('roleplay-links')}
-                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '500ms' }}
               >
                 <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -299,7 +300,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {userRole?.toLowerCase() === 'admin' && (
               <button
                 onClick={() => setShowSalesDashboard(true)}
-                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '600ms' }}
               >
                 <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -346,7 +347,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Header Navigation */}
       <header className="fixed top-0 w-full bg-black/70 backdrop-blur-xl z-50">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-center h-20">
+        <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center h-20">
           <div className="w-full flex items-center justify-between">
             {/* Logo */}
             <div className="cursor-pointer" onClick={() => handleViewChange('home')}>
