@@ -1339,85 +1339,158 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {followUpAnalyses.map((analysis) => (
+                <div className="space-y-6">
+                  {followUpAnalyses.map((analysis, index) => (
                     <div
                       key={analysis.id}
-                      className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700 hover:border-green-500/50 transition-all"
+                      className="group relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-3xl p-6 border border-gray-700 hover:border-green-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(34,197,94,0.15)] backdrop-blur-xl animate-slide-up"
+                      style={{ animationDelay: `${index * 100}ms` }}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-4 mb-3">
-                            <span className={`text-3xl font-bold ${
-                              analysis.nota_final >= 8 ? 'text-green-400' :
-                              analysis.nota_final >= 6 ? 'text-yellow-400' :
-                              analysis.nota_final >= 4 ? 'text-orange-400' :
-                              'text-red-400'
-                            }`}>
-                              {analysis.nota_final.toFixed(1)}
-                            </span>
+                      {/* Gradient overlay on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl pointer-events-none" />
 
-                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                              analysis.classificacao === 'excelente' ? 'bg-purple-900/30 text-purple-400 border border-purple-500/30' :
-                              analysis.classificacao === 'bom' ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
-                              analysis.classificacao === 'medio' ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
-                              analysis.classificacao === 'ruim' ? 'bg-orange-900/30 text-orange-400 border border-orange-500/30' :
-                              'bg-red-900/30 text-red-400 border border-red-500/30'
+                      <div className="relative">
+                        {/* Header with score and classification */}
+                        <div className="flex items-start justify-between mb-5">
+                          <div className="flex items-center gap-4">
+                            {/* Score Circle */}
+                            <div className={`relative flex items-center justify-center w-20 h-20 rounded-2xl ${
+                              analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30' :
+                              analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30' :
+                              analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30' :
+                              'bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30'
                             }`}>
-                              {analysis.classificacao.toUpperCase()}
-                            </span>
+                              <span className={`text-3xl font-bold ${
+                                analysis.nota_final >= 8 ? 'text-green-400' :
+                                analysis.nota_final >= 6 ? 'text-yellow-400' :
+                                analysis.nota_final >= 4 ? 'text-orange-400' :
+                                'text-red-400'
+                              }`}>
+                                {analysis.nota_final.toFixed(1)}
+                              </span>
+                              <div className="absolute -top-1 -right-1">
+                                <div className={`w-3 h-3 rounded-full animate-pulse ${
+                                  analysis.nota_final >= 8 ? 'bg-green-400' :
+                                  analysis.nota_final >= 6 ? 'bg-yellow-400' :
+                                  analysis.nota_final >= 4 ? 'bg-orange-400' :
+                                  'bg-red-400'
+                                }`} />
+                              </div>
+                            </div>
 
-                            <div className="flex gap-2 text-xs text-gray-500">
-                              <span className="px-2 py-1 bg-gray-700/50 rounded">{analysis.tipo_venda}</span>
-                              <span className="px-2 py-1 bg-gray-700/50 rounded">{analysis.canal}</span>
-                              <span className="px-2 py-1 bg-gray-700/50 rounded">{analysis.fase_funil}</span>
+                            {/* Info section */}
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide ${
+                                  analysis.classificacao === 'excelente' ? 'bg-gradient-to-r from-purple-600/20 to-purple-500/20 text-purple-400 border border-purple-500/30' :
+                                  analysis.classificacao === 'bom' ? 'bg-gradient-to-r from-green-600/20 to-green-500/20 text-green-400 border border-green-500/30' :
+                                  analysis.classificacao === 'medio' ? 'bg-gradient-to-r from-yellow-600/20 to-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                                  analysis.classificacao === 'ruim' ? 'bg-gradient-to-r from-orange-600/20 to-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                  'bg-gradient-to-r from-red-600/20 to-red-500/20 text-red-400 border border-red-500/30'
+                                }`}>
+                                  {analysis.classificacao}
+                                </span>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <span className="px-3 py-1 bg-blue-900/30 text-blue-400 rounded-lg text-xs font-medium border border-blue-500/20">
+                                  {analysis.tipo_venda}
+                                </span>
+                                <span className="px-3 py-1 bg-green-900/30 text-green-400 rounded-lg text-xs font-medium border border-green-500/20">
+                                  {analysis.canal}
+                                </span>
+                                <span className="px-3 py-1 bg-purple-900/30 text-purple-400 rounded-lg text-xs font-medium border border-purple-500/20">
+                                  {analysis.fase_funil.replace('_', ' ')}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
-                          <p className="text-gray-300 mb-2">
-                            <span className="font-medium">Contexto:</span> {analysis.contexto}
+                          {/* Date */}
+                          <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-800/50 rounded-lg px-3 py-2">
+                            <Calendar className="w-4 h-4 text-gray-500" />
+                            <span>
+                              {new Date(analysis.created_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                            <span className="text-gray-600">•</span>
+                            <span>
+                              {new Date(analysis.created_at).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Context */}
+                        <div className="mb-5 p-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
+                          <p className="text-sm text-gray-300">
+                            <span className="font-semibold text-gray-400 uppercase text-xs tracking-wide">Contexto: </span>
+                            <span className="text-white">{analysis.contexto}</span>
                           </p>
+                        </div>
 
-                          {/* Mini resumo das notas */}
-                          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-3">
-                            {Object.entries(analysis.avaliacao.notas).map(([key, value]: [string, any]) => {
-                              const labels: Record<string, string> = {
-                                'valor_agregado': 'Valor',
-                                'personalizacao': 'Person.',
-                                'tom_consultivo': 'Tom',
-                                'objetividade': 'Objetiv.',
-                                'cta': 'CTA',
-                                'timing': 'Timing'
-                              }
-                              return (
-                                <div key={key} className="text-center">
-                                  <p className="text-xs text-gray-500 mb-1">{labels[key]}</p>
-                                  <p className={`text-sm font-bold ${
-                                    value.nota >= 8 ? 'text-green-400' :
-                                    value.nota >= 6 ? 'text-yellow-400' :
-                                    value.nota >= 4 ? 'text-orange-400' :
-                                    'text-red-400'
-                                  }`}>
-                                    {value.nota.toFixed(1)}
-                                  </p>
+                        {/* Scores Grid */}
+                        <div className="grid grid-cols-6 gap-3">
+                          {Object.entries(analysis.avaliacao.notas).map(([key, value]: [string, any]) => {
+                            const labels: Record<string, string> = {
+                              'valor_agregado': 'Valor',
+                              'personalizacao': 'Person.',
+                              'tom_consultivo': 'Tom',
+                              'objetividade': 'Objetiv.',
+                              'cta': 'CTA',
+                              'timing': 'Timing'
+                            }
+
+                            const getScoreGradient = (nota: number) => {
+                              if (nota >= 8) return 'from-green-500/20 to-green-600/10 border-green-500/30'
+                              if (nota >= 6) return 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30'
+                              if (nota >= 4) return 'from-orange-500/20 to-orange-600/10 border-orange-500/30'
+                              return 'from-red-500/20 to-red-600/10 border-red-500/30'
+                            }
+
+                            return (
+                              <div
+                                key={key}
+                                className={`bg-gradient-to-br ${getScoreGradient(value.nota)} backdrop-blur-sm rounded-xl p-3 text-center border transition-all hover:scale-105`}
+                              >
+                                <p className="text-[10px] text-gray-400 mb-1 font-medium uppercase tracking-wide">
+                                  {labels[key]}
+                                </p>
+                                <p className={`text-xl font-bold ${
+                                  value.nota >= 8 ? 'text-green-400' :
+                                  value.nota >= 6 ? 'text-yellow-400' :
+                                  value.nota >= 4 ? 'text-orange-400' :
+                                  'text-red-400'
+                                }`}>
+                                  {value.nota.toFixed(1)}
+                                </p>
+                                {/* Mini progress bar */}
+                                <div className="mt-2 h-1 bg-gray-700 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      value.nota >= 8 ? 'bg-green-400' :
+                                      value.nota >= 6 ? 'bg-yellow-400' :
+                                      value.nota >= 4 ? 'bg-orange-400' :
+                                      'bg-red-400'
+                                    }`}
+                                    style={{ width: `${value.nota * 10}%` }}
+                                  />
                                 </div>
-                              )
-                            })}
-                          </div>
+                              </div>
+                            )
+                          })}
                         </div>
 
-                        <div className="text-right ml-4">
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(analysis.created_at).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </div>
-                        </div>
+                        {/* View Details Button */}
+                        <button className="mt-5 w-full py-2.5 bg-gradient-to-r from-gray-800 to-gray-700 hover:from-green-900/30 hover:to-green-800/30 text-gray-300 hover:text-white rounded-xl font-medium transition-all border border-gray-600 hover:border-green-500/50 group flex items-center justify-center gap-2">
+                          <FileSearch className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          Ver Análise Completa
+                        </button>
                       </div>
                     </div>
                   ))}

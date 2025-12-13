@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, X, FileText, TrendingUp, Building2, Users, MessageSquare, Target, Sparkles } from 'lucide-react'
+import { Upload, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, X, FileText, TrendingUp, Building2, Users, MessageSquare, Target, Sparkles, BarChart3 } from 'lucide-react'
 
 interface FollowUpAnalysis {
   notas: {
@@ -431,27 +431,46 @@ export default function FollowUpView() {
 
         {/* Analysis Results */}
         {analysis && (
-          <div className="space-y-6 animate-fadeIn">
-            {/* Overall Score Card */}
-            <div className="bg-gradient-to-r from-green-600 to-lime-500 rounded-2xl p-6 text-white shadow-2xl shadow-green-500/30">
-              <div className="flex items-center justify-between">
+          <div className="space-y-8 animate-fadeIn">
+            {/* Overall Score Card - Redesigned */}
+            <div className={`relative overflow-hidden rounded-3xl p-8 shadow-2xl ${
+              analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-500 via-green-600 to-emerald-700' :
+              analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600' :
+              analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-500 via-orange-600 to-red-600' :
+              'bg-gradient-to-br from-red-500 via-red-600 to-red-700'
+            }`}>
+              {/* Animated background pattern */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute -top-4 -right-4 w-40 h-40 bg-white rounded-full blur-3xl animate-pulse" />
+                <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-white rounded-full blur-2xl animate-pulse animation-delay-1000" />
+              </div>
+
+              <div className="relative">
                 <div>
-                  <p className="text-green-100 text-sm mb-1">Nota Final</p>
-                  <p className="text-5xl font-bold">{analysis.nota_final.toFixed(1)}</p>
-                  <div className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium ${getClassificationColor(analysis.classificacao)}`}>
-                    {analysis.classificacao.toUpperCase()}
+                  <p className="text-white/80 text-sm font-medium mb-2 uppercase tracking-wider">Nota Final</p>
+                  <div className="flex items-baseline gap-4">
+                    <p className="text-7xl font-black text-white">{analysis.nota_final.toFixed(1)}</p>
+                    <div>
+                      <span className={`px-4 py-2 rounded-full text-sm font-bold bg-white/20 backdrop-blur-sm text-white border border-white/30`}>
+                        {analysis.classificacao.toUpperCase()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <TrendingUp className="w-16 h-16 text-green-200" />
               </div>
             </div>
 
-            {/* Detailed Scores */}
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 shadow-[0_0_40px_rgba(34,197,94,0.2)]">
-              <h3 className="text-lg font-semibold text-white mb-4">Análise Detalhada</h3>
-              <div className="space-y-4">
-                {Object.entries(analysis.notas).map(([key, value]) => {
-                  // Better formatted labels for each field
+            {/* Detailed Scores - Redesigned */}
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-3xl p-8 border border-gray-700 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+              <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                  <BarChart3 className="w-5 h-5 text-green-400" />
+                </div>
+                Análise Detalhada
+              </h3>
+
+              <div className="space-y-5">
+                {Object.entries(analysis.notas).map(([key, value], index) => {
                   const fieldLabels: Record<string, string> = {
                     'valor_agregado': 'Agregação de Valor',
                     'personalizacao': 'Personalização',
@@ -462,36 +481,77 @@ export default function FollowUpView() {
                   }
 
                   return (
-                    <div key={key} className="border-b border-gray-800 pb-4 last:border-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-300">
-                            {fieldLabels[key] || key.replace(/_/g, ' ')}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            ({value.peso}%)
-                          </span>
+                    <div
+                      key={key}
+                      className="group relative"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-gray-800/50 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                      <div className="relative p-5 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3">
+                            <div>
+                              <span className="font-semibold text-white text-lg">
+                                {fieldLabels[key] || key.replace(/_/g, ' ')}
+                              </span>
+                              <span className="ml-2 text-xs text-gray-400 bg-gray-800/50 px-2 py-1 rounded-full">
+                                {value.peso}% do peso
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-3xl font-black ${
+                              value.nota >= 8 ? 'text-green-400' :
+                              value.nota >= 6 ? 'text-yellow-400' :
+                              value.nota >= 4 ? 'text-orange-400' :
+                              'text-red-400'
+                            }`}>
+                              {value.nota.toFixed(1)}
+                            </span>
+                            <p className={`text-xs mt-1 ${
+                              value.nota >= 8 ? 'text-green-400/70' :
+                              value.nota >= 6 ? 'text-yellow-400/70' :
+                              value.nota >= 4 ? 'text-orange-400/70' :
+                              'text-red-400/70'
+                            }`}>
+                              {value.nota >= 8 ? 'Excelente' :
+                               value.nota >= 6 ? 'Bom' :
+                               value.nota >= 4 ? 'Regular' : 'Precisa Melhorar'}
+                            </p>
+                          </div>
                         </div>
-                        <span className={`text-lg font-bold ${
-                          value.nota >= 8 ? 'text-green-400' :
-                          value.nota >= 6 ? 'text-yellow-400' :
-                          value.nota >= 4 ? 'text-orange-400' :
-                          'text-red-400'
-                        }`}>
-                          {value.nota.toFixed(1)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-400">{value.comentario}</p>
-                      <div className="mt-2 bg-gray-800 rounded-full h-2 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            value.nota >= 8 ? 'bg-gradient-to-r from-green-500 to-green-400' :
-                            value.nota >= 6 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-                            value.nota >= 4 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
-                            'bg-gradient-to-r from-red-500 to-red-400'
-                          }`}
-                          style={{ width: `${value.nota * 10}%` }}
-                        />
+
+                        <p className="text-sm text-gray-300 mb-3 leading-relaxed">{value.comentario}</p>
+
+                        {/* Progress bar with animation */}
+                        <div className="relative">
+                          <div className="bg-gray-700/50 rounded-full h-3 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden ${
+                                value.nota >= 8 ? 'bg-gradient-to-r from-green-500 via-green-400 to-emerald-400' :
+                                value.nota >= 6 ? 'bg-gradient-to-r from-yellow-500 via-yellow-400 to-amber-400' :
+                                value.nota >= 4 ? 'bg-gradient-to-r from-orange-500 via-orange-400 to-red-400' :
+                                'bg-gradient-to-r from-red-600 via-red-500 to-red-400'
+                              }`}
+                              style={{
+                                width: `${value.nota * 10}%`,
+                                animation: 'slideIn 1s ease-out'
+                              }}
+                            >
+                              <div className="absolute inset-0 bg-white/20 animate-shimmer" />
+                            </div>
+                          </div>
+                          {/* Percentage indicator */}
+                          <div
+                            className="absolute -top-1 transition-all duration-1000 ease-out"
+                            style={{ left: `calc(${value.nota * 10}% - 20px)` }}
+                          >
+                            <div className="bg-gray-800 text-white text-xs px-2 py-0.5 rounded-full font-bold border border-gray-600">
+                              {(value.nota * 10).toFixed(0)}%
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )
@@ -501,74 +561,162 @@ export default function FollowUpView() {
 
             {/* Positive Points */}
             {analysis.pontos_positivos.length > 0 && (
-              <div className="bg-green-900/20 border border-green-500/30 rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg flex items-center justify-center border border-green-500/30">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
+              <div className="group relative bg-gradient-to-br from-green-900/30 to-emerald-900/30 backdrop-blur-sm rounded-3xl p-8 border border-green-500/40 hover:border-green-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(34,197,94,0.2)] overflow-hidden">
+                {/* Animated background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-green-500/30 blur-xl animate-pulse"></div>
+                      <div className="relative w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/50">
+                        <CheckCircle className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400">
+                        Pontos Positivos
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Você acertou nestes aspectos</p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-semibold text-green-400">Pontos Positivos</h3>
+
+                  <div className="space-y-3">
+                    {analysis.pontos_positivos.map((ponto, idx) => (
+                      <div key={idx} className="group/item flex items-start gap-3 p-3 rounded-xl hover:bg-green-500/10 transition-all duration-300">
+                        <div className="mt-1 w-6 h-6 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-lg flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                          <span className="text-green-400 text-sm">✓</span>
+                        </div>
+                        <span className="text-gray-200 flex-1 leading-relaxed">{ponto}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <ul className="space-y-2">
-                  {analysis.pontos_positivos.map((ponto, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-green-400 mt-1">•</span>
-                      <span className="text-gray-300">{ponto}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
 
             {/* Points to Improve */}
             {analysis.pontos_melhorar.length > 0 && (
-              <div className="bg-orange-900/20 border border-orange-500/30 rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-lg flex items-center justify-center border border-orange-500/30">
-                    <AlertCircle className="w-4 h-4 text-orange-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-orange-400">Pontos para Melhorar</h3>
-                </div>
-                <div className="space-y-4">
-                  {analysis.pontos_melhorar.map((item, idx) => (
-                    <div key={idx} className="bg-gray-900/50 rounded-lg p-4 border border-gray-800">
-                      <p className="font-medium text-orange-400 mb-2">
-                        ❌ {item.problema}
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        ✅ <span className="font-medium text-green-400">Como resolver:</span> {item.como_resolver}
-                      </p>
+              <div className="group relative bg-gradient-to-br from-orange-900/30 to-amber-900/30 backdrop-blur-sm rounded-3xl p-8 border border-orange-500/40 hover:border-orange-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(251,146,60,0.2)] overflow-hidden">
+                {/* Animated background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-orange-500/30 blur-xl animate-pulse"></div>
+                      <div className="relative w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/50">
+                        <AlertCircle className="w-6 h-6 text-white" />
+                      </div>
                     </div>
-                  ))}
+                    <div>
+                      <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">
+                        Pontos para Melhorar
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Oportunidades de desenvolvimento</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {analysis.pontos_melhorar.map((item, idx) => (
+                      <div key={idx} className="group/item bg-gradient-to-br from-gray-900/60 to-gray-800/60 rounded-2xl p-5 border border-gray-700 hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10 hover:scale-[1.02]">
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-lg flex items-center justify-center">
+                            <span className="text-lg">⚠️</span>
+                          </div>
+                          <p className="font-semibold text-orange-300 flex-1">
+                            {item.problema}
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-3 ml-11">
+                          <div className="w-6 h-6 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-md flex items-center justify-center mt-0.5">
+                            <span className="text-xs">💡</span>
+                          </div>
+                          <div>
+                            <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Solução:</span>
+                            <p className="text-sm text-gray-200 mt-1 leading-relaxed">{item.como_resolver}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Main Tip */}
-            <div className="bg-green-900/20 border border-green-500/30 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg flex items-center justify-center border border-green-500/30">
-                  <Sparkles className="w-4 h-4 text-green-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-green-400">Dica Principal</h3>
+            <div className="group relative bg-gradient-to-br from-purple-900/30 to-pink-900/30 backdrop-blur-sm rounded-3xl p-8 border border-purple-500/40 hover:border-purple-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-hidden">
+              {/* Animated sparkles effect */}
+              <div className="absolute inset-0">
+                <div className="absolute top-10 left-10 w-2 h-2 bg-purple-400 rounded-full animate-ping"></div>
+                <div className="absolute bottom-10 right-10 w-2 h-2 bg-pink-400 rounded-full animate-ping" style={{ animationDelay: '200ms' }}></div>
+                <div className="absolute top-20 right-20 w-2 h-2 bg-purple-400 rounded-full animate-ping" style={{ animationDelay: '400ms' }}></div>
               </div>
-              <p className="text-gray-300">{analysis.dica_principal}</p>
+
+              <div className="relative">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-purple-500/30 blur-xl animate-pulse"></div>
+                    <div className="relative w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/50 animate-bounce">
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                      Dica Principal
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Foque neste insight para melhorar rapidamente</p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-6 border border-purple-500/20">
+                  <p className="text-gray-100 leading-relaxed text-lg">{analysis.dica_principal}</p>
+                </div>
+              </div>
             </div>
 
             {/* Rewritten Version */}
-            <div className="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30">
-                  <FileText className="w-4 h-4 text-blue-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-blue-400">Versão Melhorada</h3>
+            <div className="group relative bg-gradient-to-br from-blue-900/30 to-cyan-900/30 backdrop-blur-sm rounded-3xl p-8 border border-blue-500/40 hover:border-blue-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(59,130,246,0.2)] overflow-hidden">
+              {/* Animated background pattern */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 bg-[size:20px_20px] bg-repeat"
+                     style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)' }}></div>
               </div>
-              <div className="bg-gray-900/50 rounded-lg p-4 whitespace-pre-wrap text-gray-300 border border-gray-800">
-                {analysis.versao_reescrita}
+
+              <div className="relative">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-blue-500/30 blur-xl animate-pulse"></div>
+                    <div className="relative w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50">
+                      <FileText className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+                      Versão Melhorada
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Exemplo otimizado do seu follow-up</p>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute -top-2 -left-2 text-6xl text-blue-500/20 font-serif">"</div>
+                  <div className="absolute -bottom-2 -right-2 text-6xl text-blue-500/20 font-serif rotate-180">"</div>
+                  <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-6 border border-blue-500/20 backdrop-blur-sm">
+                    <pre className="whitespace-pre-wrap text-gray-100 leading-relaxed font-sans">
+                      {analysis.versao_reescrita}
+                    </pre>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span>Copie e adapte ao seu estilo</span>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-4">
+            <div className="flex gap-4 mt-8">
               <button
                 onClick={() => {
                   setAnalysis(null)
@@ -579,9 +727,15 @@ export default function FollowUpView() {
                   // Reset form but keep previous context values for convenience
                   // User can change if needed
                 }}
-                className="flex-1 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-xl py-3 px-6 font-medium hover:from-green-700 hover:to-lime-600 transition-all transform hover:scale-[1.02] shadow-lg shadow-green-500/30"
+                className="group flex-1 relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl py-4 px-8 font-bold hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-[1.02] shadow-xl shadow-green-500/30"
               >
-                Fazer Nova Análise
+                <div className="absolute inset-0 bg-gradient-to-r from-green-400/30 to-emerald-400/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <span className="relative flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Fazer Nova Análise
+                </span>
               </button>
 
               <button
@@ -593,9 +747,14 @@ export default function FollowUpView() {
                   setExtractedText(null)
                   setError(null)
                 }}
-                className="px-6 py-3 bg-gray-800/50 backdrop-blur-sm text-white rounded-xl font-medium hover:bg-gray-700/50 transition-colors border border-gray-600"
+                className="group px-8 py-4 relative bg-gradient-to-br from-gray-800/60 to-gray-900/60 backdrop-blur-sm text-gray-300 rounded-2xl font-bold hover:from-gray-700/60 hover:to-gray-800/60 hover:text-white transition-all border border-gray-700 hover:border-gray-600 hover:shadow-lg"
               >
-                Fechar
+                <span className="relative flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Fechar
+                </span>
               </button>
             </div>
           </div>
