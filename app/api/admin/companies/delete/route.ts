@@ -74,7 +74,80 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // 3. Deletar a empresa (CASCADE deletará todos os dados relacionados)
+    // 3. Deletar dados adicionais que podem não ter CASCADE configurado
+    console.log('🧹 Limpando dados relacionados...')
+
+    // Deletar roleplay_sessions dos funcionários da empresa
+    const { data: sessions } = await supabaseAdmin
+      .from('roleplay_sessions')
+      .select('id')
+      .in('user_id', employees?.map(e => e.user_id) || [])
+
+    if (sessions && sessions.length > 0) {
+      console.log(`  📝 Deletando ${sessions.length} sessões de roleplay...`)
+      await supabaseAdmin
+        .from('roleplay_sessions')
+        .delete()
+        .in('user_id', employees?.map(e => e.user_id) || [])
+    }
+
+    // Deletar user_performance_summaries
+    const { data: summaries } = await supabaseAdmin
+      .from('user_performance_summaries')
+      .select('id')
+      .in('user_id', employees?.map(e => e.user_id) || [])
+
+    if (summaries && summaries.length > 0) {
+      console.log(`  📊 Deletando ${summaries.length} resumos de performance...`)
+      await supabaseAdmin
+        .from('user_performance_summaries')
+        .delete()
+        .in('user_id', employees?.map(e => e.user_id) || [])
+    }
+
+    // Deletar chat_sessions
+    const { data: chats } = await supabaseAdmin
+      .from('chat_sessions')
+      .select('id')
+      .in('user_id', employees?.map(e => e.user_id) || [])
+
+    if (chats && chats.length > 0) {
+      console.log(`  💬 Deletando ${chats.length} sessões de chat...`)
+      await supabaseAdmin
+        .from('chat_sessions')
+        .delete()
+        .in('user_id', employees?.map(e => e.user_id) || [])
+    }
+
+    // Deletar PDIs
+    const { data: pdis } = await supabaseAdmin
+      .from('pdis')
+      .select('id')
+      .in('user_id', employees?.map(e => e.user_id) || [])
+
+    if (pdis && pdis.length > 0) {
+      console.log(`  📋 Deletando ${pdis.length} PDIs...`)
+      await supabaseAdmin
+        .from('pdis')
+        .delete()
+        .in('user_id', employees?.map(e => e.user_id) || [])
+    }
+
+    // Deletar análises de follow-up
+    const { data: followups } = await supabaseAdmin
+      .from('followup_analyses')
+      .select('id')
+      .in('user_id', employees?.map(e => e.user_id) || [])
+
+    if (followups && followups.length > 0) {
+      console.log(`  📱 Deletando ${followups.length} análises de follow-up...`)
+      await supabaseAdmin
+        .from('followup_analyses')
+        .delete()
+        .in('user_id', employees?.map(e => e.user_id) || [])
+    }
+
+    // 4. Deletar a empresa (CASCADE deletará todos os dados relacionados)
     // Devido às foreign keys com ON DELETE CASCADE, isso deletará automaticamente:
     // - employees
     // - personas
@@ -82,11 +155,6 @@ export async function DELETE(request: NextRequest) {
     // - company_data
     // - company_type
     // - documents
-    // - roleplay_sessions
-    // - chat_sessions
-    // - pdis
-    // - user_performance_summaries
-    // - knowledge_base (se tiver company_id)
 
     const { error: deleteError } = await supabaseAdmin
       .from('companies')
