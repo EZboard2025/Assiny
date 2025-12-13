@@ -710,7 +710,11 @@ export default function CompaniesAdmin() {
                     <h3 className="text-xl font-bold text-white mb-1">{company.name}</h3>
                     <div className="flex items-center gap-2 text-sm text-gray-400">
                       <Globe className="w-4 h-4" />
-                      <span>{company.subdomain}.ramppy.local</span>
+                      <span>
+                        {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
+                          ? 'Sistema Unificado'
+                          : `${company.subdomain}.ramppy.local`}
+                      </span>
                     </div>
                   </div>
 
@@ -763,32 +767,42 @@ export default function CompaniesAdmin() {
 
                 <div className="mt-4 pt-4 border-t border-gray-700 space-y-2">
                   <div className="flex gap-2">
-                    <a
-                      href={`http://${company.subdomain}.ramppy.local:3000`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg text-sm font-medium text-center transition-colors"
-                    >
-                      Acessar Local
-                    </a>
-                    <a
-                      href={`https://${company.subdomain}.ramppy.site`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded-lg text-sm font-medium text-center transition-colors"
-                    >
-                      Acessar Produção
-                    </a>
+                    {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true' ? (
+                      <p className="text-xs text-gray-500 text-center w-full">
+                        Acesso unificado em ramppy.site
+                      </p>
+                    ) : (
+                      <>
+                        <a
+                          href={`http://${company.subdomain}.ramppy.local:3000`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg text-sm font-medium text-center transition-colors"
+                        >
+                          Acessar Local
+                        </a>
+                        <a
+                          href={`https://${company.subdomain}.ramppy.site`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded-lg text-sm font-medium text-center transition-colors"
+                        >
+                          Acessar Produção
+                        </a>
+                      </>
+                    )}
                   </div>
-                  <a
-                    href={`https://${company.subdomain}.ramppy.site?openConfigHub=true`}
-                    target="_blank"
+                  {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM !== 'true' && (
+                    <a
+                      href={`https://${company.subdomain}.ramppy.site?openConfigHub=true`}
+                      target="_blank"
                     rel="noopener noreferrer"
                     className="w-full px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-sm font-medium text-center transition-colors flex items-center justify-center gap-2"
                   >
-                    <Settings className="w-4 h-4" />
-                    Ver Configurações
-                  </a>
+                      <Settings className="w-4 h-4" />
+                      Ver Configurações
+                    </a>
+                  )}
                 </div>
               </div>
             ))}
@@ -840,24 +854,28 @@ export default function CompaniesAdmin() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Subdomínio
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
+                    {/* Subdomínio - Mostrar apenas se não estiver no modo unificado */}
+                    {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM !== 'true' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Subdomínio
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
                           value={subdomain}
                           onChange={(e) => handleSubdomainChange(e.target.value)}
                           placeholder="techsolutions"
                           className="flex-1 px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
                         />
-                        <span className="text-gray-400">.ramppy.local</span>
+                            <span className="text-gray-400">.ramppy.local</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Apenas letras minúsculas, números e hífens
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Apenas letras minúsculas, números e hífens
-                      </p>
-                    </div>
+                    )}
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">

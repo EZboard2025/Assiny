@@ -34,38 +34,57 @@ export async function POST(request: NextRequest) {
       employeeLimit
     } = body
 
+    // Sistema unificado não requer subdomínio
+    const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
+
     // Validações
-    if (!companyName || !subdomain || !adminName || !adminEmail || !adminPassword || !businessType) {
+    if (!companyName || !adminName || !adminEmail || !adminPassword || !businessType) {
       return NextResponse.json(
-        { error: 'Todos os campos são obrigatórios' },
+        { error: 'Todos os campos obrigatórios devem ser preenchidos' },
         { status: 400 }
       )
     }
 
-    // Verificar se subdomínio já existe
-    const { data: existingCompany } = await supabaseAdmin
-      .from('companies')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .single()
-
-    if (existingCompany) {
+    // No sistema legado, subdomínio é obrigatório
+    if (!USE_UNIFIED_SYSTEM && !subdomain) {
       return NextResponse.json(
-        { error: 'Subdomínio já está em uso' },
+        { error: 'Subdomínio é obrigatório no sistema com subdomínios' },
         { status: 400 }
       )
     }
 
-    console.log(`📦 Criando empresa: ${companyName} (${subdomain})`)
+    // Verificar se subdomínio já existe (apenas no sistema legado)
+    if (!USE_UNIFIED_SYSTEM && subdomain) {
+      const { data: existingCompany } = await supabaseAdmin
+        .from('companies')
+        .select('id')
+        .eq('subdomain', subdomain)
+        .single()
+
+      if (existingCompany) {
+        return NextResponse.json(
+          { error: 'Subdomínio já está em uso' },
+          { status: 400 }
+        )
+      }
+    }
+
+    console.log(`📦 Criando empresa: ${companyName} ${USE_UNIFIED_SYSTEM ? '(Sistema Unificado)' : `(${subdomain})`}`)
 
     // 1. Criar empresa
+    const companyData: any = {
+      name: companyName,
+      employee_limit: employeeLimit || null
+    }
+
+    // Só adicionar subdomínio se não estiver no modo unificado
+    if (!USE_UNIFIED_SYSTEM && subdomain) {
+      companyData.subdomain = subdomain
+    }
+
     const { data: company, error: companyError } = await supabaseAdmin
       .from('companies')
-      .insert({
-        name: companyName,
-        subdomain: subdomain,
-        employee_limit: employeeLimit || null
-      })
+      .insert(companyData)
       .select()
       .single()
 
