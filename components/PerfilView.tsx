@@ -214,13 +214,25 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
     console.log('🔍 Processando estatísticas de personas...')
     console.log('Total de sessões para processar:', sessions.length)
 
+    // Debug: Ver estrutura das sessões
+    if (sessions.length > 0) {
+      console.log('📊 Exemplo de config da primeira sessão:', (sessions[0] as any).config)
+    }
+
     sessions.forEach((session, index) => {
       const config = (session as any).config
       console.log(`Sessão ${index + 1} config:`, config)
 
       // Tentar pegar persona ou usar segment como fallback
-      let persona = config?.persona
+      let persona = config?.persona || config?.selectedPersona // Pode estar em campos diferentes
       let personaId = persona?.id || persona?.persona_id
+
+      // Debug detalhado da persona
+      console.log(`Sessão ${index + 1} - Persona encontrada:`, {
+        temPersona: !!persona,
+        personaId: personaId,
+        personaCompleta: persona
+      })
 
       // Se não tem persona mas tem segment (sessões antigas), criar um objeto persona fictício
       if (!persona && config?.segment) {
@@ -235,10 +247,10 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
       }
 
       if (!personaId || !persona) {
-        console.log(`Sessão ${index + 1}: Sem persona ou segment`)
+        console.log(`Sessão ${index + 1}: Sem persona ou segment - IGNORANDO`)
         return
       }
-      console.log(`Sessão ${index + 1}: Persona/segment encontrado:`, persona)
+      console.log(`Sessão ${index + 1}: AGRUPANDO persona ID "${personaId}" - Nome: "${persona.cargo || persona.job_title || 'Sem nome'}"`)
 
       let evaluation = (session as any).evaluation
       // Parse se necessário
@@ -278,13 +290,20 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
     })
 
     // Calcular médias
-    stats.forEach(stat => {
+    stats.forEach((stat, personaId) => {
       stat.average = stat.scores.length > 0
         ? stat.scores.reduce((a, b) => a + b, 0) / stat.scores.length
         : 0
+
+      console.log(`📈 Persona "${stat.persona.cargo || stat.persona.job_title}" (ID: ${personaId}):`, {
+        praticas: stat.count,
+        notas: stat.scores,
+        media: stat.average.toFixed(1)
+      })
     })
 
-    console.log('📊 Estatísticas de personas finais:', stats)
+    console.log('📊 Total de personas agrupadas:', stats.size)
+    console.log('📊 Estatísticas de personas finais:', Array.from(stats.entries()))
     setPersonaStats(stats)
   }
 
@@ -870,7 +889,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                   <div key={i} className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border ${borderColor} ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white mb-2">
+                        <h3 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mb-2 drop-shadow-[0_0_20px_rgba(34,197,94,0.5)]">
                           {stat.persona.cargo || stat.persona.job_title || 'Cargo não especificado'}
                         </h3>
                         <p className="text-sm text-gray-400">
