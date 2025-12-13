@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
       // Processar cada imagem
       const extractedTexts = await Promise.all(
-        images.map(async (image, index) => {
+        images.map(async (image: string, index: number) => {
           const base64Data = image.replace(/^data:image\/\w+;base64,/, '')
 
           const visionResponse = await openai.chat.completions.create({

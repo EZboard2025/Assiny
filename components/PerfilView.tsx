@@ -1340,162 +1340,108 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {followUpAnalyses.map((analysis, index) => (
                     <div
                       key={analysis.id}
-                      className="group relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-3xl p-6 border border-gray-700 hover:border-green-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(34,197,94,0.15)] backdrop-blur-xl animate-slide-up"
-                      style={{ animationDelay: `${index * 100}ms` }}
+                      className="group bg-gray-900/50 rounded-2xl p-5 border border-gray-800 hover:border-green-500/30 transition-all duration-300"
                     >
-                      {/* Gradient overlay on hover */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl pointer-events-none" />
-
-                      <div className="relative">
-                        {/* Header with score and classification */}
-                        <div className="flex items-start justify-between mb-5">
-                          <div className="flex items-center gap-4">
-                            {/* Score Circle */}
-                            <div className={`relative flex items-center justify-center w-20 h-20 rounded-2xl ${
-                              analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30' :
-                              analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30' :
-                              analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30' :
-                              'bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30'
+                      <div className="flex items-start justify-between mb-3">
+                        {/* Left: Score and Basic Info */}
+                        <div className="flex items-center gap-4">
+                          {/* Simplified Score */}
+                          <div className={`flex items-center justify-center w-14 h-14 rounded-xl ${
+                            analysis.nota_final >= 8 ? 'bg-green-500/10 border border-green-500/20' :
+                            analysis.nota_final >= 6 ? 'bg-yellow-500/10 border border-yellow-500/20' :
+                            analysis.nota_final >= 4 ? 'bg-orange-500/10 border border-orange-500/20' :
+                            'bg-red-500/10 border border-red-500/20'
+                          }`}>
+                            <span className={`text-xl font-bold ${
+                              analysis.nota_final >= 8 ? 'text-green-400' :
+                              analysis.nota_final >= 6 ? 'text-yellow-400' :
+                              analysis.nota_final >= 4 ? 'text-orange-400' :
+                              'text-red-400'
                             }`}>
-                              <span className={`text-3xl font-bold ${
-                                analysis.nota_final >= 8 ? 'text-green-400' :
-                                analysis.nota_final >= 6 ? 'text-yellow-400' :
-                                analysis.nota_final >= 4 ? 'text-orange-400' :
+                              {analysis.nota_final.toFixed(1)}
+                            </span>
+                          </div>
+
+                          {/* Basic Info */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-xs font-medium uppercase ${
+                                analysis.classificacao === 'excelente' ? 'text-purple-400' :
+                                analysis.classificacao === 'bom' ? 'text-green-400' :
+                                analysis.classificacao === 'medio' ? 'text-yellow-400' :
+                                analysis.classificacao === 'ruim' ? 'text-orange-400' :
                                 'text-red-400'
                               }`}>
-                                {analysis.nota_final.toFixed(1)}
+                                {analysis.classificacao}
                               </span>
-                              <div className="absolute -top-1 -right-1">
-                                <div className={`w-3 h-3 rounded-full animate-pulse ${
-                                  analysis.nota_final >= 8 ? 'bg-green-400' :
-                                  analysis.nota_final >= 6 ? 'bg-yellow-400' :
-                                  analysis.nota_final >= 4 ? 'bg-orange-400' :
-                                  'bg-red-400'
-                                }`} />
-                              </div>
+                              <span className="text-gray-500">•</span>
+                              <span className="text-xs text-gray-400">
+                                {analysis.tipo_venda} • {analysis.canal}
+                              </span>
                             </div>
-
-                            {/* Info section */}
-                            <div>
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide ${
-                                  analysis.classificacao === 'excelente' ? 'bg-gradient-to-r from-purple-600/20 to-purple-500/20 text-purple-400 border border-purple-500/30' :
-                                  analysis.classificacao === 'bom' ? 'bg-gradient-to-r from-green-600/20 to-green-500/20 text-green-400 border border-green-500/30' :
-                                  analysis.classificacao === 'medio' ? 'bg-gradient-to-r from-yellow-600/20 to-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                                  analysis.classificacao === 'ruim' ? 'bg-gradient-to-r from-orange-600/20 to-orange-500/20 text-orange-400 border border-orange-500/30' :
-                                  'bg-gradient-to-r from-red-600/20 to-red-500/20 text-red-400 border border-red-500/30'
-                                }`}>
-                                  {analysis.classificacao}
-                                </span>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <span className="px-3 py-1 bg-blue-900/30 text-blue-400 rounded-lg text-xs font-medium border border-blue-500/20">
-                                  {analysis.tipo_venda}
-                                </span>
-                                <span className="px-3 py-1 bg-green-900/30 text-green-400 rounded-lg text-xs font-medium border border-green-500/20">
-                                  {analysis.canal}
-                                </span>
-                                <span className="px-3 py-1 bg-purple-900/30 text-purple-400 rounded-lg text-xs font-medium border border-purple-500/20">
-                                  {analysis.fase_funil.replace('_', ' ')}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Date */}
-                          <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-800/50 rounded-lg px-3 py-2">
-                            <Calendar className="w-4 h-4 text-gray-500" />
-                            <span>
-                              {new Date(analysis.created_at).toLocaleDateString('pt-BR', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric'
-                              })}
-                            </span>
-                            <span className="text-gray-600">•</span>
-                            <span>
-                              {new Date(analysis.created_at).toLocaleTimeString('pt-BR', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
+                            <p className="text-xs text-gray-500 line-clamp-1">
+                              {analysis.contexto}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Context */}
-                        <div className="mb-5 p-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
-                          <p className="text-sm text-gray-300">
-                            <span className="font-semibold text-gray-400 uppercase text-xs tracking-wide">Contexto: </span>
-                            <span className="text-white">{analysis.contexto}</span>
+                        {/* Right: Date and Time */}
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">
+                            {new Date(analysis.created_at).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short'
+                            })}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {new Date(analysis.created_at).toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </p>
                         </div>
-
-                        {/* Scores Grid */}
-                        <div className="grid grid-cols-6 gap-3">
-                          {Object.entries(analysis.avaliacao.notas).map(([key, value]: [string, any]) => {
-                            const labels: Record<string, string> = {
-                              'valor_agregado': 'Valor',
-                              'personalizacao': 'Person.',
-                              'tom_consultivo': 'Tom',
-                              'objetividade': 'Objetiv.',
-                              'cta': 'CTA',
-                              'timing': 'Timing'
-                            }
-
-                            const getScoreGradient = (nota: number) => {
-                              if (nota >= 8) return 'from-green-500/20 to-green-600/10 border-green-500/30'
-                              if (nota >= 6) return 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30'
-                              if (nota >= 4) return 'from-orange-500/20 to-orange-600/10 border-orange-500/30'
-                              return 'from-red-500/20 to-red-600/10 border-red-500/30'
-                            }
-
-                            return (
-                              <div
-                                key={key}
-                                className={`bg-gradient-to-br ${getScoreGradient(value.nota)} backdrop-blur-sm rounded-xl p-3 text-center border transition-all hover:scale-105`}
-                              >
-                                <p className="text-[10px] text-gray-400 mb-1 font-medium uppercase tracking-wide">
-                                  {labels[key]}
-                                </p>
-                                <p className={`text-xl font-bold ${
-                                  value.nota >= 8 ? 'text-green-400' :
-                                  value.nota >= 6 ? 'text-yellow-400' :
-                                  value.nota >= 4 ? 'text-orange-400' :
-                                  'text-red-400'
-                                }`}>
-                                  {value.nota.toFixed(1)}
-                                </p>
-                                {/* Mini progress bar */}
-                                <div className="mt-2 h-1 bg-gray-700 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full transition-all ${
-                                      value.nota >= 8 ? 'bg-green-400' :
-                                      value.nota >= 6 ? 'bg-yellow-400' :
-                                      value.nota >= 4 ? 'bg-orange-400' :
-                                      'bg-red-400'
-                                    }`}
-                                    style={{ width: `${value.nota * 10}%` }}
-                                  />
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        {/* View Details Button */}
-                        <button
-                          onClick={() => setSelectedFollowUpAnalysis(analysis)}
-                          className="mt-5 w-full py-2.5 bg-gradient-to-r from-gray-800 to-gray-700 hover:from-green-900/30 hover:to-green-800/30 text-gray-300 hover:text-white rounded-xl font-medium transition-all border border-gray-600 hover:border-green-500/50 group flex items-center justify-center gap-2"
-                        >
-                          <FileSearch className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          Ver Análise Completa
-                        </button>
                       </div>
+
+                      {/* Simple Score Indicators */}
+                      <div className="flex gap-3 items-center text-xs">
+                        <span className="text-gray-500">Critérios:</span>
+                        {Object.entries(analysis.avaliacao.notas).map(([key, value]: [string, any]) => {
+                          const shortLabels: Record<string, string> = {
+                            'valor_agregado': 'VALOR',
+                            'personalizacao': 'PERSON',
+                            'tom_consultivo': 'TOM',
+                            'objetividade': 'OBJETIV',
+                            'cta': 'CTA',
+                            'timing': 'TIMING'
+                          }
+
+                          return (
+                            <div key={key} className="flex items-center gap-1">
+                              <span className="text-gray-600">{shortLabels[key]}:</span>
+                              <span className={`font-semibold ${
+                                value.nota >= 7 ? 'text-green-400' :
+                                value.nota >= 5 ? 'text-yellow-400' :
+                                'text-orange-400'
+                              }`}>
+                                {value.nota.toFixed(0)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Clean Button */}
+                      <button
+                        onClick={() => setSelectedFollowUpAnalysis(analysis)}
+                        className="mt-3 w-full py-2 bg-gray-800/30 hover:bg-gray-700/40 text-gray-400 hover:text-white rounded-lg text-sm font-medium transition-all border border-gray-700/50 hover:border-green-500/30 flex items-center justify-center gap-2"
+                      >
+                        <FileSearch className="w-4 h-4" />
+                        Ver Análise Completa
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1506,19 +1452,18 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
         {/* Modal de Análise Completa do Follow-up - Design EXATO do FollowUpView */}
         {selectedFollowUpAnalysis && (
-          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm overflow-y-auto">
-            <div className="min-h-screen px-4 py-8 flex items-center justify-center">
-              <div className="relative w-full max-w-5xl bg-gradient-to-br from-gray-900 to-gray-950 rounded-3xl shadow-2xl">
-                {/* Close Button */}
-                <button
-                  onClick={() => setSelectedFollowUpAnalysis(null)}
-                  className="absolute top-6 right-6 z-10 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-400 hover:text-white" />
-                </button>
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center pt-20 pb-4 px-4">
+            <div className="relative w-full max-w-5xl max-h-[calc(100vh-120px)] bg-gradient-to-br from-gray-900 to-gray-950 rounded-3xl shadow-2xl overflow-hidden">
+              {/* Close Button */}
+              <button
+                onClick={() => setSelectedFollowUpAnalysis(null)}
+                className="absolute top-6 right-6 z-10 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400 hover:text-white" />
+              </button>
 
-                {/* Content with EXACT design from FollowUpView */}
-                <div className="p-8 space-y-8">
+              {/* Content with EXACT design from FollowUpView - Scrollable */}
+              <div className="p-8 space-y-8 overflow-y-auto max-h-[calc(100vh-160px)]">
                   {/* Overall Score Card - Same as FollowUpView */}
                   <div className={`relative overflow-hidden rounded-2xl p-6 border ${
                     selectedFollowUpAnalysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-500/30' :
@@ -1884,8 +1829,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   )
