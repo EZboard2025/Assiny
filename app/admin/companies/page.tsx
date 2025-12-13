@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { PlanType, PLAN_CONFIGS, PLAN_NAMES } from '@/lib/types/plans'
 
 interface Company {
   id: string
@@ -13,6 +14,8 @@ interface Company {
   created_at: string
   updated_at: string
   employee_limit: number | null
+  training_plan?: PlanType
+  selection_plan?: PlanType | null
   _count?: {
     employees: number
   }
@@ -140,6 +143,13 @@ export default function CompaniesAdmin() {
   const [newUserRole, setNewUserRole] = useState<'admin' | 'vendedor'>('vendedor')
   const [creatingUser, setCreatingUser] = useState(false)
   const [selectedCompanyForNewUser, setSelectedCompanyForNewUser] = useState<Company | null>(null)
+
+  // Estados para editar plano
+  const [showPlanModal, setShowPlanModal] = useState(false)
+  const [companyToEditPlan, setCompanyToEditPlan] = useState<Company | null>(null)
+  const [selectedTrainingPlan, setSelectedTrainingPlan] = useState<PlanType>(PlanType.OG)
+  const [selectedSelectionPlan, setSelectedSelectionPlan] = useState<PlanType | null>(null)
+  const [updatingPlan, setUpdatingPlan] = useState(false)
 
   useEffect(() => {
     // Verificar se já tem senha salva no sessionStorage
@@ -295,6 +305,48 @@ export default function CompaniesAdmin() {
     setCompanyToEditLimit(company)
     setNewEmployeeLimit(company.employee_limit?.toString() || '')
     setShowEditLimitModal(true)
+  }
+
+  const handleEditPlanClick = (company: Company) => {
+    setCompanyToEditPlan(company)
+    setSelectedTrainingPlan(company.training_plan || PlanType.OG)
+    setSelectedSelectionPlan(company.selection_plan || null)
+    setShowPlanModal(true)
+  }
+
+  const handleUpdatePlan = async () => {
+    if (!companyToEditPlan) return
+
+    setUpdatingPlan(true)
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          training_plan: selectedTrainingPlan,
+          selection_plan: selectedSelectionPlan
+        })
+        .eq('id', companyToEditPlan.id)
+
+      if (error) throw error
+
+      const trainingName = PLAN_NAMES[selectedTrainingPlan]
+      const selectionName = selectedSelectionPlan ? PLAN_NAMES[selectedSelectionPlan] : null
+
+      const message = selectionName
+        ? `Treinamento: ${trainingName}, Seleção: ${selectionName}`
+        : `Treinamento: ${trainingName}`
+
+      showToast('success', 'Planos atualizados!', message)
+
+      setShowPlanModal(false)
+      setCompanyToEditPlan(null)
+      await loadCompanies()
+    } catch (error: any) {
+      console.error('Erro ao atualizar planos:', error)
+      showToast('error', 'Erro ao atualizar planos', error.message)
+    } finally {
+      setUpdatingPlan(false)
+    }
   }
 
   const handleManageUsersClick = async (company: Company) => {
@@ -778,9 +830,35 @@ export default function CompaniesAdmin() {
                       <Globe className="w-4 h-4" />
                       <span>Sistema Unificado</span>
                     </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {company.training_plan && (
+                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-full">
+                          <Package className="w-3 h-3 text-purple-400" />
+                          <span className="text-xs font-medium text-purple-300">
+                            {PLAN_NAMES[company.training_plan]}
+                          </span>
+                        </div>
+                      )}
+                      {company.selection_plan && (
+                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-orange-600/20 to-yellow-600/20 rounded-full">
+                          <Globe className="w-3 h-3 text-orange-400" />
+                          <span className="text-xs font-medium text-orange-300">
+                            {PLAN_NAMES[company.selection_plan]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex gap-1">
+                    <button
+                      onClick={() => handleEditPlanClick(company)}
+                      className="p-2 text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                      title="Editar plano"
+                    >
+                      <Package className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => handleOpenCreateUser(company)}
                       className="p-2 text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -799,7 +877,7 @@ export default function CompaniesAdmin() {
 
                     <button
                       onClick={() => handleEditLimitClick(company)}
-                      className="p-2 text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                      className="p-2 text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
                       title="Editar limite de funcionários"
                     >
                       <UserCog className="w-4 h-4" />
@@ -1356,6 +1434,324 @@ export default function CompaniesAdmin() {
                     )}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Plan Selection Modal */}
+        {showPlanModal && companyToEditPlan && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-2xl w-full border border-purple-500/30 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Selecionar Plano</h2>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Empresa: <span className="text-purple-400 font-medium">{companyToEditPlan.name}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPlanModal(false)
+                    setCompanyToEditPlan(null)
+                  }}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {/* Planos de Treinamento */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-purple-400" />
+                    Planos de Treinamento
+                  </h3>
+                  <div className="space-y-2">
+                    {/* OG Plan */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedTrainingPlan === PlanType.OG
+                        ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 border-2 border-purple-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        value={PlanType.OG}
+                        checked={selectedTrainingPlan === PlanType.OG}
+                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.OG]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-purple-600/50 to-pink-600/50 text-purple-300 rounded-full">
+                            Early Adopters
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">Para nossos primeiros clientes - tudo ilimitado!</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">∞ Roleplays/semana</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">∞ Personas</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">∞ Objeções</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">✓ Todos os recursos</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* PRO Plan */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedTrainingPlan === PlanType.PRO
+                        ? 'bg-gradient-to-r from-blue-600/30 to-cyan-600/30 border-2 border-blue-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        value={PlanType.PRO}
+                        checked={selectedTrainingPlan === PlanType.PRO}
+                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PRO]}</span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">Para equipes em crescimento</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">4 Roleplays/semana</span>
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">3 Personas</span>
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">10 Objeções</span>
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">3 formas/objeção</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* MAX Plan */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedTrainingPlan === PlanType.MAX
+                        ? 'bg-gradient-to-r from-green-600/30 to-emerald-600/30 border-2 border-green-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        value={PlanType.MAX}
+                        checked={selectedTrainingPlan === PlanType.MAX}
+                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.MAX]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-green-600/50 to-emerald-600/50 text-green-300 rounded-full">
+                            Premium
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">Recursos ilimitados para grandes equipes</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ Roleplays/semana</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ Personas</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ Objeções</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ formas/objeção</span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Planos de Processo Seletivo */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-orange-400" />
+                    Plano de Processo Seletivo (Opcional)
+                  </h3>
+
+                  {/* Opção de não ter plano de seleção */}
+                  <div className="mb-3">
+                    <label className={`relative flex items-center p-3 rounded-xl cursor-pointer transition-all ${
+                      selectedSelectionPlan === null
+                        ? 'bg-gray-700/50 border-2 border-gray-600'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="selectionPlan"
+                        value=""
+                        checked={selectedSelectionPlan === null}
+                        onChange={() => setSelectedSelectionPlan(null)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-300">Sem plano de processo seletivo</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="space-y-2">
+                    {/* PS Starter */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedSelectionPlan === PlanType.PS_STARTER
+                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="selectionPlan"
+                        value={PlanType.PS_STARTER}
+                        checked={selectedSelectionPlan === PlanType.PS_STARTER}
+                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_STARTER]}</span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">5 candidatos - válido por 30 dias</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">5 candidatos</span>
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* PS Scale */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedSelectionPlan === PlanType.PS_SCALE
+                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="selectionPlan"
+                        value={PlanType.PS_SCALE}
+                        checked={selectedSelectionPlan === PlanType.PS_SCALE}
+                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_SCALE].name}</span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">10 candidatos - válido por 30 dias</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">10 candidatos</span>
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* PS Growth */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedSelectionPlan === PlanType.PS_GROWTH
+                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="selectionPlan"
+                        value={PlanType.PS_GROWTH}
+                        checked={selectedSelectionPlan === PlanType.PS_GROWTH}
+                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_GROWTH].name}</span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">20 candidatos - válido por 30 dias</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">20 candidatos</span>
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* PS Pro */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedSelectionPlan === PlanType.PS_PRO
+                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="selectionPlan"
+                        value={PlanType.PS_PRO}
+                        checked={selectedSelectionPlan === PlanType.PS_PRO}
+                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_PRO].name}</span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">50 candidatos - válido por 30 dias</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">50 candidatos</span>
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* PS Max */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedSelectionPlan === PlanType.PS_MAX
+                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="selectionPlan"
+                        value={PlanType.PS_MAX}
+                        checked={selectedSelectionPlan === PlanType.PS_MAX}
+                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_MAX].name}</span>
+                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-orange-600/50 to-yellow-600/50 text-orange-300 rounded-full">
+                            Ilimitado
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">Candidatos ilimitados - válido por 30 dias</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">∞ candidatos</span>
+                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-700">
+                <button
+                  onClick={() => {
+                    setShowPlanModal(false)
+                    setCompanyToEditPlan(null)
+                  }}
+                  disabled={updatingPlan}
+                  className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleUpdatePlan}
+                  disabled={updatingPlan}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {updatingPlan ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-5 h-5" />
+                      Salvar Plano
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
