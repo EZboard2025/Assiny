@@ -10,7 +10,8 @@ import PerfilView from './PerfilView'
 import PDIView from './PDIView'
 import RoleplayLinksView from './RoleplayLinksView'
 import SalesDashboard from './SalesDashboard'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap } from 'lucide-react'
+import FollowUpView from './FollowUpView'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, FileSearch } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 
 interface DashboardProps {
@@ -21,7 +22,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -39,7 +40,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const view = params.get('view')
-      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links'].includes(view)) {
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links', 'followup'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
 
@@ -114,6 +115,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'roleplay-links') {
       return <RoleplayLinksView />
+    }
+
+    if (currentView === 'followup') {
+      return <FollowUpView />
     }
 
     // Home view
@@ -261,12 +266,45 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div>
 
+            {/* Follow-up Analysis Card */}
+            <button
+              onClick={() => handleViewChange('followup')}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '500ms' }}
+            >
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
+                <div className="absolute top-3 right-3">
+                  <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-[10px] font-semibold rounded-full border border-purple-500/30">
+                    Novo
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30">
+                    <FileSearch className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Análise de Follow-up</h3>
+                    <span className="text-xs text-purple-400">WhatsApp</span>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  Envie prints do WhatsApp e receba análise detalhada do seu follow-up.
+                </p>
+                <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-purple-300 transition-colors">
+                  <span>Analisar follow-up</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
                 onClick={() => handleViewChange('roleplay-links')}
                 className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '500ms' }}
+                style={{ animationDelay: '600ms' }}
               >
                 <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
                   <div className="absolute top-3 right-3">
