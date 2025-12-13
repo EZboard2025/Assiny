@@ -311,8 +311,8 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
       // Se não tem objections_analysis mas tem objections no config (para sessões com dados parciais)
       if (!objectionsToAnalyze && config?.objections && Array.isArray(config.objections)) {
         console.log(`Sessão ${index + 1}: Usando objections do config como fallback`)
-        objectionsToAnalyze = config.objections.map((obj: any) => ({
-          objection: obj.name || obj.objection || 'Objeção sem nome',
+        objectionsToAnalyze = config.objections.map((obj: any, objIdx: number) => ({
+          objection: obj.name || obj.objection || `Objeção #${objIdx + 1}`,
           handling_score: 5 // Score padrão para objeções sem avaliação
         }))
       }
@@ -323,9 +323,51 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
       }
       console.log(`Sessão ${index + 1}: objections encontrado:`, objectionsToAnalyze)
 
-      objectionsToAnalyze.forEach((obj: any) => {
-        const objName = obj.objection || obj.name || 'Objeção sem nome'
+      objectionsToAnalyze.forEach((obj: any, objIdx: number) => {
+        console.log(`Sessão ${index + 1}, Objeção ${objIdx + 1}:`, obj)
+
+        // Primeiro verificar se tem objection_id válido
+        let objId = obj.objection_id || obj.id || null
+
+        // FILTRO: Só processar objeções com ID válido
+        // Aceitar IDs reais (UUID), legacy-X, ou unknown-X
+        // Ignorar apenas objeções sem ID ou com "não-configurada"
+        if (!objId || objId === 'não-configurada') {
+          console.log(`Sessão ${index + 1}, Objeção ${objIdx + 1}: Ignorando - sem objection_id válido`)
+          return // Pular esta objeção
+        }
+
+        // Se tem objection_id válido, tentar encontrar o nome da objeção configurada
+        let objName = ''
+        if (config?.objections) {
+          // Procurar a objeção pelo ID real
+          const configuredObj = config.objections.find((o: any) => {
+            // Comparar com o ID real do banco
+            if (typeof o === 'object' && o.id === objId) {
+              return true
+            }
+            // Para formato legacy, comparar pelo índice
+            if (objId.startsWith('legacy-')) {
+              const index = parseInt(objId.replace('legacy-', ''))
+              return config.objections.indexOf(o) === index
+            }
+            return false
+          })
+
+          if (configuredObj) {
+            objName = typeof configuredObj === 'string' ? configuredObj : (configuredObj.name || '')
+            console.log(`Objeção mapeada pelo ID ${objId}: ${objName}`)
+          }
+        }
+
+        // Se não conseguiu mapear, tentar usar o texto da objeção como fallback
+        if (!objName) {
+          objName = obj.objection_text || obj.objection || obj.name || `Objeção ${objId}`
+          console.log(`Usando texto da objeção como fallback: ${objName}`)
+        }
+
         const handlingScore = obj.handling_score || obj.score || 5
+        console.log(`Processando: "${objName}", score: ${handlingScore}, ID: ${objId}`)
 
         if (!stats.has(objName)) {
           stats.set(objName, {

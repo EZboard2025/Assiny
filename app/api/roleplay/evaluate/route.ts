@@ -63,15 +63,42 @@ export async function POST(request: Request) {
 
     // Preparar contexto (mantido para compatibilidade)
     const config = session.config as any
+
+    // Usar IDs reais das objeções do banco de dados
+    const objectionsWithIds = (config.objections || []).map((obj: any, index: number) => {
+      if (typeof obj === 'string') {
+        // Formato antigo (apenas string) - usar índice como fallback
+        return {
+          id: `legacy-${index}`,
+          name: obj,
+          rebuttals: []
+        }
+      } else {
+        // Formato novo - usar o ID real do banco de dados
+        return {
+          id: obj.id || `unknown-${index}`, // ID real do banco
+          name: obj.name,
+          rebuttals: obj.rebuttals || []
+        }
+      }
+    })
+
     const context = {
       age: config.age,
       temperament: config.temperament,
       persona: config.segment || config.persona || '', // Suporta ambos os campos
-      objections: config.objections || []
+      objections: objectionsWithIds
     }
 
     // Preparar perfil completo do cliente simulado (em texto formatado)
     let client_profile = `PERFIL DO CLIENTE SIMULADO
+
+INSTRUÇÃO IMPORTANTE PARA O AVALIADOR:
+Ao analisar as objeções no diálogo, você DEVE:
+1. Identificar quando cada objeção configurada abaixo aparece no diálogo
+2. Incluir o ID da objeção no campo "objection_id" da sua análise
+3. Se a objeção identificada corresponder a uma das configuradas, usar o ID fornecido
+4. Se for uma objeção não configurada, usar "objection_id": "não-configurada"
 
 DADOS DEMOGRÁFICOS:
 - Idade: ${config.age}
@@ -80,23 +107,16 @@ DADOS DEMOGRÁFICOS:
 
 OBJEÇÕES TRABALHADAS:`
 
-    if (config.objections && config.objections.length > 0) {
-      config.objections.forEach((obj: any, index: number) => {
-        // Se for string (formato antigo)
-        if (typeof obj === 'string') {
-          client_profile += `\n\n${index + 1}. ${obj}`
-          client_profile += `\n   Formas de quebrar: Não cadastradas`
+    if (objectionsWithIds && objectionsWithIds.length > 0) {
+      objectionsWithIds.forEach((obj: any, index: number) => {
+        client_profile += `\n\n${index + 1}. [ID: ${obj.id}] ${obj.name}`
+        if (obj.rebuttals && obj.rebuttals.length > 0) {
+          client_profile += `\n   Formas de quebrar:`
+          obj.rebuttals.forEach((rebuttal: string, i: number) => {
+            client_profile += `\n   ${String.fromCharCode(97 + i)}) ${rebuttal}`
+          })
         } else {
-          // Formato novo com rebuttals
-          client_profile += `\n\n${index + 1}. ${obj.name}`
-          if (obj.rebuttals && obj.rebuttals.length > 0) {
-            client_profile += `\n   Formas de quebrar:`
-            obj.rebuttals.forEach((rebuttal: string, i: number) => {
-              client_profile += `\n   ${String.fromCharCode(97 + i)}) ${rebuttal}`
-            })
-          } else {
-            client_profile += `\n   Formas de quebrar: Não cadastradas`
-          }
+          client_profile += `\n   Formas de quebrar: Não cadastradas`
         }
       })
     } else {

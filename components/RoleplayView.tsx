@@ -210,8 +210,9 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         }
       }
 
-      // Formatar objeções com suas formas de quebra
+      // Formatar objeções com suas formas de quebra E incluir o ID
       const objectionsWithRebuttals = selectedObjectionsData.map(o => ({
+        id: o.id,  // IMPORTANTE: Incluir o ID real do banco
         name: o.name,
         rebuttals: o.rebuttals || []
       }))
@@ -583,8 +584,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         selectedPersonaData = personas.find(p => p.id === selectedPersona)
         const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
 
-        // Formatar objeções com suas formas de quebra
+        // Formatar objeções com suas formas de quebra E incluir o ID
         objectionsWithRebuttals = selectedObjectionsData.map(o => ({
+          id: o.id,  // IMPORTANTE: Incluir o ID real do banco
           name: o.name,
           rebuttals: o.rebuttals || []
         }))
