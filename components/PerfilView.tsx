@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History, Users, MessageSquare } from 'lucide-react'
+import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History, Users, MessageSquare, FileSearch, Award, Calendar } from 'lucide-react'
 import { getUserRoleplaySessions, type RoleplaySession } from '@/lib/roleplay'
+import { getFollowUpAnalyses, getFollowUpStats } from '@/lib/followup'
 
 interface PerfilViewProps {
-  onViewChange?: (view: 'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links') => void | Promise<void>
+  onViewChange?: (view: 'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup') => void | Promise<void>
 }
 
 // Tipos para as estatísticas
@@ -46,9 +47,14 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
   const [sessions, setSessions] = useState<RoleplaySession[]>([])
 
   // Novos estados para as abas
-  const [activeTab, setActiveTab] = useState<'geral' | 'personas' | 'objecoes'>('geral')
+  const [activeTab, setActiveTab] = useState<'geral' | 'personas' | 'objecoes' | 'followups'>('geral')
   const [personaStats, setPersonaStats] = useState<Map<string, PersonaStats>>(new Map())
   const [objectionStats, setObjectionStats] = useState<Map<string, ObjectionStats>>(new Map())
+
+  // Estados para follow-ups
+  const [followUpAnalyses, setFollowUpAnalyses] = useState<any[]>([])
+  const [followUpStats, setFollowUpStats] = useState<any>(null)
+  const [loadingFollowUps, setLoadingFollowUps] = useState(false)
 
   const maxVisibleSessions = 8
 
@@ -56,6 +62,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
     setMounted(true)
     loadUserData()
     loadSpinAverages()
+    loadFollowUpData()
   }, [])
 
   const loadUserData = async () => {
@@ -70,6 +77,28 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
       }
     } catch (error) {
       console.error('Erro ao carregar dados do usuário:', error)
+    }
+  }
+
+  const loadFollowUpData = async () => {
+    try {
+      setLoadingFollowUps(true)
+
+      // Carregar análises
+      const { data: analyses, error: analysesError } = await getFollowUpAnalyses()
+      if (!analysesError && analyses) {
+        setFollowUpAnalyses(analyses)
+      }
+
+      // Carregar estatísticas
+      const stats = await getFollowUpStats()
+      if (stats) {
+        setFollowUpStats(stats)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados de follow-up:', error)
+    } finally {
+      setLoadingFollowUps(false)
     }
   }
 
@@ -669,6 +698,19 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           >
             Por Objeção
           </button>
+          <button
+            onClick={() => setActiveTab('followups')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'followups'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <FileSearch className="w-4 h-4" />
+              Follow-ups
+            </span>
+          </button>
         </div>
 
         {/* Tab Content - Visão Geral */}
@@ -1224,6 +1266,163 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content - Follow-ups */}
+        {activeTab === 'followups' && (
+          <div className="space-y-6">
+            {/* Estatísticas de Follow-ups */}
+            {followUpStats && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-green-500/30">
+                  <div className="flex items-center gap-3">
+                    <FileSearch className="w-8 h-8 text-green-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Total Análises</p>
+                      <p className="text-2xl font-bold text-white">{followUpStats.totalAnalises}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-purple-500/30">
+                  <div className="flex items-center gap-3">
+                    <Award className="w-8 h-8 text-purple-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Média Geral</p>
+                      <p className="text-2xl font-bold text-white">{followUpStats.mediaNota.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-blue-500/30">
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="w-8 h-8 text-blue-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Melhor Nota</p>
+                      <p className="text-2xl font-bold text-green-400">{followUpStats.melhorNota.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-orange-500/30">
+                  <div className="flex items-center gap-3">
+                    <Target className="w-8 h-8 text-orange-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Nota Mais Baixa</p>
+                      <p className="text-2xl font-bold text-orange-400">{followUpStats.piorNota.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de Análises de Follow-up */}
+            <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                <History className="w-6 h-6 text-green-400" />
+                Histórico de Análises de Follow-up
+              </h2>
+
+              {loadingFollowUps ? (
+                <div className="text-center text-gray-400 py-12">
+                  Carregando análises...
+                </div>
+              ) : followUpAnalyses.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileSearch className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400 text-lg">Nenhuma análise de follow-up ainda</p>
+                  <p className="text-gray-500 text-sm mt-2">Faça sua primeira análise para ver o histórico aqui</p>
+                  <button
+                    onClick={() => onViewChange?.('followup')}
+                    className="mt-4 px-6 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-xl font-medium hover:from-green-700 hover:to-lime-600 transition-all"
+                  >
+                    Analisar Follow-up
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {followUpAnalyses.map((analysis) => (
+                    <div
+                      key={analysis.id}
+                      className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700 hover:border-green-500/50 transition-all"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4 mb-3">
+                            <span className={`text-3xl font-bold ${
+                              analysis.nota_final >= 8 ? 'text-green-400' :
+                              analysis.nota_final >= 6 ? 'text-yellow-400' :
+                              analysis.nota_final >= 4 ? 'text-orange-400' :
+                              'text-red-400'
+                            }`}>
+                              {analysis.nota_final.toFixed(1)}
+                            </span>
+
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              analysis.classificacao === 'excelente' ? 'bg-purple-900/30 text-purple-400 border border-purple-500/30' :
+                              analysis.classificacao === 'bom' ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
+                              analysis.classificacao === 'medio' ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
+                              analysis.classificacao === 'ruim' ? 'bg-orange-900/30 text-orange-400 border border-orange-500/30' :
+                              'bg-red-900/30 text-red-400 border border-red-500/30'
+                            }`}>
+                              {analysis.classificacao.toUpperCase()}
+                            </span>
+
+                            <div className="flex gap-2 text-xs text-gray-500">
+                              <span className="px-2 py-1 bg-gray-700/50 rounded">{analysis.tipo_venda}</span>
+                              <span className="px-2 py-1 bg-gray-700/50 rounded">{analysis.canal}</span>
+                              <span className="px-2 py-1 bg-gray-700/50 rounded">{analysis.fase_funil}</span>
+                            </div>
+                          </div>
+
+                          <p className="text-gray-300 mb-2">
+                            <span className="font-medium">Contexto:</span> {analysis.contexto}
+                          </p>
+
+                          {/* Mini resumo das notas */}
+                          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-3">
+                            {Object.entries(analysis.avaliacao.notas).map(([key, value]: [string, any]) => {
+                              const labels: Record<string, string> = {
+                                'valor_agregado': 'Valor',
+                                'personalizacao': 'Person.',
+                                'tom_consultivo': 'Tom',
+                                'objetividade': 'Objetiv.',
+                                'cta': 'CTA',
+                                'timing': 'Timing'
+                              }
+                              return (
+                                <div key={key} className="text-center">
+                                  <p className="text-xs text-gray-500 mb-1">{labels[key]}</p>
+                                  <p className={`text-sm font-bold ${
+                                    value.nota >= 8 ? 'text-green-400' :
+                                    value.nota >= 6 ? 'text-yellow-400' :
+                                    value.nota >= 4 ? 'text-orange-400' :
+                                    'text-red-400'
+                                  }`}>
+                                    {value.nota.toFixed(1)}
+                                  </p>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="text-right ml-4">
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(analysis.created_at).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

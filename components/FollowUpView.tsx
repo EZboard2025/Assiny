@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import { Upload, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, X, FileText, TrendingUp, Building2, Users, MessageSquare, Target, Sparkles } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
 
 interface FollowUpAnalysis {
   notas: {
@@ -31,6 +30,11 @@ interface FollowUpAnalysis {
       peso: number
       comentario: string
     }
+    timing: {
+      nota: number
+      peso: number
+      comentario: string
+    }
   }
   nota_final: number
   classificacao: string
@@ -52,11 +56,13 @@ export default function FollowUpView() {
   const [extractedText, setExtractedText] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+
   // Context form state
   const [tipoVenda, setTipoVenda] = useState<'B2B' | 'B2C'>('B2B')
   const [contexto, setContexto] = useState<string>('')
   const [canal, setCanal] = useState<string>('WhatsApp')
   const [faseFunil, setFaseFunil] = useState<string>('prospeccao')
+
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -127,10 +133,22 @@ export default function FollowUpView() {
         )
       )
 
+      // Obter o token de autenticação se disponível
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
       // Send to API for OCR and analysis with context
       const response = await fetch('/api/followup/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           images: base64Images, // Agora enviando array de imagens
           filenames: selectedImages.map(img => img.name),
@@ -432,35 +450,52 @@ export default function FollowUpView() {
             <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 shadow-[0_0_40px_rgba(34,197,94,0.2)]">
               <h3 className="text-lg font-semibold text-white mb-4">Análise Detalhada</h3>
               <div className="space-y-4">
-                {Object.entries(analysis.notas).map(([key, value]) => (
-                  <div key={key} className="border-b border-gray-800 pb-4 last:border-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-300 capitalize">
-                        {key.replace(/_/g, ' ')}
-                      </span>
-                      <span className={`text-lg font-bold ${
-                        value.nota >= 8 ? 'text-green-400' :
-                        value.nota >= 6 ? 'text-yellow-400' :
-                        value.nota >= 4 ? 'text-orange-400' :
-                        'text-red-400'
-                      }`}>
-                        {value.nota.toFixed(1)}
-                      </span>
+                {Object.entries(analysis.notas).map(([key, value]) => {
+                  // Better formatted labels for each field
+                  const fieldLabels: Record<string, string> = {
+                    'valor_agregado': 'Agregação de Valor',
+                    'personalizacao': 'Personalização',
+                    'tom_consultivo': 'Tom Consultivo',
+                    'objetividade': 'Objetividade',
+                    'cta': 'Call to Action (CTA)',
+                    'timing': 'Timing'
+                  }
+
+                  return (
+                    <div key={key} className="border-b border-gray-800 pb-4 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-300">
+                            {fieldLabels[key] || key.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({value.peso}%)
+                          </span>
+                        </div>
+                        <span className={`text-lg font-bold ${
+                          value.nota >= 8 ? 'text-green-400' :
+                          value.nota >= 6 ? 'text-yellow-400' :
+                          value.nota >= 4 ? 'text-orange-400' :
+                          'text-red-400'
+                        }`}>
+                          {value.nota.toFixed(1)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-400">{value.comentario}</p>
+                      <div className="mt-2 bg-gray-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            value.nota >= 8 ? 'bg-gradient-to-r from-green-500 to-green-400' :
+                            value.nota >= 6 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                            value.nota >= 4 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
+                            'bg-gradient-to-r from-red-500 to-red-400'
+                          }`}
+                          style={{ width: `${value.nota * 10}%` }}
+                        />
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-400">{value.comentario}</p>
-                    <div className="mt-2 bg-gray-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          value.nota >= 8 ? 'bg-gradient-to-r from-green-500 to-green-400' :
-                          value.nota >= 6 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-                          value.nota >= 4 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
-                          'bg-gradient-to-r from-red-500 to-red-400'
-                        }`}
-                        style={{ width: `${value.nota * 10}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
@@ -532,21 +567,37 @@ export default function FollowUpView() {
               </div>
             </div>
 
-            {/* New Analysis Button */}
-            <button
-              onClick={() => {
-                setAnalysis(null)
-                setSelectedImages([])
-                setImagePreviews([])
-                setExtractedText(null)
-                setError(null)
-                // Reset form but keep previous context values for convenience
-                // User can change if needed
-              }}
-              className="w-full bg-gray-800/50 backdrop-blur-sm text-white rounded-xl py-3 px-6 font-medium hover:bg-gray-700/50 transition-colors border border-green-500/30"
-            >
-              Analisar Novo Follow-up
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setAnalysis(null)
+                  setSelectedImages([])
+                  setImagePreviews([])
+                  setExtractedText(null)
+                  setError(null)
+                  // Reset form but keep previous context values for convenience
+                  // User can change if needed
+                }}
+                className="flex-1 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-xl py-3 px-6 font-medium hover:from-green-700 hover:to-lime-600 transition-all transform hover:scale-[1.02] shadow-lg shadow-green-500/30"
+              >
+                Fazer Nova Análise
+              </button>
+
+              <button
+                onClick={() => {
+                  // Simply clear the analysis to return to form
+                  setAnalysis(null)
+                  setSelectedImages([])
+                  setImagePreviews([])
+                  setExtractedText(null)
+                  setError(null)
+                }}
+                className="px-6 py-3 bg-gray-800/50 backdrop-blur-sm text-white rounded-xl font-medium hover:bg-gray-700/50 transition-colors border border-gray-600"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         )}
       </div>

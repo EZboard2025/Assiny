@@ -156,26 +156,263 @@ Retorne as mensagens organizadas conforme o formato especificado.`
 
       console.log('Follow-up filtrado e organizado com sucesso')
 
-      // Retornar tanto o texto completo quanto o filtrado
-      return NextResponse.json({
-        extractedText: filteredText, // Agora retorna o texto FILTRADO
-        fullText: fullExtractedText, // Texto completo caso precise
-        analysis: {
-          notas: {
-            valor_agregado: { nota: 0, peso: 30, comentario: "Teste - apenas transcrição" },
-            personalizacao: { nota: 0, peso: 20, comentario: "Teste - apenas transcrição" },
-            tom_consultivo: { nota: 0, peso: 15, comentario: "Teste - apenas transcrição" },
-            objetividade: { nota: 0, peso: 15, comentario: "Teste - apenas transcrição" },
-            cta: { nota: 0, peso: 20, comentario: "Teste - apenas transcrição" }
+      // TERCEIRA ETAPA: Enviar para N8N para análise real
+      console.log('Enviando para N8N para análise...')
+
+      const n8nWebhookUrl = 'https://ezboard.app.n8n.cloud/webhook/c025a4ee-aa92-4a89-82fe-54eb6710a139'
+
+      try {
+        const n8nResponse = await fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          nota_final: 0,
-          classificacao: "teste",
-          pontos_positivos: ["Transcrição realizada com sucesso"],
-          pontos_melhorar: [],
-          versao_reescrita: "TESTE: Apenas extração e filtragem",
-          dica_principal: `FOLLOW-UP IDENTIFICADO E FILTRADO:\n\n${filteredText}`
+          body: JSON.stringify({
+            chatInput: "faça a analise",              // Mensagem padrão para o N8N
+            transcricao: filteredText,                // Apenas o texto filtrado (follow-up identificado)
+            tipo_venda: avaliacao.tipo_venda,         // B2B ou B2C
+            canal: avaliacao.canal,                   // WhatsApp, E-mail, etc
+            fase_funil: avaliacao.fase_funil,         // Prospecção, Qualificação, etc
+            contexto: avaliacao.contexto,             // Contexto do momento (pós-proposta, cold, etc)
+          })
+        })
+
+        let n8nResult = null
+
+        if (n8nResponse.ok) {
+          const n8nData = await n8nResponse.json()
+
+          // N8N pode retornar em diferentes formatos
+          if (n8nData && typeof n8nData === 'object') {
+            // Caso 1: Resposta direta
+            if (n8nData.analysis) {
+              n8nResult = n8nData.analysis
+            }
+            // Caso 2: Array com output
+            else if (Array.isArray(n8nData) && n8nData[0]?.output) {
+              let outputString = n8nData[0].output
+
+              // Remover markdown code blocks se existirem
+              if (typeof outputString === 'string') {
+                // Remove ```json do início e ``` do fim
+                outputString = outputString.replace(/^```json\n/, '').replace(/\n```$/, '')
+
+                try {
+                  n8nResult = JSON.parse(outputString)
+                } catch (e) {
+                  console.error('Erro ao fazer parse do output:', e)
+                  n8nResult = n8nData[0].output
+                }
+              } else {
+                n8nResult = n8nData[0].output
+              }
+            }
+            // Caso 3: Objeto com output
+            else if (n8nData.output) {
+              if (typeof n8nData.output === 'string') {
+                let outputString = n8nData.output
+                // Remove ```json do início e ``` do fim se existirem
+                outputString = outputString.replace(/^```json\n/, '').replace(/\n```$/, '')
+
+                try {
+                  n8nResult = JSON.parse(outputString)
+                } catch (e) {
+                  console.error('Erro ao fazer parse do output:', e)
+                  n8nResult = n8nData.output
+                }
+              } else {
+                n8nResult = n8nData.output
+              }
+            }
+            // Caso 4: É a análise diretamente
+            else if (n8nData.notas) {
+              n8nResult = n8nData
+            }
+            // Caso 5: Resposta vem como string JSON
+            else if (typeof n8nData === 'string') {
+              try {
+                n8nResult = JSON.parse(n8nData)
+              } catch (e) {
+                console.error('Erro ao fazer parse da resposta do N8N:', e)
+              }
+            }
+          }
         }
-      })
+
+        // Se conseguiu análise do N8N, retornar ela
+        if (n8nResult && n8nResult.notas) {
+          console.log('Análise recebida do N8N com sucesso')
+
+          // Garantir que timing está presente (adicionar se não estiver)
+          if (!n8nResult.notas.timing) {
+            n8nResult.notas.timing = {
+              nota: 0,
+              peso: 10,
+              comentario: "Timing não avaliado"
+            }
+          }
+
+          // Salvar análise no banco de dados
+          // Vamos usar uma abordagem mais simples e direta
+          // Extrair o token do header Authorization
+          const authHeader = req.headers.get('authorization')
+          const token = authHeader?.replace('Bearer ', '')
+
+          console.log('🔐 Token presente?', !!token)
+
+          if (token) {
+            try {
+              // Criar cliente Supabase com o token do usuário
+              const supabase = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                {
+                  global: {
+                    headers: {
+                      Authorization: `Bearer ${token}`
+                    }
+                  }
+                }
+              )
+
+              // Obter o usuário atual
+              const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+
+              console.log('🔍 Usuário:', user?.id)
+
+              if (user && !userError) {
+              console.log('✅ Usuário encontrado:', user.id)
+              console.log('📊 N8N Result completo:', JSON.stringify(n8nResult, null, 2))
+              console.log('📝 Dados da avaliação:', {
+                tipo_venda: avaliacao.tipo_venda,
+                canal: avaliacao.canal,
+                fase_funil: avaliacao.fase_funil,
+                contexto: avaliacao.contexto
+              })
+              console.log('🎯 Notas finais:', {
+                nota_final: n8nResult.nota_final,
+                classificacao: n8nResult.classificacao
+              })
+
+              // Preparar dados para inserção
+              const dataToInsert = {
+                user_id: user.id,
+                tipo_venda: avaliacao.tipo_venda,
+                canal: avaliacao.canal,
+                fase_funil: avaliacao.fase_funil,
+                contexto: avaliacao.contexto,
+                transcricao_original: fullExtractedText,
+                transcricao_filtrada: filteredText,
+                avaliacao: n8nResult,
+                nota_final: parseFloat(n8nResult.nota_final.toString()) || 0, // Garantir que é número
+                classificacao: n8nResult.classificacao || 'indefinido'
+              }
+
+              console.log('💾 Dados preparados para inserção:')
+              console.log('- user_id:', dataToInsert.user_id, typeof dataToInsert.user_id)
+              console.log('- tipo_venda:', dataToInsert.tipo_venda, typeof dataToInsert.tipo_venda)
+              console.log('- nota_final:', dataToInsert.nota_final, typeof dataToInsert.nota_final)
+              console.log('- classificacao:', dataToInsert.classificacao, typeof dataToInsert.classificacao)
+              console.log('- tamanho transcricao_original:', dataToInsert.transcricao_original.length)
+              console.log('- tamanho transcricao_filtrada:', dataToInsert.transcricao_filtrada.length)
+
+              // Salvar análise no banco
+              const { data: insertedData, error: insertError } = await supabase
+                .from('followup_analyses')
+                .insert(dataToInsert)
+                .select()
+                .single()
+
+              if (insertError) {
+                console.error('❌ Erro ao salvar análise no banco:', insertError)
+                console.error('❌ Código do erro:', insertError.code)
+                console.error('❌ Mensagem do erro:', insertError.message)
+                console.error('❌ Detalhes do erro:', insertError.details)
+                console.error('❌ Hint:', insertError.hint)
+              } else {
+                console.log('✅ Análise salva com sucesso no banco de dados!')
+                console.log('✅ ID da análise salva:', insertedData?.id)
+                console.log('✅ Dados salvos:', insertedData)
+              }
+              } else {
+                console.error('❌ Usuário não encontrado ou erro:', userError)
+              }
+            } catch (dbError) {
+              console.error('❌ Erro ao salvar no banco de dados:', dbError)
+            }
+          } else {
+            console.log('⚠️ Sem token de autenticação - tentando via service role')
+
+            // Fallback: tentar pegar o user_id de outra forma ou usar service role
+            // Este é um fallback para garantir que funcione
+            try {
+              // Criar cliente com service role para testes
+              const supabaseAdmin = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+              )
+
+              // Para teste, vamos pegar o primeiro usuário ou você pode passar o ID
+              // Em produção, isso deveria vir do frontend
+              const { data: users } = await supabaseAdmin.from('employees').select('user_id').limit(1)
+              const testUserId = users?.[0]?.user_id
+
+              if (testUserId) {
+                console.log('📝 Salvando com user_id de teste:', testUserId)
+
+                const dataToInsert = {
+                  user_id: testUserId,
+                  tipo_venda: avaliacao.tipo_venda,
+                  canal: avaliacao.canal,
+                  fase_funil: avaliacao.fase_funil,
+                  contexto: avaliacao.contexto,
+                  transcricao_original: fullExtractedText,
+                  transcricao_filtrada: filteredText,
+                  avaliacao: n8nResult,
+                  nota_final: parseFloat(n8nResult.nota_final.toString()) || 0,
+                  classificacao: n8nResult.classificacao || 'indefinido'
+                }
+
+                const { data: insertedData, error: insertError } = await supabaseAdmin
+                  .from('followup_analyses')
+                  .insert(dataToInsert)
+                  .select()
+                  .single()
+
+                if (insertError) {
+                  console.error('❌ Erro ao salvar (fallback):', insertError)
+                } else {
+                  console.log('✅ Análise salva via fallback!')
+                  console.log('✅ ID:', insertedData?.id)
+                }
+              }
+            } catch (fallbackError) {
+              console.error('❌ Erro no fallback:', fallbackError)
+            }
+          }
+
+          return NextResponse.json({
+            extractedText: filteredText,
+            fullText: fullExtractedText,
+            analysis: n8nResult
+          })
+        }
+      } catch (n8nError) {
+        console.error('Erro ao enviar para N8N:', n8nError)
+        // Continuar com resposta de teste se N8N falhar
+      }
+
+      // Se N8N não retornar análise válida, retornar erro
+      console.error('N8N não retornou análise válida')
+
+      return NextResponse.json(
+        {
+          error: 'Erro ao processar análise',
+          details: 'O sistema de análise não retornou uma avaliação válida. Por favor, tente novamente.',
+          suggestion: 'Verifique se o follow-up está claro na imagem e tente novamente'
+        },
+        { status: 500 }
+      )
 
     } catch (openaiError: any) {
       console.error('Erro ao chamar GPT-4 Vision:', openaiError)
