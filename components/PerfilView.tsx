@@ -1,11 +1,28 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History } from 'lucide-react'
+import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History, Users, MessageSquare } from 'lucide-react'
 import { getUserRoleplaySessions, type RoleplaySession } from '@/lib/roleplay'
 
 interface PerfilViewProps {
   onViewChange?: (view: 'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links') => void | Promise<void>
+}
+
+// Tipos para as estatísticas
+interface PersonaStats {
+  persona: any
+  count: number
+  scores: number[]
+  average: number
+  lastPractice: string
+}
+
+interface ObjectionStats {
+  name: string
+  count: number
+  scores: number[]
+  average: number
+  bestScore: number
 }
 
 export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
@@ -27,6 +44,12 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
   const [showSummary, setShowSummary] = useState(false)
   const [summaryData, setSummaryData] = useState<any>(null)
   const [sessions, setSessions] = useState<RoleplaySession[]>([])
+
+  // Novos estados para as abas
+  const [activeTab, setActiveTab] = useState<'geral' | 'personas' | 'objecoes'>('geral')
+  const [personaStats, setPersonaStats] = useState<Map<string, PersonaStats>>(new Map())
+  const [objectionStats, setObjectionStats] = useState<Map<string, ObjectionStats>>(new Map())
+
   const maxVisibleSessions = 8
 
   useEffect(() => {
@@ -174,11 +197,162 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
         })
       }
 
+      // Processar estatísticas por persona e objeção
+      processPersonaStats(completedSessions)
+      processObjectionStats(completedSessions)
+
       setLoading(false)
     } catch (error) {
       console.error('Erro ao carregar médias SPIN:', error)
       setLoading(false)
     }
+  }
+
+  // Função para processar estatísticas por persona
+  const processPersonaStats = (sessions: RoleplaySession[]) => {
+    const stats = new Map<string, PersonaStats>()
+    console.log('🔍 Processando estatísticas de personas...')
+    console.log('Total de sessões para processar:', sessions.length)
+
+    sessions.forEach((session, index) => {
+      const config = (session as any).config
+      console.log(`Sessão ${index + 1} config:`, config)
+
+      // Tentar pegar persona ou usar segment como fallback
+      let persona = config?.persona
+      let personaId = persona?.id || persona?.persona_id
+
+      // Se não tem persona mas tem segment (sessões antigas), criar um objeto persona fictício
+      if (!persona && config?.segment) {
+        // Usar o segment como ID para agrupar sessões do mesmo segment
+        persona = {
+          id: `segment-${config.segment}`,
+          cargo: config.segment,
+          tipo_empresa_faturamento: 'Sessão Antiga (Segment)'
+        }
+        personaId = persona.id
+        console.log(`Sessão ${index + 1}: Usando segment como persona:`, config.segment)
+      }
+
+      if (!personaId || !persona) {
+        console.log(`Sessão ${index + 1}: Sem persona ou segment`)
+        return
+      }
+      console.log(`Sessão ${index + 1}: Persona/segment encontrado:`, persona)
+
+      let evaluation = (session as any).evaluation
+      // Parse se necessário
+      if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+        try {
+          evaluation = JSON.parse(evaluation.output)
+        } catch (e) {
+          return
+        }
+      }
+
+      if (!evaluation?.overall_score) return
+
+      let score = evaluation.overall_score
+      // Converter de 0-100 para 0-10 se necessário
+      if (score > 10) {
+        score = score / 10
+      }
+
+      if (!stats.has(personaId)) {
+        stats.set(personaId, {
+          persona: persona,
+          count: 0,
+          scores: [],
+          average: 0,
+          lastPractice: session.created_at
+        })
+      }
+
+      const stat = stats.get(personaId)!
+      stat.count++
+      stat.scores.push(score)
+      // Atualizar última prática se for mais recente
+      if (new Date(session.created_at) > new Date(stat.lastPractice)) {
+        stat.lastPractice = session.created_at
+      }
+    })
+
+    // Calcular médias
+    stats.forEach(stat => {
+      stat.average = stat.scores.length > 0
+        ? stat.scores.reduce((a, b) => a + b, 0) / stat.scores.length
+        : 0
+    })
+
+    console.log('📊 Estatísticas de personas finais:', stats)
+    setPersonaStats(stats)
+  }
+
+  // Função para processar estatísticas por objeção
+  const processObjectionStats = (sessions: RoleplaySession[]) => {
+    const stats = new Map<string, ObjectionStats>()
+    console.log('🔍 Processando estatísticas de objeções...')
+
+    sessions.forEach((session, index) => {
+      const config = (session as any).config
+      let evaluation = (session as any).evaluation
+      // Parse se necessário
+      if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+        try {
+          evaluation = JSON.parse(evaluation.output)
+        } catch (e) {
+          return
+        }
+      }
+
+      // Tentar pegar objections_analysis ou usar objections do config como fallback
+      let objectionsToAnalyze = evaluation?.objections_analysis
+
+      // Se não tem objections_analysis mas tem objections no config (para sessões com dados parciais)
+      if (!objectionsToAnalyze && config?.objections && Array.isArray(config.objections)) {
+        console.log(`Sessão ${index + 1}: Usando objections do config como fallback`)
+        objectionsToAnalyze = config.objections.map((obj: any) => ({
+          objection: obj.name || obj.objection || 'Objeção sem nome',
+          handling_score: 5 // Score padrão para objeções sem avaliação
+        }))
+      }
+
+      if (!objectionsToAnalyze || !Array.isArray(objectionsToAnalyze)) {
+        console.log(`Sessão ${index + 1}: Sem objections_analysis ou objections`)
+        return
+      }
+      console.log(`Sessão ${index + 1}: objections encontrado:`, objectionsToAnalyze)
+
+      objectionsToAnalyze.forEach((obj: any) => {
+        const objName = obj.objection || obj.name || 'Objeção sem nome'
+        const handlingScore = obj.handling_score || obj.score || 5
+
+        if (!stats.has(objName)) {
+          stats.set(objName, {
+            name: objName,
+            count: 0,
+            scores: [],
+            average: 0,
+            bestScore: 0
+          })
+        }
+
+        const stat = stats.get(objName)!
+        stat.count++
+        stat.scores.push(handlingScore)
+        stat.bestScore = Math.max(stat.bestScore, handlingScore)
+      })
+    })
+
+    // Calcular médias
+    stats.forEach(stat => {
+      stat.average = stat.scores.length > 0
+        ? stat.scores.reduce((a, b) => a + b, 0) / stat.scores.length
+        : 0
+    })
+
+    console.log('📊 Estatísticas de objeções finais:', stats)
+    setObjectionStats(stats)
   }
 
   // Processar evaluation antes de usar
@@ -402,7 +576,43 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('geral')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'geral'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            Visão Geral
+          </button>
+          <button
+            onClick={() => setActiveTab('personas')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'personas'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            Por Persona
+          </button>
+          <button
+            onClick={() => setActiveTab('objecoes')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'objecoes'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            Por Objeção
+          </button>
+        </div>
+
+        {/* Tab Content - Visão Geral */}
+        {activeTab === 'geral' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Evolution Chart */}
           <div className="lg:col-span-2 space-y-6">
             {/* Evolution Card */}
@@ -597,6 +807,226 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Tab Content - Por Persona */}
+        {activeTab === 'personas' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {personaStats.size === 0 ? (
+              <div className="col-span-full bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-12 border border-gray-500/30 text-center">
+                <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg">Nenhuma prática com personas ainda</p>
+                <p className="text-gray-500 text-sm mt-2">Complete sessões de roleplay para ver estatísticas por persona</p>
+              </div>
+            ) : (
+              Array.from(personaStats.values()).map((stat, i) => {
+                const scoreColor = stat.average >= 7 ? 'text-green-400' : stat.average >= 5 ? 'text-yellow-400' : 'text-red-400'
+                const borderColor = stat.average >= 7 ? 'border-green-500/30' : stat.average >= 5 ? 'border-yellow-500/30' : 'border-red-500/30'
+                const bgGradient = stat.average >= 7 ? 'from-green-600/10 to-green-400/5' : stat.average >= 5 ? 'from-yellow-600/10 to-yellow-400/5' : 'from-red-600/10 to-red-400/5'
+
+                return (
+                  <div key={i} className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border ${borderColor} ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white mb-2">
+                          {stat.persona.cargo || stat.persona.job_title || 'Cargo não especificado'}
+                        </h3>
+                        <p className="text-sm text-gray-400">
+                          {stat.persona.tipo_empresa_faturamento || stat.persona.company_type || 'Empresa não especificada'}
+                        </p>
+                      </div>
+                      <div className={`bg-gradient-to-br ${bgGradient} rounded-xl px-3 py-1`}>
+                        <div className="text-xs text-gray-400">Nota Média</div>
+                        <div className={`text-2xl font-bold ${scoreColor}`}>
+                          {stat.average.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-400">Práticas realizadas</span>
+                        <span className="font-semibold text-white">{stat.count}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-400">Última prática</span>
+                        <span className="text-sm text-gray-300">
+                          {new Date(stat.lastPractice).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Score evolution line chart */}
+                    <div className="mt-4 pt-4 border-t border-gray-700/50">
+                      <div className="text-xs text-gray-400 mb-2">Evolução das notas</div>
+                      <div className="relative h-52 bg-gray-800/30 rounded-lg p-4">
+                        <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet">
+                          {/* Grid lines */}
+                          <defs>
+                            <linearGradient id={`gradient-persona-${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor={stat.average >= 7 ? '#10b981' : stat.average >= 5 ? '#eab308' : '#ef4444'} stopOpacity="0.2" />
+                              <stop offset="100%" stopColor={stat.average >= 7 ? '#10b981' : stat.average >= 5 ? '#eab308' : '#ef4444'} stopOpacity="0.02" />
+                            </linearGradient>
+                          </defs>
+
+                          {/* Horizontal grid lines */}
+                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(value => {
+                            const y = 180 - (value / 10) * 160
+                            return (
+                              <g key={value}>
+                                <line
+                                  x1="35"
+                                  y1={y}
+                                  x2="380"
+                                  y2={y}
+                                  stroke={value % 5 === 0 ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)"}
+                                  strokeWidth={value % 5 === 0 ? "1" : "0.5"}
+                                />
+                                <text x="25" y={y + 4} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                                  {value}
+                                </text>
+                              </g>
+                            )
+                          })}
+
+                          {/* Area under the line */}
+                          {stat.scores.length > 0 && (
+                            <path
+                              d={
+                                stat.scores.map((score, idx) => {
+                                  const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                                  const x = 40 + (idx * xSpacing)
+                                  const y = 180 - (score / 10) * 160
+                                  return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`
+                                }).join(' ') +
+                                ` L ${stat.scores.length === 1 ? 40 : 380} 180 L 40 180 Z`
+                              }
+                              fill={`url(#gradient-persona-${i})`}
+                            />
+                          )}
+
+                          {/* Line path */}
+                          {stat.scores.length > 0 && (
+                            <path
+                              d={stat.scores.map((score, idx) => {
+                                const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                                const x = 40 + (idx * xSpacing)
+                                const y = 180 - (score / 10) * 160
+                                return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`
+                              }).join(' ')}
+                              fill="none"
+                              stroke={stat.average >= 7 ? '#10b981' : stat.average >= 5 ? '#eab308' : '#ef4444'}
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          )}
+
+                          {/* Points */}
+                          {stat.scores.map((score, idx) => {
+                            const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                            const x = 40 + (idx * xSpacing)
+                            const y = 180 - (score / 10) * 160
+                            const color = score >= 7 ? '#10b981' : score >= 5 ? '#eab308' : '#ef4444'
+                            return (
+                              <g key={idx}>
+                                <circle
+                                  cx={x}
+                                  cy={y}
+                                  r="5"
+                                  fill={color}
+                                  stroke="#1f2937"
+                                  strokeWidth="2"
+                                />
+                                <title>Sessão {idx + 1}: {score.toFixed(1)}/10</title>
+                              </g>
+                            )
+                          })}
+
+                          {/* X-axis labels for sessions */}
+                          {stat.scores.length <= 15 && stat.scores.map((_, idx) => {
+                            const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                            const x = 40 + (idx * xSpacing)
+                            return (
+                              <text key={idx} x={x} y={193} fill="rgba(255,255,255,0.3)" fontSize="10" textAnchor="middle">
+                                S{idx + 1}
+                              </text>
+                            )
+                          })}
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        {/* Tab Content - Por Objeção */}
+        {activeTab === 'objecoes' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {objectionStats.size === 0 ? (
+              <div className="col-span-full bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-12 border border-gray-500/30 text-center">
+                <MessageSquare className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg">Nenhuma objeção enfrentada ainda</p>
+                <p className="text-gray-500 text-sm mt-2">Complete sessões de roleplay para ver estatísticas por objeção</p>
+              </div>
+            ) : (
+              Array.from(objectionStats.values()).map((stat, i) => {
+                const scoreColor = stat.average >= 7 ? 'text-green-400' : stat.average >= 5 ? 'text-yellow-400' : 'text-red-400'
+                const borderColor = stat.average >= 7 ? 'border-green-500/30' : stat.average >= 5 ? 'border-yellow-500/30' : 'border-red-500/30'
+                const bgGradient = stat.average >= 7 ? 'from-green-600/10 to-green-400/5' : stat.average >= 5 ? 'from-yellow-600/10 to-yellow-400/5' : 'from-red-600/10 to-red-400/5'
+
+                return (
+                  <div key={i} className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border ${borderColor} ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1 pr-4">
+                        <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">
+                          {stat.name}
+                        </h3>
+                      </div>
+                      <div className={`bg-gradient-to-br ${bgGradient} rounded-xl px-3 py-1 text-center`}>
+                        <div className="text-xs text-gray-400">Média</div>
+                        <div className={`text-2xl font-bold ${scoreColor}`}>
+                          {stat.average.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <span className="text-sm text-gray-400">Vezes enfrentada</span>
+                        <div className="font-semibold text-white text-lg">{stat.count}</div>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-400">Melhor nota</span>
+                        <div className={`font-semibold text-lg ${stat.bestScore >= 7 ? 'text-green-400' : stat.bestScore >= 5 ? 'text-yellow-400' : 'text-red-400'}`}>
+                          {stat.bestScore.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar showing average */}
+                    <div className="mt-4 pt-4 border-t border-gray-700/50">
+                      <div className="text-xs text-gray-400 mb-2">Desempenho médio</div>
+                      <div className="h-2 bg-gray-700/50 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-1000 ${
+                            stat.average >= 7 ? 'bg-gradient-to-r from-green-500 to-green-400' :
+                            stat.average >= 5 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                            'bg-gradient-to-r from-red-500 to-red-400'
+                          }`}
+                          style={{ width: `${(stat.average / 10) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
 
         {/* Modal de Resumo Geral */}
         {showSummary && summaryData && (
