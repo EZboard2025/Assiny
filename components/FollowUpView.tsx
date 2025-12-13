@@ -469,102 +469,145 @@ export default function FollowUpView() {
               </div>
             </div>
 
-            {/* Detailed Scores - Redesigned */}
-            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-3xl p-8 border border-gray-700 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-              <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
-                  <BarChart3 className="w-5 h-5 text-green-400" />
+            {/* Detailed Scores - Redesigned with Green Theme */}
+            <div className="group relative bg-gradient-to-br from-green-900/30 to-emerald-900/30 backdrop-blur-sm rounded-3xl p-8 border border-green-500/40 hover:border-green-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(34,197,94,0.2)] overflow-hidden">
+              {/* Animated background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              {/* Animated dots pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-10 left-10 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
+                <div className="absolute bottom-10 right-10 w-3 h-3 bg-emerald-400 rounded-full animate-ping" style={{ animationDelay: '200ms' }}></div>
+                <div className="absolute top-20 right-20 w-3 h-3 bg-green-400 rounded-full animate-ping" style={{ animationDelay: '400ms' }}></div>
+              </div>
+
+              <div className="relative">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-green-500/30 blur-xl animate-pulse"></div>
+                    <div className="relative w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/50">
+                      <BarChart3 className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400">
+                      Análise Detalhada
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Avaliação critério por critério</p>
+                  </div>
                 </div>
-                Análise Detalhada
-              </h3>
 
-              <div className="space-y-5">
-                {Object.entries(analysis.notas).map(([key, value], index) => {
-                  const fieldLabels: Record<string, string> = {
-                    'valor_agregado': 'Agregação de Valor',
-                    'personalizacao': 'Personalização',
-                    'tom_consultivo': 'Tom Consultivo',
-                    'objetividade': 'Objetividade',
-                    'cta': 'Call to Action (CTA)',
-                    'timing': 'Timing'
-                  }
+                <div className="grid gap-4">
+                  {Object.entries(analysis.notas).map(([key, value], index) => {
+                    const fieldLabels: Record<string, string> = {
+                      'valor_agregado': 'Agregação de Valor',
+                      'personalizacao': 'Personalização',
+                      'tom_consultivo': 'Tom Consultivo',
+                      'objetividade': 'Objetividade',
+                      'cta': 'Call to Action (CTA)',
+                      'timing': 'Timing'
+                    }
 
-                  return (
-                    <div
-                      key={key}
-                      className="group relative"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-gray-800/50 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    const getColorScheme = (nota: number) => {
+                      if (nota >= 8) return {
+                        bg: 'from-green-900/40 to-emerald-900/40',
+                        border: 'border-green-500/30 hover:border-green-400/50',
+                        text: 'text-green-400',
+                        bar: 'from-green-400 to-emerald-500',
+                        glow: 'shadow-green-500/20'
+                      }
+                      if (nota >= 6) return {
+                        bg: 'from-yellow-900/40 to-amber-900/40',
+                        border: 'border-yellow-500/30 hover:border-yellow-400/50',
+                        text: 'text-yellow-400',
+                        bar: 'from-yellow-400 to-amber-500',
+                        glow: 'shadow-yellow-500/20'
+                      }
+                      if (nota >= 4) return {
+                        bg: 'from-orange-900/40 to-amber-900/40',
+                        border: 'border-orange-500/30 hover:border-orange-400/50',
+                        text: 'text-orange-400',
+                        bar: 'from-orange-400 to-amber-500',
+                        glow: 'shadow-orange-500/20'
+                      }
+                      return {
+                        bg: 'from-red-900/40 to-rose-900/40',
+                        border: 'border-red-500/30 hover:border-red-400/50',
+                        text: 'text-red-400',
+                        bar: 'from-red-400 to-rose-500',
+                        glow: 'shadow-red-500/20'
+                      }
+                    }
 
-                      <div className="relative p-5 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-start gap-3">
-                            <div>
-                              <span className="font-semibold text-white text-lg">
-                                {fieldLabels[key] || key.replace(/_/g, ' ')}
-                              </span>
-                              <span className="ml-2 text-xs text-gray-400 bg-gray-800/50 px-2 py-1 rounded-full">
-                                {value.peso}% do peso
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className={`text-3xl font-black ${
-                              value.nota >= 8 ? 'text-green-400' :
-                              value.nota >= 6 ? 'text-yellow-400' :
-                              value.nota >= 4 ? 'text-orange-400' :
-                              'text-red-400'
-                            }`}>
-                              {value.nota.toFixed(1)}
-                            </span>
-                            <p className={`text-xs mt-1 ${
-                              value.nota >= 8 ? 'text-green-400/70' :
-                              value.nota >= 6 ? 'text-yellow-400/70' :
-                              value.nota >= 4 ? 'text-orange-400/70' :
-                              'text-red-400/70'
-                            }`}>
-                              {value.nota >= 8 ? 'Excelente' :
-                               value.nota >= 6 ? 'Bom' :
-                               value.nota >= 4 ? 'Regular' : 'Precisa Melhorar'}
-                            </p>
-                          </div>
+                    const colors = getColorScheme(value.nota)
+
+                    return (
+                      <div
+                        key={key}
+                        className={`group/item relative bg-gradient-to-br ${colors.bg} rounded-2xl p-5 border ${colors.border} transition-all duration-300 hover:shadow-lg hover:scale-[1.01]`}
+                        style={{ animationDelay: `${index * 100}ms` }}
+                      >
+                        {/* Shine effect on hover */}
+                        <div className="absolute inset-0 opacity-0 group-hover/item:opacity-100 transition-opacity duration-500 rounded-2xl overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/item:translate-x-full transition-transform duration-1000" />
                         </div>
 
-                        <p className="text-sm text-gray-300 mb-3 leading-relaxed">{value.comentario}</p>
-
-                        {/* Progress bar with animation */}
                         <div className="relative">
-                          <div className="bg-gray-700/50 rounded-full h-3 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden ${
-                                value.nota >= 8 ? 'bg-gradient-to-r from-green-500 via-green-400 to-emerald-400' :
-                                value.nota >= 6 ? 'bg-gradient-to-r from-yellow-500 via-yellow-400 to-amber-400' :
-                                value.nota >= 4 ? 'bg-gradient-to-r from-orange-500 via-orange-400 to-red-400' :
-                                'bg-gradient-to-r from-red-600 via-red-500 to-red-400'
-                              }`}
-                              style={{
-                                width: `${value.nota * 10}%`,
-                                animation: 'slideIn 1s ease-out'
-                              }}
-                            >
-                              <div className="absolute inset-0 bg-white/20 animate-shimmer" />
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-start gap-3">
+                              <div>
+                                <span className="font-semibold text-white text-lg">
+                                  {fieldLabels[key] || key.replace(/_/g, ' ')}
+                                </span>
+                                <span className="ml-2 text-xs text-gray-400 bg-gray-800/50 px-2 py-1 rounded-full">
+                                  {value.peso}% do peso
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className={`text-3xl font-black ${colors.text}`}>
+                                {value.nota.toFixed(1)}
+                              </span>
+                              <p className={`text-xs mt-1 ${colors.text} opacity-70`}>
+                                {value.nota >= 8 ? 'Excelente' :
+                                 value.nota >= 6 ? 'Bom' :
+                                 value.nota >= 4 ? 'Regular' : 'Precisa Melhorar'}
+                              </p>
                             </div>
                           </div>
-                          {/* Percentage indicator */}
-                          <div
-                            className="absolute -top-1 transition-all duration-1000 ease-out"
-                            style={{ left: `calc(${value.nota * 10}% - 20px)` }}
-                          >
-                            <div className="bg-gray-800 text-white text-xs px-2 py-0.5 rounded-full font-bold border border-gray-600">
-                              {(value.nota * 10).toFixed(0)}%
+
+                          <div className="bg-gray-900/40 backdrop-blur-sm rounded-lg p-3 border border-gray-700/50 mb-3">
+                            <p className="text-sm text-gray-200 leading-relaxed">{value.comentario}</p>
+                          </div>
+
+                          {/* Enhanced Progress bar */}
+                          <div className="relative">
+                            <div className="bg-gray-900/60 h-3 rounded-full overflow-hidden backdrop-blur-sm">
+                              <div
+                                className={`h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden bg-gradient-to-r ${colors.bar}`}
+                                style={{
+                                  width: `${value.nota * 10}%`,
+                                  animation: 'slideIn 1s ease-out'
+                                }}
+                              >
+                                <div className="absolute inset-0 bg-white/30 animate-pulse" />
+                              </div>
+                            </div>
+                            {/* Floating percentage */}
+                            <div
+                              className="absolute -top-8 transition-all duration-1000 ease-out"
+                              style={{ left: `calc(${value.nota * 10}% - 20px)` }}
+                            >
+                              <div className={`${colors.text} text-xs px-2 py-1 rounded-lg font-bold bg-gray-900/80 border ${colors.border} backdrop-blur-sm`}>
+                                {(value.nota * 10).toFixed(0)}%
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             </div>
 
