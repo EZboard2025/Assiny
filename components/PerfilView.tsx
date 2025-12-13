@@ -1344,19 +1344,19 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                   {followUpAnalyses.map((analysis, index) => (
                     <div
                       key={analysis.id}
-                      className="group bg-gray-900/50 rounded-2xl p-5 border border-gray-800 hover:border-green-500/30 transition-all duration-300"
+                      className="group bg-gray-900/50 rounded-2xl p-5 border-2 border-green-400/40 hover:border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:shadow-[0_0_25px_rgba(74,222,128,0.25)] transition-all duration-300"
                     >
                       <div className="flex items-start justify-between mb-3">
                         {/* Left: Score and Basic Info */}
                         <div className="flex items-center gap-4">
-                          {/* Simplified Score */}
-                          <div className={`flex items-center justify-center w-14 h-14 rounded-xl ${
-                            analysis.nota_final >= 8 ? 'bg-green-500/10 border border-green-500/20' :
-                            analysis.nota_final >= 6 ? 'bg-yellow-500/10 border border-yellow-500/20' :
-                            analysis.nota_final >= 4 ? 'bg-orange-500/10 border border-orange-500/20' :
-                            'bg-red-500/10 border border-red-500/20'
+                          {/* Larger Score with gradient background */}
+                          <div className={`flex items-center justify-center w-20 h-20 rounded-xl shadow-lg ${
+                            analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-500/30 to-emerald-500/30 border border-green-400/30' :
+                            analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-500/30 to-amber-500/30 border border-yellow-400/30' :
+                            analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/30 border border-orange-400/30' :
+                            'bg-gradient-to-br from-red-500/30 to-rose-500/30 border border-red-400/30'
                           }`}>
-                            <span className={`text-xl font-bold ${
+                            <span className={`text-3xl font-bold ${
                               analysis.nota_final >= 8 ? 'text-green-400' :
                               analysis.nota_final >= 6 ? 'text-yellow-400' :
                               analysis.nota_final >= 4 ? 'text-orange-400' :
@@ -1406,9 +1406,9 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                         </div>
                       </div>
 
-                      {/* Simple Score Indicators */}
-                      <div className="flex gap-3 items-center text-xs">
-                        <span className="text-gray-500">Critérios:</span>
+                      {/* Larger Score Indicators with background */}
+                      <div className="flex gap-3 items-center text-sm bg-gray-800/30 rounded-lg p-2 mt-3">
+                        <span className="text-gray-400 font-medium">Critérios:</span>
                         {Object.entries(analysis.avaliacao.notas).map(([key, value]: [string, any]) => {
                           const shortLabels: Record<string, string> = {
                             'valor_agregado': 'VALOR',
@@ -1420,9 +1420,9 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                           }
 
                           return (
-                            <div key={key} className="flex items-center gap-1">
-                              <span className="text-gray-600">{shortLabels[key]}:</span>
-                              <span className={`font-semibold ${
+                            <div key={key} className="flex items-center gap-1.5">
+                              <span className="text-gray-500 text-xs">{shortLabels[key]}:</span>
+                              <span className={`font-bold text-base ${
                                 value.nota >= 7 ? 'text-green-400' :
                                 value.nota >= 5 ? 'text-yellow-400' :
                                 'text-orange-400'
