@@ -66,20 +66,25 @@ export async function POST(request: Request) {
     const body = await request.json()
     console.log('📥 Recebido no backend:', body)
 
-    const { name, email, password } = body
+    const { name, email, password, role, company_id } = body
 
     if (!name || !email || !password) {
       console.log('❌ Campos obrigatórios faltando')
       return NextResponse.json({ error: 'Nome, email e senha são obrigatórios' }, { status: 400 })
     }
 
-    // Obter company_id do subdomínio
-    const companyId = await getCompanyIdFromSubdomain(request)
+    // Sistema unificado - usar company_id fornecido ou detectar do subdomínio
+    let companyId = company_id
 
     if (!companyId) {
-      console.log('❌ company_id não encontrado na sessão')
+      // Fallback para detecção por subdomínio (compatibilidade)
+      companyId = await getCompanyIdFromSubdomain(request)
+    }
+
+    if (!companyId) {
+      console.log('❌ company_id não encontrado')
       return NextResponse.json({
-        error: 'Usuário não associado a nenhuma empresa'
+        error: 'Empresa não identificada'
       }, { status: 403 })
     }
 
@@ -122,6 +127,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Usar o role fornecido ou default para 'vendedor'
+    const userRole = role || 'vendedor'
+
     // Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -129,7 +137,7 @@ export async function POST(request: Request) {
       email_confirm: true,
       user_metadata: {
         name,
-        role: 'Vendedor'
+        role: userRole
       }
     })
 
@@ -144,7 +152,7 @@ export async function POST(request: Request) {
       .insert([{
         name,
         email,
-        role: 'Vendedor',
+        role: userRole,
         user_id: authData.user.id,
         company_id: companyId
       }])

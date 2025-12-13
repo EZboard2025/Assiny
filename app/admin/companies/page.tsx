@@ -126,12 +126,20 @@ export default function CompaniesAdmin() {
 
   // Form fields
   const [companyName, setCompanyName] = useState('')
-  const [subdomain, setSubdomain] = useState('')
   const [adminName, setAdminName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2B')
   const [employeeLimit, setEmployeeLimit] = useState('10')
+
+  // Estados para criar novo usuário
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false)
+  const [newUserName, setNewUserName] = useState('')
+  const [newUserEmail, setNewUserEmail] = useState('')
+  const [newUserPassword, setNewUserPassword] = useState('')
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'vendedor'>('vendedor')
+  const [creatingUser, setCreatingUser] = useState(false)
+  const [selectedCompanyForNewUser, setSelectedCompanyForNewUser] = useState<Company | null>(null)
 
   useEffect(() => {
     // Verificar se já tem senha salva no sessionStorage
@@ -194,18 +202,6 @@ export default function CompaniesAdmin() {
     }
   }
 
-  const validateSubdomain = (value: string) => {
-    // Remover caracteres especiais e espaços
-    return value
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '')
-      .replace(/\s+/g, '-')
-  }
-
-  const handleSubdomainChange = (value: string) => {
-    const cleaned = validateSubdomain(value)
-    setSubdomain(cleaned)
-  }
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%'
@@ -221,7 +217,7 @@ export default function CompaniesAdmin() {
     setSuccess('')
 
     // Validações
-    if (!companyName || !subdomain || !adminName || !adminEmail || !adminPassword) {
+    if (!companyName || !adminName || !adminEmail || !adminPassword) {
       setError('Todos os campos são obrigatórios')
       return
     }
@@ -239,18 +235,6 @@ export default function CompaniesAdmin() {
     setCreating(true)
 
     try {
-      // Verificar se subdomínio já existe
-      const { data: existingCompany } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('subdomain', subdomain)
-        .single()
-
-      if (existingCompany) {
-        setError('Este subdomínio já está em uso')
-        setCreating(false)
-        return
-      }
 
       // Chamar API para criar empresa
       const response = await fetch('/api/admin/companies/create', {
@@ -260,7 +244,6 @@ export default function CompaniesAdmin() {
         },
         body: JSON.stringify({
           companyName,
-          subdomain,
           adminName,
           adminEmail,
           adminPassword,
@@ -279,7 +262,6 @@ export default function CompaniesAdmin() {
 
       // Limpar formulário
       setCompanyName('')
-      setSubdomain('')
       setAdminName('')
       setAdminEmail('')
       setAdminPassword('')
@@ -335,6 +317,90 @@ export default function CompaniesAdmin() {
       showToast('error', 'Erro ao carregar usuários', 'Tente novamente')
     } finally {
       setLoadingUsers(false)
+    }
+  }
+
+  const handleOpenCreateUser = (company: Company) => {
+    setSelectedCompanyForNewUser(company)
+    setShowCreateUserModal(true)
+    setNewUserName('')
+    setNewUserEmail('')
+    setNewUserPassword('')
+    setNewUserRole('vendedor')
+  }
+
+  const generateUserPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%'
+    let password = ''
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setNewUserPassword(password)
+  }
+
+  const handleCreateUser = async () => {
+    if (!selectedCompanyForNewUser) return
+
+    // Validações
+    if (!newUserName || !newUserEmail || !newUserPassword) {
+      showToast('error', 'Todos os campos são obrigatórios')
+      return
+    }
+
+    if (!newUserEmail.includes('@')) {
+      showToast('error', 'Email inválido')
+      return
+    }
+
+    if (newUserPassword.length < 6) {
+      showToast('error', 'A senha deve ter pelo menos 6 caracteres')
+      return
+    }
+
+    setCreatingUser(true)
+
+    try {
+      const response = await fetch('/api/employees/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newUserName,
+          email: newUserEmail,
+          password: newUserPassword,
+          role: newUserRole,
+          company_id: selectedCompanyForNewUser.id
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao criar usuário')
+      }
+
+      showToast('success', 'Usuário criado com sucesso!', `${newUserName} foi adicionado à empresa ${selectedCompanyForNewUser.name}`)
+
+      // Limpar formulário e fechar modal
+      setShowCreateUserModal(false)
+      setNewUserName('')
+      setNewUserEmail('')
+      setNewUserPassword('')
+      setNewUserRole('vendedor')
+
+      // Recarregar usuários se o modal de gerenciamento estiver aberto
+      if (showManageUsersModal && companyToManageUsers?.id === selectedCompanyForNewUser.id) {
+        await loadCompanyUsers(selectedCompanyForNewUser.id)
+      }
+
+      // Recarregar empresas para atualizar contadores
+      await loadCompanies()
+    } catch (error: any) {
+      console.error('Erro ao criar usuário:', error)
+      showToast('error', 'Erro ao criar usuário', error.message || 'Tente novamente')
+    } finally {
+      setCreatingUser(false)
     }
   }
 
@@ -710,15 +776,19 @@ export default function CompaniesAdmin() {
                     <h3 className="text-xl font-bold text-white mb-1">{company.name}</h3>
                     <div className="flex items-center gap-2 text-sm text-gray-400">
                       <Globe className="w-4 h-4" />
-                      <span>
-                        {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
-                          ? 'Sistema Unificado'
-                          : `${company.subdomain}.ramppy.local`}
-                      </span>
+                      <span>Sistema Unificado</span>
                     </div>
                   </div>
 
                   <div className="flex gap-1">
+                    <button
+                      onClick={() => handleOpenCreateUser(company)}
+                      className="p-2 text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+                      title="Criar novo usuário"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => handleManageUsersClick(company)}
                       className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
@@ -854,28 +924,6 @@ export default function CompaniesAdmin() {
                       />
                     </div>
 
-                    {/* Subdomínio - Mostrar apenas se não estiver no modo unificado */}
-                    {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM !== 'true' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Subdomínio
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                          value={subdomain}
-                          onChange={(e) => handleSubdomainChange(e.target.value)}
-                          placeholder="techsolutions"
-                          className="flex-1 px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
-                        />
-                            <span className="text-gray-400">.ramppy.local</span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Apenas letras minúsculas, números e hífens
-                          </p>
-                        </div>
-                      </div>
-                    )}
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -1190,6 +1238,123 @@ export default function CompaniesAdmin() {
                     <li>• <strong className="text-purple-400">Vendedor:</strong> Acesso apenas aos treinamentos</li>
                     <li>• As alterações são aplicadas imediatamente</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Criar Novo Usuário */}
+        {showCreateUserModal && selectedCompanyForNewUser && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-lg w-full border border-green-500/30">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Criar Novo Usuário</h2>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Empresa: <span className="text-green-400 font-medium">{selectedCompanyForNewUser.name}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowCreateUserModal(false)
+                    setSelectedCompanyForNewUser(null)
+                  }}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Nome do Usuário
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    placeholder="João Silva"
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="joao@empresa.com"
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Senha
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="flex-1 px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
+                    />
+                    <button
+                      onClick={generateUserPassword}
+                      className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-xl font-medium transition-colors"
+                    >
+                      Gerar
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Cargo
+                  </label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'vendedor')}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:border-green-500/50 focus:outline-none"
+                  >
+                    <option value="vendedor">Vendedor</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowCreateUserModal(false)
+                      setSelectedCompanyForNewUser(null)
+                    }}
+                    className="flex-1 px-6 py-3 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 rounded-xl font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCreateUser}
+                    disabled={creatingUser}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
+                  >
+                    {creatingUser ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Criando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>Criar Usuário</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
