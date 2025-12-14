@@ -1,16 +1,26 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { PlanLimitWarning } from '@/components/PlanLimitWarning'
 
 interface RoleplayViewProps {
   onNavigateToHistory?: () => void
 }
 
 export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps = {}) {
+  // Hook para verificar limites do plano
+  const {
+    checkRoleplayLimit,
+    incrementRoleplay,
+    planUsage,
+    trainingPlan
+  } = usePlanLimits()
+
   // CSS for custom scrollbar
   const scrollbarStyles = `
     <style>
@@ -34,6 +44,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [showConfig, setShowConfig] = useState(false)
   const [isSimulating, setIsSimulating] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [roleplayLimitReached, setRoleplayLimitReached] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -85,6 +96,21 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     setMounted(true)
     loadData()
   }, [])
+
+  // Verificar limite de roleplays semanais
+  useEffect(() => {
+    if (planUsage && trainingPlan) {
+      const used = planUsage.training?.roleplays?.used || 0
+      const limit = planUsage.training?.roleplays?.limit || 999
+
+      if (trainingPlan === 'pro' && used >= limit) {
+        setRoleplayLimitReached(true)
+        console.log('⚠️ Limite semanal de roleplays atingido:', used, '/', limit)
+      } else {
+        setRoleplayLimitReached(false)
+      }
+    }
+  }, [planUsage, trainingPlan])
 
   const loadData = async () => {
     const [businessTypeData, personasData, objectionsData, tagsData] = await Promise.all([
@@ -154,6 +180,26 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }
 
   const handleStartSimulation = async () => {
+    // Primeiro verificar os limites do plano antes de iniciar
+    const limitCheck = await checkRoleplayLimit()
+
+    if (!limitCheck.allowed) {
+      // Mostrar aviso de limite atingido
+      setRoleplayLimitReached(true)
+
+      // Mostrar mensagem de erro
+      const messageElement = document.createElement('div')
+      messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
+      messageElement.textContent = limitCheck.message || 'Limite de simulações atingido'
+      document.body.appendChild(messageElement)
+
+      setTimeout(() => {
+        messageElement.remove()
+      }, 3000)
+
+      return
+    }
+
     setShowConfig(false)
     setIsSimulating(true)
     setIsLoading(true)
@@ -336,6 +382,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       if (session) {
         setSessionId(session.id)
         console.log('💾 Sessão salva no Supabase:', session.id)
+
+        // Incrementar contador de roleplays após criação bem-sucedida
+        await incrementRoleplay()
+        console.log('📊 Contador de roleplays incrementado')
       }
 
       // Adicionar primeira mensagem do cliente
@@ -1043,14 +1093,65 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
             <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30">
+              {/* Contador de Roleplays Semanais */}
+              {planUsage && (
+                <div className="flex justify-center mb-6">
+                  <div className={`px-4 py-2 rounded-xl flex items-center gap-3 ${
+                    trainingPlan === 'pro' && planUsage.training?.roleplays?.used >= planUsage.training?.roleplays?.limit
+                      ? 'bg-red-900/30 border border-red-500/40'
+                      : trainingPlan === 'pro'
+                      ? 'bg-yellow-900/30 border border-yellow-500/40'
+                      : 'bg-green-900/30 border border-green-500/40'
+                  }`}>
+                    <Zap className={`w-5 h-5 ${
+                      trainingPlan === 'pro' && planUsage.training?.roleplays?.used >= planUsage.training?.roleplays?.limit
+                        ? 'text-red-400'
+                        : trainingPlan === 'pro'
+                        ? 'text-yellow-400'
+                        : 'text-green-400'
+                    }`} />
+                    <div className="flex flex-col">
+                      <span className={`text-sm font-medium ${
+                        trainingPlan === 'pro' && planUsage.training?.roleplays?.used >= planUsage.training?.roleplays?.limit
+                          ? 'text-red-400'
+                          : trainingPlan === 'pro'
+                          ? 'text-yellow-400'
+                          : 'text-green-400'
+                      }`}>
+                        Simulações esta semana: {planUsage.training?.roleplays?.used || 0}/{planUsage.training?.roleplays?.limit === 999 ? '∞' : planUsage.training?.roleplays?.limit || 0}
+                      </span>
+                      {trainingPlan === 'pro' && planUsage.training?.roleplays?.used === planUsage.training?.roleplays?.limit - 1 && (
+                        <span className="text-xs text-yellow-400 font-semibold animate-pulse">
+                          ⚠️ Última simulação disponível!
+                        </span>
+                      )}
+                      {trainingPlan === 'pro' && planUsage.training?.roleplays?.resetDate && (
+                        <span className="text-xs text-gray-400">
+                          Reseta em: {new Date(planUsage.training.roleplays.resetDate).toLocaleDateString('pt-BR', { weekday: 'long' })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-center gap-4 mb-6">
                 {!isSimulating && (
                   <button
                     onClick={() => setShowConfig(true)}
-                    className="px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 rounded-2xl font-semibold text-lg flex items-center gap-3 hover:scale-105 transition-transform glow-green"
+                    disabled={roleplayLimitReached}
+                    className={`px-8 py-4 rounded-2xl font-semibold text-lg flex items-center gap-3 transition-transform ${
+                      roleplayLimitReached
+                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'bg-gradient-to-r from-green-600 to-green-500 hover:scale-105 glow-green'
+                    }`}
                   >
-                    <Play className="w-5 h-5" />
-                    Iniciar Simulação
+                    {roleplayLimitReached ? (
+                      <Lock className="w-5 h-5" />
+                    ) : (
+                      <Play className="w-5 h-5" />
+                    )}
+                    {roleplayLimitReached ? 'Limite Semanal Atingido' : 'Iniciar Simulação'}
                   </button>
                 )}
               </div>

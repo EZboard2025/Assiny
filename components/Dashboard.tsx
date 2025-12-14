@@ -2,17 +2,29 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import ChatInterface, { ChatInterfaceHandle } from './ChatInterface'
 import ConfigHub from './ConfigHub'
 import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
-import RoleplayLinksView from './RoleplayLinksView'
 import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, FileSearch } from 'lucide-react'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, FileSearch, Lock } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { PlanType } from '@/lib/types/plans'
+
+// Lazy load RoleplayLinksView to prevent it from executing on public pages
+const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+    </div>
+  )
+})
 
 interface DashboardProps {
   onLogout: () => void
@@ -28,6 +40,20 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const chatRef = useRef<ChatInterfaceHandle>(null)
+
+  // Hook para verificar limites do plano
+  const {
+    trainingPlan,
+    planUsage,
+    checkChatIAAccess,
+    checkPDIAccess,
+    checkFollowUpAccess
+  } = usePlanLimits()
+
+  // Estados para controlar acesso às features
+  const [hasChatIA, setHasChatIA] = useState(true)
+  const [hasPDI, setHasPDI] = useState(true)
+  const [hasFollowUp, setHasFollowUp] = useState(true)
 
   // Sempre usar tema Ramppy (verde espacial) para TODAS as empresas
   const isRamppy = true
@@ -51,6 +77,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       }
     }
   }, [])
+
+  // Verificar acesso às features baseado no plano
+  useEffect(() => {
+    const checkFeatureAccess = async () => {
+      if (checkChatIAAccess && checkPDIAccess && checkFollowUpAccess) {
+        const chatIA = await checkChatIAAccess()
+        const pdi = await checkPDIAccess()
+        const followUp = await checkFollowUpAccess()
+
+        setHasChatIA(chatIA)
+        setHasPDI(pdi)
+        setHasFollowUp(followUp)
+      }
+    }
+    checkFeatureAccess()
+  }, [checkChatIAAccess, checkPDIAccess, checkFollowUpAccess])
 
   // Check if user is admin/gestor
   const checkUserRole = async () => {
@@ -94,6 +136,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   const renderContent = () => {
     if (currentView === 'chat') {
+      if (!hasChatIA) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 max-w-md">
+              <Lock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white text-center mb-2">Chat IA Bloqueado</h2>
+              <p className="text-gray-400 text-center mb-4">
+                O Chat IA não está disponível no plano {trainingPlan?.toUpperCase()}.
+              </p>
+              <p className="text-sm text-yellow-400 text-center">
+                Faça upgrade para o plano MAX ou OG para acessar esta funcionalidade.
+              </p>
+            </div>
+          </div>
+        )
+      }
       return <ChatInterface ref={chatRef} />
     }
 
@@ -102,6 +160,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'pdi') {
+      if (!hasPDI) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 max-w-md">
+              <Lock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white text-center mb-2">PDI Bloqueado</h2>
+              <p className="text-gray-400 text-center mb-4">
+                O Plano de Desenvolvimento Individual não está disponível no plano {trainingPlan?.toUpperCase()}.
+              </p>
+              <p className="text-sm text-yellow-400 text-center">
+                Faça upgrade para o plano MAX ou OG para acessar esta funcionalidade.
+              </p>
+            </div>
+          </div>
+        )
+      }
       return <PDIView />
     }
 

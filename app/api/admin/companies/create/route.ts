@@ -74,12 +74,9 @@ export async function POST(request: NextRequest) {
     // 1. Criar empresa
     const companyData: any = {
       name: companyName,
-      employee_limit: employeeLimit || null
-    }
-
-    // Só adicionar subdomínio se não estiver no modo unificado
-    if (!USE_UNIFIED_SYSTEM && subdomain) {
-      companyData.subdomain = subdomain
+      employee_limit: employeeLimit || null,
+      // No sistema unificado, usar string vazia para subdomain
+      subdomain: USE_UNIFIED_SYSTEM ? '' : (subdomain || '')
     }
 
     const { data: company, error: companyError } = await supabaseAdmin

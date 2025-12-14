@@ -7,6 +7,12 @@ import { supabase } from '@/lib/supabase'
  */
 export async function getUserCompanyId(): Promise<string | null> {
   try {
+    // Verificar se estamos em uma página pública
+    if (typeof window !== 'undefined' && window.location.pathname.includes('roleplay-publico')) {
+      console.log('[getUserCompanyId] Chamada de página pública - retornando null')
+      return null
+    }
+
     // Obter o usuário logado
     const { data: { user }, error: userError } = await supabase.auth.getUser()
 
@@ -121,6 +127,12 @@ export async function getCompanyIdFromSubdomain(): Promise<string | null> {
  * @returns company_id ou null se não encontrado
  */
 export async function getCompanyId(): Promise<string | null> {
+  // Verificar se estamos em uma página pública
+  if (typeof window !== 'undefined' && window.location.pathname.includes('roleplay-publico')) {
+    console.log('[getCompanyId] Chamada de página pública - retornando null')
+    return null
+  }
+
   // Verificar se estamos em modo unificado
   const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
 

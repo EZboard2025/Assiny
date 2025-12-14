@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { PlanType, PLAN_CONFIGS, PLAN_NAMES } from '@/lib/types/plans'
+import { getTimeUntilReset } from '@/lib/utils/resetTimer'
 
 interface Company {
   id: string
@@ -101,6 +102,18 @@ export default function CompaniesAdmin() {
   const [showMetrics, setShowMetrics] = useState(false)
   const [expandedMetricId, setExpandedMetricId] = useState<string | null>(null)
   const [showUsersForCompany, setShowUsersForCompany] = useState<string | null>(null)
+
+  // Timer state for weekly reset
+  const [timeUntilReset, setTimeUntilReset] = useState(getTimeUntilReset())
+
+  // Update timer every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeUntilReset(getTimeUntilReset())
+    }, 1000) // Update every second
+
+    return () => clearInterval(interval)
+  }, [])
 
   const loadMetrics = async () => {
     setLoadingMetrics(true)
@@ -604,6 +617,37 @@ export default function CompaniesAdmin() {
               Gerenciar Empresas
             </h1>
             <p className="text-gray-400">Administre as empresas do sistema multi-tenant</p>
+
+            {/* Timer para reset semanal */}
+            <div className="mt-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-400" />
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">Reset semanal em:</span>
+                <div className="flex items-center gap-4 text-white font-mono">
+                  {timeUntilReset.days > 0 && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xl font-bold text-blue-400">{timeUntilReset.days}</span>
+                      <span className="text-xs text-gray-400">dias</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-purple-400">{String(timeUntilReset.hours).padStart(2, '0')}</span>
+                    <span className="text-xs text-gray-400">h</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-pink-400">{String(timeUntilReset.minutes).padStart(2, '0')}</span>
+                    <span className="text-xs text-gray-400">m</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-yellow-400">{String(timeUntilReset.seconds).padStart(2, '0')}</span>
+                    <span className="text-xs text-gray-400">s</span>
+                  </div>
+                </div>
+              </div>
+              <div className="ml-auto text-xs text-gray-500">
+                Próxima segunda-feira 00:00
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3">
@@ -1564,6 +1608,20 @@ export default function CompaniesAdmin() {
                     <Globe className="w-5 h-5 text-orange-400" />
                     Plano de Processo Seletivo (Opcional)
                   </h3>
+
+                  {/* Aviso sobre consumo de créditos */}
+                  <div className="mb-4 bg-yellow-900/20 border border-yellow-500/40 rounded-xl p-3 flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-yellow-300">
+                      <p className="font-semibold mb-1">⚠️ Importante sobre o Processo Seletivo:</p>
+                      <ul className="space-y-1 ml-3">
+                        <li>• Cada candidato que realizar o roleplay via link consumirá 1 crédito</li>
+                        <li>• Os créditos são limitados pelo plano escolhido (5, 10, 20, 50 ou ilimitado)</li>
+                        <li>• O plano tem validade de 30 dias a partir da ativação</li>
+                        <li>• Após expirar ou esgotar os créditos, será necessário renovar o plano</li>
+                      </ul>
+                    </div>
+                  </div>
 
                   {/* Opção de não ter plano de seleção */}
                   <div className="mb-3">
