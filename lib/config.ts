@@ -622,3 +622,99 @@ export async function updatePersonaTags(personaId: string, tagIds: string[]): Pr
 
   return true
 }
+
+// Roleplay Objectives
+export interface RoleplayObjective {
+  id: string
+  company_id: string
+  name: string
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
+export async function getRoleplayObjectives(): Promise<RoleplayObjective[]> {
+  const companyId = await getCompanyId()
+
+  if (!companyId) {
+    console.error('[getRoleplayObjectives] Company ID não encontrado')
+    return []
+  }
+
+  console.log('[getRoleplayObjectives] Buscando objetivos para company_id:', companyId)
+
+  const { data, error } = await supabase
+    .from('roleplay_objectives')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('[getRoleplayObjectives] Erro ao buscar objetivos:', error)
+    return []
+  }
+
+  console.log('[getRoleplayObjectives] Objetivos encontrados:', data?.length || 0)
+  return data || []
+}
+
+export async function addRoleplayObjective(name: string, description: string = ''): Promise<RoleplayObjective | null> {
+  const companyId = await getCompanyId()
+
+  if (!companyId) {
+    console.error('[addRoleplayObjective] Company ID não encontrado')
+    return null
+  }
+
+  console.log('[addRoleplayObjective] Inserindo objetivo com company_id:', companyId)
+
+  const { data, error } = await supabase
+    .from('roleplay_objectives')
+    .insert([{
+      name,
+      description,
+      company_id: companyId
+    }])
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[addRoleplayObjective] Erro ao adicionar objetivo:', error)
+    return null
+  }
+
+  console.log('[addRoleplayObjective] Objetivo criado com sucesso:', data)
+  return data
+}
+
+export async function updateRoleplayObjective(id: string, name: string, description: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('roleplay_objectives')
+    .update({
+      name,
+      description,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('[updateRoleplayObjective] Erro ao atualizar objetivo:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function deleteRoleplayObjective(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('roleplay_objectives')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('[deleteRoleplayObjective] Erro ao deletar objetivo:', error)
+    return false
+  }
+
+  return true
+}

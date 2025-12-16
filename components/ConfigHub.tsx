@@ -24,12 +24,17 @@ import {
   deleteTag,
   getPersonaTags,
   updatePersonaTags,
+  getRoleplayObjectives,
+  addRoleplayObjective,
+  updateRoleplayObjective,
+  deleteRoleplayObjective,
   type Employee,
   type Objection,
   type Persona,
   type PersonaB2B,
   type PersonaB2C,
-  type Tag
+  type Tag,
+  type RoleplayObjective
 } from '@/lib/config'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import {
@@ -86,7 +91,7 @@ function ConfigurationInterface({
     planUsage
   } = usePlanLimits()
 
-  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'files'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files'>('employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
@@ -106,6 +111,14 @@ function ConfigurationInterface({
   const [expandedObjections, setExpandedObjections] = useState<Set<string>>(new Set())
   const [evaluatingObjection, setEvaluatingObjection] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Estados para Objetivos de Roleplay
+  const [objectives, setObjectives] = useState<RoleplayObjective[]>([])
+  const [newObjectiveName, setNewObjectiveName] = useState('')
+  const [newObjectiveDescription, setNewObjectiveDescription] = useState('')
+  const [editingObjectiveId, setEditingObjectiveId] = useState<string | null>(null)
+  const [editingObjectiveName, setEditingObjectiveName] = useState('')
+  const [editingObjectiveDescription, setEditingObjectiveDescription] = useState('')
 
   // Estados para Tags
   const [tags, setTags] = useState<Tag[]>([])
@@ -394,17 +407,19 @@ function ConfigurationInterface({
   const loadData = async () => {
     setLoading(true)
     try {
-      const [employeesData, companyTypeData, personasData, objectionsData] = await Promise.all([
+      const [employeesData, companyTypeData, personasData, objectionsData, objectivesData] = await Promise.all([
         getEmployees(),
         getCompanyType(),
         getPersonas(),
-        getObjections()
+        getObjections(),
+        getRoleplayObjectives()
       ])
 
       setEmployees(employeesData)
       setBusinessType(companyTypeData)
       setPersonas(personasData)
       setObjections(objectionsData)
+      setObjectives(objectivesData)
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
@@ -1214,6 +1229,80 @@ function ConfigurationInterface({
     }
   }
 
+  // Funções para Objetivos de Roleplay
+  const handleAddObjective = async () => {
+    if (!newObjectiveName.trim()) {
+      showToast('warning', 'Preencha o nome do objetivo')
+      return
+    }
+
+    if (!newObjectiveDescription.trim()) {
+      showToast('warning', 'Preencha a descrição do objetivo')
+      return
+    }
+
+    const objective = await addRoleplayObjective(newObjectiveName.trim(), newObjectiveDescription.trim())
+    if (objective) {
+      setObjectives([...objectives, objective])
+      setNewObjectiveName('')
+      setNewObjectiveDescription('')
+      showToast('success', 'Objetivo criado com sucesso')
+    } else {
+      showToast('error', 'Erro ao criar objetivo')
+    }
+  }
+
+  const handleUpdateObjective = async (id: string) => {
+    if (!editingObjectiveName.trim()) {
+      showToast('warning', 'Preencha o nome do objetivo')
+      return
+    }
+
+    if (!editingObjectiveDescription.trim()) {
+      showToast('warning', 'Preencha a descrição do objetivo')
+      return
+    }
+
+    const success = await updateRoleplayObjective(id, editingObjectiveName.trim(), editingObjectiveDescription.trim())
+    if (success) {
+      setObjectives(objectives.map(o =>
+        o.id === id
+          ? { ...o, name: editingObjectiveName.trim(), description: editingObjectiveDescription.trim() }
+          : o
+      ))
+      setEditingObjectiveId(null)
+      setEditingObjectiveName('')
+      setEditingObjectiveDescription('')
+      showToast('success', 'Objetivo atualizado')
+    } else {
+      showToast('error', 'Erro ao atualizar objetivo')
+    }
+  }
+
+  const handleDeleteObjective = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este objetivo?')) return
+
+    const success = await deleteRoleplayObjective(id)
+    if (success) {
+      setObjectives(objectives.filter(o => o.id !== id))
+      showToast('success', 'Objetivo excluído')
+    } else {
+      showToast('error', 'Erro ao excluir objetivo')
+    }
+  }
+
+  const startEditingObjective = (objective: RoleplayObjective) => {
+    setEditingObjectiveId(objective.id)
+    setEditingObjectiveName(objective.name)
+    setEditingObjectiveDescription(objective.description || '')
+  }
+
+  const cancelEditingObjective = () => {
+    setEditingObjectiveId(null)
+    setEditingObjectiveName('')
+    setEditingObjectiveDescription('')
+  }
+
   const getQualityLabel = (score: number): string => {
     if (score >= 95) return 'Perfeito'
     if (score >= 80) return 'Ótimo'
@@ -1427,6 +1516,17 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         >
           <Target className="w-4 h-4 inline mr-2" />
           Objeções
+        </button>
+        <button
+          onClick={() => setActiveTab('objectives')}
+          className={`px-6 py-3 font-medium transition-all ${
+            activeTab === 'objectives'
+              ? 'border-b-2 border-green-500 text-white'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          <CheckCircle className="w-4 h-4 inline mr-2" />
+          Objetivos de Roleplay
         </button>
         <button
           onClick={() => setActiveTab('files')}
@@ -2634,6 +2734,137 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Objetivos de Roleplay Tab */}
+        {activeTab === 'objectives' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-xl font-bold mb-4">Objetivos de Roleplay</h3>
+              <p className="text-gray-400 mb-6 text-sm">
+                Defina os objetivos que os vendedores devem alcançar durante os roleplays (ex: marcar reunião, fechar venda, identificar necessidades).
+              </p>
+
+              {/* Formulário de novo objetivo */}
+              <div className="mb-6 bg-gray-900/50 border border-green-500/20 rounded-xl p-4">
+                <h4 className="text-sm font-bold text-green-400 mb-3">Adicionar Novo Objetivo</h4>
+                <div className="space-y-3">
+                  <div>
+                    <input
+                      type="text"
+                      value={newObjectiveName}
+                      onChange={(e) => setNewObjectiveName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddObjective()}
+                      placeholder="Nome do objetivo (ex: Marcar próxima reunião)"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <textarea
+                      value={newObjectiveDescription}
+                      onChange={(e) => setNewObjectiveDescription(e.target.value)}
+                      placeholder="Descrição do objetivo"
+                      rows={2}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors resize-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handleAddObjective}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-medium transition-all shadow-lg shadow-green-500/20"
+                  >
+                    <Plus className="w-4 h-4 inline mr-2" />
+                    Adicionar Objetivo
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista de objetivos */}
+              {objectives.length > 0 ? (
+                <div className="space-y-3">
+                  {objectives.map((objective) => (
+                    <div
+                      key={objective.id}
+                      className="bg-gray-900/50 border border-green-500/20 rounded-xl p-4"
+                    >
+                      {editingObjectiveId === objective.id ? (
+                        // Modo de edição
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            value={editingObjectiveName}
+                            onChange={(e) => setEditingObjectiveName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleUpdateObjective(objective.id)
+                              if (e.key === 'Escape') cancelEditingObjective()
+                            }}
+                            className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500"
+                            autoFocus
+                          />
+                          <textarea
+                            value={editingObjectiveDescription}
+                            onChange={(e) => setEditingObjectiveDescription(e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500 resize-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleUpdateObjective(objective.id)}
+                              className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-medium transition-colors"
+                            >
+                              <Check className="w-4 h-4 inline mr-1" />
+                              Salvar
+                            </button>
+                            <button
+                              onClick={cancelEditingObjective}
+                              className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors"
+                            >
+                              <X className="w-4 h-4 inline mr-1" />
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // Modo de visualização
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                              <h4 className="text-white font-medium">{objective.name}</h4>
+                            </div>
+                            {objective.description && (
+                              <p className="text-gray-400 text-sm ml-6">{objective.description}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => startEditingObjective(objective)}
+                              className="p-2 text-gray-400 hover:text-green-400 transition-colors"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteObjective(objective.id)}
+                              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-gray-900/30 rounded-xl border border-green-500/10">
+                  <CheckCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500">Nenhum objetivo cadastrado ainda.</p>
+                  <p className="text-gray-600 text-sm mt-1">Adicione objetivos acima para começar.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
