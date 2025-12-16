@@ -840,12 +840,12 @@ export default function RoleplayLinksView() {
                 </button>
                 <button
                   onClick={toggleActive}
-                  disabled={saving || (
+                  disabled={!!(saving || (
                     !roleplayLink.is_active &&
                     selectionPlan &&
                     PLAN_CONFIGS[selectionPlan]?.maxSelectionCandidates !== null &&
                     roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates
-                  )}
+                  ))}
                   className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
                     roleplayLink.is_active
                       ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 glow-green'
