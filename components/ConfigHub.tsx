@@ -86,18 +86,19 @@ function ConfigurationInterface({
     planUsage
   } = usePlanLimits()
 
-  const [activeTab, setActiveTab] = useState<'employees' | 'business-type' | 'personas' | 'objections' | 'files'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'files'>('employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
   const [newEmployeePassword, setNewEmployeePassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [addingEmployee, setAddingEmployee] = useState(false)
-  const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2C')
+  const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
   const [personas, setPersonas] = useState<Persona[]>([])
   const [showPersonaForm, setShowPersonaForm] = useState(false)
   const [newPersona, setNewPersona] = useState<Partial<PersonaB2B> | Partial<PersonaB2C>>({})
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null)
+  const [selectedPersonaType, setSelectedPersonaType] = useState<'B2B' | 'B2C'>('B2B')
   const [objections, setObjections] = useState<Objection[]>([])
   const [newObjection, setNewObjection] = useState('')
   const [newRebuttal, setNewRebuttal] = useState('')
@@ -682,7 +683,7 @@ function ConfigurationInterface({
     }
   }
 
-  const handleSetBusinessType = async (type: 'B2B' | 'B2C') => {
+  const handleSetBusinessType = async (type: 'B2B' | 'B2C' | 'Ambos') => {
     const success = await setCompanyType(type)
     if (success) {
       setBusinessType(type)
@@ -690,7 +691,10 @@ function ConfigurationInterface({
   }
 
   const handleSavePersona = async () => {
-    if (businessType === 'B2B') {
+    // Determinar o tipo de persona baseado no businessType e selectedPersonaType
+    const personaType = businessType === 'Ambos' ? selectedPersonaType : businessType
+
+    if (personaType === 'B2B') {
       const persona = newPersona as PersonaB2B
       if (!persona.job_title) {
         alert('Por favor, preencha o cargo')
@@ -702,7 +706,7 @@ function ConfigurationInterface({
         const { supabase } = await import('@/lib/supabase')
         const { data, error } = await supabase
           .from('personas')
-          .update({ ...persona, business_type: 'B2B' })
+          .update({ ...persona, business_type: personaType })
           .eq('id', editingPersonaId)
           .select()
           .single()
@@ -733,7 +737,7 @@ function ConfigurationInterface({
         }
 
         // Criar nova persona
-        const result = await addPersona({ ...persona, business_type: 'B2B' })
+        const result = await addPersona({ ...persona, business_type: personaType })
         if (result) {
           setPersonas([...personas, result])
           // Adicionar tags à nova persona
@@ -745,7 +749,7 @@ function ConfigurationInterface({
           setSelectedPersonaTags([])
         }
       }
-    } else {
+    } else if (personaType === 'B2C') {
       const persona = newPersona as PersonaB2C
       if (!persona.profession) {
         alert('Por favor, preencha a profissão')
@@ -757,7 +761,7 @@ function ConfigurationInterface({
         const { supabase } = await import('@/lib/supabase')
         const { data, error } = await supabase
           .from('personas')
-          .update({ ...persona, business_type: 'B2C' })
+          .update({ ...persona, business_type: personaType })
           .eq('id', editingPersonaId)
           .select()
           .single()
@@ -788,7 +792,7 @@ function ConfigurationInterface({
         }
 
         // Criar nova persona
-        const result = await addPersona({ ...persona, business_type: 'B2C' })
+        const result = await addPersona({ ...persona, business_type: personaType })
         if (result) {
           setPersonas([...personas, result])
           // Adicionar tags à nova persona
@@ -1396,17 +1400,6 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
           Funcionários
         </button>
         <button
-          onClick={() => setActiveTab('business-type')}
-          className={`px-6 py-3 font-medium transition-all ${
-            activeTab === 'business-type'
-              ? 'border-b-2 border-green-500 text-white'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          <Building2 className="w-4 h-4 inline mr-2" />
-          Tipo de Empresa
-        </button>
-        <button
           onClick={() => setActiveTab('personas')}
           className={`px-6 py-3 font-medium transition-all ${
             activeTab === 'personas'
@@ -1571,36 +1564,6 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
           </div>
         )}
 
-        {/* Tipo de Empresa Tab */}
-        {activeTab === 'business-type' && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-xl font-bold mb-4">Tipo de Empresa</h3>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => handleSetBusinessType('B2C')}
-                  className={`flex-1 px-6 py-4 rounded-xl font-medium transition-all ${
-                    businessType === 'B2C'
-                      ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                      : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
-                  }`}
-                >
-                  B2C (Business to Consumer)
-                </button>
-                <button
-                  onClick={() => handleSetBusinessType('B2B')}
-                  className={`flex-1 px-6 py-4 rounded-xl font-medium transition-all ${
-                    businessType === 'B2B'
-                      ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                      : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
-                  }`}
-                >
-                  B2B (Business to Business)
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Personas Tab */}
         {activeTab === 'personas' && (
@@ -1608,7 +1571,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-xl font-bold">Personas {businessType}</h3>
+                  <h3 className="text-xl font-bold">Personas {businessType === 'Ambos' ? 'B2B e B2C' : businessType}</h3>
                   {/* Contador de Personas */}
                   <div className={`px-3 py-1 rounded-lg text-sm font-medium ${
                     personaLimitReached
@@ -1851,7 +1814,13 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
               {/* Lista de personas */}
               {!showPersonaForm && personas.filter(p => {
                 // Filtrar por tipo de negócio
-                if (p.business_type !== businessType) return false
+                if (businessType === 'Ambos') {
+                  // Se "Ambos" está selecionado, mostrar tanto B2B quanto B2C
+                  if (p.business_type !== 'B2B' && p.business_type !== 'B2C') return false
+                } else {
+                  // Caso contrário, filtrar pelo tipo específico
+                  if (p.business_type !== businessType) return false
+                }
 
                 // Filtrar por tag se selecionada
                 if (filterTag && p.id) {
@@ -1864,7 +1833,13 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                 <div className="mb-4 space-y-4">
                   {personas.filter(p => {
                     // Filtrar por tipo de negócio
-                    if (p.business_type !== businessType) return false
+                    if (businessType === 'Ambos') {
+                      // Se "Ambos" está selecionado, mostrar tanto B2B quanto B2C
+                      if (p.business_type !== 'B2B' && p.business_type !== 'B2C') return false
+                    } else {
+                      // Caso contrário, filtrar pelo tipo específico
+                      if (p.business_type !== businessType) return false
+                    }
 
                     // Filtrar por tag se selecionada
                     if (filterTag && p.id) {
@@ -2044,7 +2019,7 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                 <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 space-y-4">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold">
-                      {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType}
+                      {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType === 'Ambos' ? selectedPersonaType : businessType}
                     </h4>
                     <button
                       onClick={() => {
@@ -2059,7 +2034,44 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                     </button>
                   </div>
 
-                  {businessType === 'B2B' ? (
+                  {/* Selector de tipo quando businessType é "Ambos" */}
+                  {businessType === 'Ambos' && !editingPersonaId && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Tipo de Persona
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => {
+                            setSelectedPersonaType('B2B')
+                            setNewPersona({})
+                          }}
+                          className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                            selectedPersonaType === 'B2B'
+                              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                              : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                          }`}
+                        >
+                          B2B
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedPersonaType('B2C')
+                            setNewPersona({})
+                          }}
+                          className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                            selectedPersonaType === 'B2C'
+                              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                              : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                          }`}
+                        >
+                          B2C
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(businessType === 'B2B' || (businessType === 'Ambos' && selectedPersonaType === 'B2B')) ? (
                     <>
                       {/* Formulário B2B */}
                       <div>
@@ -2627,6 +2639,55 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
               <p className="text-gray-400 mb-6">
                 Preencha as informações sobre sua empresa para melhorar o treinamento da IA.
               </p>
+
+              {/* Tipo de Empresa */}
+              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">
+                <h4 className="text-lg font-semibold mb-4">Tipo de Empresa</h4>
+                <p className="text-sm text-gray-400 mb-4">
+                  Selecione o modelo de negócio da sua empresa
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => handleSetBusinessType('B2C')}
+                    className={`px-6 py-4 rounded-xl font-medium transition-all ${
+                      businessType === 'B2C'
+                        ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                        : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold">B2C</div>
+                      <div className="text-xs mt-1 opacity-80">Business to Consumer</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleSetBusinessType('B2B')}
+                    className={`px-6 py-4 rounded-xl font-medium transition-all ${
+                      businessType === 'B2B'
+                        ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                        : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold">B2B</div>
+                      <div className="text-xs mt-1 opacity-80">Business to Business</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleSetBusinessType('Ambos')}
+                    className={`px-6 py-4 rounded-xl font-medium transition-all ${
+                      businessType === 'Ambos'
+                        ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                        : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold">Ambos</div>
+                      <div className="text-xs mt-1 opacity-80">B2B e B2C</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
 
               {/* Formulário de Dados da Empresa */}
               <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">

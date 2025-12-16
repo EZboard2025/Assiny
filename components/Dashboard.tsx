@@ -340,7 +340,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div> */}
 
-            {/* Follow-up Analysis Card (temporariamente oculto) */}
+            {/* Follow-up Analysis Card - TEMPORARIAMENTE OCULTO */}
             {/* <button
               onClick={() => handleViewChange('followup')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}

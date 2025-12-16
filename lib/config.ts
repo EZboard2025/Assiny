@@ -176,7 +176,7 @@ export async function deleteCustomerSegment(id: string): Promise<boolean> {
 }
 
 // Company Type
-export async function getCompanyType(): Promise<'B2B' | 'B2C'> {
+export async function getCompanyType(): Promise<'B2B' | 'B2C' | 'Ambos'> {
   const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
 
   if (!companyId) {
@@ -203,7 +203,7 @@ export async function getCompanyType(): Promise<'B2B' | 'B2C'> {
   return data.name
 }
 
-export async function setCompanyType(type: 'B2B' | 'B2C'): Promise<boolean> {
+export async function setCompanyType(type: 'B2B' | 'B2C' | 'Ambos'): Promise<boolean> {
   const companyId = await getCompanyId() // Usa subdomínio primeiro, depois usuário
 
   if (!companyId) {
