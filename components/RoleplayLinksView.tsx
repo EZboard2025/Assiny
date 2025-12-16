@@ -481,7 +481,7 @@ export default function RoleplayLinksView() {
         setRoleplayLink(result.data)
 
         // Forçar reload dos dados para garantir consistência
-        await loadRoleplayLink()
+        await loadData()
       }
     } catch (error) {
       console.error('❌ Erro ao atualizar status:', error)
