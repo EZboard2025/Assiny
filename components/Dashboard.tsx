@@ -340,8 +340,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div> */}
 
-            {/* Follow-up Analysis Card (temporariamente oculto) */}
-            {/* <button
+            {/* Follow-up Analysis Card */}
+            <button
               onClick={() => handleViewChange('followup')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '500ms' }}
@@ -371,7 +371,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   </svg>
                 </div>
               </div>
-            </button> */}
+            </button>
 
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
