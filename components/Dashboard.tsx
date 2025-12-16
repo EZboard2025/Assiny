@@ -311,8 +311,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </button>
 
-            {/* PDI Card - Desabilitado */}
-            <div
+            {/* PDI Card - Desabilitado (temporariamente oculto) */}
+            {/* <div
               className={`text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'} opacity-60 cursor-not-allowed`}
               style={{ animationDelay: '400ms' }}
             >
@@ -338,10 +338,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   <span>Disponível em breve</span>
                 </div>
               </div>
-            </div>
+            </div> */}
 
-            {/* Follow-up Analysis Card */}
-            <button
+            {/* Follow-up Analysis Card (temporariamente oculto) */}
+            {/* <button
               onClick={() => handleViewChange('followup')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '500ms' }}
@@ -371,7 +371,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   </svg>
                 </div>
               </div>
-            </button>
+            </button> */}
 
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
