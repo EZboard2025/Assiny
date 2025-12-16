@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const images = body.images || (body.image ? [body.image] : null)
     const filenames = body.filenames || (body.filename ? [body.filename] : [])
     const avaliacao = body.avaliacao
+    const dadosEmpresa = body.dados_empresa || null
 
     if (!images || images.length === 0) {
       return NextResponse.json(
@@ -158,6 +159,9 @@ Retorne as mensagens organizadas conforme o formato especificado.`
 
       // TERCEIRA ETAPA: Enviar para N8N para análise real
       console.log('Enviando para N8N para análise...')
+      if (dadosEmpresa) {
+        console.log('Dados da empresa incluídos:', Object.keys(dadosEmpresa))
+      }
 
       const n8nWebhookUrl = 'https://ezboard.app.n8n.cloud/webhook/c025a4ee-aa92-4a89-82fe-54eb6710a139'
 
@@ -174,6 +178,7 @@ Retorne as mensagens organizadas conforme o formato especificado.`
             canal: avaliacao.canal,                   // WhatsApp, E-mail, etc
             fase_funil: avaliacao.fase_funil,         // Prospecção, Qualificação, etc
             contexto: avaliacao.contexto,             // Contexto do momento (pós-proposta, cold, etc)
+            dados_empresa: dadosEmpresa ? JSON.stringify(dadosEmpresa) : null  // Stringify dos dados da empresa
           })
         })
 

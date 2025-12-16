@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Upload, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, X, FileText, TrendingUp, Building2, Users, MessageSquare, Target, Sparkles, BarChart3 } from 'lucide-react'
 
 interface FollowUpAnalysis {
@@ -55,6 +55,7 @@ export default function FollowUpView() {
   const [error, setError] = useState<string | null>(null)
   const [extractedText, setExtractedText] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [companyData, setCompanyData] = useState<any>(null)
 
 
   // Context form state
@@ -62,6 +63,38 @@ export default function FollowUpView() {
   const [contexto, setContexto] = useState<string>('')
   const [canal, setCanal] = useState<string>('WhatsApp')
   const [faseFunil, setFaseFunil] = useState<string>('prospeccao')
+
+  // Carregar dados da empresa ao montar o componente
+  useEffect(() => {
+    const loadCompanyData = async () => {
+      try {
+        const { supabase } = await import('@/lib/supabase')
+        const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+
+        // Buscar company_id (prioriza subdomínio, depois usuário)
+        const companyId = await getCompanyId()
+        if (!companyId) {
+          console.warn('⚠️ company_id não encontrado')
+          return
+        }
+
+        const { data, error } = await supabase
+          .from('company_data')
+          .select('*')
+          .eq('company_id', companyId)
+          .single()
+
+        if (data && !error) {
+          setCompanyData(data)
+          console.log('✅ Dados da empresa carregados:', data)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados da empresa:', error)
+      }
+    }
+
+    loadCompanyData()
+  }, [])
 
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +190,8 @@ export default function FollowUpView() {
             contexto: contexto,
             canal: canal,
             fase_funil: faseFunil
-          }
+          },
+          dados_empresa: companyData // Enviando todos os dados da empresa
         })
       })
 
