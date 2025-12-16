@@ -190,7 +190,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       // Mostrar mensagem de erro
       const messageElement = document.createElement('div')
       messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
-      messageElement.textContent = limitCheck.message || 'Limite de simulações atingido'
+      messageElement.textContent = limitCheck.reason || 'Limite de simulações atingido'
       document.body.appendChild(messageElement)
 
       setTimeout(() => {
