@@ -257,7 +257,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
             onClick={() => setViewMode('followup')}
             className={`flex-1 px-6 py-3.5 rounded-xl font-medium transition-all duration-300 ${
               viewMode === 'followup'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg shadow-purple-500/25 scale-[1.02]'
+                ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white shadow-lg shadow-green-500/25 scale-[1.02]'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
             }`}
           >
@@ -294,13 +294,15 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20">
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-500/20 rounded-xl">
+              <div className={`p-3 ${
+                viewMode === 'followup' ? 'bg-green-500/20' : 'bg-blue-500/20'
+              } rounded-xl`}>
                 {viewMode === 'roleplay' ? (
                   <TrendingUp className="w-6 h-6 text-blue-400" />
                 ) : (
-                  <Activity className="w-6 h-6 text-purple-400" />
+                  <Activity className="w-6 h-6 text-green-400" />
                 )}
               </div>
               <div>
@@ -317,7 +319,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20">
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 hover:scale-[1.02]">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-yellow-500/20 rounded-xl">
                 <Award className="w-6 h-6 text-yellow-400" />
