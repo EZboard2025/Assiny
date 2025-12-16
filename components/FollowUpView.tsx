@@ -593,9 +593,6 @@ export default function FollowUpView() {
                                 <span className="font-semibold text-white text-lg">
                                   {fieldLabels[key] || key.replace(/_/g, ' ')}
                                 </span>
-                                <span className="ml-2 text-xs text-gray-400 bg-gray-800/50 px-2 py-1 rounded-full">
-                                  {value.peso}% do peso
-                                </span>
                               </div>
                             </div>
                             <div className="text-right">
