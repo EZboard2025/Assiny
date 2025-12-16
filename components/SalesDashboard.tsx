@@ -768,10 +768,64 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                   <MessageSquare className="w-5 h-5" />
                   Transcrição do Follow-up
                 </h3>
-                <div className="bg-gradient-to-br from-purple-900/10 to-pink-900/10 rounded-xl p-6 border border-purple-500/20">
-                  <p className="text-gray-200 whitespace-pre-wrap leading-relaxed">
-                    {selectedFollowUp.transcricao_filtrada || 'Transcrição não disponível'}
-                  </p>
+                <div className="bg-gradient-to-br from-purple-900/10 to-pink-900/10 rounded-xl p-4 border border-purple-500/20 max-h-96 overflow-y-auto">
+                  <div className="space-y-3">
+                    {selectedFollowUp.transcricao_filtrada ? (
+                      selectedFollowUp.transcricao_filtrada
+                        .replace('=== CONVERSA COMPLETA ===', '')
+                        .replace('=== CONTEXTO ANTERIOR ===', '')
+                        .replace('=== INÍCIO DO FOLLOW-UP ===', '')
+                        .replace('=== RESPOSTA DO CLIENTE (se houver) ===', '')
+                        .trim()
+                        .split('\n').map((line, index) => {
+                        // Parse each line to identify timestamp, sender, and message
+                        const match = line.match(/^\[(\d{2}:\d{2})\]\s*(Vendedor|Cliente|Remetente):\s*(.+)$/);
+
+                        if (match) {
+                          const [, timestamp, sender, message] = match;
+                          const isVendedor = sender === 'Vendedor';
+
+                          return (
+                            <div key={index} className={`flex gap-3 ${isVendedor ? 'justify-end' : 'justify-start'}`}>
+                              {!isVendedor && (
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white text-xs font-bold">C</span>
+                                </div>
+                              )}
+                              <div className={`max-w-[70%] ${isVendedor ? 'items-end' : 'items-start'}`}>
+                                <div className={`rounded-2xl px-4 py-2 ${
+                                  isVendedor
+                                    ? 'bg-gradient-to-br from-green-600/20 to-emerald-600/20 border border-green-500/30'
+                                    : 'bg-gray-800/50 border border-gray-700/50'
+                                }`}>
+                                  <p className="text-sm text-gray-100">{message}</p>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 px-1">
+                                  <span className="text-[10px] text-gray-500">{timestamp}</span>
+                                  <span className="text-[10px] text-gray-500">• {sender}</span>
+                                </div>
+                              </div>
+                              {isVendedor && (
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white text-xs font-bold">V</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        } else if (line.trim()) {
+                          // Fallback for lines that don't match the pattern
+                          return (
+                            <div key={index} className="text-gray-400 text-sm italic px-2">
+                              {line}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }).filter(Boolean)
+                    ) : (
+                      <p className="text-gray-400 text-center py-4">Transcrição não disponível</p>
+                    )}
+                  </div>
                 </div>
               </div>
 

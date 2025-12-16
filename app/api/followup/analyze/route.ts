@@ -153,7 +153,15 @@ Retorne as mensagens organizadas conforme o formato especificado.`
         temperature: 0.3 // Baixa temperatura para ser mais preciso
       })
 
-      const filteredText = filterResponse.choices[0].message.content || fullExtractedText
+      let filteredText = filterResponse.choices[0].message.content || fullExtractedText
+
+      // Limpar headers de formatação
+      filteredText = filteredText
+        .replace('=== CONVERSA COMPLETA ===', '')
+        .replace('=== CONTEXTO ANTERIOR ===', '')
+        .replace('=== INÍCIO DO FOLLOW-UP ===', '')
+        .replace('=== RESPOSTA DO CLIENTE (se houver) ===', '')
+        .trim()
 
       console.log('Follow-up filtrado e organizado com sucesso')
 
