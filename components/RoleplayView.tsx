@@ -60,7 +60,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
 
   // Dados do banco
-  const [businessType, setBusinessType] = useState<'B2B' | 'B2C'>('B2C')
+  const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
   const [personas, setPersonas] = useState<Persona[]>([])
   const [objections, setObjections] = useState<Objection[]>([])
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
@@ -135,7 +135,9 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     setPersonaTags(newPersonaTags)
 
     // Filtrar personas pelo tipo de empresa e selecionar a primeira
-    const filteredPersonas = personasData.filter(p => p.business_type === businessTypeData)
+    const filteredPersonas = businessTypeData === 'Ambos'
+      ? personasData
+      : personasData.filter(p => p.business_type === businessTypeData)
     if (filteredPersonas.length > 0) {
       setSelectedPersona(filteredPersonas[0].id!)
     }
@@ -145,7 +147,9 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
 
   // Função para agrupar e ordenar personas por tags
   const getGroupedPersonas = () => {
-    const filtered = personas.filter(p => p.business_type === businessType)
+    const filtered = businessType === 'Ambos'
+      ? personas
+      : personas.filter(p => p.business_type === businessType)
 
     // Agrupar por tags
     const tagGroups = new Map<string, Persona[]>()
@@ -1547,7 +1551,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Persona
                       </label>
-                      {personas.filter(p => p.business_type === businessType).length === 0 ? (
+                      {(businessType === 'Ambos' ? personas : personas.filter(p => p.business_type === businessType)).length === 0 ? (
                         <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
                           Nenhuma persona {businessType} cadastrada.
                         </div>

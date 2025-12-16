@@ -63,7 +63,8 @@ interface SalesDashboardProps {
 }
 
 export default function SalesDashboard({ onClose }: SalesDashboardProps) {
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(false)
   const [sellers, setSellers] = useState<SellerPerformance[]>([])
   const [selectedSeller, setSelectedSeller] = useState<SellerPerformance | null>(null)
   const [viewMode, setViewMode] = useState<'roleplay' | 'followup'>('roleplay')
@@ -79,7 +80,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
   const loadSellersData = async () => {
     try {
-      setLoading(true)
+      setDataLoading(true)
 
       // Obter company_id usando a função utilitária
       const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
@@ -87,7 +88,8 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
       if (!companyId) {
         console.error('Company ID não encontrado')
-        setLoading(false)
+        setDataLoading(false)
+        setInitialLoading(false)
         return
       }
 
@@ -100,7 +102,8 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
       if (!response.ok) {
         console.error('Erro ao buscar dados:', response.statusText)
-        setLoading(false)
+        setDataLoading(false)
+        setInitialLoading(false)
         return
       }
 
@@ -108,7 +111,8 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
       if (!performanceData || performanceData.length === 0) {
         setSellers([])
-        setLoading(false)
+        setDataLoading(false)
+        setInitialLoading(false)
         return
       }
 
@@ -116,13 +120,14 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
-      setLoading(false)
+      setDataLoading(false)
+      setInitialLoading(false)
     }
   }
 
   const loadFollowupData = async () => {
     try {
-      setLoading(true)
+      setDataLoading(true)
 
       // Obter company_id usando a função utilitária
       const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
@@ -130,7 +135,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
       if (!companyId) {
         console.error('Company ID não encontrado')
-        setLoading(false)
+        setDataLoading(false)
         return
       }
 
@@ -143,7 +148,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
       if (!response.ok) {
         console.error('Erro ao buscar dados de follow-up:', response.statusText)
-        setLoading(false)
+        setDataLoading(false)
         return
       }
 
@@ -151,7 +156,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
       if (!followupData || followupData.length === 0) {
         setSellers([])
-        setLoading(false)
+        setDataLoading(false)
         return
       }
 
@@ -159,7 +164,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
     } catch (error) {
       console.error('Erro ao carregar dados de follow-up:', error)
     } finally {
-      setLoading(false)
+      setDataLoading(false)
     }
   }
 
@@ -190,7 +195,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
   const totalFollowupAnalyses = sellers.reduce((sum, s) => sum + (s.followup_data?.total_analyses || 0), 0)
   const activeFollowupUsers = sellers.filter(s => s.followup_data && s.followup_data.total_analyses > 0).length
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         {/* Starfield background */}
@@ -263,6 +268,14 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
             </div>
           </button>
         </div>
+
+        {/* Loading Indicator for Data Changes */}
+        {dataLoading && (
+          <div className="flex items-center justify-center gap-2 mb-6 text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Carregando dados...</span>
+          </div>
+        )}
 
         {/* Cards de Estatísticas Gerais com Design Aprimorado */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
