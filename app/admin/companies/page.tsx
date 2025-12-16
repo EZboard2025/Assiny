@@ -1687,7 +1687,7 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_SCALE].name}</span>
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_SCALE]}</span>
                         </div>
                         <p className="text-sm text-gray-400 mb-2">10 candidatos - válido por 30 dias</p>
                         <div className="flex flex-wrap gap-2">
@@ -1713,7 +1713,7 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_GROWTH].name}</span>
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_GROWTH]}</span>
                         </div>
                         <p className="text-sm text-gray-400 mb-2">20 candidatos - válido por 30 dias</p>
                         <div className="flex flex-wrap gap-2">
@@ -1739,7 +1739,7 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_PRO].name}</span>
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_PRO]}</span>
                         </div>
                         <p className="text-sm text-gray-400 mb-2">50 candidatos - válido por 30 dias</p>
                         <div className="flex flex-wrap gap-2">
@@ -1765,7 +1765,7 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_MAX].name}</span>
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_MAX]}</span>
                           <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-orange-600/50 to-yellow-600/50 text-orange-300 rounded-full">
                             Ilimitado
                           </span>
