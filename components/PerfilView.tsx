@@ -1,11 +1,29 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History } from 'lucide-react'
+import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History, Users, MessageSquare, FileSearch, Award, Calendar, CheckCircle, AlertCircle, Sparkles, X } from 'lucide-react'
 import { getUserRoleplaySessions, type RoleplaySession } from '@/lib/roleplay'
+import { getFollowUpAnalyses, getFollowUpStats } from '@/lib/followup'
 
 interface PerfilViewProps {
-  onViewChange?: (view: 'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links') => void | Promise<void>
+  onViewChange?: (view: 'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup') => void | Promise<void>
+}
+
+// Tipos para as estatísticas
+interface PersonaStats {
+  persona: any
+  count: number
+  scores: number[]
+  average: number
+  lastPractice: string
+}
+
+interface ObjectionStats {
+  name: string
+  count: number
+  scores: number[]
+  average: number
+  bestScore: number
 }
 
 export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
@@ -27,12 +45,25 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
   const [showSummary, setShowSummary] = useState(false)
   const [summaryData, setSummaryData] = useState<any>(null)
   const [sessions, setSessions] = useState<RoleplaySession[]>([])
+
+  // Novos estados para as abas
+  const [activeTab, setActiveTab] = useState<'geral' | 'personas' | 'objecoes' | 'followups'>('geral')
+  const [personaStats, setPersonaStats] = useState<Map<string, PersonaStats>>(new Map())
+  const [objectionStats, setObjectionStats] = useState<Map<string, ObjectionStats>>(new Map())
+
+  // Estados para follow-ups
+  const [followUpAnalyses, setFollowUpAnalyses] = useState<any[]>([])
+  const [followUpStats, setFollowUpStats] = useState<any>(null)
+  const [loadingFollowUps, setLoadingFollowUps] = useState(false)
+  const [selectedFollowUpAnalysis, setSelectedFollowUpAnalysis] = useState<any>(null)
+
   const maxVisibleSessions = 8
 
   useEffect(() => {
     setMounted(true)
     loadUserData()
     loadSpinAverages()
+    loadFollowUpData()
   }, [])
 
   const loadUserData = async () => {
@@ -47,6 +78,28 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
       }
     } catch (error) {
       console.error('Erro ao carregar dados do usuário:', error)
+    }
+  }
+
+  const loadFollowUpData = async () => {
+    try {
+      setLoadingFollowUps(true)
+
+      // Carregar análises
+      const { data: analyses, error: analysesError } = await getFollowUpAnalyses()
+      if (!analysesError && analyses) {
+        setFollowUpAnalyses(analyses)
+      }
+
+      // Carregar estatísticas
+      const stats = await getFollowUpStats()
+      if (stats) {
+        setFollowUpStats(stats)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados de follow-up:', error)
+    } finally {
+      setLoadingFollowUps(false)
     }
   }
 
@@ -174,11 +227,223 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
         })
       }
 
+      // Processar estatísticas por persona e objeção
+      processPersonaStats(completedSessions)
+      processObjectionStats(completedSessions)
+
       setLoading(false)
     } catch (error) {
       console.error('Erro ao carregar médias SPIN:', error)
       setLoading(false)
     }
+  }
+
+  // Função para processar estatísticas por persona
+  const processPersonaStats = (sessions: RoleplaySession[]) => {
+    const stats = new Map<string, PersonaStats>()
+    console.log('🔍 Processando estatísticas de personas...')
+    console.log('Total de sessões para processar:', sessions.length)
+
+    // Debug: Ver estrutura das sessões
+    if (sessions.length > 0) {
+      console.log('📊 Exemplo de config da primeira sessão:', (sessions[0] as any).config)
+    }
+
+    sessions.forEach((session, index) => {
+      const config = (session as any).config
+      console.log(`Sessão ${index + 1} config:`, config)
+
+      // Tentar pegar persona ou usar segment como fallback
+      let persona = config?.persona || config?.selectedPersona // Pode estar em campos diferentes
+      let personaId = persona?.id || persona?.persona_id
+
+      // Debug detalhado da persona
+      console.log(`Sessão ${index + 1} - Persona encontrada:`, {
+        temPersona: !!persona,
+        personaId: personaId,
+        personaCompleta: persona
+      })
+
+      // Se não tem persona mas tem segment (sessões antigas), criar um objeto persona fictício
+      if (!persona && config?.segment) {
+        // Usar o segment como ID para agrupar sessões do mesmo segment
+        persona = {
+          id: `segment-${config.segment}`,
+          cargo: config.segment,
+          tipo_empresa_faturamento: 'Sessão Antiga (Segment)'
+        }
+        personaId = persona.id
+        console.log(`Sessão ${index + 1}: Usando segment como persona:`, config.segment)
+      }
+
+      if (!personaId || !persona) {
+        console.log(`Sessão ${index + 1}: Sem persona ou segment - IGNORANDO`)
+        return
+      }
+      console.log(`Sessão ${index + 1}: AGRUPANDO persona ID "${personaId}" - Nome: "${persona.cargo || persona.job_title || 'Sem nome'}"`)
+
+      let evaluation = (session as any).evaluation
+      // Parse se necessário
+      if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+        try {
+          evaluation = JSON.parse(evaluation.output)
+        } catch (e) {
+          return
+        }
+      }
+
+      if (!evaluation?.overall_score) return
+
+      let score = evaluation.overall_score
+      // Converter de 0-100 para 0-10 se necessário
+      if (score > 10) {
+        score = score / 10
+      }
+
+      if (!stats.has(personaId)) {
+        stats.set(personaId, {
+          persona: persona,
+          count: 0,
+          scores: [],
+          average: 0,
+          lastPractice: session.created_at
+        })
+      }
+
+      const stat = stats.get(personaId)!
+      stat.count++
+      stat.scores.push(score)
+      // Atualizar última prática se for mais recente
+      if (new Date(session.created_at) > new Date(stat.lastPractice)) {
+        stat.lastPractice = session.created_at
+      }
+    })
+
+    // Calcular médias
+    stats.forEach((stat, personaId) => {
+      stat.average = stat.scores.length > 0
+        ? stat.scores.reduce((a, b) => a + b, 0) / stat.scores.length
+        : 0
+
+      console.log(`📈 Persona "${stat.persona.cargo || stat.persona.job_title}" (ID: ${personaId}):`, {
+        praticas: stat.count,
+        notas: stat.scores,
+        media: stat.average.toFixed(1)
+      })
+    })
+
+    console.log('📊 Total de personas agrupadas:', stats.size)
+    console.log('📊 Estatísticas de personas finais:', Array.from(stats.entries()))
+    setPersonaStats(stats)
+  }
+
+  // Função para processar estatísticas por objeção
+  const processObjectionStats = (sessions: RoleplaySession[]) => {
+    const stats = new Map<string, ObjectionStats>()
+    console.log('🔍 Processando estatísticas de objeções...')
+
+    sessions.forEach((session, index) => {
+      const config = (session as any).config
+      let evaluation = (session as any).evaluation
+      // Parse se necessário
+      if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+        try {
+          evaluation = JSON.parse(evaluation.output)
+        } catch (e) {
+          return
+        }
+      }
+
+      // Tentar pegar objections_analysis ou usar objections do config como fallback
+      let objectionsToAnalyze = evaluation?.objections_analysis
+
+      // Se não tem objections_analysis mas tem objections no config (para sessões com dados parciais)
+      if (!objectionsToAnalyze && config?.objections && Array.isArray(config.objections)) {
+        console.log(`Sessão ${index + 1}: Usando objections do config como fallback`)
+        objectionsToAnalyze = config.objections.map((obj: any, objIdx: number) => ({
+          objection: obj.name || obj.objection || `Objeção #${objIdx + 1}`,
+          handling_score: 5 // Score padrão para objeções sem avaliação
+        }))
+      }
+
+      if (!objectionsToAnalyze || !Array.isArray(objectionsToAnalyze)) {
+        console.log(`Sessão ${index + 1}: Sem objections_analysis ou objections`)
+        return
+      }
+      console.log(`Sessão ${index + 1}: objections encontrado:`, objectionsToAnalyze)
+
+      objectionsToAnalyze.forEach((obj: any, objIdx: number) => {
+        console.log(`Sessão ${index + 1}, Objeção ${objIdx + 1}:`, obj)
+
+        // Primeiro verificar se tem objection_id válido
+        let objId = obj.objection_id || obj.id || null
+
+        // FILTRO: Só processar objeções com ID válido
+        // Aceitar IDs reais (UUID), legacy-X, ou unknown-X
+        // Ignorar apenas objeções sem ID ou com "não-configurada"
+        if (!objId || objId === 'não-configurada') {
+          console.log(`Sessão ${index + 1}, Objeção ${objIdx + 1}: Ignorando - sem objection_id válido`)
+          return // Pular esta objeção
+        }
+
+        // Se tem objection_id válido, tentar encontrar o nome da objeção configurada
+        let objName = ''
+        if (config?.objections) {
+          // Procurar a objeção pelo ID real
+          const configuredObj = config.objections.find((o: any) => {
+            // Comparar com o ID real do banco
+            if (typeof o === 'object' && o.id === objId) {
+              return true
+            }
+            // Para formato legacy, comparar pelo índice
+            if (objId.startsWith('legacy-')) {
+              const index = parseInt(objId.replace('legacy-', ''))
+              return config.objections.indexOf(o) === index
+            }
+            return false
+          })
+
+          if (configuredObj) {
+            objName = typeof configuredObj === 'string' ? configuredObj : (configuredObj.name || '')
+            console.log(`Objeção mapeada pelo ID ${objId}: ${objName}`)
+          }
+        }
+
+        // Se não conseguiu mapear, tentar usar o texto da objeção como fallback
+        if (!objName) {
+          objName = obj.objection_text || obj.objection || obj.name || `Objeção ${objId}`
+          console.log(`Usando texto da objeção como fallback: ${objName}`)
+        }
+
+        const handlingScore = obj.handling_score || obj.score || 5
+        console.log(`Processando: "${objName}", score: ${handlingScore}, ID: ${objId}`)
+
+        if (!stats.has(objName)) {
+          stats.set(objName, {
+            name: objName,
+            count: 0,
+            scores: [],
+            average: 0,
+            bestScore: 0
+          })
+        }
+
+        const stat = stats.get(objName)!
+        stat.count++
+        stat.scores.push(handlingScore)
+        stat.bestScore = Math.max(stat.bestScore, handlingScore)
+      })
+    })
+
+    // Calcular médias
+    stats.forEach(stat => {
+      stat.average = stat.scores.length > 0
+        ? stat.scores.reduce((a, b) => a + b, 0) / stat.scores.length
+        : 0
+    })
+
+    console.log('📊 Estatísticas de objeções finais:', stats)
+    setObjectionStats(stats)
   }
 
   // Processar evaluation antes de usar
@@ -402,7 +667,56 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('geral')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'geral'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            Visão Geral
+          </button>
+          <button
+            onClick={() => setActiveTab('personas')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'personas'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            Por Persona
+          </button>
+          <button
+            onClick={() => setActiveTab('objecoes')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'objecoes'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            Por Objeção
+          </button>
+          <button
+            onClick={() => setActiveTab('followups')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'followups'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <FileSearch className="w-4 h-4" />
+              Follow-ups
+            </span>
+          </button>
+        </div>
+
+        {/* Tab Content - Visão Geral */}
+        {activeTab === 'geral' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Evolution Chart */}
           <div className="lg:col-span-2 space-y-6">
             {/* Evolution Card */}
@@ -597,6 +911,226 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Tab Content - Por Persona */}
+        {activeTab === 'personas' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {personaStats.size === 0 ? (
+              <div className="col-span-full bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-12 border border-gray-500/30 text-center">
+                <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg">Nenhuma prática com personas ainda</p>
+                <p className="text-gray-500 text-sm mt-2">Complete sessões de roleplay para ver estatísticas por persona</p>
+              </div>
+            ) : (
+              Array.from(personaStats.values()).map((stat, i) => {
+                const scoreColor = stat.average >= 7 ? 'text-green-400' : stat.average >= 5 ? 'text-yellow-400' : 'text-red-400'
+                const borderColor = stat.average >= 7 ? 'border-green-500/30' : stat.average >= 5 ? 'border-yellow-500/30' : 'border-red-500/30'
+                const bgGradient = stat.average >= 7 ? 'from-green-600/10 to-green-400/5' : stat.average >= 5 ? 'from-yellow-600/10 to-yellow-400/5' : 'from-red-600/10 to-red-400/5'
+
+                return (
+                  <div key={i} className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border ${borderColor} ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mb-2 drop-shadow-[0_0_20px_rgba(34,197,94,0.5)]">
+                          {stat.persona.cargo || stat.persona.job_title || 'Cargo não especificado'}
+                        </h3>
+                        <p className="text-sm text-gray-400">
+                          {stat.persona.tipo_empresa_faturamento || stat.persona.company_type || 'Empresa não especificada'}
+                        </p>
+                      </div>
+                      <div className={`bg-gradient-to-br ${bgGradient} rounded-xl px-3 py-1`}>
+                        <div className="text-xs text-gray-400">Nota Média</div>
+                        <div className={`text-2xl font-bold ${scoreColor}`}>
+                          {stat.average.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-400">Práticas realizadas</span>
+                        <span className="font-semibold text-white">{stat.count}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-400">Última prática</span>
+                        <span className="text-sm text-gray-300">
+                          {new Date(stat.lastPractice).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Score evolution line chart */}
+                    <div className="mt-4 pt-4 border-t border-gray-700/50">
+                      <div className="text-xs text-gray-400 mb-2">Evolução das notas</div>
+                      <div className="relative h-52 bg-gray-800/30 rounded-lg p-4">
+                        <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet">
+                          {/* Grid lines */}
+                          <defs>
+                            <linearGradient id={`gradient-persona-${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor={stat.average >= 7 ? '#10b981' : stat.average >= 5 ? '#eab308' : '#ef4444'} stopOpacity="0.2" />
+                              <stop offset="100%" stopColor={stat.average >= 7 ? '#10b981' : stat.average >= 5 ? '#eab308' : '#ef4444'} stopOpacity="0.02" />
+                            </linearGradient>
+                          </defs>
+
+                          {/* Horizontal grid lines */}
+                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(value => {
+                            const y = 180 - (value / 10) * 160
+                            return (
+                              <g key={value}>
+                                <line
+                                  x1="35"
+                                  y1={y}
+                                  x2="380"
+                                  y2={y}
+                                  stroke={value % 5 === 0 ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)"}
+                                  strokeWidth={value % 5 === 0 ? "1" : "0.5"}
+                                />
+                                <text x="25" y={y + 4} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                                  {value}
+                                </text>
+                              </g>
+                            )
+                          })}
+
+                          {/* Area under the line */}
+                          {stat.scores.length > 0 && (
+                            <path
+                              d={
+                                stat.scores.map((score, idx) => {
+                                  const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                                  const x = 40 + (idx * xSpacing)
+                                  const y = 180 - (score / 10) * 160
+                                  return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`
+                                }).join(' ') +
+                                ` L ${stat.scores.length === 1 ? 40 : 380} 180 L 40 180 Z`
+                              }
+                              fill={`url(#gradient-persona-${i})`}
+                            />
+                          )}
+
+                          {/* Line path */}
+                          {stat.scores.length > 0 && (
+                            <path
+                              d={stat.scores.map((score, idx) => {
+                                const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                                const x = 40 + (idx * xSpacing)
+                                const y = 180 - (score / 10) * 160
+                                return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`
+                              }).join(' ')}
+                              fill="none"
+                              stroke={stat.average >= 7 ? '#10b981' : stat.average >= 5 ? '#eab308' : '#ef4444'}
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          )}
+
+                          {/* Points */}
+                          {stat.scores.map((score, idx) => {
+                            const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                            const x = 40 + (idx * xSpacing)
+                            const y = 180 - (score / 10) * 160
+                            const color = score >= 7 ? '#10b981' : score >= 5 ? '#eab308' : '#ef4444'
+                            return (
+                              <g key={idx}>
+                                <circle
+                                  cx={x}
+                                  cy={y}
+                                  r="5"
+                                  fill={color}
+                                  stroke="#1f2937"
+                                  strokeWidth="2"
+                                />
+                                <title>Sessão {idx + 1}: {score.toFixed(1)}/10</title>
+                              </g>
+                            )
+                          })}
+
+                          {/* X-axis labels for sessions */}
+                          {stat.scores.length <= 15 && stat.scores.map((_, idx) => {
+                            const xSpacing = stat.scores.length === 1 ? 0 : (340 / (stat.scores.length - 1))
+                            const x = 40 + (idx * xSpacing)
+                            return (
+                              <text key={idx} x={x} y={193} fill="rgba(255,255,255,0.3)" fontSize="10" textAnchor="middle">
+                                S{idx + 1}
+                              </text>
+                            )
+                          })}
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        {/* Tab Content - Por Objeção */}
+        {activeTab === 'objecoes' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {objectionStats.size === 0 ? (
+              <div className="col-span-full bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-12 border border-gray-500/30 text-center">
+                <MessageSquare className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg">Nenhuma objeção enfrentada ainda</p>
+                <p className="text-gray-500 text-sm mt-2">Complete sessões de roleplay para ver estatísticas por objeção</p>
+              </div>
+            ) : (
+              Array.from(objectionStats.values()).map((stat, i) => {
+                const scoreColor = stat.average >= 7 ? 'text-green-400' : stat.average >= 5 ? 'text-yellow-400' : 'text-red-400'
+                const borderColor = stat.average >= 7 ? 'border-green-500/30' : stat.average >= 5 ? 'border-yellow-500/30' : 'border-red-500/30'
+                const bgGradient = stat.average >= 7 ? 'from-green-600/10 to-green-400/5' : stat.average >= 5 ? 'from-yellow-600/10 to-yellow-400/5' : 'from-red-600/10 to-red-400/5'
+
+                return (
+                  <div key={i} className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border ${borderColor} ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1 pr-4">
+                        <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">
+                          {stat.name}
+                        </h3>
+                      </div>
+                      <div className={`bg-gradient-to-br ${bgGradient} rounded-xl px-3 py-1 text-center`}>
+                        <div className="text-xs text-gray-400">Média</div>
+                        <div className={`text-2xl font-bold ${scoreColor}`}>
+                          {stat.average.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <span className="text-sm text-gray-400">Vezes enfrentada</span>
+                        <div className="font-semibold text-white text-lg">{stat.count}</div>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-400">Melhor nota</span>
+                        <div className={`font-semibold text-lg ${stat.bestScore >= 7 ? 'text-green-400' : stat.bestScore >= 5 ? 'text-yellow-400' : 'text-red-400'}`}>
+                          {stat.bestScore.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar showing average */}
+                    <div className="mt-4 pt-4 border-t border-gray-700/50">
+                      <div className="text-xs text-gray-400 mb-2">Desempenho médio</div>
+                      <div className="h-2 bg-gray-700/50 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-1000 ${
+                            stat.average >= 7 ? 'bg-gradient-to-r from-green-500 to-green-400' :
+                            stat.average >= 5 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
+                            'bg-gradient-to-r from-red-500 to-red-400'
+                          }`}
+                          style={{ width: `${(stat.average / 10) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
 
         {/* Modal de Resumo Geral */}
         {showSummary && summaryData && (
@@ -736,6 +1270,566 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
             </div>
           </div>
         )}
+
+        {/* Tab Content - Follow-ups */}
+        {activeTab === 'followups' && (
+          <div className="space-y-6">
+            {/* Estatísticas de Follow-ups */}
+            {followUpStats && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-green-500/30">
+                  <div className="flex items-center gap-3">
+                    <FileSearch className="w-8 h-8 text-green-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Total Análises</p>
+                      <p className="text-2xl font-bold text-white">{followUpStats.totalAnalises}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-purple-500/30">
+                  <div className="flex items-center gap-3">
+                    <Award className="w-8 h-8 text-purple-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Média Geral</p>
+                      <p className="text-2xl font-bold text-white">{followUpStats.mediaNota.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-blue-500/30">
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="w-8 h-8 text-blue-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Melhor Nota</p>
+                      <p className="text-2xl font-bold text-green-400">{followUpStats.melhorNota.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-4 border border-orange-500/30">
+                  <div className="flex items-center gap-3">
+                    <Target className="w-8 h-8 text-orange-400" />
+                    <div>
+                      <p className="text-xs text-gray-400">Nota Mais Baixa</p>
+                      <p className="text-2xl font-bold text-orange-400">{followUpStats.piorNota.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de Análises de Follow-up */}
+            <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                <History className="w-6 h-6 text-green-400" />
+                Histórico de Análises de Follow-up
+              </h2>
+
+              {loadingFollowUps ? (
+                <div className="text-center text-gray-400 py-12">
+                  Carregando análises...
+                </div>
+              ) : followUpAnalyses.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileSearch className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400 text-lg">Nenhuma análise de follow-up ainda</p>
+                  <p className="text-gray-500 text-sm mt-2">Faça sua primeira análise para ver o histórico aqui</p>
+                  <button
+                    onClick={() => onViewChange?.('followup')}
+                    className="mt-4 px-6 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-xl font-medium hover:from-green-700 hover:to-lime-600 transition-all"
+                  >
+                    Analisar Follow-up
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {followUpAnalyses.map((analysis, index) => (
+                    <div
+                      key={analysis.id}
+                      className="group bg-gray-900/50 rounded-2xl p-5 border-2 border-green-400/40 hover:border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:shadow-[0_0_25px_rgba(74,222,128,0.25)] transition-all duration-300"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        {/* Left: Score and Basic Info */}
+                        <div className="flex items-center gap-4">
+                          {/* Larger Score with gradient background */}
+                          <div className={`flex items-center justify-center w-20 h-20 rounded-xl shadow-lg ${
+                            analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-500/30 to-emerald-500/30 border border-green-400/30' :
+                            analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-500/30 to-amber-500/30 border border-yellow-400/30' :
+                            analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/30 border border-orange-400/30' :
+                            'bg-gradient-to-br from-red-500/30 to-rose-500/30 border border-red-400/30'
+                          }`}>
+                            <span className={`text-3xl font-bold ${
+                              analysis.nota_final >= 8 ? 'text-green-400' :
+                              analysis.nota_final >= 6 ? 'text-yellow-400' :
+                              analysis.nota_final >= 4 ? 'text-orange-400' :
+                              'text-red-400'
+                            }`}>
+                              {analysis.nota_final.toFixed(1)}
+                            </span>
+                          </div>
+
+                          {/* Basic Info */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-xs font-medium uppercase ${
+                                analysis.classificacao === 'excelente' ? 'text-purple-400' :
+                                analysis.classificacao === 'bom' ? 'text-green-400' :
+                                analysis.classificacao === 'medio' ? 'text-yellow-400' :
+                                analysis.classificacao === 'ruim' ? 'text-orange-400' :
+                                'text-red-400'
+                              }`}>
+                                {analysis.classificacao}
+                              </span>
+                              <span className="text-gray-500">•</span>
+                              <span className="text-xs text-gray-400">
+                                {analysis.tipo_venda} • {analysis.canal}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 line-clamp-1">
+                              {analysis.contexto}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Right: Date and Time */}
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">
+                            {new Date(analysis.created_at).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short'
+                            })}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {new Date(analysis.created_at).toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Larger Score Indicators with background */}
+                      <div className="flex gap-3 items-center text-sm bg-gray-800/30 rounded-lg p-2 mt-3">
+                        <span className="text-gray-400 font-medium">Critérios:</span>
+                        {Object.entries(analysis.avaliacao.notas).map(([key, value]: [string, any]) => {
+                          const shortLabels: Record<string, string> = {
+                            'valor_agregado': 'VALOR',
+                            'personalizacao': 'PERSON',
+                            'tom_consultivo': 'TOM',
+                            'objetividade': 'OBJETIV',
+                            'cta': 'CTA',
+                            'timing': 'TIMING'
+                          }
+
+                          return (
+                            <div key={key} className="flex items-center gap-1.5">
+                              <span className="text-gray-500 text-xs">{shortLabels[key]}:</span>
+                              <span className={`font-bold text-base ${
+                                value.nota >= 7 ? 'text-green-400' :
+                                value.nota >= 5 ? 'text-yellow-400' :
+                                'text-orange-400'
+                              }`}>
+                                {value.nota.toFixed(0)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Clean Button */}
+                      <button
+                        onClick={() => setSelectedFollowUpAnalysis(analysis)}
+                        className="mt-3 w-full py-2 bg-gray-800/30 hover:bg-gray-700/40 text-gray-400 hover:text-white rounded-lg text-sm font-medium transition-all border border-gray-700/50 hover:border-green-500/30 flex items-center justify-center gap-2"
+                      >
+                        <FileSearch className="w-4 h-4" />
+                        Ver Análise Completa
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Análise Completa do Follow-up - Design EXATO do FollowUpView */}
+        {selectedFollowUpAnalysis && (
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center pt-20 pb-4 px-4">
+            <div className="relative w-full max-w-5xl max-h-[calc(100vh-120px)] bg-gradient-to-br from-gray-900 to-gray-950 rounded-3xl shadow-2xl overflow-hidden">
+              {/* Close Button */}
+              <button
+                onClick={() => setSelectedFollowUpAnalysis(null)}
+                className="absolute top-6 right-6 z-10 p-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400 hover:text-white" />
+              </button>
+
+              {/* Content with EXACT design from FollowUpView - Scrollable */}
+              <div className="p-8 space-y-8 overflow-y-auto max-h-[calc(100vh-160px)]">
+                  {/* Overall Score Card - Same as FollowUpView */}
+                  <div className={`relative overflow-hidden rounded-2xl p-6 border ${
+                    selectedFollowUpAnalysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-500/30' :
+                    selectedFollowUpAnalysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-900/20 to-amber-900/20 border-yellow-500/30' :
+                    selectedFollowUpAnalysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-900/20 to-red-900/20 border-orange-500/30' :
+                    'bg-gradient-to-br from-red-900/20 to-red-950/20 border-red-500/30'
+                  }`}>
+                    <div className="relative">
+                      <div>
+                        <p className={`text-xs font-medium mb-2 uppercase tracking-wider ${
+                          selectedFollowUpAnalysis.nota_final >= 8 ? 'text-green-400/70' :
+                          selectedFollowUpAnalysis.nota_final >= 6 ? 'text-yellow-400/70' :
+                          selectedFollowUpAnalysis.nota_final >= 4 ? 'text-orange-400/70' :
+                          'text-red-400/70'
+                        }`}>Nota Final</p>
+                        <div className="flex items-baseline gap-3">
+                          <p className={`text-5xl font-bold ${
+                            selectedFollowUpAnalysis.nota_final >= 8 ? 'text-green-400' :
+                            selectedFollowUpAnalysis.nota_final >= 6 ? 'text-yellow-400' :
+                            selectedFollowUpAnalysis.nota_final >= 4 ? 'text-orange-400' :
+                            'text-red-400'
+                          }`}>{selectedFollowUpAnalysis.nota_final.toFixed(1)}</p>
+                          <div>
+                            <span className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                              selectedFollowUpAnalysis.nota_final >= 8 ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                              selectedFollowUpAnalysis.nota_final >= 6 ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                              selectedFollowUpAnalysis.nota_final >= 4 ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' :
+                              'bg-red-500/10 text-red-400 border border-red-500/20'
+                            }`}>
+                              {selectedFollowUpAnalysis.classificacao.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detailed Scores - Green Theme like FollowUpView */}
+                  <div className="group relative bg-gradient-to-br from-green-900/30 to-emerald-900/30 backdrop-blur-sm rounded-3xl p-8 border border-green-500/40 hover:border-green-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(34,197,94,0.2)] overflow-hidden">
+                    {/* Animated background gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                    {/* Animated dots pattern */}
+                    <div className="absolute inset-0 opacity-5">
+                      <div className="absolute top-10 left-10 w-3 h-3 bg-green-400 rounded-full animate-ping"></div>
+                      <div className="absolute bottom-10 right-10 w-3 h-3 bg-emerald-400 rounded-full animate-ping" style={{ animationDelay: '200ms' }}></div>
+                      <div className="absolute top-20 right-20 w-3 h-3 bg-green-400 rounded-full animate-ping" style={{ animationDelay: '400ms' }}></div>
+                    </div>
+
+                    <div className="relative">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="relative">
+                          <div className="absolute inset-0 bg-green-500/30 blur-xl animate-pulse"></div>
+                          <div className="relative w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/50">
+                            <BarChart3 className="w-6 h-6 text-white" />
+                          </div>
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400">
+                            Análise Detalhada
+                          </h3>
+                          <p className="text-xs text-gray-400 mt-0.5">Avaliação critério por critério</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4">
+                        {Object.entries(selectedFollowUpAnalysis.avaliacao.notas).map(([key, value]: [string, any], index) => {
+                          const fieldLabels: Record<string, string> = {
+                            'valor_agregado': 'Agregação de Valor',
+                            'personalizacao': 'Personalização',
+                            'tom_consultivo': 'Tom Consultivo',
+                            'objetividade': 'Objetividade',
+                            'cta': 'Call to Action (CTA)',
+                            'timing': 'Timing'
+                          }
+
+                          const getColorScheme = (nota: number) => {
+                            if (nota >= 8) return {
+                              bg: 'from-green-900/40 to-emerald-900/40',
+                              border: 'border-green-500/30 hover:border-green-400/50',
+                              text: 'text-green-400',
+                              bar: 'from-green-400 to-emerald-500',
+                              glow: 'shadow-green-500/20'
+                            }
+                            if (nota >= 6) return {
+                              bg: 'from-yellow-900/40 to-amber-900/40',
+                              border: 'border-yellow-500/30 hover:border-yellow-400/50',
+                              text: 'text-yellow-400',
+                              bar: 'from-yellow-400 to-amber-500',
+                              glow: 'shadow-yellow-500/20'
+                            }
+                            if (nota >= 4) return {
+                              bg: 'from-orange-900/40 to-amber-900/40',
+                              border: 'border-orange-500/30 hover:border-orange-400/50',
+                              text: 'text-orange-400',
+                              bar: 'from-orange-400 to-amber-500',
+                              glow: 'shadow-orange-500/20'
+                            }
+                            return {
+                              bg: 'from-red-900/40 to-rose-900/40',
+                              border: 'border-red-500/30 hover:border-red-400/50',
+                              text: 'text-red-400',
+                              bar: 'from-red-400 to-rose-500',
+                              glow: 'shadow-red-500/20'
+                            }
+                          }
+
+                          const colors = getColorScheme(value.nota)
+
+                          return (
+                            <div
+                              key={key}
+                              className={`group/item relative bg-gradient-to-br ${colors.bg} rounded-2xl p-5 border ${colors.border} transition-all duration-300 hover:shadow-lg hover:scale-[1.01]`}
+                              style={{ animationDelay: `${index * 100}ms` }}
+                            >
+                              {/* Shine effect on hover */}
+                              <div className="absolute inset-0 opacity-0 group-hover/item:opacity-100 transition-opacity duration-500 rounded-2xl overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/item:translate-x-full transition-transform duration-1000" />
+                              </div>
+
+                              <div className="relative">
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex items-start gap-3">
+                                    <div>
+                                      <span className="font-semibold text-white text-lg">
+                                        {fieldLabels[key] || key.replace(/_/g, ' ')}
+                                      </span>
+                                      <span className="ml-2 text-xs text-gray-400 bg-gray-800/50 px-2 py-1 rounded-full">
+                                        {value.peso}% do peso
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className={`text-3xl font-black ${colors.text}`}>
+                                      {value.nota.toFixed(1)}
+                                    </span>
+                                    <p className={`text-xs mt-1 ${colors.text} opacity-70`}>
+                                      {value.nota >= 8 ? 'Excelente' :
+                                       value.nota >= 6 ? 'Bom' :
+                                       value.nota >= 4 ? 'Regular' : 'Precisa Melhorar'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="bg-gray-900/40 backdrop-blur-sm rounded-lg p-3 border border-gray-700/50 mb-3">
+                                  <p className="text-sm text-gray-200 leading-relaxed">{value.comentario}</p>
+                                </div>
+
+                                {/* Enhanced Progress bar */}
+                                <div className="relative">
+                                  <div className="bg-gray-900/60 h-3 rounded-full overflow-hidden backdrop-blur-sm">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden bg-gradient-to-r ${colors.bar}`}
+                                      style={{
+                                        width: `${value.nota * 10}%`,
+                                        animation: 'slideIn 1s ease-out'
+                                      }}
+                                    >
+                                      <div className="absolute inset-0 bg-white/30 animate-pulse" />
+                                    </div>
+                                  </div>
+                                  {/* Floating percentage */}
+                                  <div
+                                    className="absolute -top-8 transition-all duration-1000 ease-out"
+                                    style={{ left: `calc(${value.nota * 10}% - 20px)` }}
+                                  >
+                                    <div className={`${colors.text} text-xs px-2 py-1 rounded-lg font-bold bg-gray-900/80 border ${colors.border} backdrop-blur-sm`}>
+                                      {(value.nota * 10).toFixed(0)}%
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Positive Points - Modern Design */}
+                  {selectedFollowUpAnalysis.avaliacao.pontos_positivos?.length > 0 && (
+                    <div className="group relative bg-gradient-to-br from-green-900/30 to-emerald-900/30 backdrop-blur-sm rounded-3xl p-8 border border-green-500/40 hover:border-green-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(34,197,94,0.2)] overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                      <div className="relative">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-green-500/30 blur-xl animate-pulse"></div>
+                            <div className="relative w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/50">
+                              <CheckCircle className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400">
+                              Pontos Positivos
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-0.5">Você acertou nestes aspectos</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          {selectedFollowUpAnalysis.avaliacao.pontos_positivos.map((ponto: string, idx: number) => (
+                            <div key={idx} className="group/item flex items-start gap-3 p-3 rounded-xl hover:bg-green-500/10 transition-all duration-300">
+                              <div className="mt-1 w-6 h-6 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-lg flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                <span className="text-green-400 text-sm">✓</span>
+                              </div>
+                              <span className="text-gray-200 flex-1 leading-relaxed">{ponto}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Points to Improve - Modern Design */}
+                  {selectedFollowUpAnalysis.avaliacao.pontos_melhorar?.length > 0 && (
+                    <div className="group relative bg-gradient-to-br from-orange-900/30 to-amber-900/30 backdrop-blur-sm rounded-3xl p-8 border border-orange-500/40 hover:border-orange-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(251,146,60,0.2)] overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                      <div className="relative">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-orange-500/30 blur-xl animate-pulse"></div>
+                            <div className="relative w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/50">
+                              <AlertCircle className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">
+                              Pontos para Melhorar
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-0.5">Oportunidades de desenvolvimento</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          {selectedFollowUpAnalysis.avaliacao.pontos_melhorar.map((item: any, idx: number) => (
+                            <div key={idx} className="group/item bg-gradient-to-br from-gray-900/60 to-gray-800/60 rounded-2xl p-5 border border-gray-700 hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10 hover:scale-[1.02]">
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="w-8 h-8 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-lg flex items-center justify-center">
+                                  <span className="text-lg">⚠️</span>
+                                </div>
+                                <p className="font-semibold text-orange-300 flex-1">
+                                  {item.problema}
+                                </p>
+                              </div>
+                              <div className="flex items-start gap-3 ml-11">
+                                <div className="w-6 h-6 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-md flex items-center justify-center mt-0.5">
+                                  <span className="text-xs">💡</span>
+                                </div>
+                                <div>
+                                  <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Solução:</span>
+                                  <p className="text-sm text-gray-200 mt-1 leading-relaxed">{item.como_resolver}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Main Tip - Modern Design */}
+                  {selectedFollowUpAnalysis.avaliacao.dica_principal && (
+                    <div className="group relative bg-gradient-to-br from-purple-900/30 to-pink-900/30 backdrop-blur-sm rounded-3xl p-8 border border-purple-500/40 hover:border-purple-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-hidden">
+                      <div className="absolute inset-0">
+                        <div className="absolute top-10 left-10 w-2 h-2 bg-purple-400 rounded-full animate-ping"></div>
+                        <div className="absolute bottom-10 right-10 w-2 h-2 bg-pink-400 rounded-full animate-ping" style={{ animationDelay: '200ms' }}></div>
+                        <div className="absolute top-20 right-20 w-2 h-2 bg-purple-400 rounded-full animate-ping" style={{ animationDelay: '400ms' }}></div>
+                      </div>
+
+                      <div className="relative">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-purple-500/30 blur-xl animate-pulse"></div>
+                            <div className="relative w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/50 animate-bounce">
+                              <Sparkles className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                              Dica Principal
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-0.5">Foque neste insight para melhorar rapidamente</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-6 border border-purple-500/20">
+                          <p className="text-gray-100 leading-relaxed text-lg">{selectedFollowUpAnalysis.avaliacao.dica_principal}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Improved Version - Modern Design */}
+                  {selectedFollowUpAnalysis.avaliacao.versao_reescrita && (
+                    <div className="group relative bg-gradient-to-br from-blue-900/30 to-cyan-900/30 backdrop-blur-sm rounded-3xl p-8 border border-blue-500/40 hover:border-blue-400/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(59,130,246,0.2)] overflow-hidden">
+                      <div className="absolute inset-0 opacity-10">
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 bg-[size:20px_20px] bg-repeat"
+                             style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)' }}></div>
+                      </div>
+
+                      <div className="relative">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-blue-500/30 blur-xl animate-pulse"></div>
+                            <div className="relative w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50">
+                              <FileText className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+                              Versão Melhorada
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-0.5">Exemplo otimizado do seu follow-up</p>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <div className="absolute -top-2 -left-2 text-6xl text-blue-500/20 font-serif">"</div>
+                          <div className="absolute -bottom-2 -right-2 text-6xl text-blue-500/20 font-serif rotate-180">"</div>
+                          <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 rounded-2xl p-6 border border-blue-500/20 backdrop-blur-sm">
+                            <pre className="whitespace-pre-wrap text-gray-100 leading-relaxed font-sans">
+                              {selectedFollowUpAnalysis.avaliacao.versao_reescrita}
+                            </pre>
+                          </div>
+                          <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span>Copie e adapte ao seu estilo</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons - Same as FollowUpView */}
+                  <div className="flex gap-4 mt-8">
+                    <button
+                      onClick={() => onViewChange?.('followup')}
+                      className="group flex-1 relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl py-4 px-8 font-bold hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-[1.02] shadow-xl shadow-green-500/30"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-400/30 to-emerald-400/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <span className="relative flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Fazer Nova Análise
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedFollowUpAnalysis(null)}
+                      className="group px-8 py-4 relative bg-gradient-to-br from-gray-800/60 to-gray-900/60 backdrop-blur-sm text-gray-300 rounded-2xl font-bold hover:from-gray-700/60 hover:to-gray-800/60 hover:text-white transition-all border border-gray-700 hover:border-gray-600 hover:shadow-lg"
+                    >
+                      <span className="relative flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Fechar
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
       </div>
     </div>
   )

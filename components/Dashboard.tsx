@@ -2,16 +2,29 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import ChatInterface, { ChatInterfaceHandle } from './ChatInterface'
 import ConfigHub from './ConfigHub'
 import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
-import RoleplayLinksView from './RoleplayLinksView'
 import SalesDashboard from './SalesDashboard'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap } from 'lucide-react'
+import FollowUpView from './FollowUpView'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, FileSearch, Lock } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { PlanType } from '@/lib/types/plans'
+
+// Lazy load RoleplayLinksView to prevent it from executing on public pages
+const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+    </div>
+  )
+})
 
 interface DashboardProps {
   onLogout: () => void
@@ -21,12 +34,26 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const chatRef = useRef<ChatInterfaceHandle>(null)
+
+  // Hook para verificar limites do plano
+  const {
+    trainingPlan,
+    planUsage,
+    checkChatIAAccess,
+    checkPDIAccess,
+    checkFollowUpAccess
+  } = usePlanLimits()
+
+  // Estados para controlar acesso às features
+  const [hasChatIA, setHasChatIA] = useState(true)
+  const [hasPDI, setHasPDI] = useState(true)
+  const [hasFollowUp, setHasFollowUp] = useState(true)
 
   // Sempre usar tema Ramppy (verde espacial) para TODAS as empresas
   const isRamppy = true
@@ -39,7 +66,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const view = params.get('view')
-      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links'].includes(view)) {
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links', 'followup'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
 
@@ -50,6 +77,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       }
     }
   }, [])
+
+  // Verificar acesso às features baseado no plano
+  useEffect(() => {
+    const checkFeatureAccess = async () => {
+      if (checkChatIAAccess && checkPDIAccess && checkFollowUpAccess) {
+        const chatIA = await checkChatIAAccess()
+        const pdi = await checkPDIAccess()
+        const followUp = await checkFollowUpAccess()
+
+        setHasChatIA(chatIA)
+        setHasPDI(pdi)
+        setHasFollowUp(followUp)
+      }
+    }
+    checkFeatureAccess()
+  }, [checkChatIAAccess, checkPDIAccess, checkFollowUpAccess])
 
   // Check if user is admin/gestor
   const checkUserRole = async () => {
@@ -93,6 +136,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   const renderContent = () => {
     if (currentView === 'chat') {
+      if (!hasChatIA) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 max-w-md">
+              <Lock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white text-center mb-2">Chat IA Bloqueado</h2>
+              <p className="text-gray-400 text-center mb-4">
+                O Chat IA não está disponível no plano {trainingPlan?.toUpperCase()}.
+              </p>
+              <p className="text-sm text-yellow-400 text-center">
+                Faça upgrade para o plano MAX ou OG para acessar esta funcionalidade.
+              </p>
+            </div>
+          </div>
+        )
+      }
       return <ChatInterface ref={chatRef} />
     }
 
@@ -101,6 +160,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'pdi') {
+      if (!hasPDI) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 max-w-md">
+              <Lock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white text-center mb-2">PDI Bloqueado</h2>
+              <p className="text-gray-400 text-center mb-4">
+                O Plano de Desenvolvimento Individual não está disponível no plano {trainingPlan?.toUpperCase()}.
+              </p>
+              <p className="text-sm text-yellow-400 text-center">
+                Faça upgrade para o plano MAX ou OG para acessar esta funcionalidade.
+              </p>
+            </div>
+          </div>
+        )
+      }
       return <PDIView />
     }
 
@@ -116,10 +191,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       return <RoleplayLinksView />
     }
 
+    if (currentView === 'followup') {
+      return <FollowUpView />
+    }
+
     // Home view
     return (
       <div className="py-12 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1600px] mx-auto">
           {/* Welcome Section */}
           <div className="mb-12 text-center">
             <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
@@ -146,11 +225,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Grid Container com ajuste para centralizar últimos elementos */}
+          <div className="flex flex-wrap justify-center gap-6">
             {/* Roleplay Card */}
             <button
               onClick={() => handleViewChange('roleplay')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -178,7 +258,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Meu Perfil Card */}
             <button
               onClick={() => handleViewChange('perfil')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '200ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -206,7 +286,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Histórico Card */}
             <button
               onClick={() => handleViewChange('historico')}
-              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '300ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -231,9 +311,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </button>
 
-            {/* PDI Card - Desabilitado */}
-            <div
-              className={`text-left ${mounted ? 'animate-slide-up' : 'opacity-0'} opacity-60 cursor-not-allowed`}
+            {/* PDI Card - Desabilitado (temporariamente oculto) */}
+            {/* <div
+              className={`text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'} opacity-60 cursor-not-allowed`}
               style={{ animationDelay: '400ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/40 to-gray-800/40 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20 h-full">
@@ -258,14 +338,47 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   <span>Disponível em breve</span>
                 </div>
               </div>
-            </div>
+            </div> */}
+
+            {/* Follow-up Analysis Card (temporariamente oculto) */}
+            {/* <button
+              onClick={() => handleViewChange('followup')}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '500ms' }}
+            >
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
+                <div className="absolute top-3 right-3">
+                  <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-[10px] font-semibold rounded-full border border-purple-500/30">
+                    Novo
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30">
+                    <FileSearch className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Análise de Follow-up</h3>
+                    <span className="text-xs text-purple-400">WhatsApp</span>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  Envie prints do WhatsApp e receba análise detalhada do seu follow-up.
+                </p>
+                <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-purple-300 transition-colors">
+                  <span>Analisar follow-up</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button> */}
 
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
                 onClick={() => handleViewChange('roleplay-links')}
-                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '500ms' }}
+                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                style={{ animationDelay: '600ms' }}
               >
                 <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
                   <div className="absolute top-3 right-3">
@@ -299,7 +412,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {userRole?.toLowerCase() === 'admin' && (
               <button
                 onClick={() => setShowSalesDashboard(true)}
-                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '600ms' }}
               >
                 <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
@@ -346,7 +459,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Header Navigation */}
       <header className="fixed top-0 w-full bg-black/70 backdrop-blur-xl z-50">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-center h-20">
+        <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center h-20">
           <div className="w-full flex items-center justify-between">
             {/* Logo */}
             <div className="cursor-pointer" onClick={() => handleViewChange('home')}>

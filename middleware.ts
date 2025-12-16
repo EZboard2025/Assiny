@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
+  // SISTEMA UNIFICADO: Verificar se está ativado
+  const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
+
+  if (USE_UNIFIED_SYSTEM) {
+    // Sistema unificado - não faz nada com subdomínios
+    // Todo o controle de empresa é feito pelo company_id do usuário logado
+    return NextResponse.next()
+  }
+
+  // SISTEMA LEGADO: Código original para compatibilidade
   const hostname = request.headers.get('host') || ''
 
   // Detectar ambiente
@@ -22,9 +32,6 @@ export function middleware(request: NextRequest) {
       subdomain = parts[0]
     }
   }
-
-  // Remover redirecionamento para página de seleção de empresas
-  // A página /select-company não será mais usada
 
   // Se tem subdomínio, adicionar header para usar no app
   if (subdomain && subdomain !== 'www' && subdomain !== 'ramppy') {

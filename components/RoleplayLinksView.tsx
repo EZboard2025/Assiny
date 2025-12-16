@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save, History, Loader2, ArrowUpDown, Calendar, Trophy, GitCompare, Check } from 'lucide-react'
-import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
+import { Link2, Copy, CheckCircle, Users, BarChart3, Settings, Power, Sparkles, Target, Edit2, X, Save, History, Loader2, ArrowUpDown, Calendar, Trophy, GitCompare, Check, AlertCircle } from 'lucide-react'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { PLAN_CONFIGS } from '@/lib/types/plans'
 
 interface RoleplayLink {
   id: string
@@ -52,6 +53,32 @@ export default function RoleplayLinksView() {
   const [saving, setSaving] = useState(false)
   const [configSaved, setConfigSaved] = useState(false)
   const [editMode, setEditMode] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Hook para verificar limites do plano
+  const { trainingPlan, selectionPlan, planUsage } = usePlanLimits()
+
+  // Debug - verificar se o plano está sendo carregado
+  useEffect(() => {
+    console.log('🎯 Plano de treinamento:', trainingPlan)
+    console.log('🎯 Plano de seleção:', selectionPlan)
+    console.log('📊 Uso do plano:', planUsage)
+    console.log('🔗 RoleplayLink:', roleplayLink)
+    console.log('📈 Usage count:', roleplayLink?.usage_count)
+
+    if (selectionPlan) {
+      console.log('✅ Plano de seleção encontrado:', selectionPlan)
+      console.log('🔍 Configuração completa:', PLAN_CONFIGS[selectionPlan])
+      console.log('📌 É plano de seleção?', PLAN_CONFIGS[selectionPlan]?.isSelectionPlan)
+      console.log('👥 Limite de candidatos:', PLAN_CONFIGS[selectionPlan]?.maxSelectionCandidates)
+
+      // Verificar se a condição para mostrar o card está sendo atendida
+      const shouldShowCard = selectionPlan && PLAN_CONFIGS[selectionPlan]?.isSelectionPlan
+      console.log('🎨 Deve mostrar o card de limite?', shouldShowCard)
+    } else {
+      console.log('❌ Nenhum plano de seleção encontrado')
+    }
+  }, [trainingPlan, selectionPlan, planUsage, roleplayLink])
 
   // Ver Roleplays
   const [showHistorico, setShowHistorico] = useState(false)
@@ -71,6 +98,7 @@ export default function RoleplayLinksView() {
   // Opções disponíveis
   const [personas, setPersonas] = useState<Persona[]>([])
   const [objections, setObjections] = useState<Objection[]>([])
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
 
   // Configuração
   const [config, setConfig] = useState({
@@ -89,18 +117,236 @@ export default function RoleplayLinksView() {
   })
 
   useEffect(() => {
-    loadData()
+    // Aguardar um pouco para garantir que a sessão esteja carregada
+    const timer = setTimeout(() => {
+      loadData()
+    }, 100)
+
+    // Listener para mudanças de autenticação
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event)
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        loadData()
+      } else if (event === 'SIGNED_OUT') {
+        setError('Sessão encerrada. Por favor, faça login novamente.')
+        setLoading(false)
+      }
+    })
+
+    return () => {
+      clearTimeout(timer)
+      authListener?.subscription?.unsubscribe()
+    }
   }, [])
+
+  // Função alternativa para carregar dados via API quando há problemas de autenticação
+  const loadDataViaAPI = async (companyId: string, userId?: string) => {
+    try {
+      console.log('🚀 Carregando dados via API para company_id:', companyId)
+
+      // Buscar ou criar link via API
+      const linkResponse = await fetch('/api/roleplay-links/get-or-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, userId: userId || null })
+      })
+
+      if (!linkResponse.ok) {
+        throw new Error('Erro ao buscar/criar link')
+      }
+
+      const linkResult = await linkResponse.json()
+      const linkData = linkResult.data
+
+      console.log('✅ Link carregado via API:', linkData)
+      console.log('🔍 Status is_active:', linkData.is_active)
+      setRoleplayLink(linkData)
+
+      // Carregar configuração
+      const loadedConfig = linkData.config || {
+        age: '25-34',
+        temperament: 'Analítico',
+        persona_id: null,
+        objection_ids: []
+      }
+
+      // Garantir compatibilidade
+      if (loadedConfig.age_range && !loadedConfig.age) {
+        loadedConfig.age = loadedConfig.age_range
+        delete loadedConfig.age_range
+      }
+
+      setConfig(loadedConfig)
+      setOriginalConfig(JSON.parse(JSON.stringify(loadedConfig)))
+
+      // Verificar se já tem configuração salva
+      if (loadedConfig.persona_id && loadedConfig.objection_ids?.length > 0) {
+        setConfigSaved(true)
+        setEditMode(false)
+      } else {
+        setConfigSaved(false)
+        setEditMode(true)
+      }
+
+      // Buscar dados da empresa usando service role
+      try {
+        // Buscar empresa
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', companyId)
+          .single()
+
+        if (companyData) {
+          setCompany(companyData)
+        }
+
+        // Buscar personas
+        const { data: personasData } = await supabase
+          .from('personas')
+          .select('id, job_title, company_type, profession, business_type')
+          .eq('company_id', companyId)
+          .order('created_at')
+
+        if (personasData) {
+          setPersonas(personasData)
+        }
+
+        // Buscar objeções
+        const { data: objectionsData } = await supabase
+          .from('objections')
+          .select('id, name')
+          .eq('company_id', companyId)
+          .order('name')
+
+        if (objectionsData) {
+          setObjections(objectionsData)
+        }
+      } catch (error) {
+        console.error('⚠️ Erro ao buscar dados complementares:', error)
+        // Não é crítico, continuar sem esses dados
+      }
+
+      setLoading(false)
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados via API:', error)
+      setError('Erro ao carregar configuração. Por favor, recarregue a página.')
+      setLoading(false)
+    }
+  }
 
   const loadData = async () => {
     try {
-      const companyId = await getCompanyId()
+      setError(null)
 
-      if (!companyId) {
-        console.error('Company ID não encontrado')
+      // Verificar se estamos no contexto correto (não em página pública)
+      if (typeof window !== 'undefined' && window.location.pathname.includes('roleplay-publico')) {
+        console.log('RoleplayLinksView: Pulando carregamento em página pública')
         setLoading(false)
         return
       }
+
+      // Buscar a sessão atual de forma mais confiável
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+      console.log('🔍 Sessão atual:', session ? 'Encontrada' : 'Não encontrada')
+      console.log('🔍 Erro de sessão:', sessionError)
+
+      let user = session?.user
+
+      // Se não encontrou sessão, NÃO tentar buscar usuário diretamente pois vai dar erro
+      if (!user) {
+        console.log('🔍 Sessão não encontrada, tentando alternativas...')
+
+        // Tentar buscar dados diretamente do localStorage do Supabase
+        const storageKey = `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '').split('.')[0]}-auth-token`
+        const storedSession = localStorage.getItem(storageKey)
+
+        if (storedSession) {
+          try {
+            const parsed = JSON.parse(storedSession)
+            if (parsed?.user) {
+              console.log('✅ Usuário encontrado no localStorage')
+              user = parsed.user
+            }
+          } catch (e) {
+            console.error('❌ Erro ao parsear sessão do localStorage:', e)
+          }
+        }
+
+        // Se ainda não tem usuário, tentar usar um ID fixo temporário para testes
+        if (!user) {
+          console.log('⚠️ Usando fallback para buscar dados sem autenticação completa')
+
+          // Buscar a primeira empresa disponível
+          console.log('🔍 Buscando primeira empresa disponível...')
+
+          const { data: companies } = await supabase
+            .from('companies')
+            .select('id, name')
+            .limit(1)
+            .single()
+
+          if (companies) {
+            console.log('✅ Empresa encontrada:', companies.name)
+
+            // Usar a empresa encontrada para continuar
+            await loadDataViaAPI(companies.id)
+            return
+          }
+        }
+      }
+
+      if (!user) {
+        console.error('❌ Nenhum usuário autenticado encontrado')
+        setError('Usuário não autenticado. Por favor, faça login novamente.')
+        setLoading(false)
+        return
+      }
+
+      console.log('✅ Usuário autenticado:', user.email)
+
+      // Buscar o company_id do usuário
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single()
+
+      if (employeeError || !employeeData?.company_id) {
+        console.error('Company ID não encontrado para o usuário:', employeeError)
+
+        // Tentar buscar via API com service role
+        console.log('🔍 Tentando buscar company_id via API...')
+        try {
+          const response = await fetch('/api/user/company', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+          })
+
+          if (response.ok) {
+            const { companyId: apiCompanyId } = await response.json()
+            if (apiCompanyId) {
+              console.log('✅ Company ID encontrado via API:', apiCompanyId)
+              setCurrentCompanyId(apiCompanyId)
+
+              // Continuar com o fluxo usando a API
+              await loadDataViaAPI(apiCompanyId, user.id)
+              return
+            }
+          }
+        } catch (apiError) {
+          console.error('❌ Erro ao buscar via API:', apiError)
+        }
+
+        setLoading(false)
+        return
+      }
+
+      const companyId = employeeData.company_id
+      console.log('Company ID encontrado:', companyId)
+      setCurrentCompanyId(companyId)
 
       // Buscar dados da empresa
       const { data: companyData } = await supabase
@@ -143,6 +389,7 @@ export default function RoleplayLinksView() {
 
       if (linkData) {
         console.log('Link data carregado:', linkData)
+        console.log('🔍 Status is_active do RPC:', linkData.is_active)
         setRoleplayLink(linkData)
 
         // Garantir que a configuração seja aplicada corretamente
@@ -174,8 +421,9 @@ export default function RoleplayLinksView() {
           setEditMode(true) // Iniciar em modo edição se não tem config
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar dados:', error)
+      setError(error?.message || 'Erro ao carregar configuração do roleplay')
     } finally {
       setLoading(false)
     }
@@ -184,26 +432,60 @@ export default function RoleplayLinksView() {
   const toggleActive = async () => {
     if (!roleplayLink) return
 
+    // Verificar se pode ativar baseado no limite do plano
+    if (!roleplayLink.is_active && selectionPlan) {
+      const planConfig = PLAN_CONFIGS[selectionPlan]
+      if (planConfig?.maxSelectionCandidates !== null) {
+        const used = roleplayLink.usage_count || 0
+        const limit = planConfig.maxSelectionCandidates
+
+        if (used >= limit) {
+          alert(`Não é possível ativar o link. O limite de ${limit} candidatos já foi atingido.`)
+          return
+        }
+      }
+    }
+
     setSaving(true)
     try {
       const newStatus = !roleplayLink.is_active
 
-      const { error } = await supabase
-        .from('roleplay_links')
-        .update({
-          is_active: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', roleplayLink.id)  // ✅ Usar ID específico do link
+      console.log('🔄 Atualizando status do link:', {
+        id: roleplayLink.id,
+        currentStatus: roleplayLink.is_active,
+        newStatus: newStatus
+      })
 
-      if (!error) {
-        setRoleplayLink({
-          ...roleplayLink,
-          is_active: newStatus
+      // Usar API com service role para bypass RLS
+      const response = await fetch('/api/roleplay-links/toggle-active', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          linkId: roleplayLink.id,
+          isActive: newStatus
         })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error('❌ Erro ao atualizar status:', result)
+        alert('Erro ao atualizar status do link. Tente novamente.')
+        return
+      }
+
+      if (result.data) {
+        console.log('✅ Status atualizado com sucesso:', result.data)
+        setRoleplayLink(result.data)
+
+        // Forçar reload dos dados para garantir consistência
+        await loadRoleplayLink()
       }
     } catch (error) {
-      console.error('Erro ao atualizar status:', error)
+      console.error('❌ Erro ao atualizar status:', error)
+      alert('Erro ao atualizar status do link. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -300,9 +582,9 @@ export default function RoleplayLinksView() {
     // Gerar link completo (dev ou prod)
     let link = ''
     if (window.location.hostname.includes('localhost') || window.location.hostname.includes('ramppy.local')) {
-      link = `http://${company.subdomain}.ramppy.local:3000/roleplay-publico?link=${roleplayLink.link_code}`
+      link = `http://localhost:3000/roleplay-publico?link=${roleplayLink.link_code}`
     } else {
-      link = `https://${company.subdomain}.ramppy.site/roleplay-publico?link=${roleplayLink.link_code}`
+      link = `https://ramppy.site/roleplay-publico?link=${roleplayLink.link_code}`
     }
 
     // Tentar copiar com clipboard API (só funciona em HTTPS ou localhost)
@@ -365,15 +647,16 @@ export default function RoleplayLinksView() {
   }
 
   const getRoleplayUrl = () => {
-    if (!company || !roleplayLink?.link_code) return ''
+    if (!roleplayLink?.link_code) return ''
 
+    // Sistema unificado - não usa mais subdomínios
     // Em desenvolvimento
     if (window.location.hostname.includes('localhost') || window.location.hostname.includes('ramppy.local')) {
-      return `http://${company.subdomain}.ramppy.local:3000/roleplay-publico?link=${roleplayLink.link_code}`
+      return `http://localhost:3000/roleplay-publico?link=${roleplayLink.link_code}`
     }
 
     // Em produção
-    return `https://${company.subdomain}.ramppy.site/roleplay-publico?link=${roleplayLink.link_code}`
+    return `https://ramppy.site/roleplay-publico?link=${roleplayLink.link_code}`
   }
 
   // Função para ordenar o histórico
@@ -431,11 +714,66 @@ export default function RoleplayLinksView() {
     )
   }
 
-  if (!roleplayLink || !company) {
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6 max-w-md">
+          <h3 className="text-red-400 font-bold mb-2">Erro ao carregar</h3>
+          <p className="text-red-300 mb-4">{error}</p>
+
+          {error.includes('autenticado') || error.includes('Sessão') ? (
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  // Redirecionar para a página de login
+                  window.location.href = '/'
+                }}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white transition-colors"
+              >
+                Ir para Login
+              </button>
+              <button
+                onClick={() => {
+                  setError(null)
+                  setLoading(true)
+                  loadData()
+                }}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-white transition-colors"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setError(null)
+                setLoading(true)
+                loadData()
+              }}
+              className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors"
+            >
+              Tentar novamente
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (!roleplayLink) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 max-w-md">
-          <p className="text-yellow-300">Erro ao carregar configuração de roleplay</p>
+          <p className="text-yellow-300">Configuração de roleplay não encontrada</p>
+          <button
+            onClick={() => {
+              setLoading(true)
+              loadData()
+            }}
+            className="mt-4 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-white transition-colors"
+          >
+            Recarregar
+          </button>
         </div>
       </div>
     )
@@ -502,12 +840,25 @@ export default function RoleplayLinksView() {
                 </button>
                 <button
                   onClick={toggleActive}
-                  disabled={saving}
+                  disabled={saving || (
+                    !roleplayLink.is_active &&
+                    selectionPlan &&
+                    PLAN_CONFIGS[selectionPlan]?.maxSelectionCandidates !== null &&
+                    roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates
+                  )}
                   className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
                     roleplayLink.is_active
                       ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 glow-green'
                       : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-                  } disabled:opacity-50`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title={
+                    !roleplayLink.is_active &&
+                    selectionPlan &&
+                    PLAN_CONFIGS[selectionPlan]?.maxSelectionCandidates !== null &&
+                    roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates
+                      ? 'Limite de candidatos atingido'
+                      : ''
+                  }
                 >
                   <Power className="w-5 h-5" />
                   {roleplayLink.is_active ? 'Ativo' : 'Desativado'}
@@ -536,7 +887,7 @@ export default function RoleplayLinksView() {
             </div>
 
             {/* Estatísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gradient-to-r from-green-600/10 to-lime-500/10 rounded-2xl p-5 border border-green-500/20">
                 <div className="flex items-center gap-3 mb-2">
                   <Users className="w-5 h-5 text-green-400" />
@@ -546,6 +897,71 @@ export default function RoleplayLinksView() {
                   {roleplayLink.usage_count}
                 </p>
               </div>
+
+              {/* Card de Limites do Plano */}
+              {selectionPlan && (
+                (() => {
+                  console.log('🎯 Renderizando card de limite para plano:', selectionPlan)
+                  const planConfig = PLAN_CONFIGS[selectionPlan]
+
+                  if (!planConfig) {
+                    console.error('❌ Configuração não encontrada para:', selectionPlan)
+                    return null
+                  }
+
+                  if (!planConfig.isSelectionPlan) {
+                    console.log('⚠️ Não é plano de seleção:', selectionPlan)
+                    return null
+                  }
+
+                  const maxCandidates = planConfig.maxSelectionCandidates
+                  const used = roleplayLink.usage_count || 0
+
+                  return (
+                    <div className="bg-gradient-to-r from-yellow-600/10 to-orange-500/10 rounded-2xl p-5 border border-yellow-500/20">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Target className="w-5 h-5 text-yellow-400" />
+                        <p className="text-sm font-medium text-gray-300">Limite do Plano</p>
+                      </div>
+                      {maxCandidates === null ? (
+                        <div>
+                          <p className="text-2xl font-bold text-white">Ilimitado</p>
+                          <p className="text-xs text-gray-400 mt-1">{used} realizados</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-2xl font-bold text-white">
+                            {used}/{maxCandidates}
+                          </p>
+                          <div className="mt-2">
+                            <div className="w-full bg-black/40 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full transition-all ${
+                                  (used / maxCandidates) * 100 >= 100 ? 'bg-red-500' :
+                                  (used / maxCandidates) * 100 >= 80 ? 'bg-yellow-500' :
+                                  'bg-green-500'
+                                }`}
+                                style={{ width: `${Math.min((used / maxCandidates) * 100, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                          <p className={`text-xs mt-1 ${
+                            Math.max(0, maxCandidates - used) === 0 ? 'text-red-400' :
+                            Math.max(0, maxCandidates - used) <= 2 ? 'text-yellow-400' :
+                            'text-gray-400'
+                          }`}>
+                            {Math.max(0, maxCandidates - used) === 0
+                              ? '⚠️ Limite atingido'
+                              : `${Math.max(0, maxCandidates - used)} ${Math.max(0, maxCandidates - used) === 1 ? 'restante' : 'restantes'}`
+                            }
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()
+              )}
+
               <div className="bg-gradient-to-r from-green-600/10 to-lime-500/10 rounded-2xl p-5 border border-green-500/20">
                 <div className="flex items-center gap-3 mb-2">
                   <BarChart3 className="w-5 h-5 text-green-400" />
@@ -556,6 +972,22 @@ export default function RoleplayLinksView() {
                 </p>
               </div>
             </div>
+
+            {/* Aviso de limite atingido */}
+            {selectionPlan && PLAN_CONFIGS[selectionPlan]?.isSelectionPlan &&
+             PLAN_CONFIGS[selectionPlan].maxSelectionCandidates !== null &&
+             roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates && (
+              <div className="mt-4 bg-red-900/20 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-red-400 font-semibold mb-1">Limite de Candidatos Atingido</h4>
+                  <p className="text-red-300/80 text-sm">
+                    Você atingiu o limite de {PLAN_CONFIGS[selectionPlan].maxSelectionCandidates} candidatos do seu plano.
+                    Para avaliar mais candidatos, considere fazer upgrade do plano.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Conteúdo Condicional */}

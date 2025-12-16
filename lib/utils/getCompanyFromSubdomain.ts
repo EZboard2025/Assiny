@@ -1,10 +1,66 @@
 import { supabase } from '@/lib/supabase'
 
 /**
- * Obtém o company_id baseado no subdomínio atual
+ * NOVA VERSÃO: Sistema unificado sem subdomínios
+ * Obtém o company_id do usuário logado
  * @returns company_id ou null se não encontrado
  */
+export async function getUserCompanyId(): Promise<string | null> {
+  try {
+    // Verificar se estamos em uma página pública
+    if (typeof window !== 'undefined' && window.location.pathname.includes('roleplay-publico')) {
+      console.log('[getUserCompanyId] Chamada de página pública - retornando null')
+      return null
+    }
+
+    // Obter o usuário logado
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      console.log('[getUserCompanyId] Usuário não autenticado')
+      return null
+    }
+
+    // Buscar o company_id do usuário na tabela employees
+    const { data, error } = await supabase
+      .from('employees')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (error) {
+      console.error('[getUserCompanyId] Erro ao buscar company_id do usuário:', error)
+      return null
+    }
+
+    if (!data?.company_id) {
+      console.error('[getUserCompanyId] Usuário não tem company_id associado')
+      return null
+    }
+
+    console.log('[getUserCompanyId] ✅ Company ID encontrado:', data.company_id, 'para usuário:', user.email)
+    return data.company_id
+  } catch (error) {
+    console.error('[getUserCompanyId] Erro inesperado:', error)
+    return null
+  }
+}
+
+/**
+ * VERSÃO LEGADA: Mantida temporariamente para compatibilidade
+ * Obtém o company_id baseado no subdomínio atual
+ * @deprecated Usar getUserCompanyId() ao invés
+ */
 export async function getCompanyIdFromSubdomain(): Promise<string | null> {
+  // Verificar se estamos em modo unificado (sem subdomínios)
+  const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
+
+  if (USE_UNIFIED_SYSTEM) {
+    // No modo unificado, usar company_id do usuário
+    return getUserCompanyId()
+  }
+
+  // CÓDIGO ORIGINAL MANTIDO PARA COMPATIBILIDADE
   try {
     // Só funciona no cliente (browser)
     if (typeof window === 'undefined') {
@@ -67,27 +123,47 @@ export async function getCompanyIdFromSubdomain(): Promise<string | null> {
 }
 
 /**
- * Obtém o company_id correto - prioriza subdomínio sobre usuário
+ * Função principal - usa sistema unificado ou subdomínios baseado na configuração
  * @returns company_id ou null se não encontrado
  */
 export async function getCompanyId(): Promise<string | null> {
-  // Primeiro tenta pegar pelo subdomínio
+  // Verificar se estamos em uma página pública
+  if (typeof window !== 'undefined' && window.location.pathname.includes('roleplay-publico')) {
+    console.log('[getCompanyId] Chamada de página pública - retornando null')
+    return null
+  }
+
+  // Verificar se estamos em modo unificado
+  const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
+
+  if (USE_UNIFIED_SYSTEM) {
+    // NOVO SISTEMA: Usar apenas company_id do usuário
+    const companyId = await getUserCompanyId()
+    if (companyId) {
+      console.log('[getCompanyId] ✅ Sistema Unificado - Company ID:', companyId)
+      return companyId
+    }
+    console.error('[getCompanyId] Sistema Unificado - Falha ao obter company_id')
+    return null
+  }
+
+  // SISTEMA LEGADO: Priorizar subdomínio
   const companyIdFromSubdomain = await getCompanyIdFromSubdomain()
 
   if (companyIdFromSubdomain) {
-    console.log('[getCompanyId] Usando company_id do subdomínio:', companyIdFromSubdomain)
+    console.log('[getCompanyId] Sistema Legado - Usando company_id do subdomínio:', companyIdFromSubdomain)
     return companyIdFromSubdomain
   }
 
-  // Se não conseguir pelo subdomínio, pega do usuário (fallback)
+  // Fallback para usuário
   const { getCompanyIdFromUser } = await import('./getCompanyId')
   const companyIdFromUser = await getCompanyIdFromUser()
 
   if (companyIdFromUser) {
-    console.log('[getCompanyId] Usando company_id do usuário (fallback):', companyIdFromUser)
+    console.log('[getCompanyId] Sistema Legado - Usando company_id do usuário (fallback):', companyIdFromUser)
     return companyIdFromUser
   }
 
-  console.error('[getCompanyId] Não foi possível obter company_id')
+  console.error('[getCompanyId] Sistema Legado - Não foi possível obter company_id')
   return null
 }
