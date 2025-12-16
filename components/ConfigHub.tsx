@@ -728,7 +728,7 @@ function ConfigurationInterface({
         // Verificar limite de personas antes de criar
         const limitCheck = await checkPersonaLimit()
         if (!limitCheck.allowed) {
-          showToast('error', 'Limite atingido', limitCheck.message || 'Limite de personas atingido para o plano')
+          showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de personas atingido para o plano')
           return
         }
 
@@ -783,7 +783,7 @@ function ConfigurationInterface({
         // Verificar limite de personas antes de criar
         const limitCheck = await checkPersonaLimit()
         if (!limitCheck.allowed) {
-          showToast('error', 'Limite atingido', limitCheck.message || 'Limite de personas atingido para o plano')
+          showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de personas atingido para o plano')
           return
         }
 
@@ -956,7 +956,7 @@ function ConfigurationInterface({
       // Verificar limite de objeções antes de criar
       const limitCheck = await checkObjectionLimit()
       if (!limitCheck.allowed) {
-        showToast('error', 'Limite atingido', limitCheck.message || 'Limite de objeções atingido para o plano')
+        showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de objeções atingido para o plano')
         return
       }
 
@@ -980,7 +980,7 @@ function ConfigurationInterface({
     const currentRebuttalCount = objection.rebuttals?.length || 0
     const limitCheck = await checkRebuttalLimit(currentRebuttalCount)
     if (!limitCheck.allowed) {
-      showToast('error', 'Limite atingido', limitCheck.message || 'Limite de formas de quebrar atingido para o plano')
+      showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de formas de quebrar atingido para o plano')
       return
     }
 
