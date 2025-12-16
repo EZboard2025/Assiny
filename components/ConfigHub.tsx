@@ -706,7 +706,7 @@ function ConfigurationInterface({
         const { supabase } = await import('@/lib/supabase')
         const { data, error } = await supabase
           .from('personas')
-          .update({ ...persona, business_type: 'B2B' })
+          .update({ ...persona, business_type: personaType })
           .eq('id', editingPersonaId)
           .select()
           .single()
@@ -737,7 +737,7 @@ function ConfigurationInterface({
         }
 
         // Criar nova persona
-        const result = await addPersona({ ...persona, business_type: 'B2B' })
+        const result = await addPersona({ ...persona, business_type: personaType })
         if (result) {
           setPersonas([...personas, result])
           // Adicionar tags à nova persona
@@ -761,7 +761,7 @@ function ConfigurationInterface({
         const { supabase } = await import('@/lib/supabase')
         const { data, error } = await supabase
           .from('personas')
-          .update({ ...persona, business_type: 'B2C' })
+          .update({ ...persona, business_type: personaType })
           .eq('id', editingPersonaId)
           .select()
           .single()
@@ -792,7 +792,7 @@ function ConfigurationInterface({
         }
 
         // Criar nova persona
-        const result = await addPersona({ ...persona, business_type: 'B2C' })
+        const result = await addPersona({ ...persona, business_type: personaType })
         if (result) {
           setPersonas([...personas, result])
           // Adicionar tags à nova persona
