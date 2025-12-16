@@ -162,7 +162,8 @@ function ConfigurationInterface({
     concorrentes: '',
     dados_metricas: '',
     erros_comuns: '',
-    percepcao_desejada: ''
+    percepcao_desejada: '',
+    dores_resolvidas: ''
   })
   const [companyDataId, setCompanyDataId] = useState<string | null>(null)
   const [savingCompanyData, setSavingCompanyData] = useState(false)
@@ -261,7 +262,8 @@ function ConfigurationInterface({
           concorrentes: data.concorrentes || '',
           dados_metricas: data.dados_metricas || '',
           erros_comuns: data.erros_comuns || '',
-          percepcao_desejada: data.percepcao_desejada || ''
+          percepcao_desejada: data.percepcao_desejada || '',
+          dores_resolvidas: data.dores_resolvidas || ''
         })
 
         // Carregar última avaliação se existir
@@ -317,6 +319,7 @@ function ConfigurationInterface({
             dados_metricas: companyData.dados_metricas,
             erros_comuns: companyData.erros_comuns,
             percepcao_desejada: companyData.percepcao_desejada,
+            dores_resolvidas: companyData.dores_resolvidas,
             updated_at: new Date().toISOString()
           })
           .eq('id', companyDataId)
@@ -344,7 +347,8 @@ function ConfigurationInterface({
             concorrentes: companyData.concorrentes,
             dados_metricas: companyData.dados_metricas,
             erros_comuns: companyData.erros_comuns,
-            percepcao_desejada: companyData.percepcao_desejada
+            percepcao_desejada: companyData.percepcao_desejada,
+            dores_resolvidas: companyData.dores_resolvidas
           })
           .select()
           .single()
@@ -1262,6 +1266,9 @@ ${companyData.erros_comuns || '(não preenchido)'}
 
 9. Como a empresa deseja ser percebida pelos clientes (ex: acessível, premium, inovadora, consultiva, simples, tradicional etc.)?
 ${companyData.percepcao_desejada || '(não preenchido)'}
+
+10. Quais dores a empresa resolve para seus clientes?
+${companyData.dores_resolvidas || '(não preenchido)'}
 `.trim()
 
       const response = await fetch('https://ezboard.app.n8n.cloud/webhook/avaliar-documento', {
@@ -2842,6 +2849,23 @@ ${companyData.percepcao_desejada || '(não preenchido)'}
                       }}
                       placeholder="Ex: Inovadora e acessível, com foco em simplificar tecnologia para PMEs"
                       rows={2}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+
+                  {/* Dores que Resolve */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Quais dores a empresa resolve para seus clientes?
+                    </label>
+                    <textarea
+                      value={companyData.dores_resolvidas}
+                      onChange={(e) => {
+                        setCompanyData({ ...companyData, dores_resolvidas: e.target.value })
+                        setCompanyDataEdited(true)
+                      }}
+                      placeholder="Ex: Falta de controle financeiro, processos manuais demorados, dificuldade em escalar o negócio, perda de vendas por falta de organização"
+                      rows={3}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>

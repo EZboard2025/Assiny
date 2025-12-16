@@ -83,6 +83,11 @@ export async function POST(req: Request) {
         category: 'posicionamento',
         question: 'Como a empresa quer ser vista?',
         content: `Percepção desejada: ${companyData.percepcao_desejada || 'Não informada'}`
+      },
+      {
+        category: 'solucoes',
+        question: 'Quais dores a empresa resolve?',
+        content: `Dores resolvidas: ${companyData.dores_resolvidas || 'Não informadas'}`
       }
     ]
 
