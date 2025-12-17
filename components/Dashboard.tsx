@@ -11,7 +11,7 @@ import PerfilView from './PerfilView'
 import PDIView from './PDIView'
 import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
-import { AnaliseVendaRealView } from './AnaliseVendaRealView'
+// import { AnaliseVendaRealView } from './AnaliseVendaRealView'
 import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, FileSearch, Lock } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
@@ -196,9 +196,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       return <FollowUpView />
     }
 
-    if (currentView === 'analise-venda-real') {
+    /* if (currentView === 'analise-venda-real') {
       return <AnaliseVendaRealView />
-    }
+    } */
 
     // Home view
     return (
@@ -378,7 +378,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </button>
 
-            {/* Análise de Venda Real Card */}
+            {/* Análise de Venda Real Card - HIDDEN
             <button
               onClick={() => handleViewChange('analise-venda-real')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
@@ -412,6 +412,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </div>
             </button>
+            */}
 
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
