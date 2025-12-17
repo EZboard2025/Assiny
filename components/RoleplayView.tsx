@@ -2040,8 +2040,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         {/* Modal de Avaliação - Novo Design */}
         {showEvaluationSummary && evaluation && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center">
-            <div className="relative w-full max-w-4xl mx-auto p-4 max-h-[85vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-y-auto flex items-start justify-center pt-20 pb-20">
+            <div className="relative w-full max-w-7xl mx-auto px-4">
               {/* Close Button */}
               <button
                 onClick={() => setShowEvaluationSummary(false)}
@@ -2051,8 +2051,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </button>
 
               {/* Header com Tabs */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-5">
-                <h2 className="text-2xl font-bold text-center text-white mb-4">DESEMPENHO DO VENDEDOR</h2>
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-3">
+                <h2 className="text-xl font-bold text-center text-white mb-3">DESEMPENHO DO VENDEDOR</h2>
                 <div className="flex justify-center gap-2">
                   <button
                     onClick={() => setActiveEvaluationTab('conversation')}
@@ -2085,12 +2085,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </div>
 
               {/* Main Content */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-5">
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-3">
                 {/* Aba Conversa */}
                 {activeEvaluationTab === 'conversation' && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-white mb-4">Transcrição da Conversa</h3>
-                    <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-2">
+                    <h3 className="text-base font-bold text-white mb-2">Transcrição da Conversa</h3>
+                    <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20 max-h-[300px] overflow-y-auto">
                       <div className="space-y-3">
                         {messages.map((msg, index) => (
                           <div key={index} className={`flex ${msg.role === 'seller' ? 'justify-end' : 'justify-start'}`}>
@@ -2115,15 +2115,15 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Aba Avaliação */}
                 {activeEvaluationTab === 'evaluation' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
 
                   {/* Left Side - SPIN Radar Chart */}
-                  <div className="space-y-4">
-                    <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                      <h3 className="text-base font-bold text-white mb-4 text-center">Métricas de Competências SPIN</h3>
+                  <div className="space-y-2">
+                    <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20">
+                      <h3 className="text-sm font-bold text-white mb-2 text-center">Métricas de Competências SPIN</h3>
 
                       {/* Radar Chart Visual - Diamond Shape */}
-                      <div className="relative w-full aspect-square max-w-[220px] mx-auto mb-4">
+                      <div className="relative w-full aspect-square max-w-[200px] mx-auto mb-2">
                         <svg viewBox="0 0 240 240" className="w-full h-full">
                           {/* Background diamonds (losangos) - 10 níveis */}
                           {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
@@ -2226,9 +2226,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       </div>
 
                       {/* Média Geral */}
-                      <div className="mt-4 bg-gradient-to-r from-green-600 to-green-500 rounded-xl px-4 py-2.5 text-center">
+                      <div className="mt-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl px-3 py-2 text-center">
                         <div className="text-xs text-purple-100 mb-1">Média Geral</div>
-                        <div className="text-xl font-bold text-white">
+                        <div className="text-lg font-bold text-white">
                           {evaluation.spin_evaluation ? (
                             ((evaluation.spin_evaluation.S?.final_score || 0) +
                              (evaluation.spin_evaluation.P?.final_score || 0) +
@@ -2241,12 +2241,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
 
                   {/* Right Side - Performance Metrics */}
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {/* Overall Score */}
-                    <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/30 rounded-xl p-4">
-                      <h3 className="text-center text-sm text-gray-400 mb-2">Performance Geral</h3>
+                    <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/30 rounded-xl p-3">
+                      <h3 className="text-center text-xs text-gray-400 mb-1">Performance Geral</h3>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-white">
+                        <div className="text-2xl font-bold text-white">
                           {evaluation.performance_level === 'legendary' && 'Lendário'}
                           {evaluation.performance_level === 'excellent' && 'Excelente'}
                           {evaluation.performance_level === 'very_good' && 'Muito Bom'}
@@ -2264,13 +2264,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Aba Feedback */}
                 {activeEvaluationTab === 'feedback' && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-white mb-4">Feedback Detalhado</h3>
+                  <div className="space-y-2">
+                    <h3 className="text-base font-bold text-white mb-2">Feedback Detalhado</h3>
 
                     {/* Pontos Fortes */}
                     {evaluation?.top_strengths && evaluation.top_strengths.length > 0 && (
-                      <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 rounded-xl p-4 border border-green-500/30">
-                        <h4 className="text-base font-bold text-green-400 mb-3 flex items-center gap-2">
+                      <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 rounded-xl p-3 border border-green-500/30">
+                        <h4 className="text-sm font-bold text-green-400 mb-2 flex items-center gap-2">
                           <CheckCircle className="w-5 h-5" />
                           Seus Pontos Fortes
                         </h4>
@@ -2287,8 +2287,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Gaps Críticos */}
                     {evaluation?.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                      <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 rounded-xl p-4 border border-red-500/30">
-                        <h4 className="text-base font-bold text-red-400 mb-3 flex items-center gap-2">
+                      <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 rounded-xl p-3 border border-red-500/30">
+                        <h4 className="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
                           <AlertCircle className="w-5 h-5" />
                           Áreas para Desenvolvimento
                         </h4>
@@ -2305,8 +2305,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Melhorias Prioritárias */}
                     {evaluation?.priority_improvements && evaluation.priority_improvements.length > 0 && (
-                      <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 rounded-xl p-4 border border-purple-500/30">
-                        <h4 className="text-base font-bold text-purple-400 mb-3 flex items-center gap-2">
+                      <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 rounded-xl p-3 border border-purple-500/30">
+                        <h4 className="text-sm font-bold text-purple-400 mb-2 flex items-center gap-2">
                           <Zap className="w-5 h-5" />
                           Melhorias Prioritárias
                         </h4>
@@ -2335,19 +2335,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Resumo Executivo */}
                     {evaluation?.executive_summary && (
-                      <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                        <h4 className="text-base font-bold text-white mb-3">Resumo Executivo</h4>
-                        <p className="text-sm text-gray-200 leading-relaxed">{evaluation.executive_summary}</p>
+                      <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20">
+                        <h4 className="text-sm font-bold text-white mb-2">Resumo Executivo</h4>
+                        <p className="text-xs text-gray-200 leading-relaxed">{evaluation.executive_summary}</p>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-4 mt-6">
+                <div className="flex gap-3 mt-4">
                   <button
                     onClick={() => setShowEvaluationSummary(false)}
-                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors text-white"
+                    className="flex-1 px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors text-white text-sm"
                   >
                     Fechar
                   </button>
@@ -2360,7 +2360,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         window.location.href = '/?view=historico';
                       }
                     }}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-green-500/30"
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-green-500/30 text-sm"
                   >
                     Ver Análise Completa no Histórico
                   </button>
