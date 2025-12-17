@@ -439,6 +439,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         segment: segmentDescription,
         objections: objectionsWithRebuttals,
         client_name: data.clientName, // Salvar o nome do cliente
+        objective: selectedObjectiveData, // Salvar o objetivo do roleplay
       })
 
       if (session) {
