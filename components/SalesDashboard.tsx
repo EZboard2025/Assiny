@@ -779,7 +779,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                         .replace('=== INÍCIO DO FOLLOW-UP ===', '')
                         .replace('=== RESPOSTA DO CLIENTE (se houver) ===', '')
                         .trim()
-                        .split('\n').map((line, index) => {
+                        .split('\n').map((line: string, index: number) => {
                         // Parse each line to identify timestamp, sender, and message
                         const match = line.match(/^\[(\d{2}:\d{2})\]\s*(Vendedor|Cliente|Remetente):\s*(.+)$/);
 

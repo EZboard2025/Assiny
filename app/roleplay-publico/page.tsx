@@ -50,10 +50,12 @@ interface CompanyConfig {
       temperament: string
       persona_id: string | null
       objection_ids: string[]
+      objective_id: string | null
     }
   }
   personas: any[]
   objections: any[]
+  objectives: any[]
 }
 
 export default function RoleplayPublico() {
@@ -91,6 +93,7 @@ export default function RoleplayPublico() {
   const [selectedTemperament, setSelectedTemperament] = useState('')
   const [selectedPersona, setSelectedPersona] = useState('')
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
+  const [selectedObjective, setSelectedObjective] = useState('')
   const [linkId, setLinkId] = useState<string | null>(null) // ID do roleplay_link
 
   // Sessão de roleplay
@@ -157,6 +160,10 @@ export default function RoleplayPublico() {
         setSelectedTemperament(config.temperament)
         setSelectedPersona(config.persona_id)
         setSelectedObjections(config.objection_ids || [])
+        setSelectedObjective(config.objective_id || (data.objectives?.length > 0 ? data.objectives[0].id : ''))
+      } else if (data.objectives?.length > 0) {
+        // Se não tiver config pré-definido, selecionar primeiro objetivo
+        setSelectedObjective(data.objectives[0].id)
       }
     } catch (error: any) {
       console.error('Erro ao carregar configuração:', error)
@@ -403,6 +410,11 @@ export default function RoleplayPublico() {
       return
     }
 
+    if (!selectedObjective) {
+      alert('Por favor, selecione um objetivo para o roleplay')
+      return
+    }
+
     setIsProcessing(true)
     try {
       // Debug: verificar valores antes de enviar
@@ -411,6 +423,7 @@ export default function RoleplayPublico() {
       console.log('  selectedTemperament:', selectedTemperament)
       console.log('  selectedPersona:', selectedPersona)
       console.log('  selectedObjections:', selectedObjections)
+      console.log('  selectedObjective:', selectedObjective)
       console.log('  companyConfig?.roleplayLink?.config:', companyConfig?.roleplayLink?.config)
 
       const requestData = {
@@ -421,7 +434,8 @@ export default function RoleplayPublico() {
           age: selectedAge,
           temperament: selectedTemperament,
           personaId: selectedPersona,
-          objectionIds: selectedObjections
+          objectionIds: selectedObjections,
+          objectiveId: selectedObjective
         }
       }
 
@@ -602,12 +616,15 @@ export default function RoleplayPublico() {
   }
 
   if (!sessionStarted) {
-    // Buscar detalhes da persona e objeções selecionadas
+    // Buscar detalhes da persona, objeções e objetivo selecionados
     const selectedPersonaData = companyConfig?.personas.find(
       p => p.id === companyConfig.roleplayLink.config.persona_id
     )
     const selectedObjectionsData = companyConfig?.objections.filter(
       o => companyConfig.roleplayLink.config.objection_ids.includes(o.id)
+    )
+    const selectedObjectiveData = companyConfig?.objectives?.find(
+      o => o.id === (companyConfig.roleplayLink.config.objective_id || selectedObjective)
     )
 
     return (
@@ -696,6 +713,23 @@ export default function RoleplayPublico() {
                           <p className="text-green-400 font-semibold">{index + 1}. {objection.name}</p>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Objetivo */}
+                {selectedObjectiveData && (
+                  <div>
+                    <p className="text-gray-400 font-semibold mb-1">🎯 Objetivo do Roleplay:</p>
+                    <div className="bg-gradient-to-r from-green-900/30 to-green-800/10 border border-green-500/30 rounded-lg p-3">
+                      <p className="text-green-400 font-semibold text-sm">
+                        {selectedObjectiveData.name}
+                      </p>
+                      {selectedObjectiveData.description && (
+                        <p className="text-gray-300 text-xs mt-2 leading-relaxed">
+                          {selectedObjectiveData.description}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

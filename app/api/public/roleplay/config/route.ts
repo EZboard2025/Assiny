@@ -42,14 +42,18 @@ export async function GET(request: Request) {
 
     const company = roleplayLink.companies
 
-    // Buscar personas e objeções da empresa
-    const [personasResult, objectionsResult] = await Promise.all([
+    // Buscar personas, objeções e objetivos da empresa
+    const [personasResult, objectionsResult, objectivesResult] = await Promise.all([
       supabaseAdmin
         .from('personas')
         .select('*')
         .eq('company_id', company.id),
       supabaseAdmin
         .from('objections')
+        .select('*')
+        .eq('company_id', company.id),
+      supabaseAdmin
+        .from('roleplay_objectives')
         .select('*')
         .eq('company_id', company.id)
     ])
@@ -69,7 +73,8 @@ export async function GET(request: Request) {
         usage_count: roleplayLink.usage_count
       },
       personas: personasResult.data || [],
-      objections: objectionsResult.data || []
+      objections: objectionsResult.data || [],
+      objectives: objectivesResult.data || []
     })
   } catch (error) {
     console.error('Erro ao buscar configuração:', error)

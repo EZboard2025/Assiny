@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock } from 'lucide-react'
-import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag } from '@/lib/config'
+import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
@@ -58,11 +58,13 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [temperament, setTemperament] = useState('Analítico')
   const [selectedPersona, setSelectedPersona] = useState('')
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
+  const [selectedObjective, setSelectedObjective] = useState('')
 
   // Dados do banco
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
   const [personas, setPersonas] = useState<Persona[]>([])
   const [objections, setObjections] = useState<Objection[]>([])
+  const [objectives, setObjectives] = useState<RoleplayObjective[]>([])
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [personaTags, setPersonaTags] = useState<Map<string, Tag[]>>(new Map())
@@ -113,15 +115,17 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }, [planUsage, trainingPlan])
 
   const loadData = async () => {
-    const [businessTypeData, personasData, objectionsData, tagsData] = await Promise.all([
+    const [businessTypeData, personasData, objectionsData, objectivesData, tagsData] = await Promise.all([
       getCompanyType(),
       getPersonas(),
       getObjections(),
+      getRoleplayObjectives(),
       getTags(),
     ])
     setBusinessType(businessTypeData)
     setPersonas(personasData)
     setObjections(objectionsData)
+    setObjectives(objectivesData)
     setTags(tagsData)
 
     // Carregar tags de cada persona
@@ -140,6 +144,11 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       : personasData.filter(p => p.business_type === businessTypeData)
     if (filteredPersonas.length > 0) {
       setSelectedPersona(filteredPersonas[0].id!)
+    }
+
+    // Selecionar primeiro objetivo se existir
+    if (objectivesData.length > 0) {
+      setSelectedObjective(objectivesData[0].id)
     }
   }
 
@@ -184,6 +193,20 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }
 
   const handleStartSimulation = async () => {
+    // Validar objetivo selecionado
+    if (!selectedObjective) {
+      const messageElement = document.createElement('div')
+      messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
+      messageElement.textContent = 'Selecione um objetivo para o roleplay'
+      document.body.appendChild(messageElement)
+
+      setTimeout(() => {
+        messageElement.remove()
+      }, 3000)
+
+      return
+    }
+
     // Primeiro verificar os limites do plano antes de iniciar
     const limitCheck = await checkRoleplayLimit()
 
@@ -232,6 +255,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       // Buscar persona selecionada
       const selectedPersonaData = personas.find(p => p.id === selectedPersona)
       const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
+      const selectedObjectiveData = objectives.find(o => o.id === selectedObjective)
 
       // Enviar todos os dados da persona para o agente
       let personaData: any = {}
@@ -273,6 +297,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         temperament,
         selectedPersona: selectedPersonaData,
         objections: objectionsWithRebuttals,
+        objective: selectedObjectiveData,
         personaData: personaData
       }
       setRoleplayConfig(fullConfig)
@@ -322,6 +347,10 @@ ${personaInfo}
 Objeções que o cliente pode usar:
 ${objectionsText}
 
+OBJETIVO DO VENDEDOR NESTE ROLEPLAY:
+${selectedObjectiveData?.name || 'Não especificado'}
+${selectedObjectiveData?.description ? `Descrição: ${selectedObjectiveData.description}` : ''}
+
 Interprete este personagem de forma realista e consistente com todas as características acima. Inicie a conversa como cliente.`
 
       // Criar nova sessão com N8N
@@ -336,6 +365,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
             temperament,
             persona: personaData,
             objections: objectionsWithRebuttals,
+            objective: selectedObjectiveData,
           },
           userId: userId,
           companyId: companyId,
@@ -1839,6 +1869,62 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                     <ChevronDown className="w-4 h-4" />
                                   )}
                                 </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Objetivos */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Objetivo do Roleplay <span className="text-red-400">*</span>
+                      </label>
+                      {objectives.length === 0 ? (
+                        <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
+                          Nenhum objetivo cadastrado.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {objectives.map((objective) => (
+                            <div
+                              key={objective.id}
+                              onClick={() => setSelectedObjective(objective.id)}
+                              className={`group cursor-pointer border rounded-xl p-4 transition-all duration-200 ${
+                                selectedObjective === objective.id
+                                  ? 'bg-gradient-to-r from-green-900/40 to-green-800/20 border-green-500 shadow-md shadow-green-500/10'
+                                  : 'bg-gray-800/40 border-green-500/20 hover:border-green-500/40 hover:bg-gray-800/60'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 mt-0.5 ${
+                                    selectedObjective === objective.id
+                                      ? 'bg-green-500 border-green-500'
+                                      : 'border-green-500/40 group-hover:border-green-500/60'
+                                  }`}
+                                >
+                                  {selectedObjective === objective.id && (
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`font-medium transition-colors duration-200 ${
+                                    selectedObjective === objective.id
+                                      ? 'text-white'
+                                      : 'text-gray-300 group-hover:text-gray-200'
+                                  }`}>
+                                    {objective.name}
+                                  </p>
+                                  {objective.description && (
+                                    <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                                      {objective.description}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
