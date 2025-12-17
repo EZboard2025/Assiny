@@ -12,6 +12,7 @@ export interface RoleplayConfig {
   segment: string
   objections: string[] | { name: string; rebuttals: string[] }[]
   client_name?: string // Nome do cliente virtual gerado
+  objective?: { id: string; name: string; description: string | null } // Objetivo do roleplay
 }
 
 export interface RoleplaySession {
