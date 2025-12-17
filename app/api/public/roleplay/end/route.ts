@@ -72,6 +72,10 @@ DADOS DEMOGRÁFICOS:
 - Temperamento: ${config?.temperament || 'Não especificado'}
 - Persona/Segmento: ${config?.persona?.cargo || config?.persona?.job_title || config?.persona?.profession || 'Não especificado'}
 
+OBJETIVO DO ROLEPLAY:
+${config?.objective?.name || 'Não especificado'}
+${config?.objective?.description ? `Descrição: ${config.objective.description}` : ''}
+
 OBJEÇÕES TRABALHADAS:`
 
     if (config?.objections && config.objections.length > 0) {
@@ -98,7 +102,10 @@ OBJEÇÕES TRABALHADAS:`
       transcription,
       context,
       client_profile,
-      companyId: session.company_id
+      companyId: session.company_id,
+      objetivo: config?.objective?.name
+        ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
+        : 'Não especificado'
     }
 
     console.log('📡 Payload completo para N8N:', JSON.stringify(n8nPayload, null, 2))

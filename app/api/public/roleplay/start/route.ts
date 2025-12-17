@@ -93,6 +93,19 @@ export async function POST(request: Request) {
       console.error('❌ Erro ao buscar objeções:', objectionsError)
     }
 
+    // Buscar objetivo completo
+    let objective = null
+    if (config.objectiveId) {
+      const { data: objectiveData } = await supabaseAdmin
+        .from('roleplay_objectives')
+        .select('*')
+        .eq('id', config.objectiveId)
+        .single()
+
+      objective = objectiveData
+      console.log('🎯 Objetivo retornado:', objective)
+    }
+
     // Montar texto das objeções
     let objectionsText = 'Nenhuma objeção específica'
     if (objections && objections.length > 0) {
@@ -149,7 +162,10 @@ PERFIL DO CLIENTE B2C:
         idade: config.age,
         temperamento: config.temperament,
         persona: personaInfo.trim(),
-        objecoes: objectionsText
+        objecoes: objectionsText,
+        objetivo: objective?.name
+          ? `${objective.name}${objective.description ? `\nDescrição: ${objective.description}` : ''}`
+          : 'Não especificado'
       }),
     })
 
@@ -180,6 +196,7 @@ PERFIL DO CLIENTE B2C:
         temperament: config.temperament,
         persona: persona,
         objections: objections,
+        objective: objective,
         clientName: clientName  // Armazenar o nome do cliente para uso nas próximas mensagens
       },
       messages: [],

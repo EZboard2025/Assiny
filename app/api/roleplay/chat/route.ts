@@ -124,7 +124,10 @@ PERFIL DO CLIENTE B2C:
           idade: config.age,
           temperamento: config.temperament,
           persona: personaInfo.trim(),
-          objecoes: objectionsText
+          objecoes: objectionsText,
+          objetivo: config.objective?.name
+            ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
+            : 'Não especificado'
         }),
       })
 

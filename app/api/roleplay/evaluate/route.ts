@@ -105,6 +105,10 @@ DADOS DEMOGRÁFICOS:
 - Temperamento: ${config.temperament}
 - Persona/Segmento: ${config.segment || config.persona || 'Não especificado'}
 
+OBJETIVO DO ROLEPLAY:
+${config.objective?.name || 'Não especificado'}
+${config.objective?.description ? `Descrição: ${config.objective.description}` : ''}
+
 OBJEÇÕES TRABALHADAS:`
 
     if (objectionsWithIds && objectionsWithIds.length > 0) {
@@ -133,7 +137,10 @@ OBJEÇÕES TRABALHADAS:`
       transcription,
       context,
       client_profile,
-      companyId: companyId // ID da empresa para contexto do agente
+      companyId: companyId, // ID da empresa para contexto do agente
+      objetivo: config.objective?.name
+        ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
+        : 'Não especificado'
     }
 
     console.log('📡 Enviando payload para N8N:', JSON.stringify(n8nPayload, null, 2))
