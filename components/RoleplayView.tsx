@@ -1431,7 +1431,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         {/* Configuration Modal */}
         {showConfig && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-20 pb-8 px-4 overflow-y-auto">
-            <div className="relative max-w-4xl w-full">
+            <div className="relative max-w-6xl w-full">
               <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
               <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 max-h-[calc(100vh-120px)] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
