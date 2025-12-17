@@ -193,6 +193,34 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }
 
   const handleStartSimulation = async () => {
+    // Validar persona selecionada
+    if (!selectedPersona) {
+      const messageElement = document.createElement('div')
+      messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
+      messageElement.textContent = 'Selecione uma persona para o roleplay'
+      document.body.appendChild(messageElement)
+
+      setTimeout(() => {
+        messageElement.remove()
+      }, 3000)
+
+      return
+    }
+
+    // Validar objeções selecionadas
+    if (selectedObjections.length === 0) {
+      const messageElement = document.createElement('div')
+      messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
+      messageElement.textContent = 'Selecione pelo menos uma objeção'
+      document.body.appendChild(messageElement)
+
+      setTimeout(() => {
+        messageElement.remove()
+      }, 3000)
+
+      return
+    }
+
     // Validar objetivo selecionado
     if (!selectedObjective) {
       const messageElement = document.createElement('div')
@@ -1934,6 +1962,38 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
                 </div>
 
+                {/* Aviso de configuração incompleta */}
+                {(!selectedPersona || selectedObjections.length === 0 || !selectedObjective) && (
+                  <div className="mt-4 bg-yellow-900/20 border border-yellow-500/40 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-yellow-300 mb-2">Configure os itens obrigatórios para iniciar:</p>
+                        <ul className="space-y-1 text-xs text-yellow-200">
+                          {!selectedPersona && (
+                            <li className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span>
+                              Selecione uma <strong>Persona</strong>
+                            </li>
+                          )}
+                          {selectedObjections.length === 0 && (
+                            <li className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span>
+                              Selecione pelo menos uma <strong>Objeção</strong>
+                            </li>
+                          )}
+                          {!selectedObjective && (
+                            <li className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span>
+                              Selecione um <strong>Objetivo</strong>
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-4 mt-5">
                   <button
@@ -1950,7 +2010,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <button
                     onClick={handleStartSimulation}
                     type="button"
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl text-base font-semibold hover:scale-105 transition-transform glow-green cursor-pointer"
+                    disabled={!selectedPersona || selectedObjections.length === 0 || !selectedObjective}
+                    className={`flex-1 px-6 py-3 rounded-xl text-base font-semibold transition-all ${
+                      !selectedPersona || selectedObjections.length === 0 || !selectedObjective
+                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'bg-gradient-to-r from-green-600 to-green-500 hover:scale-105 glow-green cursor-pointer'
+                    }`}
                   >
                     Iniciar Roleplay
                   </button>
