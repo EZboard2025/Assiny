@@ -10,9 +10,7 @@ import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
 import SalesDashboard from './SalesDashboard'
-import FollowUpView from './FollowUpView'
-// import { AnaliseVendaRealView } from './AnaliseVendaRealView'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, FileSearch, Lock } from 'lucide-react'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -35,7 +33,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'analise-venda-real'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -67,7 +65,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const view = params.get('view')
-      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links', 'followup'].includes(view)) {
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
 
@@ -191,14 +189,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (currentView === 'roleplay-links') {
       return <RoleplayLinksView />
     }
-
-    if (currentView === 'followup') {
-      return <FollowUpView />
-    }
-
-    /* if (currentView === 'analise-venda-real') {
-      return <AnaliseVendaRealView />
-    } */
 
     // Home view
     return (
@@ -345,8 +335,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div> */}
 
-            {/* Follow-up Analysis Card */}
-            <button
+            {/* Follow-up Analysis Card - TEMPORARIAMENTE OCULTO */}
+            {/* <button
               onClick={() => handleViewChange('followup')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '500ms' }}
@@ -376,7 +366,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   </svg>
                 </div>
               </div>
-            </button>
+            </button> */}
 
             {/* Análise de Venda Real Card - HIDDEN
             <button
