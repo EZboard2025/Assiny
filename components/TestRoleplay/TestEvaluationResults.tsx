@@ -1,16 +1,33 @@
 'use client'
 
-import { Trophy, Target, AlertTriangle, CheckCircle, ArrowRight, RotateCcw, Star, Zap, TrendingUp, Award, Sparkles } from 'lucide-react'
+import { Trophy, Target, AlertTriangle, CheckCircle, ArrowRight, RotateCcw, Star, Zap, TrendingUp, Award, Sparkles, MessageCircle } from 'lucide-react'
 
 interface TestEvaluationResultsProps {
   evaluation: any
+  sessionId: string
   onRestart: () => void
 }
 
 export default function TestEvaluationResults({
   evaluation,
+  sessionId,
   onRestart
 }: TestEvaluationResultsProps) {
+  // Função para registrar interesse e abrir WhatsApp
+  const handleInterest = () => {
+    // Registrar interesse no banco (fire and forget)
+    fetch('/api/teste/interest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId })
+    }).catch(() => {})
+
+    // Redirecionar para WhatsApp do vendedor
+    window.open(
+      'https://wa.me/5531994713357?text=Olá!%20Acabei%20de%20testar%20a%20Ramppy%20e%20tenho%20interesse%20em%20conhecer%20mais%20para%20minha%20equipe%20de%20vendas.',
+      '_blank'
+    )
+  }
   if (!evaluation) {
     return (
       <div className="text-center text-gray-400">
@@ -335,33 +352,44 @@ export default function TestEvaluationResults({
           )}
 
           {/* CTA Final */}
-          <div className="bg-gradient-to-r from-green-600/20 via-emerald-600/20 to-teal-600/20 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="text-center md:text-left">
-                <h3 className="text-xl font-bold text-white mb-2">
-                  Quer treinar mais e melhorar suas vendas?
+          <div className="relative overflow-hidden bg-gradient-to-br from-green-600/30 via-emerald-600/20 to-teal-600/30 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 shadow-2xl shadow-green-500/10">
+            {/* Brilho decorativo */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+            <div className="relative">
+              {/* Texto centralizado */}
+              <div className="text-center mb-6">
+                <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 leading-tight">
+                  Imagine sua equipe{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">
+                    treinando assim
+                  </span>{' '}
+                  todos os dias
                 </h3>
-                <p className="text-gray-400 text-sm">
-                  Com a Ramppy, você pratica com IA quantas vezes quiser e evolui constantemente.
+                <p className="text-gray-300 text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
+                  Acelere o ramp-up, reduza erros em campo e acompanhe a evolução de cada vendedor em tempo real.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                <button
-                  onClick={onRestart}
-                  className="px-6 py-3 bg-gray-700/50 text-white rounded-xl font-medium hover:bg-gray-700 transition-all flex items-center justify-center gap-2 border border-gray-600/50"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                  Novo Teste
-                </button>
+
+              {/* Botões centralizados */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <a
-                  href="https://ramppy.site"
+                  href="https://ramppy.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/30 transition-all flex items-center justify-center gap-2"
+                  className="group px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-2xl font-semibold hover:bg-white/20 transition-all flex items-center justify-center gap-3 border border-white/20 hover:border-white/40"
                 >
-                  Conhecer a Ramppy
-                  <ArrowRight className="w-5 h-5" />
+                  Visitar Site
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </a>
+                <button
+                  onClick={handleInterest}
+                  className="group px-8 py-4 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-green-500 to-emerald-400 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/40"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Tenho Interesse
+                </button>
               </div>
             </div>
           </div>

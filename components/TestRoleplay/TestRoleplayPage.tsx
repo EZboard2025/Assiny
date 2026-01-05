@@ -407,6 +407,7 @@ export default function TestRoleplayPage() {
       return (
         <TestEvaluationResults
           evaluation={evaluation}
+          sessionId={sessionId || ''}
           onRestart={handleRestart}
         />
       )
