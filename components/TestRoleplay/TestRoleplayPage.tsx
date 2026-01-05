@@ -617,13 +617,13 @@ export default function TestRoleplayPage() {
           {!sessionStarted && !showEvaluation && (
             <>
               <div className="text-center mb-8">
-                <h1 className="text-3xl md:text-4xl font-bold mb-3">
-                  <span className="text-white">Teste o </span>
+                <h1 className="text-3xl md:text-4xl font-bold mb-4">
+                  <span className="text-white">Teste a </span>
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-lime-400">
                     Ramppy
                   </span>
                 </h1>
-                <p className="text-gray-400">
+                <p className="text-lg md:text-xl text-transparent bg-clip-text bg-gradient-to-r from-green-300 via-emerald-200 to-lime-300 font-medium">
                   Configure seu cenário de vendas e experimente um roleplay personalizado
                 </p>
               </div>
