@@ -167,6 +167,18 @@ OBJEÇÕES TRABALHADAS:`
       overallScore = overallScore / 10
     }
 
+    // Converter scores SPIN também se necessário
+    if (evaluation.spin_evaluation) {
+      for (const key of ['S', 'P', 'I', 'N']) {
+        if (evaluation.spin_evaluation[key]?.final_score > 10) {
+          evaluation.spin_evaluation[key].final_score = evaluation.spin_evaluation[key].final_score / 10
+        }
+      }
+    }
+
+    // Atualizar o overall_score no objeto evaluation também
+    evaluation.overall_score = overallScore
+
     // Atualizar sessão com avaliação
     const { error: updateError } = await supabaseAdmin
       .from('test_roleplays')
