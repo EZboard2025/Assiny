@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Mic, MicOff, Square, Loader2, Volume2, User, Sparkles, Phone, Clock } from 'lucide-react'
+import { Mic, MicOff, Square, Loader2, Volume2, User, Sparkles, Clock } from 'lucide-react'
 import { PersonaB2B, PersonaB2C, Objection, CompanyInfo } from './TestRoleplayPage'
 
 interface TestRoleplaySessionProps {
@@ -364,31 +364,10 @@ export default function TestRoleplaySession({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Timer */}
-            <div className="flex items-center gap-2 bg-gray-800/60 px-4 py-2 rounded-xl border border-gray-700/50">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-white font-mono font-medium">{formatTime(elapsedTime)}</span>
-            </div>
-
-            {/* Botão Finalizar */}
-            <button
-              onClick={() => handleEndSession(false)}
-              disabled={isEnding || isLoading || messages.length < 2}
-              className="group px-5 py-2.5 bg-gradient-to-r from-red-600/20 to-orange-600/20 text-red-400 rounded-xl font-medium border border-red-500/30 hover:border-red-500/50 hover:from-red-600/30 hover:to-orange-600/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isEnding ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Avaliando...
-                </>
-              ) : (
-                <>
-                  <Phone className="w-4 h-4 group-hover:rotate-[135deg] transition-transform" />
-                  Encerrar Ligação
-                </>
-              )}
-            </button>
+          {/* Timer */}
+          <div className="flex items-center gap-2 bg-gray-800/60 px-4 py-2 rounded-xl border border-gray-700/50">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <span className="text-white font-mono font-medium">{formatTime(elapsedTime)}</span>
           </div>
         </div>
       </div>
