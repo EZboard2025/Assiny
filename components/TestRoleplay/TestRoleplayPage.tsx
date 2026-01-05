@@ -544,16 +544,17 @@ export default function TestRoleplayPage() {
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-green-500/10 rounded-full blur-[150px] pointer-events-none" />
 
       {/* Header */}
-      <header className="relative z-10 py-6 px-6">
+      <header className="relative z-10 py-4 px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-center">
-          <Image
-            src="/images/ramppy-logo.png"
-            alt="Ramppy"
-            width={400}
-            height={133}
-            className="h-24 w-auto"
-            priority
-          />
+          <div className="relative w-[350px] h-[100px] overflow-hidden">
+            <Image
+              src="/images/ramppy-logo.png"
+              alt="Ramppy"
+              fill
+              className="object-contain object-center scale-[2.2]"
+              priority
+            />
+          </div>
         </div>
       </header>
 
