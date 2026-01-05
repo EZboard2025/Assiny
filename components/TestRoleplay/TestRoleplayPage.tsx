@@ -12,7 +12,7 @@ import ClientProfileStep from './ClientProfileStep'
 import TestRoleplaySession from './TestRoleplaySession'
 import TestEvaluationResults from './TestEvaluationResults'
 
-// Keyframes CSS globais para animação das estrelas
+// Keyframes CSS globais para animação das estrelas e transições
 const globalStyles = `
   @keyframes twinkle {
     0%, 100% { opacity: 0.3; }
@@ -25,6 +25,52 @@ const globalStyles = `
     to {
       transform: translateY(-150vh) translateX(var(--float-x));
     }
+  }
+
+  /* Step transition animations */
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .step-enter-right {
+    animation: slideInRight 0.4s ease-out forwards;
+  }
+
+  .step-enter-left {
+    animation: slideInLeft 0.4s ease-out forwards;
+  }
+
+  .step-fade-up {
+    animation: fadeInUp 0.5s ease-out forwards;
   }
 
   /* Custom scrollbar */
@@ -87,6 +133,8 @@ const STEPS = [
 export default function TestRoleplayPage() {
   // Estado do step atual
   const [currentStep, setCurrentStep] = useState(0)
+  const [transitionDirection, setTransitionDirection] = useState<'forward' | 'backward'>('forward')
+  const [stepKey, setStepKey] = useState(0) // Para forçar re-render com animação
 
   // Step 1: Lead info
   const [leadName, setLeadName] = useState('')
@@ -221,15 +269,19 @@ export default function TestRoleplayPage() {
     })
   }, [])
 
-  // Navegação entre steps
+  // Navegação entre steps com animação
   const nextStep = () => {
     if (currentStep < STEPS.length - 1) {
+      setTransitionDirection('forward')
+      setStepKey(prev => prev + 1)
       setCurrentStep(currentStep + 1)
     }
   }
 
   const prevStep = () => {
     if (currentStep > 0) {
+      setTransitionDirection('backward')
+      setStepKey(prev => prev + 1)
       setCurrentStep(currentStep - 1)
     }
   }
@@ -585,7 +637,12 @@ export default function TestRoleplayPage() {
           )}
 
           {/* Step content */}
-          <div className="mt-8">
+          <div
+            key={stepKey}
+            className={`mt-8 ${
+              transitionDirection === 'forward' ? 'step-enter-right' : 'step-enter-left'
+            }`}
+          >
             {renderStepContent()}
           </div>
         </div>
