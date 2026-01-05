@@ -130,15 +130,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               {/* Logo e Título */}
               <div className="text-center mb-6">
                 {/* Logo Next.js Image */}
-                <div className="flex items-center justify-center mb-4">
-                  <Image
-                    src="/images/ramppy-logo.png"
-                    alt="Ramppy Logo"
-                    width={300}
-                    height={45}
-                    className="rounded-lg"
-                    priority
-                  />
+                <div className="flex items-center justify-center mb-2">
+                  <div className="relative w-[350px] h-[120px] overflow-hidden">
+                    <Image
+                      src="/images/ramppy-logo.png"
+                      alt="Ramppy Logo"
+                      fill
+                      className="object-contain object-center scale-[2.2]"
+                      priority
+                    />
+                  </div>
                 </div>
 
                 <h1 className="text-2xl font-bold mb-2">
