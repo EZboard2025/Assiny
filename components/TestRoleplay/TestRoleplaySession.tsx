@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Mic, MicOff, Square, Loader2, Volume2 } from 'lucide-react'
+import { Mic, MicOff, Square, Loader2, Volume2, User, Sparkles, Phone, Clock } from 'lucide-react'
 import { PersonaB2B, PersonaB2C, Objection, CompanyInfo } from './TestRoleplayPage'
 
 interface TestRoleplaySessionProps {
@@ -41,17 +41,39 @@ export default function TestRoleplaySession({
 }: TestRoleplaySessionProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isRecording, setIsRecording] = useState(false)
-  const [isLoading, setIsLoading] = useState(true) // Começa carregando primeira mensagem
+  const [isLoading, setIsLoading] = useState(true)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
   const [isEnding, setIsEnding] = useState(false)
+  const [audioVolume, setAudioVolume] = useState(0)
+  const [elapsedTime, setElapsedTime] = useState(0)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const hasInitializedRef = useRef(false) // Ref para evitar double execution do StrictMode
+  const hasInitializedRef = useRef(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animationRef = useRef<number | null>(null)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Scroll para o final das mensagens
+  // Timer
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setElapsedTime(prev => prev + 1)
+    }, 1000)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -60,14 +82,11 @@ export default function TestRoleplaySession({
     scrollToBottom()
   }, [messages])
 
-  // Carregar primeira mensagem do cliente (já vem do /api/teste/start)
   useEffect(() => {
-    // Usar ref para evitar double execution do React StrictMode
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
 
     const initFirstMessage = async () => {
-      // Usar a mensagem que já veio do /api/teste/start
       if (firstMessage) {
         const firstClientMessage: Message = {
           role: 'client',
@@ -75,18 +94,51 @@ export default function TestRoleplaySession({
           timestamp: new Date().toISOString()
         }
         setMessages([firstClientMessage])
-
-        // Tocar TTS da primeira mensagem
         await playTTS(firstMessage)
       }
-
       setIsLoading(false)
     }
 
     initFirstMessage()
   }, [])
 
-  // Tocar TTS
+  // Audio visualizer
+  const setupAudioVisualizer = (audio: HTMLAudioElement) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext()
+      }
+
+      const audioContext = audioContextRef.current
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 128
+      analyser.smoothingTimeConstant = 0.3
+      analyserRef.current = analyser
+
+      const source = audioContext.createMediaElementSource(audio)
+      source.connect(analyser)
+      analyser.connect(audioContext.destination)
+
+      const updateVolume = () => {
+        if (!analyserRef.current) return
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
+        analyserRef.current.getByteFrequencyData(dataArray)
+
+        const relevantFrequencies = dataArray.slice(5, 40)
+        const average = relevantFrequencies.reduce((a, b) => a + b, 0) / relevantFrequencies.length
+        const normalizedVolume = Math.min((average / 80) * 2.5, 1.2)
+
+        setAudioVolume(normalizedVolume)
+        animationRef.current = requestAnimationFrame(updateVolume)
+      }
+
+      updateVolume()
+    } catch (error) {
+      console.error('Erro ao configurar visualizador:', error)
+    }
+  }
+
   const playTTS = async (text: string) => {
     try {
       setIsPlayingAudio(true)
@@ -102,13 +154,22 @@ export default function TestRoleplaySession({
         const audio = new Audio(audioUrl)
         audioRef.current = audio
 
+        audio.onplay = () => {
+          setupAudioVisualizer(audio)
+        }
+
         audio.onended = () => {
           setIsPlayingAudio(false)
+          setAudioVolume(0)
+          if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current)
+          }
           URL.revokeObjectURL(audioUrl)
         }
 
         audio.onerror = () => {
           setIsPlayingAudio(false)
+          setAudioVolume(0)
           URL.revokeObjectURL(audioUrl)
         }
 
@@ -122,7 +183,6 @@ export default function TestRoleplaySession({
     }
   }
 
-  // Iniciar gravação
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -150,7 +210,6 @@ export default function TestRoleplaySession({
     }
   }
 
-  // Parar gravação
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
@@ -158,11 +217,9 @@ export default function TestRoleplaySession({
     }
   }
 
-  // Transcrever e enviar mensagem
   const handleTranscription = async (audioBlob: Blob) => {
     setIsLoading(true)
     try {
-      // Transcrever áudio
       const formData = new FormData()
       formData.append('audio', audioBlob, 'audio.webm')
 
@@ -182,7 +239,6 @@ export default function TestRoleplaySession({
         return
       }
 
-      // Adicionar mensagem do vendedor
       const sellerMessage: Message = {
         role: 'seller',
         text: transcribedText,
@@ -190,7 +246,6 @@ export default function TestRoleplaySession({
       }
       setMessages(prev => [...prev, sellerMessage])
 
-      // Enviar para o chat e receber resposta
       const chatResponse = await fetch('/api/teste/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -212,7 +267,6 @@ export default function TestRoleplaySession({
       if (chatResponse.ok) {
         const data = await chatResponse.json()
 
-        // Adicionar resposta do cliente
         const clientMessage: Message = {
           role: 'client',
           text: data.message,
@@ -220,15 +274,12 @@ export default function TestRoleplaySession({
         }
         setMessages(prev => [...prev, clientMessage])
 
-        // Tocar TTS da resposta
         await playTTS(data.message)
 
-        // Verificar se o roleplay foi finalizado pelo cliente (IA detectou comportamento inadequado ou fim natural)
         const messageText = data.message.toLowerCase()
         if (messageText.includes('roleplay finalizado') || messageText.includes('finalizar sessão') || messageText.includes('encerrar por aqui')) {
-          // Aguardar um pouco para o usuário ver a mensagem e depois finalizar automaticamente
           setTimeout(() => {
-            handleEndSession(true) // true = finalização automática, pula validação
+            handleEndSession(true)
           }, 2000)
         }
       }
@@ -239,9 +290,7 @@ export default function TestRoleplaySession({
     }
   }
 
-  // Finalizar sessão
   const handleEndSession = async (autoFinalize = false) => {
-    // Validação só para finalização manual
     if (!autoFinalize && messages.length < 2) {
       alert('Converse um pouco mais antes de finalizar.')
       return
@@ -269,112 +318,189 @@ export default function TestRoleplaySession({
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl border border-green-500/20 overflow-hidden">
-        {/* Header */}
-        <div className="p-4 border-b border-green-500/10 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-white">
-              Conversa com {clientName}
-            </h3>
-            <p className="text-xs text-gray-400">
-              {clientAge} anos | {clientTemperament}
-            </p>
-          </div>
-          <button
-            onClick={handleEndSession}
-            disabled={isEnding || isLoading || messages.length < 2}
-            className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isEnding ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Avaliando...
-              </>
-            ) : (
-              <>
-                <Square className="w-4 h-4" />
-                Finalizar
-              </>
-            )}
-          </button>
-        </div>
+    <div className="w-full max-w-4xl mx-auto">
+      {/* Header com info do cliente */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Avatar animado */}
+            <div className="relative">
+              <div
+                className={`w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg transition-all duration-300 ${
+                  isPlayingAudio ? 'scale-110 shadow-green-500/50' : ''
+                }`}
+                style={{
+                  transform: isPlayingAudio ? `scale(${1 + audioVolume * 0.15})` : 'scale(1)'
+                }}
+              >
+                <User className="w-8 h-8 text-white" />
+              </div>
+              {/* Indicador de status */}
+              <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-black flex items-center justify-center ${
+                isPlayingAudio ? 'bg-green-500' : isLoading ? 'bg-yellow-500' : 'bg-gray-500'
+              }`}>
+                {isPlayingAudio && <Volume2 className="w-3 h-3 text-white animate-pulse" />}
+                {isLoading && !isPlayingAudio && <Loader2 className="w-3 h-3 text-white animate-spin" />}
+              </div>
+            </div>
 
+            <div>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                {clientName}
+                {isPlayingAudio && (
+                  <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full animate-pulse">
+                    Falando...
+                  </span>
+                )}
+              </h2>
+              <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
+                <span className="flex items-center gap-1">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  {clientAge} anos
+                </span>
+                <span className="w-1 h-1 rounded-full bg-gray-600" />
+                <span className="text-emerald-400 font-medium">{clientTemperament}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Timer */}
+            <div className="flex items-center gap-2 bg-gray-800/60 px-4 py-2 rounded-xl border border-gray-700/50">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span className="text-white font-mono font-medium">{formatTime(elapsedTime)}</span>
+            </div>
+
+            {/* Botão Finalizar */}
+            <button
+              onClick={() => handleEndSession(false)}
+              disabled={isEnding || isLoading || messages.length < 2}
+              className="group px-5 py-2.5 bg-gradient-to-r from-red-600/20 to-orange-600/20 text-red-400 rounded-xl font-medium border border-red-500/30 hover:border-red-500/50 hover:from-red-600/30 hover:to-orange-600/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isEnding ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Avaliando...
+                </>
+              ) : (
+                <>
+                  <Phone className="w-4 h-4 group-hover:rotate-[135deg] transition-transform" />
+                  Encerrar Ligação
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Container principal */}
+      <div className="bg-gradient-to-b from-gray-900/80 to-gray-950/80 backdrop-blur-xl rounded-3xl border border-gray-700/50 overflow-hidden shadow-2xl">
         {/* Mensagens */}
-        <div className="h-[400px] overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        <div className="h-[450px] overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {messages.map((msg, index) => (
             <div
               key={index}
-              className={`flex ${msg.role === 'seller' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.role === 'seller' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                className={`max-w-[75%] rounded-2xl px-5 py-3.5 ${
                   msg.role === 'seller'
-                    ? 'bg-green-500/20 text-white rounded-br-md'
-                    : 'bg-gray-800/50 text-gray-200 rounded-bl-md'
+                    ? 'bg-gradient-to-br from-green-600/30 to-emerald-600/20 border border-green-500/30 rounded-br-md'
+                    : 'bg-gray-800/70 border border-gray-700/50 rounded-bl-md'
                 }`}
               >
-                <p className="text-xs text-gray-500 mb-1">
-                  {msg.role === 'seller' ? 'Você' : clientName}
-                </p>
-                <p className="text-sm">{msg.text}</p>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={`text-xs font-medium ${
+                    msg.role === 'seller' ? 'text-green-400' : 'text-gray-400'
+                  }`}>
+                    {msg.role === 'seller' ? 'Você' : clientName}
+                  </span>
+                  <span className="text-[10px] text-gray-600">
+                    {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
               </div>
             </div>
           ))}
 
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-800/50 rounded-2xl px-4 py-3 rounded-bl-md">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-green-400" />
-                  <span className="text-sm text-gray-400">Pensando...</span>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Controles */}
-        <div className="p-4 border-t border-green-500/10">
-          {/* Indicador de áudio tocando */}
+        {/* Área de controles */}
+        <div className="relative border-t border-gray-700/50 bg-gradient-to-t from-gray-900/50 to-transparent p-6">
+          {/* Visualização de áudio tocando */}
           {isPlayingAudio && (
-            <div className="flex items-center justify-center gap-2 mb-4 text-green-400">
-              <Volume2 className="w-5 h-5 animate-pulse" />
-              <span className="text-sm">Cliente falando...</span>
-            </div>
+            <div className="absolute inset-x-0 -top-1 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent animate-pulse" />
           )}
 
-          {/* Botão de gravação */}
-          <div className="flex justify-center">
-            {!isRecording ? (
+          <div className="flex flex-col items-center">
+            {/* Botão principal de gravação */}
+            <div className="relative">
+              {/* Anel animado quando está tocando áudio */}
+              {isPlayingAudio && (
+                <div
+                  className="absolute inset-0 rounded-full bg-green-500/20 animate-ping"
+                  style={{ transform: `scale(${1.2 + audioVolume * 0.3})` }}
+                />
+              )}
+
+              {/* Anel de gravação */}
+              {isRecording && (
+                <div className="absolute inset-0 rounded-full border-4 border-red-500/50 animate-pulse scale-[1.15]" />
+              )}
+
               <button
-                onClick={startRecording}
+                onClick={isRecording ? stopRecording : startRecording}
                 disabled={isLoading || isPlayingAudio}
-                className="w-20 h-20 rounded-full bg-gradient-to-r from-green-600 to-green-500 text-white flex items-center justify-center hover:scale-105 hover:shadow-xl hover:shadow-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  isRecording
+                    ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-xl shadow-red-500/40 scale-105'
+                    : 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-xl shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105'
+                }`}
               >
-                <Mic className="w-8 h-8" />
+                {isRecording ? (
+                  <MicOff className="w-10 h-10 text-white" />
+                ) : (
+                  <Mic className="w-10 h-10 text-white" />
+                )}
               </button>
-            ) : (
-              <button
-                onClick={stopRecording}
-                className="w-20 h-20 rounded-full bg-gradient-to-r from-red-600 to-red-500 text-white flex items-center justify-center hover:scale-105 hover:shadow-xl hover:shadow-red-500/50 transition-all animate-pulse"
-              >
-                <MicOff className="w-8 h-8" />
-              </button>
+            </div>
+
+            {/* Status text */}
+            <p className={`mt-4 text-sm font-medium transition-all ${
+              isRecording
+                ? 'text-red-400'
+                : isPlayingAudio
+                ? 'text-green-400'
+                : 'text-gray-400'
+            }`}>
+              {isRecording
+                ? 'Gravando... Clique para enviar'
+                : isPlayingAudio
+                ? 'Ouça o cliente responder...'
+                : isLoading
+                ? 'Processando...'
+                : 'Clique no microfone para falar'}
+            </p>
+
+            {/* Dica */}
+            {!isRecording && !isPlayingAudio && !isLoading && messages.length > 0 && (
+              <p className="mt-2 text-xs text-gray-600">
+                Dica: Escute atentamente e responda de forma natural
+              </p>
             )}
           </div>
-
-          <p className="text-center text-xs text-gray-500 mt-3">
-            {isRecording
-              ? 'Clique para parar de gravar'
-              : isPlayingAudio
-              ? 'Aguarde o cliente terminar de falar'
-              : 'Clique para começar a falar'}
-          </p>
         </div>
+      </div>
+
+      {/* Rodapé com info */}
+      <div className="mt-4 flex items-center justify-center gap-6 text-xs text-gray-500">
+        <span>{messages.length} mensagens</span>
+        <span className="w-1 h-1 rounded-full bg-gray-600" />
+        <span>Sessão #{sessionId.slice(-6)}</span>
       </div>
     </div>
   )
