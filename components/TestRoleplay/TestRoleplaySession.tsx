@@ -44,12 +44,12 @@ export default function TestRoleplaySession({
   const [isLoading, setIsLoading] = useState(true) // Começa carregando primeira mensagem
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
   const [isEnding, setIsEnding] = useState(false)
-  const [firstMessageLoaded, setFirstMessageLoaded] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const hasInitializedRef = useRef(false) // Ref para evitar double execution do StrictMode
 
   // Scroll para o final das mensagens
   const scrollToBottom = () => {
@@ -62,12 +62,11 @@ export default function TestRoleplaySession({
 
   // Carregar primeira mensagem do cliente (já vem do /api/teste/start)
   useEffect(() => {
-    let isCancelled = false
+    // Usar ref para evitar double execution do React StrictMode
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
 
     const initFirstMessage = async () => {
-      // Evitar execução duplicada (React StrictMode)
-      if (firstMessageLoaded) return
-
       // Usar a mensagem que já veio do /api/teste/start
       if (firstMessage) {
         const firstClientMessage: Message = {
@@ -78,22 +77,13 @@ export default function TestRoleplaySession({
         setMessages([firstClientMessage])
 
         // Tocar TTS da primeira mensagem
-        if (!isCancelled) {
-          await playTTS(firstMessage)
-        }
+        await playTTS(firstMessage)
       }
 
-      if (!isCancelled) {
-        setIsLoading(false)
-        setFirstMessageLoaded(true)
-      }
+      setIsLoading(false)
     }
 
     initFirstMessage()
-
-    return () => {
-      isCancelled = true
-    }
   }, [])
 
   // Tocar TTS
@@ -232,6 +222,15 @@ export default function TestRoleplaySession({
 
         // Tocar TTS da resposta
         await playTTS(data.message)
+
+        // Verificar se o roleplay foi finalizado pelo cliente (IA detectou comportamento inadequado ou fim natural)
+        const messageText = data.message.toLowerCase()
+        if (messageText.includes('roleplay finalizado') || messageText.includes('finalizar sessão') || messageText.includes('encerrar por aqui')) {
+          // Aguardar um pouco para o usuário ver a mensagem e depois finalizar automaticamente
+          setTimeout(() => {
+            handleEndSession(true) // true = finalização automática, pula validação
+          }, 2000)
+        }
       }
     } catch (error) {
       console.error('Erro:', error)
@@ -241,8 +240,9 @@ export default function TestRoleplaySession({
   }
 
   // Finalizar sessão
-  const handleEndSession = async () => {
-    if (messages.length < 2) {
+  const handleEndSession = async (autoFinalize = false) => {
+    // Validação só para finalização manual
+    if (!autoFinalize && messages.length < 2) {
       alert('Converse um pouco mais antes de finalizar.')
       return
     }
@@ -352,7 +352,7 @@ export default function TestRoleplaySession({
             {!isRecording ? (
               <button
                 onClick={startRecording}
-                disabled={isLoading || isPlayingAudio || !firstMessageLoaded}
+                disabled={isLoading || isPlayingAudio}
                 className="w-20 h-20 rounded-full bg-gradient-to-r from-green-600 to-green-500 text-white flex items-center justify-center hover:scale-105 hover:shadow-xl hover:shadow-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 <Mic className="w-8 h-8" />
