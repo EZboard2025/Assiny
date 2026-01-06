@@ -110,6 +110,49 @@ export default function TestEvaluationResults({
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4">
+      {/* CTA Principal - No topo */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-green-600/30 via-emerald-600/20 to-teal-600/30 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 shadow-2xl shadow-green-500/10 mb-8">
+        {/* Brilho decorativo */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+        <div className="relative">
+          {/* Texto centralizado */}
+          <div className="text-center mb-6">
+            <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 leading-tight">
+              Imagine sua equipe{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">
+                treinando assim
+              </span>{' '}
+              todos os dias
+            </h3>
+            <p className="text-gray-300 text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
+              Acelere o ramp-up, reduza erros em campo e acompanhe a evolução de cada vendedor em tempo real.
+            </p>
+          </div>
+
+          {/* Botões centralizados */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="https://ramppy.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-2xl font-semibold hover:bg-white/20 transition-all flex items-center justify-center gap-3 border border-white/20 hover:border-white/40"
+            >
+              Visitar Site
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </a>
+            <button
+              onClick={handleInterest}
+              className="group px-8 py-4 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-green-500 to-emerald-400 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/40"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Tenho Interesse
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Header Principal */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30 mb-4">
@@ -351,48 +394,6 @@ export default function TestEvaluationResults({
             </div>
           )}
 
-          {/* CTA Final */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-green-600/30 via-emerald-600/20 to-teal-600/30 backdrop-blur-xl rounded-3xl p-8 border border-green-500/40 shadow-2xl shadow-green-500/10">
-            {/* Brilho decorativo */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-
-            <div className="relative">
-              {/* Texto centralizado */}
-              <div className="text-center mb-6">
-                <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 leading-tight">
-                  Imagine sua equipe{' '}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">
-                    treinando assim
-                  </span>{' '}
-                  todos os dias
-                </h3>
-                <p className="text-gray-300 text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
-                  Acelere o ramp-up, reduza erros em campo e acompanhe a evolução de cada vendedor em tempo real.
-                </p>
-              </div>
-
-              {/* Botões centralizados */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a
-                  href="https://ramppy.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-2xl font-semibold hover:bg-white/20 transition-all flex items-center justify-center gap-3 border border-white/20 hover:border-white/40"
-                >
-                  Visitar Site
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </a>
-                <button
-                  onClick={handleInterest}
-                  className="group px-8 py-4 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-green-500 to-emerald-400 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/40"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  Tenho Interesse
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
