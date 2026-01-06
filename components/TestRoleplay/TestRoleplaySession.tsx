@@ -154,7 +154,15 @@ export default function TestRoleplaySession({
         const audio = new Audio(audioUrl)
         audioRef.current = audio
 
+        // Configurações para mobile
+        audio.setAttribute('playsinline', 'true')
+        audio.setAttribute('webkit-playsinline', 'true')
+
         audio.onplay = () => {
+          // Resumir AudioContext se estiver suspenso (necessário para mobile)
+          if (audioContextRef.current?.state === 'suspended') {
+            audioContextRef.current.resume()
+          }
           setupAudioVisualizer(audio)
         }
 
@@ -167,13 +175,21 @@ export default function TestRoleplaySession({
           URL.revokeObjectURL(audioUrl)
         }
 
-        audio.onerror = () => {
+        audio.onerror = (e) => {
+          console.error('Erro ao reproduzir áudio:', e)
           setIsPlayingAudio(false)
           setAudioVolume(0)
           URL.revokeObjectURL(audioUrl)
         }
 
-        await audio.play()
+        // Tentar reproduzir - se falhar no mobile, usar interação do usuário
+        try {
+          await audio.play()
+        } catch (playError) {
+          console.warn('Autoplay bloqueado, aguardando interação:', playError)
+          // No mobile, o primeiro play pode falhar - o áudio será tocado após interação
+          setIsPlayingAudio(false)
+        }
       } else {
         setIsPlayingAudio(false)
       }
@@ -185,6 +201,14 @@ export default function TestRoleplaySession({
 
   const startRecording = async () => {
     try {
+      // Inicializar/resumir AudioContext na interação do usuário (necessário para mobile)
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext()
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
