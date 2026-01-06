@@ -433,14 +433,18 @@ export default function TestRoleplaySession({
 
               <button
                 onClick={isRecording ? stopRecording : startRecording}
-                disabled={isLoading || isPlayingAudio}
+                disabled={isLoading || isPlayingAudio || isEnding}
                 className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  isRecording
+                  isEnding
+                    ? 'bg-gradient-to-br from-purple-500 to-violet-600 shadow-xl shadow-purple-500/30'
+                    : isRecording
                     ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-xl shadow-red-500/40 scale-105'
                     : 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-xl shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105'
                 }`}
               >
-                {isRecording ? (
+                {isEnding ? (
+                  <Loader2 className="w-10 h-10 text-white animate-spin" />
+                ) : isRecording ? (
                   <MicOff className="w-10 h-10 text-white" />
                 ) : (
                   <Mic className="w-10 h-10 text-white" />
@@ -450,13 +454,17 @@ export default function TestRoleplaySession({
 
             {/* Status text */}
             <p className={`mt-4 text-sm font-medium transition-all ${
-              isRecording
+              isEnding
+                ? 'text-purple-400'
+                : isRecording
                 ? 'text-red-400'
                 : isPlayingAudio
                 ? 'text-green-400'
                 : 'text-gray-400'
             }`}>
-              {isRecording
+              {isEnding
+                ? 'Processando sua avaliação...'
+                : isRecording
                 ? 'Gravando... Clique para enviar'
                 : isPlayingAudio
                 ? 'Ouça o cliente responder...'
@@ -466,7 +474,11 @@ export default function TestRoleplaySession({
             </p>
 
             {/* Dica */}
-            {!isRecording && !isPlayingAudio && !isLoading && messages.length > 0 && (
+            {isEnding ? (
+              <p className="mt-2 text-xs text-purple-400/70">
+                Aguarde enquanto analisamos sua performance...
+              </p>
+            ) : !isRecording && !isPlayingAudio && !isLoading && messages.length > 0 && (
               <p className="mt-2 text-xs text-gray-600">
                 Dica: Escute atentamente e responda de forma natural
               </p>
