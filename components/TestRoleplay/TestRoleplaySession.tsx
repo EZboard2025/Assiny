@@ -46,6 +46,7 @@ export default function TestRoleplaySession({
   const [isEnding, setIsEnding] = useState(false)
   const [audioVolume, setAudioVolume] = useState(0)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -56,6 +57,7 @@ export default function TestRoleplaySession({
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animationRef = useRef<number | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const audioSourceCreatedRef = useRef(false)
 
   // Timer
   useEffect(() => {
@@ -102,22 +104,39 @@ export default function TestRoleplaySession({
     initFirstMessage()
   }, [])
 
-  // Audio visualizer
+  // Audio visualizer - simplificado para mobile
   const setupAudioVisualizer = (audio: HTMLAudioElement) => {
     try {
+      // Evitar criar múltiplas sources para o mesmo elemento
+      if (audioSourceCreatedRef.current) {
+        return
+      }
+
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext()
       }
 
       const audioContext = audioContextRef.current
+
+      // Resumir se suspenso
+      if (audioContext.state === 'suspended') {
+        audioContext.resume()
+      }
+
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 128
       analyser.smoothingTimeConstant = 0.3
       analyserRef.current = analyser
 
-      const source = audioContext.createMediaElementSource(audio)
-      source.connect(analyser)
-      analyser.connect(audioContext.destination)
+      try {
+        const source = audioContext.createMediaElementSource(audio)
+        source.connect(analyser)
+        analyser.connect(audioContext.destination)
+        audioSourceCreatedRef.current = true
+      } catch (sourceError) {
+        // Source já foi criada para este elemento, ignorar
+        console.warn('Audio source já existe:', sourceError)
+      }
 
       const updateVolume = () => {
         if (!analyserRef.current) return
@@ -136,6 +155,51 @@ export default function TestRoleplaySession({
       updateVolume()
     } catch (error) {
       console.error('Erro ao configurar visualizador:', error)
+    }
+  }
+
+  // Função para reproduzir áudio pendente (quando usuário clica)
+  const playPendingAudio = async () => {
+    if (!pendingAudioUrl) return
+
+    try {
+      // Inicializar AudioContext na interação do usuário
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext()
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
+      const audio = new Audio(pendingAudioUrl)
+      audioRef.current = audio
+      audio.setAttribute('playsinline', 'true')
+
+      setIsPlayingAudio(true)
+
+      audio.onplay = () => {
+        setupAudioVisualizer(audio)
+      }
+
+      audio.onended = () => {
+        setIsPlayingAudio(false)
+        setAudioVolume(0)
+        setPendingAudioUrl(null)
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current)
+        }
+      }
+
+      audio.onerror = () => {
+        setIsPlayingAudio(false)
+        setPendingAudioUrl(null)
+      }
+
+      await audio.play()
+    } catch (error) {
+      console.error('Erro ao reproduzir áudio pendente:', error)
+      setIsPlayingAudio(false)
+      setPendingAudioUrl(null)
     }
   }
 
@@ -169,6 +233,7 @@ export default function TestRoleplaySession({
         audio.onended = () => {
           setIsPlayingAudio(false)
           setAudioVolume(0)
+          setPendingAudioUrl(null)
           if (animationRef.current) {
             cancelAnimationFrame(animationRef.current)
           }
@@ -179,15 +244,17 @@ export default function TestRoleplaySession({
           console.error('Erro ao reproduzir áudio:', e)
           setIsPlayingAudio(false)
           setAudioVolume(0)
+          setPendingAudioUrl(null)
           URL.revokeObjectURL(audioUrl)
         }
 
-        // Tentar reproduzir - se falhar no mobile, usar interação do usuário
+        // Tentar reproduzir - se falhar no mobile, salvar URL para reproduzir depois
         try {
           await audio.play()
         } catch (playError) {
-          console.warn('Autoplay bloqueado, aguardando interação:', playError)
-          // No mobile, o primeiro play pode falhar - o áudio será tocado após interação
+          console.warn('Autoplay bloqueado, salvando áudio para reprodução manual:', playError)
+          // Salvar URL do áudio para o usuário clicar e reproduzir
+          setPendingAudioUrl(audioUrl)
           setIsPlayingAudio(false)
         }
       } else {
@@ -440,6 +507,17 @@ export default function TestRoleplaySession({
           )}
 
           <div className="flex flex-col items-center">
+            {/* Botão para ouvir áudio pendente (mobile) */}
+            {pendingAudioUrl && !isPlayingAudio && (
+              <button
+                onClick={playPendingAudio}
+                className="mb-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-medium flex items-center gap-2 animate-pulse hover:animate-none hover:scale-105 transition-transform shadow-lg shadow-blue-500/30"
+              >
+                <Volume2 className="w-5 h-5" />
+                Toque para ouvir o cliente
+              </button>
+            )}
+
             {/* Botão principal de gravação */}
             <div className="relative">
               {/* Anel animado quando está tocando áudio */}
@@ -457,7 +535,7 @@ export default function TestRoleplaySession({
 
               <button
                 onClick={isRecording ? stopRecording : startRecording}
-                disabled={isLoading || isPlayingAudio || isEnding}
+                disabled={isLoading || isPlayingAudio || isEnding || !!pendingAudioUrl}
                 className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${
                   isEnding
                     ? 'bg-gradient-to-br from-purple-500 to-violet-600 shadow-xl shadow-purple-500/30'
@@ -478,7 +556,9 @@ export default function TestRoleplaySession({
 
             {/* Status text */}
             <p className={`mt-4 text-sm font-medium transition-all ${
-              isEnding
+              pendingAudioUrl
+                ? 'text-blue-400'
+                : isEnding
                 ? 'text-purple-400'
                 : isRecording
                 ? 'text-red-400'
@@ -486,7 +566,9 @@ export default function TestRoleplaySession({
                 ? 'text-green-400'
                 : 'text-gray-400'
             }`}>
-              {isEnding
+              {pendingAudioUrl
+                ? 'Áudio pronto - toque no botão acima para ouvir'
+                : isEnding
                 ? 'Processando sua avaliação...'
                 : isRecording
                 ? 'Gravando... Clique para enviar'
