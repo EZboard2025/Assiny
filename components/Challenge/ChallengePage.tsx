@@ -491,6 +491,9 @@ export default function ChallengePage() {
       // Definir nova fonte
       audio.src = audioUrl
 
+      // IMPORTANTE: Garantir volume máximo (pode ter ficado baixo do unlock)
+      audio.volume = 1
+
       // Configurar visualizador
       setupAudioVisualizer(audio)
 
