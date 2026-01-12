@@ -72,6 +72,7 @@ export default function ChallengePage() {
   const streamRef = useRef<MediaStream | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioAnalyserRef = useRef<AnalyserNode | null>(null)
+  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([])
@@ -394,7 +395,7 @@ export default function ChallengePage() {
     }
   }
 
-  // Text to Speech
+  // Text to Speech - Otimizado para iOS
   const textToSpeech = async (text: string, shouldFinalize: boolean = false) => {
     try {
       console.log('🔊 Gerando TTS:', text.substring(0, 50) + '...')
@@ -413,19 +414,38 @@ export default function ChallengePage() {
       const audioBlob = await response.blob()
       const audioUrl = URL.createObjectURL(audioBlob)
 
-      if (audioRef.current) {
-        audioRef.current.pause()
+      // Reutilizar o elemento de áudio existente (importante para iOS)
+      let audio = audioRef.current
+
+      if (!audio) {
+        audio = new Audio()
+        audioRef.current = audio
+
+        // Configurar uma vez só - atributos para iOS
+        ;(audio as any).playsInline = true
+        audio.setAttribute('playsinline', 'true')
+        audio.setAttribute('webkit-playsinline', 'true')
+      } else {
+        // Parar áudio anterior se estiver tocando
+        audio.pause()
+        audio.currentTime = 0
       }
 
-      const audio = new Audio(audioUrl)
-      audioRef.current = audio
+      // Revogar URL anterior se existir
+      if (audio.src && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src)
+      }
 
+      // Definir nova fonte
+      audio.src = audioUrl
+
+      // Configurar visualizador
       setupAudioVisualizer(audio)
 
+      // Handler para quando terminar
       audio.onended = () => {
         setIsPlayingAudio(false)
         setAudioVolume(0)
-        URL.revokeObjectURL(audioUrl)
 
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current)
@@ -441,8 +461,38 @@ export default function ChallengePage() {
         }
       }
 
-      await audio.play()
-      console.log('🔊 Tocando áudio')
+      // Handler para erro
+      audio.onerror = (e) => {
+        console.error('❌ Erro ao reproduzir áudio:', e)
+        setIsPlayingAudio(false)
+        setAudioVolume(0)
+
+        if (shouldFinalize) {
+          handleEndCall()
+        }
+      }
+
+      // Carregar e tocar - essencial para iOS
+      audio.load()
+
+      // Tentar tocar com retry para iOS
+      try {
+        await audio.play()
+        console.log('🔊 Tocando áudio')
+      } catch (playError: any) {
+        console.warn('⚠️ Primeira tentativa de play falhou:', playError.message)
+
+        // iOS às vezes precisa de um pequeno delay
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        try {
+          await audio.play()
+          console.log('🔊 Tocando áudio (segunda tentativa)')
+        } catch (retryError) {
+          console.error('❌ Falha ao tocar áudio após retry:', retryError)
+          throw retryError
+        }
+      }
 
     } catch (error) {
       console.error('Erro no TTS:', error)
@@ -459,20 +509,52 @@ export default function ChallengePage() {
   // Configurar visualizador de áudio
   const setupAudioVisualizer = (audio: HTMLAudioElement) => {
     try {
+      // Cancelar animação anterior se existir
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+
+      // Criar AudioContext se não existir
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
       }
 
       const audioContext = audioContextRef.current
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 128
-      analyser.smoothingTimeConstant = 0.3
 
-      const source = audioContext.createMediaElementSource(audio)
-      source.connect(analyser)
-      analyser.connect(audioContext.destination)
+      // Resumir contexto se estiver suspenso (necessário para iOS)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume()
+      }
 
-      audioAnalyserRef.current = analyser
+      // Criar analyser se não existir
+      if (!audioAnalyserRef.current) {
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 128
+        analyser.smoothingTimeConstant = 0.3
+        audioAnalyserRef.current = analyser
+      }
+
+      const analyser = audioAnalyserRef.current
+
+      // Criar source apenas uma vez por elemento de áudio
+      // (createMediaElementSource só pode ser chamado uma vez por elemento)
+      if (!audioSourceRef.current) {
+        try {
+          const source = audioContext.createMediaElementSource(audio)
+          source.connect(analyser)
+          analyser.connect(audioContext.destination)
+          audioSourceRef.current = source
+          console.log('🔊 Audio source criado e conectado')
+        } catch (sourceError: any) {
+          // Se o elemento já foi conectado, apenas continue
+          if (sourceError.message?.includes('already connected')) {
+            console.log('🔊 Audio source já conectado, reutilizando')
+          } else {
+            throw sourceError
+          }
+        }
+      }
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount)
 
