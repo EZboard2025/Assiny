@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const overallScore = evaluation?.overall_score || evaluation?.score || null
 
     // Atualizar o lead com a avaliação
-    const updateData: Record<string, unknown> = {
+    const updateData = {
       status: 'completed',
       completed_at: new Date().toISOString(),
       evaluation: evaluation || null,
@@ -44,15 +44,20 @@ export async function POST(request: NextRequest) {
       overall_score: overallScore
     }
 
-    let query = supabaseAdmin.from('challenge_leads')
-
-    if (leadId) {
-      query = query.update(updateData).eq('id', leadId)
-    } else {
-      query = query.update(updateData).eq('session_id', sessionId)
-    }
-
-    const { data: lead, error: updateError } = await query.select().single()
+    // Executar update baseado em leadId ou sessionId
+    const { data: lead, error: updateError } = leadId
+      ? await supabaseAdmin
+          .from('challenge_leads')
+          .update(updateData)
+          .eq('id', leadId)
+          .select()
+          .single()
+      : await supabaseAdmin
+          .from('challenge_leads')
+          .update(updateData)
+          .eq('session_id', sessionId)
+          .select()
+          .single()
 
     if (updateError) {
       console.error('Erro ao atualizar lead:', updateError)
