@@ -65,6 +65,14 @@ export default function ChallengePage() {
   const [currentTranscription, setCurrentTranscription] = useState('')
   const [audioVolume, setAudioVolume] = useState(0)
 
+  // Função para normalizar score (N8N pode retornar 0-10 ou 0-100)
+  const normalizeScore = (score: number | null | undefined): number => {
+    if (score === null || score === undefined) return 0
+    // Se score > 10, está na escala 0-100, dividir por 10
+    // Se score <= 10, já está na escala 0-10
+    return score > 10 ? score / 10 : score
+  }
+
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -942,7 +950,7 @@ export default function ChallengePage() {
                                 stroke="url(#scoreGradient)"
                                 strokeWidth="8"
                                 strokeLinecap="round"
-                                strokeDasharray={`${((evaluation.overall_score ?? evaluation.score ?? 0) / 100) * 402} 402`}
+                                strokeDasharray={`${(normalizeScore(evaluation.overall_score ?? evaluation.score) / 10) * 402} 402`}
                                 className="transition-all duration-1000 ease-out"
                               />
                               <defs>
@@ -954,7 +962,7 @@ export default function ChallengePage() {
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                               <span className="text-5xl font-black text-white">
-                                {((evaluation.overall_score ?? evaluation.score ?? 0) / 10).toFixed(1)}
+                                {normalizeScore(evaluation.overall_score ?? evaluation.score).toFixed(1)}
                               </span>
                               <span className="text-gray-400 text-xs mt-1">de 10</span>
                             </div>
@@ -1025,7 +1033,7 @@ export default function ChallengePage() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           {(['S', 'P', 'I', 'N'] as const).map((letter, idx) => {
                             const spin = evaluation.spin_evaluation?.[letter]
-                            const score = spin?.final_score ?? 0
+                            const score = normalizeScore(spin?.final_score)
                             const labels = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
                             const colors = {
                               S: 'from-blue-500 to-cyan-500',
