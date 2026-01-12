@@ -154,9 +154,32 @@ export default function ChallengePage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      const options = {
-        mimeType: 'audio/webm;codecs=opus',
+      // Detectar formato suportado (Safari/iOS não suporta webm)
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg',
+        ''  // fallback para default do browser
+      ]
+
+      let selectedMimeType = ''
+      for (const mimeType of mimeTypes) {
+        if (mimeType === '' || MediaRecorder.isTypeSupported(mimeType)) {
+          selectedMimeType = mimeType
+          break
+        }
+      }
+
+      console.log('🎙️ Formato de áudio selecionado:', selectedMimeType || 'default')
+
+      const options: MediaRecorderOptions = {
         audioBitsPerSecond: 32000
+      }
+
+      if (selectedMimeType) {
+        options.mimeType = selectedMimeType
       }
 
       const mediaRecorder = new MediaRecorder(stream, options)
@@ -178,8 +201,10 @@ export default function ChallengePage() {
           return
         }
 
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        console.log('📦 Blob de áudio criado, tamanho:', audioBlob.size, 'bytes')
+        // Usar o mimeType real do MediaRecorder
+        const actualMimeType = mediaRecorder.mimeType || 'audio/webm'
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMimeType })
+        console.log('📦 Blob de áudio criado, tipo:', actualMimeType, 'tamanho:', audioBlob.size, 'bytes')
 
         stream.getTracks().forEach(track => track.stop())
         mediaRecorderRef.current = null
@@ -214,8 +239,21 @@ export default function ChallengePage() {
     setIsLoading(true)
 
     try {
+      // Determinar extensão baseado no mimeType
+      const mimeType = audioBlob.type
+      let extension = 'webm'
+      if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
+        extension = 'mp4'
+      } else if (mimeType.includes('ogg')) {
+        extension = 'ogg'
+      } else if (mimeType.includes('aac')) {
+        extension = 'aac'
+      } else if (mimeType.includes('wav')) {
+        extension = 'wav'
+      }
+
       const formData = new FormData()
-      formData.append('audio', audioBlob, 'recording.webm')
+      formData.append('audio', audioBlob, `recording.${extension}`)
 
       const response = await fetch('/api/roleplay/transcribe', {
         method: 'POST',
