@@ -74,6 +74,12 @@ export default function ChallengePage() {
   const audioAnalyserRef = useRef<AnalyserNode | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<Message[]>([])
+
+  // Manter ref sincronizada com state (evita closure stale)
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   // Auto-scroll para última mensagem
   useEffect(() => {
@@ -501,10 +507,19 @@ export default function ChallengePage() {
     // Ir para tela de avaliação
     setStep('evaluating')
 
-    // Montar transcrição completa
-    const transcription = messages
+    // Usar ref para pegar o valor mais atualizado (evita closure stale)
+    const currentMessages = messagesRef.current
+
+    console.log('📋 Messages no estado:', messages.length, 'mensagens')
+    console.log('📋 Messages na ref:', currentMessages.length, 'mensagens')
+    console.log('📋 Messages completo:', JSON.stringify(currentMessages, null, 2))
+
+    const transcription = currentMessages
       .map(msg => `${msg.role === 'seller' ? 'Vendedor' : 'Cliente'}: ${msg.text}`)
       .join('\n')
+
+    console.log('📋 Transcrição montada:', transcription.substring(0, 500))
+    console.log('📋 Tamanho da transcrição:', transcription.length, 'caracteres')
 
     try {
       console.log('📊 Enviando para avaliação...')

@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📊 Avaliando desafio - Session: ${sessionId}`)
+    console.log(`📋 Transcrição recebida (${transcription?.length || 0} chars):`, transcription?.substring(0, 1000))
     console.log(`📤 Enviando para N8N: ${N8N_EVALUATION_WEBHOOK}`)
 
     // Chamar webhook do N8N para avaliação
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       leadId
     }
-    console.log('📦 Payload:', JSON.stringify(payload).substring(0, 200) + '...')
+    console.log('📦 Payload completo:', JSON.stringify(payload))
 
     const n8nResponse = await fetch(N8N_EVALUATION_WEBHOOK, {
       method: 'POST',
