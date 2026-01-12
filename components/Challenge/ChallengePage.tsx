@@ -73,6 +73,43 @@ export default function ChallengePage() {
     return score > 10 ? score / 10 : score
   }
 
+  // Destravar áudio no iOS - deve ser chamado em resposta a interação do usuário
+  const unlockAudioForIOS = () => {
+    // Criar elemento de áudio se não existir
+    if (!audioRef.current) {
+      const audio = new Audio()
+      audioRef.current = audio
+
+      // Configurar atributos para iOS
+      ;(audio as any).playsInline = true
+      audio.setAttribute('playsinline', 'true')
+      audio.setAttribute('webkit-playsinline', 'true')
+    }
+
+    // Criar AudioContext se não existir
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+    }
+
+    // Resumir AudioContext se suspenso (iOS suspende por padrão)
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume()
+    }
+
+    // Tocar um som silencioso para destravar o áudio no iOS
+    const audio = audioRef.current
+    audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dX/////////////////////////////////'
+    audio.volume = 0.01
+    audio.play().then(() => {
+      console.log('🔓 Áudio destravado para iOS')
+      audio.pause()
+      audio.currentTime = 0
+      audio.volume = 1
+    }).catch((e) => {
+      console.log('⚠️ Não foi possível destravar áudio:', e.message)
+    })
+  }
+
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -125,6 +162,9 @@ export default function ChallengePage() {
       return
     }
 
+    // IMPORTANTE: Destravar áudio no iOS durante a interação do usuário
+    unlockAudioForIOS()
+
     setSubmittingForm(true)
 
     try {
@@ -166,6 +206,10 @@ export default function ChallengePage() {
     try {
       console.log('🎤 Iniciando gravação...')
       setCurrentTranscription('')
+
+      // Destravar áudio novamente (interação do usuário)
+      unlockAudioForIOS()
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
