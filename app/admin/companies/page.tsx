@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -34,6 +34,36 @@ interface CompanyUser {
   name: string
   email: string
   role: string
+}
+
+interface RoleplaySession {
+  id: string
+  user_id: string
+  created_at: string
+  updated_at: string
+  status: string
+  messages: Array<{ role: string; text: string; timestamp?: string }>
+  config: {
+    age?: string
+    temperament?: string
+    persona?: string
+    objections?: string[]
+  }
+  evaluation?: {
+    overall_score?: number
+    performance_level?: string
+    executive_summary?: string
+    spin_evaluation?: {
+      S?: { final_score?: number }
+      P?: { final_score?: number }
+      I?: { final_score?: number }
+      N?: { final_score?: number }
+    }
+    top_strengths?: string[]
+    critical_gaps?: string[]
+  }
+  employee_name?: string
+  employee_email?: string
 }
 
 interface CompanyMetrics {
@@ -163,6 +193,13 @@ export default function CompaniesAdmin() {
   const [selectedTrainingPlan, setSelectedTrainingPlan] = useState<PlanType>(PlanType.OG)
   const [selectedSelectionPlan, setSelectedSelectionPlan] = useState<PlanType | null>(null)
   const [updatingPlan, setUpdatingPlan] = useState(false)
+
+  // Estados para visualizar roleplays
+  const [showRoleplaysModal, setShowRoleplaysModal] = useState(false)
+  const [companyToViewRoleplays, setCompanyToViewRoleplays] = useState<Company | null>(null)
+  const [roleplays, setRoleplays] = useState<RoleplaySession[]>([])
+  const [loadingRoleplays, setLoadingRoleplays] = useState(false)
+  const [selectedRoleplay, setSelectedRoleplay] = useState<RoleplaySession | null>(null)
 
   useEffect(() => {
     // Verificar se já tem senha salva no sessionStorage
@@ -491,6 +528,46 @@ export default function CompaniesAdmin() {
       console.error('Erro ao atualizar role:', error)
       showToast('error', 'Erro ao atualizar role', error.message)
     }
+  }
+
+  // Função para carregar roleplays de uma empresa
+  const handleViewRoleplays = async (company: Company) => {
+    setCompanyToViewRoleplays(company)
+    setShowRoleplaysModal(true)
+    setLoadingRoleplays(true)
+    setRoleplays([])
+    setSelectedRoleplay(null)
+
+    try {
+      const response = await fetch(`/api/admin/companies/roleplays?companyId=${company.id}`)
+      const data = await response.json()
+
+      if (!response.ok) throw new Error(data.error)
+
+      setRoleplays(data.roleplays || [])
+    } catch (error: any) {
+      console.error('Erro ao carregar roleplays:', error)
+      showToast('error', 'Erro ao carregar roleplays', error.message)
+    } finally {
+      setLoadingRoleplays(false)
+    }
+  }
+
+  // Helper para formatar score
+  const getScoreColor = (score: number | undefined) => {
+    if (score === undefined) return 'text-gray-400'
+    if (score >= 8) return 'text-green-400'
+    if (score >= 6) return 'text-yellow-400'
+    if (score >= 4) return 'text-orange-400'
+    return 'text-red-400'
+  }
+
+  const getScoreBgColor = (score: number | undefined) => {
+    if (score === undefined) return 'bg-gray-700/50'
+    if (score >= 8) return 'bg-green-600/20'
+    if (score >= 6) return 'bg-yellow-600/20'
+    if (score >= 4) return 'bg-orange-600/20'
+    return 'bg-red-600/20'
   }
 
   const confirmUpdateLimit = async () => {
@@ -917,6 +994,14 @@ export default function CompaniesAdmin() {
                       title="Gerenciar usuários"
                     >
                       <Users className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleViewRoleplays(company)}
+                      className="p-2 text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
+                      title="Ver roleplays"
+                    >
+                      <MessageSquare className="w-4 h-4" />
                     </button>
 
                     <button
@@ -1810,6 +1895,310 @@ export default function CompaniesAdmin() {
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Roleplays */}
+        {showRoleplaysModal && companyToViewRoleplays && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-cyan-500/30 shadow-2xl shadow-cyan-500/20">
+              {/* Header */}
+              <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <MessageSquare className="w-6 h-6 text-cyan-400" />
+                    Roleplays - {companyToViewRoleplays.name}
+                  </h2>
+                  <p className="text-gray-400 text-sm mt-1">
+                    {roleplays.length} sessão(ões) encontrada(s)
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowRoleplaysModal(false)
+                    setCompanyToViewRoleplays(null)
+                    setSelectedRoleplay(null)
+                  }}
+                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex h-[calc(90vh-120px)]">
+                {/* Lista de Roleplays */}
+                <div className="w-1/3 border-r border-gray-700 overflow-y-auto">
+                  {loadingRoleplays ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                    </div>
+                  ) : roleplays.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6">
+                      <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
+                      <p className="text-center">Nenhum roleplay encontrado para esta empresa</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-700">
+                      {roleplays.map((roleplay) => (
+                        <button
+                          key={roleplay.id}
+                          onClick={() => setSelectedRoleplay(roleplay)}
+                          className={`w-full p-4 text-left transition-colors ${
+                            selectedRoleplay?.id === roleplay.id
+                              ? 'bg-cyan-600/20 border-l-4 border-cyan-500'
+                              : 'hover:bg-gray-800/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-white font-medium truncate">
+                              {roleplay.employee_name || 'Usuário'}
+                            </span>
+                            {roleplay.evaluation?.overall_score !== undefined && (
+                              <span className={`text-sm font-bold ${getScoreColor(roleplay.evaluation.overall_score)}`}>
+                                {roleplay.evaluation.overall_score.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(roleplay.created_at).toLocaleDateString('pt-BR')} às{' '}
+                              {new Date(roleplay.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <FileText className="w-3 h-3" />
+                              {roleplay.messages?.length || 0} mensagens
+                            </div>
+                            {roleplay.config?.persona && (
+                              <div className="truncate text-cyan-400/70">
+                                {roleplay.config.persona}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Detalhes do Roleplay */}
+                <div className="flex-1 overflow-y-auto">
+                  {!selectedRoleplay ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <ChevronRight className="w-12 h-12 mb-4 opacity-50" />
+                      <p>Selecione um roleplay para ver os detalhes</p>
+                    </div>
+                  ) : (
+                    <div className="p-6 space-y-6">
+                      {/* Info do Funcionário e Scores */}
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Info */}
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                            <Users className="w-4 h-4 text-cyan-400" />
+                            Informações
+                          </h3>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Funcionário:</span>
+                              <span className="text-white">{selectedRoleplay.employee_name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Email:</span>
+                              <span className="text-gray-300 text-xs">{selectedRoleplay.employee_email}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Data:</span>
+                              <span className="text-white">
+                                {new Date(selectedRoleplay.created_at).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Status:</span>
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                selectedRoleplay.status === 'completed' ? 'bg-green-600/20 text-green-400' :
+                                selectedRoleplay.status === 'active' ? 'bg-blue-600/20 text-blue-400' :
+                                'bg-gray-600/20 text-gray-400'
+                              }`}>
+                                {selectedRoleplay.status}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Score Geral */}
+                        <div className={`rounded-xl p-4 border ${getScoreBgColor(selectedRoleplay.evaluation?.overall_score)} border-gray-700`}>
+                          <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                            <Star className="w-4 h-4 text-yellow-400" />
+                            Avaliação
+                          </h3>
+                          {selectedRoleplay.evaluation ? (
+                            <div className="space-y-3">
+                              <div className="text-center">
+                                <div className={`text-4xl font-bold ${getScoreColor(selectedRoleplay.evaluation.overall_score)}`}>
+                                  {selectedRoleplay.evaluation.overall_score?.toFixed(1) || 'N/A'}
+                                </div>
+                                <div className="text-sm text-gray-400 capitalize">
+                                  {selectedRoleplay.evaluation.performance_level?.replace(/_/g, ' ') || ''}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-gray-400 text-sm text-center">Sem avaliação</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Scores SPIN */}
+                      {selectedRoleplay.evaluation?.spin_evaluation && (
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <h3 className="text-white font-semibold mb-3">Scores SPIN</h3>
+                          <div className="grid grid-cols-4 gap-3">
+                            {(['S', 'P', 'I', 'N'] as const).map((letter) => {
+                              const score = selectedRoleplay.evaluation?.spin_evaluation?.[letter]?.final_score
+                              return (
+                                <div key={letter} className={`rounded-lg p-3 text-center ${getScoreBgColor(score)}`}>
+                                  <div className="text-lg font-bold text-white">{letter}</div>
+                                  <div className={`text-2xl font-bold ${getScoreColor(score)}`}>
+                                    {score?.toFixed(1) || 'N/A'}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {letter === 'S' && 'Situação'}
+                                    {letter === 'P' && 'Problema'}
+                                    {letter === 'I' && 'Implicação'}
+                                    {letter === 'N' && 'Necessidade'}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Resumo Executivo */}
+                      {selectedRoleplay.evaluation?.executive_summary && (
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <h3 className="text-white font-semibold mb-3">Resumo Executivo</h3>
+                          <p className="text-gray-300 text-sm leading-relaxed">
+                            {selectedRoleplay.evaluation.executive_summary}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Pontos Fortes e Gaps */}
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedRoleplay.evaluation?.top_strengths && selectedRoleplay.evaluation.top_strengths.length > 0 && (
+                          <div className="bg-green-600/10 rounded-xl p-4 border border-green-500/30">
+                            <h3 className="text-green-400 font-semibold mb-3">Pontos Fortes</h3>
+                            <ul className="space-y-1">
+                              {selectedRoleplay.evaluation.top_strengths.map((strength, idx) => (
+                                <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                                  <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                                  {strength}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {selectedRoleplay.evaluation?.critical_gaps && selectedRoleplay.evaluation.critical_gaps.length > 0 && (
+                          <div className="bg-red-600/10 rounded-xl p-4 border border-red-500/30">
+                            <h3 className="text-red-400 font-semibold mb-3">Gaps Críticos</h3>
+                            <ul className="space-y-1">
+                              {selectedRoleplay.evaluation.critical_gaps.map((gap, idx) => (
+                                <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                                  {gap}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Configuração */}
+                      {selectedRoleplay.config && (
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                          <h3 className="text-white font-semibold mb-3">Configuração da Sessão</h3>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            {selectedRoleplay.config.persona && (
+                              <div>
+                                <span className="text-gray-400">Persona:</span>
+                                <p className="text-white mt-1">{selectedRoleplay.config.persona}</p>
+                              </div>
+                            )}
+                            {selectedRoleplay.config.age && (
+                              <div>
+                                <span className="text-gray-400">Faixa Etária:</span>
+                                <p className="text-white mt-1">{selectedRoleplay.config.age}</p>
+                              </div>
+                            )}
+                            {selectedRoleplay.config.temperament && (
+                              <div>
+                                <span className="text-gray-400">Temperamento:</span>
+                                <p className="text-white mt-1">{selectedRoleplay.config.temperament}</p>
+                              </div>
+                            )}
+                            {selectedRoleplay.config.objections && selectedRoleplay.config.objections.length > 0 && (
+                              <div className="col-span-2">
+                                <span className="text-gray-400">Objeções:</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {selectedRoleplay.config.objections.map((obj, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 bg-orange-600/20 text-orange-300 rounded text-xs">
+                                      {obj}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Transcrição */}
+                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-cyan-400" />
+                          Transcrição ({selectedRoleplay.messages?.length || 0} mensagens)
+                        </h3>
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {selectedRoleplay.messages?.map((msg, idx) => (
+                            <div
+                              key={idx}
+                              className={`p-3 rounded-lg ${
+                                msg.role === 'seller' || msg.role === 'user'
+                                  ? 'bg-cyan-600/20 border border-cyan-500/30 ml-8'
+                                  : 'bg-gray-700/50 border border-gray-600/30 mr-8'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs font-medium ${
+                                  msg.role === 'seller' || msg.role === 'user' ? 'text-cyan-400' : 'text-purple-400'
+                                }`}>
+                                  {msg.role === 'seller' || msg.role === 'user' ? 'Vendedor' : 'Cliente'}
+                                </span>
+                                {msg.timestamp && (
+                                  <span className="text-xs text-gray-500">
+                                    {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-gray-300 text-sm">{msg.text}</p>
+                            </div>
+                          ))}
+                          {(!selectedRoleplay.messages || selectedRoleplay.messages.length === 0) && (
+                            <p className="text-gray-400 text-sm text-center py-4">
+                              Nenhuma mensagem registrada
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
