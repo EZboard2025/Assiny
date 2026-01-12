@@ -47,24 +47,33 @@ export async function POST(request: NextRequest) {
     // Extrair avaliação do N8N (pode vir em diferentes formatos)
     let evaluation = null
 
+    // Função auxiliar para parsear JSON com fallback
+    const parseJsonSafe = (str: string) => {
+      if (typeof str !== 'string') return str
+
+      // Limpar string JSON (remover markdown code blocks se houver)
+      let cleaned = str.trim()
+      if (cleaned.startsWith('```json')) {
+        cleaned = cleaned.replace(/^```json\n?/, '').replace(/\n?```$/, '')
+      } else if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```\n?/, '').replace(/\n?```$/, '')
+      }
+
+      try {
+        return JSON.parse(cleaned)
+      } catch (e) {
+        console.error('❌ Erro ao parsear JSON:', e)
+        console.log('📝 String original (primeiros 500 chars):', cleaned.substring(0, 500))
+        return null
+      }
+    }
+
     if (Array.isArray(n8nData) && n8nData[0]?.output) {
       // Formato: [{output: "json_string"}]
-      try {
-        evaluation = typeof n8nData[0].output === 'string'
-          ? JSON.parse(n8nData[0].output)
-          : n8nData[0].output
-      } catch {
-        evaluation = n8nData[0].output
-      }
+      evaluation = parseJsonSafe(n8nData[0].output)
     } else if (n8nData?.output) {
       // Formato: {output: "json_string"}
-      try {
-        evaluation = typeof n8nData.output === 'string'
-          ? JSON.parse(n8nData.output)
-          : n8nData.output
-      } catch {
-        evaluation = n8nData.output
-      }
+      evaluation = parseJsonSafe(n8nData.output)
     } else if (n8nData?.evaluation) {
       evaluation = n8nData.evaluation
     } else if (typeof n8nData === 'object' && n8nData !== null) {
@@ -72,7 +81,7 @@ export async function POST(request: NextRequest) {
       evaluation = n8nData
     }
 
-    console.log(`✅ Avaliação processada:`, JSON.stringify(evaluation).substring(0, 200))
+    console.log(`✅ Avaliação processada:`, typeof evaluation, evaluation ? 'com dados' : 'null')
 
     return NextResponse.json({
       success: true,

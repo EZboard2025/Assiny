@@ -571,13 +571,13 @@ export default function ChallengePage() {
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
-        <header className="p-4 flex justify-center">
-          <div className="relative w-[200px] h-[60px]">
+        <header className="p-6 flex justify-center">
+          <div className="relative w-[280px] h-[80px]">
             <Image
               src="/images/ramppy-logo.png"
               alt="Ramppy Logo"
               fill
-              className="object-contain scale-[1.8]"
+              className="object-contain scale-[2.2]"
               priority
             />
           </div>
@@ -791,12 +791,12 @@ export default function ChallengePage() {
 
           {/* STEP 4: Completado */}
           {step === 'completed' && (
-            <div className="w-full max-w-3xl animate-fade-in px-4">
+            <div className="w-full max-w-3xl animate-fade-in px-4 py-4">
               <div className="relative">
                 {/* Glow Effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-green-400/10 rounded-3xl blur-2xl" />
 
-                <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-emerald-500/30 shadow-2xl shadow-emerald-500/20 max-h-[90vh] overflow-y-auto">
+                <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl border border-emerald-500/30 shadow-2xl shadow-emerald-500/20 max-h-[85vh] overflow-y-auto">
                   {/* Header com Score Principal */}
                   <div className="relative overflow-hidden">
                     {/* Background Pattern */}
@@ -857,9 +857,9 @@ export default function ChallengePage() {
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                               <span className="text-5xl font-black text-white">
-                                {Math.round(evaluation.overall_score ?? evaluation.score ?? 0)}
+                                {((evaluation.overall_score ?? evaluation.score ?? 0) / 10).toFixed(1)}
                               </span>
-                              <span className="text-gray-400 text-xs mt-1">de 100</span>
+                              <span className="text-gray-400 text-xs mt-1">de 10</span>
                             </div>
                           </div>
 
@@ -911,9 +911,14 @@ export default function ChallengePage() {
                             <p className="text-emerald-100 text-sm">
                               Todo dia, com IA.
                             </p>
-                            <button className="mt-2 px-6 py-3 bg-white hover:bg-gray-100 text-emerald-600 font-bold rounded-xl transition-all hover:scale-105 shadow-lg">
+                            <a
+                              href="https://wa.me/5531994713357?text=Oi!%20Acabei%20de%20fazer%20o%20desafio%20%22Venda%20uma%20Caneta%22%20e%20quero%20saber%20mais%20sobre%20a%20Ramppy!"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-block px-6 py-3 bg-white hover:bg-gray-100 text-emerald-600 font-bold rounded-xl transition-all hover:scale-105 shadow-lg"
+                            >
                               Quero personalizar para meu negócio
-                            </button>
+                            </a>
                           </div>
                         </div>
                       </div>
@@ -1055,39 +1060,12 @@ export default function ChallengePage() {
                         </div>
                       )}
 
-                      {/* Botão Tentar Novamente */}
-                      <button
-                        onClick={() => {
-                          setStep('form')
-                          setMessages([])
-                          setName('')
-                          setEmail('')
-                          setEvaluation(null)
-                        }}
-                        className="w-full py-4 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        <Phone className="w-5 h-5" />
-                        Tentar Novamente
-                      </button>
                     </div>
                   ) : (
                     <div className="p-6 sm:p-8 text-center">
-                      <p className="text-gray-400 mb-6">
+                      <p className="text-gray-400">
                         Obrigado por participar do desafio "Venda uma Caneta".
                       </p>
-                      <button
-                        onClick={() => {
-                          setStep('form')
-                          setMessages([])
-                          setName('')
-                          setEmail('')
-                          setEvaluation(null)
-                        }}
-                        className="w-full py-4 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2"
-                      >
-                        <Phone className="w-5 h-5" />
-                        Tentar Novamente
-                      </button>
                     </div>
                   )}
                 </div>
