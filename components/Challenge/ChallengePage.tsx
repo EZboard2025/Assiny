@@ -859,6 +859,27 @@ export default function ChallengePage() {
                   {/* Conteúdo da Avaliação */}
                   {evaluation ? (
                     <div className="p-6 sm:p-8 pt-0 space-y-5">
+                      {/* CTA Banner - Ramppy */}
+                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 p-[2px] shadow-lg shadow-emerald-500/40">
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-400 opacity-50 animate-pulse" />
+                        <div className="relative bg-gradient-to-r from-emerald-600/95 via-green-500/95 to-emerald-600/95 backdrop-blur-sm rounded-2xl p-5">
+                          <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-x-1/2 -translate-y-1/2" />
+                          <div className="absolute bottom-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl translate-x-1/2 translate-y-1/2" />
+
+                          <div className="relative text-center space-y-3">
+                            <p className="text-white font-bold text-lg leading-tight">
+                              Aqui foi caneta. Na <span className="text-yellow-300">Ramppy</span>, seu time treina SPIN Selling com o seu produto, suas objeções, seus clientes.
+                            </p>
+                            <p className="text-emerald-100 text-sm">
+                              Todo dia, com IA.
+                            </p>
+                            <button className="mt-2 px-6 py-3 bg-white hover:bg-gray-100 text-emerald-600 font-bold rounded-xl transition-all hover:scale-105 shadow-lg">
+                              Quero personalizar para meu negócio
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* SPIN Cards */}
                       {evaluation.spin_evaluation && (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
