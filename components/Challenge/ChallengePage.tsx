@@ -635,10 +635,18 @@ export default function ChallengePage() {
       if (!audioSourceRef.current) {
         try {
           const source = audioContext.createMediaElementSource(audio)
-          source.connect(analyser)
+
+          // Criar GainNode para amplificar o volume
+          const gainNode = audioContext.createGain()
+          gainNode.gain.value = 2.0 // Dobrar o volume
+
+          // Conectar: source -> gain -> analyser -> destination
+          source.connect(gainNode)
+          gainNode.connect(analyser)
           analyser.connect(audioContext.destination)
+
           audioSourceRef.current = source
-          console.log('🔊 Audio source criado e conectado')
+          console.log('🔊 Audio source criado e conectado com ganho 2x')
         } catch (sourceError: any) {
           // Se o elemento já foi conectado, apenas continue
           if (sourceError.message?.includes('already connected')) {
