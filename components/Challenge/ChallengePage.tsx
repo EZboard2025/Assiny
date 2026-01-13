@@ -63,7 +63,6 @@ export default function ChallengePage() {
   // Estados de áudio
   const [isRecording, setIsRecording] = useState(false)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
-  const [currentTranscription, setCurrentTranscription] = useState('')
   const [audioVolume, setAudioVolume] = useState(0)
 
   // Função para normalizar score (N8N pode retornar 0-10 ou 0-100)
@@ -214,7 +213,6 @@ export default function ChallengePage() {
   const startRecording = async () => {
     try {
       console.log('🎤 Iniciando gravação...')
-      setCurrentTranscription('')
 
       // Destravar áudio novamente (interação do usuário)
       unlockAudioForIOS()
@@ -303,7 +301,6 @@ export default function ChallengePage() {
   // Transcrever áudio
   const transcribeAudio = async (audioBlob: Blob) => {
     console.log('📝 Transcrevendo áudio...')
-    setCurrentTranscription('⏳ Processando sua fala...')
     setIsLoading(true)
 
     try {
@@ -337,8 +334,6 @@ export default function ChallengePage() {
       console.log('✅ Texto transcrito:', data.text)
 
       if (data.text && data.text.trim()) {
-        setCurrentTranscription(`✅ "${data.text}"`)
-
         // Adicionar mensagem do vendedor
         const sellerMessage: Message = {
           role: 'seller',
@@ -350,14 +345,11 @@ export default function ChallengePage() {
         // Enviar para o N8N
         await sendMessage(data.text.trim())
       } else {
-        setCurrentTranscription('❌ Não consegui entender, tente novamente')
-        setTimeout(() => setCurrentTranscription(''), 2000)
+        console.log('⚠️ Transcrição vazia ou inválida')
       }
 
     } catch (error) {
       console.error('Erro ao transcrever:', error)
-      setCurrentTranscription('❌ Erro ao processar áudio')
-      setTimeout(() => setCurrentTranscription(''), 2000)
     } finally {
       setIsLoading(false)
     }
@@ -456,11 +448,8 @@ export default function ChallengePage() {
       // Tocar TTS da resposta
       await textToSpeech(data.response, isFinalized)
 
-      setCurrentTranscription('')
-
     } catch (error: any) {
       console.error('Erro ao enviar mensagem:', error)
-      setCurrentTranscription('❌ Erro ao processar')
     } finally {
       setIsLoading(false)
     }
@@ -807,7 +796,7 @@ export default function ChallengePage() {
 
                     <p className="text-gray-400 text-sm leading-relaxed">
                       O desafio definitivo de vendas.
-                      Convença um desconhecido a comprar <span className="text-emerald-400 font-semibold">uma pedra do seu quintal</span>.
+                      Convença um desconhecido a comprar <span className="text-emerald-400 font-semibold">uma pedra de jardim</span>.
                     </p>
                   </div>
 
@@ -992,43 +981,43 @@ export default function ChallengePage() {
                   </div>
                 </div>
 
-                {/* Status / Transcrição */}
-                <div className="text-center mb-6 min-h-[60px]">
+                {/* Status / Fala do Cliente */}
+                <div className="text-center mb-6 min-h-[120px]">
                   {isLoading && (
                     <div className="flex items-center justify-center gap-2 text-emerald-400">
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span>Processando...</span>
                     </div>
                   )}
-                  {currentTranscription && !isLoading && (
-                    <p className="text-gray-300 text-sm">{currentTranscription}</p>
-                  )}
-                  {isPlayingAudio && !isLoading && !currentTranscription && (
-                    <p className="text-emerald-400 text-sm">Cliente falando...</p>
-                  )}
-                  {!isPlayingAudio && !isLoading && !currentTranscription && !isRecording && (
-                    <p className="text-gray-500 text-sm">Clique no microfone para falar</p>
+                  {isPlayingAudio && !isLoading && (
+                    <p className="text-emerald-400 text-sm animate-pulse">Cliente falando...</p>
                   )}
                   {isRecording && (
                     <p className="text-red-400 text-sm animate-pulse">Gravando... Clique para parar</p>
                   )}
+                  {!isPlayingAudio && !isLoading && !isRecording && (
+                    <p className="text-gray-500 text-sm">Clique no microfone para falar</p>
+                  )}
                 </div>
 
-                {/* Histórico de Mensagens (colapsado) */}
-                <div className="mb-6 max-h-40 overflow-y-auto bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                  <div className="space-y-2">
-                    {messages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        className={`text-sm ${msg.role === 'seller' ? 'text-emerald-400' : 'text-gray-300'}`}
-                      >
-                        <span className="font-medium">{msg.role === 'seller' ? 'Você: ' : 'Cliente: '}</span>
-                        {msg.text}
+                {/* Última Fala do Cliente (destacada) */}
+                {(() => {
+                  const lastClientMessage = messages.filter(m => m.role === 'client').pop()
+                  return lastClientMessage ? (
+                    <div className="mb-6 bg-gradient-to-br from-emerald-900/40 to-green-900/40 rounded-xl p-6 border border-emerald-500/30 shadow-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                          <span className="text-emerald-400 text-sm font-bold">C</span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-emerald-100 font-medium text-base leading-relaxed">
+                            {lastClientMessage.text}
+                          </p>
+                        </div>
                       </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </div>
+                    </div>
+                  ) : null
+                })()}
 
                 {/* Botão de Controle */}
                 <div className="flex justify-center">
