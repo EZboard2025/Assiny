@@ -944,8 +944,21 @@ export default function ChallengePage() {
                     </div>
                   </div>
 
+                  {/* Imagem do Geólogo */}
+                  <div className="flex justify-center p-4 pb-2">
+                    <div className="relative w-32 h-32 sm:w-40 sm:h-40">
+                      <Image
+                        src="/foto geologo/geologo.png"
+                        alt="Geólogo - Seu cliente"
+                        fill
+                        className="object-contain"
+                        priority
+                      />
+                    </div>
+                  </div>
+
                   {/* Conteúdo do contexto */}
-                  <div className="p-4 space-y-3">
+                  <div className="p-4 pt-0 space-y-3">
                     {/* Cenário */}
                     <div className="bg-gray-800/60 rounded-xl p-3 border border-emerald-500/20">
                       <div className="flex items-center gap-3">
