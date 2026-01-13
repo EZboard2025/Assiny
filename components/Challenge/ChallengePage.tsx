@@ -319,7 +319,7 @@ export default function ChallengePage() {
       const formData = new FormData()
       formData.append('audio', audioBlob, `recording.${extension}`)
 
-      const response = await fetch('/api/roleplay/transcribe', {
+      const response = await fetch('/api/challenge/transcribe', {
         method: 'POST',
         body: formData,
       })
