@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
-
-// Prompt de contexto para o desafio "Venda uma Pedra"
-// Isso ajuda o Whisper a entender melhor o contexto e transcrever com mais precisão
-const CHALLENGE_CONTEXT_PROMPT = `Contexto: Conversa de vendas em português brasileiro.
-Um vendedor está tentando vender uma pedra antiga para um homem de campo.
-Termos comuns: pedra, quintal, avô, fazenda, campo, roça, decoração, jardim, propriedade, valor sentimental, antiguidade, relíquia, preço, comprar, vender, negócio, interesse.
-O cliente pode mencionar: trabalho de campo, análise, coleta, materiais naturais, pesquisa.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,23 +27,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Arquivo de áudio vazio' }, { status: 400 })
     }
 
-    // Transcrever usando OpenAI Whisper com contexto do desafio
+    // Transcrever usando OpenAI Whisper (sem prompt para evitar interferências)
+    // O roleplay de treino funciona bem sem prompt customizado
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
       model: 'whisper-1',
       language: 'pt',
-      prompt: CHALLENGE_CONTEXT_PROMPT,
     })
 
     console.log('✅ Transcrição completa:', transcription.text)
 
+    // Verificar se a transcrição está vazia
     if (!transcription.text || transcription.text.trim() === '') {
       console.log('⚠️ Transcrição vazia retornada pela API')
       return NextResponse.json({ text: '', warning: 'Transcrição vazia' })
     }
 
+    // Validar e processar a transcrição (mesmo processo do roleplay de treino)
+    const processed = processWhisperTranscription(transcription.text)
+
+    if (processed.hasRepetition) {
+      console.warn('⚠️ Repetições detectadas no backend:', {
+        original: transcription.text,
+        cleaned: processed.text,
+        confidence: processed.confidence
+      })
+    }
+
+    // Retornar texto processado
     return NextResponse.json({
-      text: transcription.text,
+      text: processed.text,
+      originalText: transcription.text,
+      isValid: processed.isValid,
+      confidence: processed.confidence,
+      hasRepetition: processed.hasRepetition
     })
 
   } catch (error: any) {

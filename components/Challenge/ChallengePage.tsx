@@ -201,6 +201,10 @@ export default function ChallengePage() {
 
   // Iniciar roleplay após ver o contexto
   const startRoleplayAfterContext = async () => {
+    // IMPORTANTE: Destravar áudio no iOS - essa é uma interação do usuário
+    // Precisa ser chamado aqui porque é o último clique antes do TTS tocar
+    unlockAudioForIOS()
+
     setStep('roleplay')
     // Buscar primeira mensagem do agente
     await getInitialMessage(sessionId, leadId)
@@ -468,6 +472,12 @@ export default function ChallengePage() {
       console.log('🔊 Gerando TTS:', text.substring(0, 50) + '...')
       setIsPlayingAudio(true)
 
+      // Garantir que AudioContext está ativo (iOS pode ter suspenso)
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+        console.log('🔓 AudioContext resumido')
+      }
+
       const response = await fetch('/api/challenge/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -479,6 +489,7 @@ export default function ChallengePage() {
       }
 
       const audioBlob = await response.blob()
+      console.log('🔊 Áudio recebido:', audioBlob.size, 'bytes')
       const audioUrl = URL.createObjectURL(audioBlob)
 
       // Reutilizar o elemento de áudio existente (importante para iOS)
@@ -545,24 +556,47 @@ export default function ChallengePage() {
       // Carregar e tocar - essencial para iOS
       audio.load()
 
-      // Tentar tocar com retry para iOS
-      try {
-        await audio.play()
-        console.log('🔊 Tocando áudio')
-      } catch (playError: any) {
-        console.warn('⚠️ Primeira tentativa de play falhou:', playError.message)
-
-        // iOS às vezes precisa de um pequeno delay
-        await new Promise(resolve => setTimeout(resolve, 100))
-
+      // Função auxiliar para tentar tocar
+      const tryPlay = async (): Promise<boolean> => {
         try {
-          await audio.play()
-          console.log('🔊 Tocando áudio (segunda tentativa)')
-        } catch (retryError) {
-          console.error('❌ Falha ao tocar áudio após retry:', retryError)
-          throw retryError
+          await audio!.play()
+          return true
+        } catch {
+          return false
         }
       }
+
+      // Tentar tocar com múltiplas tentativas para iOS
+      let played = await tryPlay()
+
+      if (!played) {
+        console.warn('⚠️ Primeira tentativa de play falhou, tentando novamente...')
+
+        // iOS às vezes precisa de um delay após o load()
+        await new Promise(resolve => setTimeout(resolve, 150))
+        played = await tryPlay()
+
+        if (!played) {
+          console.warn('⚠️ Segunda tentativa falhou, última tentativa...')
+
+          // Última tentativa com delay maior
+          await new Promise(resolve => setTimeout(resolve, 300))
+          played = await tryPlay()
+
+          if (!played) {
+            console.error('❌ Falha ao tocar áudio após 3 tentativas')
+            // Não joga erro - permite continuar mesmo sem áudio
+            setIsPlayingAudio(false)
+            setAudioVolume(0)
+            if (shouldFinalize) {
+              handleEndCall()
+            }
+            return
+          }
+        }
+      }
+
+      console.log('🔊 Tocando áudio')
 
     } catch (error) {
       console.error('Erro no TTS:', error)
