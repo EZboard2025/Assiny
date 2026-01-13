@@ -1066,6 +1066,10 @@ export default function ChallengePage() {
                   const lastClientMessage = messages.filter(m => m.role === 'client').pop()
                   return lastClientMessage ? (
                     <div className="mb-6 bg-gradient-to-br from-emerald-900/40 to-green-900/40 rounded-xl p-6 border border-emerald-500/30 shadow-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 bg-emerald-400 rounded-full" />
+                        <span className="text-emerald-400 text-xs font-bold uppercase tracking-wider">Cliente falou:</span>
+                      </div>
                       <p className="text-emerald-100 font-medium text-base leading-relaxed">
                         {lastClientMessage.text}
                       </p>
