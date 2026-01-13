@@ -1047,7 +1047,7 @@ export default function ChallengePage() {
                   {isLoading && (
                     <div className="flex items-center justify-center gap-2 text-emerald-400">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Processando...</span>
+                      <span>{messages.length === 0 ? 'Iniciando desafio...' : 'Pensando...'}</span>
                     </div>
                   )}
                   {isPlayingAudio && !isLoading && (
