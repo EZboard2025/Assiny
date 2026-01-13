@@ -722,6 +722,7 @@ export default function ChallengePage() {
       if (response.ok && data.evaluation) {
         console.log('✅ Avaliação recebida:', data.evaluation)
         setEvaluation(data.evaluation)
+        setStep('completed') // CRITICAL: Mudar para tela de avaliação
 
         // Salvar avaliação no banco de dados
         try {
