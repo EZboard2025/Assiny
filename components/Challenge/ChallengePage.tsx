@@ -65,6 +65,9 @@ export default function ChallengePage() {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
   const [audioVolume, setAudioVolume] = useState(0)
 
+  // Estado de progresso da avaliação
+  const [evaluationProgress, setEvaluationProgress] = useState(0)
+
   // Função para normalizar score (N8N pode retornar 0-10 ou 0-100)
   const normalizeScore = (score: number | null | undefined): number => {
     if (score === null || score === undefined) return 0
@@ -131,6 +134,28 @@ export default function ChallengePage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Animação de progresso da avaliação (0-99% em 45 segundos)
+  useEffect(() => {
+    if (step === 'evaluating') {
+      setEvaluationProgress(0)
+      const duration = 45000 // 45 segundos
+      const targetProgress = 99
+      const startTime = Date.now()
+
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - startTime
+        const progress = Math.min((elapsed / duration) * targetProgress, targetProgress)
+        setEvaluationProgress(Math.floor(progress))
+
+        if (progress >= targetProgress) {
+          clearInterval(interval)
+        }
+      }, 100) // Atualiza a cada 100ms para suavidade
+
+      return () => clearInterval(interval)
+    }
+  }, [step])
 
   // Cleanup ao desmontar
   useEffect(() => {
@@ -722,7 +747,35 @@ export default function ChallengePage() {
       if (response.ok && data.evaluation) {
         console.log('✅ Avaliação recebida:', data.evaluation)
         setEvaluation(data.evaluation)
-        setStep('completed') // CRITICAL: Mudar para tela de avaliação
+
+        // Animar progresso para 100% antes de mostrar resultado
+        const currentProgress = evaluationProgress
+        if (currentProgress < 100) {
+          // Animação rápida de currentProgress -> 100%
+          const animationDuration = 500 // 0.5 segundos
+          const startProgress = currentProgress
+          const startTime = Date.now()
+
+          const animateToComplete = () => {
+            const elapsed = Date.now() - startTime
+            const progress = Math.min(startProgress + ((100 - startProgress) * (elapsed / animationDuration)), 100)
+            setEvaluationProgress(Math.floor(progress))
+
+            if (progress < 100) {
+              requestAnimationFrame(animateToComplete)
+            } else {
+              // Só muda para tela de resultado após chegar em 100%
+              setTimeout(() => {
+                setStep('completed')
+              }, 200) // Pequeno delay para visualizar 100%
+            }
+          }
+
+          requestAnimationFrame(animateToComplete)
+        } else {
+          // Já está em 100%, muda direto
+          setStep('completed')
+        }
 
         // Salvar avaliação no banco de dados
         try {
@@ -1048,14 +1101,29 @@ export default function ChallengePage() {
           {step === 'evaluating' && (
             <div className="w-full max-w-md animate-fade-in text-center">
               <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-3xl p-8 border border-emerald-500/30 shadow-2xl shadow-emerald-500/20">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-green-400/20 rounded-2xl mb-4 border border-emerald-500/30">
-                  <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-green-400/20 rounded-2xl mb-6 border border-emerald-500/30">
+                  <Sparkles className="w-10 h-10 text-emerald-400" />
                 </div>
 
-                <h2 className="text-2xl font-bold text-white mb-4">Avaliando seu desempenho...</h2>
-                <p className="text-gray-400">
+                <h2 className="text-2xl font-bold text-white mb-2">Avaliando seu desempenho...</h2>
+                <p className="text-gray-400 mb-6">
                   Nossa IA está analisando sua performance no desafio.
                 </p>
+
+                {/* Barra de progresso */}
+                <div className="relative w-full h-3 bg-gray-800 rounded-full overflow-hidden border border-emerald-500/20">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-200 ease-out rounded-full"
+                    style={{ width: `${evaluationProgress}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                  </div>
+                </div>
+
+                {/* Porcentagem */}
+                <div className="mt-3 text-3xl font-bold text-emerald-400">
+                  {evaluationProgress}%
+                </div>
               </div>
             </div>
           )}
