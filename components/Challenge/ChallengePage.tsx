@@ -1402,6 +1402,32 @@ export default function ChallengePage() {
                         </div>
                       )}
 
+                      {/* CTA Banner - Ramppy (Final) */}
+                      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 p-[2px] shadow-lg shadow-emerald-500/40">
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-400 opacity-50 animate-pulse" />
+                        <div className="relative bg-gradient-to-r from-emerald-600/95 via-green-500/95 to-emerald-600/95 backdrop-blur-sm rounded-2xl p-5">
+                          <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-x-1/2 -translate-y-1/2" />
+                          <div className="absolute bottom-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl translate-x-1/2 translate-y-1/2" />
+
+                          <div className="relative text-center space-y-3">
+                            <p className="text-white font-bold text-lg leading-tight">
+                              Aqui foi pedra. Na <span className="text-yellow-300">Ramppy</span>, seu time treina SPIN Selling com o seu produto, suas objeções, seus clientes.
+                            </p>
+                            <p className="text-emerald-100 text-sm">
+                              Todo dia, com IA.
+                            </p>
+                            <a
+                              href="https://wa.me/5531994713357?text=Oi!%20Acabei%20de%20fazer%20o%20desafio%20%22Venda%20uma%20Pedra%22%20e%20quero%20saber%20mais%20sobre%20a%20Ramppy!"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-block px-6 py-3 bg-white hover:bg-gray-100 text-emerald-600 font-bold rounded-xl transition-all hover:scale-105 shadow-lg"
+                            >
+                              Quero personalizar para meu negócio
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
                   ) : (
                     <div className="p-6 sm:p-8 text-center">
