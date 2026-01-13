@@ -1078,7 +1078,7 @@ export default function ChallengePage() {
                 })()}
 
                 {/* Botão de Controle */}
-                <div className="flex justify-center">
+                <div className="flex flex-col items-center gap-3">
                   {/* Botão do Microfone */}
                   <button
                     onClick={isRecording ? stopRecording : startRecording}
@@ -1095,6 +1095,13 @@ export default function ChallengePage() {
                       <Mic className="w-8 h-8 text-white" />
                     )}
                   </button>
+
+                  {/* Texto de Instrução */}
+                  {!isRecording && !isPlayingAudio && !isLoading && (
+                    <p className="text-emerald-400 text-sm font-medium">
+                      Aperte para falar
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
