@@ -55,6 +55,7 @@ export default function ChallengePage() {
   const [step, setStep] = useState<Step>('form')
   const [sessionId, setSessionId] = useState('')
   const [leadId, setLeadId] = useState('')
+  const [threadId, setThreadId] = useState<string | null>(null) // OpenAI Assistants thread
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
@@ -354,19 +355,18 @@ export default function ChallengePage() {
     }
   }
 
-  // Buscar mensagem inicial do agente N8N
+  // Buscar mensagem inicial do agente (OpenAI Assistants)
   const getInitialMessage = async (sessId: string, leadIdParam: string) => {
     setIsLoading(true)
 
     try {
-      // Enviar mensagem para iniciar a simulação
-      const response = await fetch('/api/challenge/chat', {
+      // Enviar mensagem para iniciar a simulação usando OpenAI Assistants
+      const response = await fetch('/api/challenge/assistant/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: 'inicie a simulação',
-          sessionId: sessId,
-          leadId: leadIdParam
+          sessionId: sessId
         })
       })
 
@@ -374,6 +374,12 @@ export default function ChallengePage() {
 
       if (!response.ok) {
         throw new Error(data.error || 'Erro ao iniciar conversa')
+      }
+
+      // Salvar threadId para mensagens futuras
+      if (data.threadId) {
+        setThreadId(data.threadId)
+        console.log('🧵 Thread ID salvo:', data.threadId)
       }
 
       // Adicionar mensagem inicial do cliente
@@ -402,18 +408,18 @@ export default function ChallengePage() {
     }
   }
 
-  // Enviar mensagem para o N8N
+  // Enviar mensagem para OpenAI Assistants
   const sendMessage = async (message: string) => {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/challenge/chat', {
+      const response = await fetch('/api/challenge/assistant/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
           sessionId,
-          leadId
+          threadId // Reutilizar thread existente
         })
       })
 
@@ -421,6 +427,11 @@ export default function ChallengePage() {
 
       if (!response.ok) {
         throw new Error(data.error || 'Erro ao enviar mensagem')
+      }
+
+      // Atualizar threadId caso tenha mudado (não deveria, mas por segurança)
+      if (data.threadId && data.threadId !== threadId) {
+        setThreadId(data.threadId)
       }
 
       // Adicionar resposta do cliente
