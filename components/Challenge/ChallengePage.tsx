@@ -1300,11 +1300,11 @@ export default function ChallengePage() {
                                     {letter}
                                   </div>
                                   <div className={`text-2xl font-bold mt-1 ${
-                                    score >= 7 ? 'text-emerald-400' : score >= 5 ? 'text-yellow-400' : 'text-red-400'
+                                    score >= 7 ? 'text-emerald-300' : score >= 5 ? 'text-yellow-300' : 'text-orange-300'
                                   }`}>
                                     {score.toFixed(1)}
                                   </div>
-                                  <div className="text-gray-400 text-xs mt-1">{labels[letter]}</div>
+                                  <div className="text-gray-200 text-xs mt-1 font-medium">{labels[letter]}</div>
                                 </div>
                               </div>
                             )
@@ -1314,16 +1314,16 @@ export default function ChallengePage() {
 
                       {/* Resumo Executivo */}
                       {(evaluation.executive_summary || evaluation.verdict || evaluation.feedback) && (
-                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 to-gray-800/40 border border-gray-700/50 p-5">
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl" />
+                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500/15 to-green-500/10 border border-emerald-500/40 p-6">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl" />
                           <div className="relative">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                                <Target className="w-5 h-5 text-emerald-400" />
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="w-11 h-11 rounded-xl bg-emerald-500/30 flex items-center justify-center border border-emerald-400/30">
+                                <Target className="w-6 h-6 text-emerald-300" />
                               </div>
-                              <h3 className="text-lg font-bold text-white">Resumo da Performance</h3>
+                              <h3 className="text-xl font-bold text-emerald-300">Resumo da Performance</h3>
                             </div>
-                            <p className="text-gray-300 leading-relaxed">
+                            <p className="text-gray-100 leading-relaxed text-base">
                               {evaluation.executive_summary || evaluation.verdict || evaluation.feedback}
                             </p>
                           </div>
@@ -1335,20 +1335,20 @@ export default function ChallengePage() {
                         {/* Pontos Fortes */}
                         {((evaluation.top_strengths && evaluation.top_strengths.length > 0) ||
                           (evaluation.strengths && evaluation.strengths.length > 0)) && (
-                          <div className="rounded-2xl bg-gradient-to-br from-emerald-500/10 to-green-500/5 border border-emerald-500/30 p-5">
+                          <div className="rounded-2xl bg-gradient-to-br from-emerald-500/15 to-green-500/10 border border-emerald-500/40 p-5">
                             <div className="flex items-center gap-3 mb-4">
-                              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                              <div className="w-11 h-11 rounded-xl bg-emerald-500/30 flex items-center justify-center border border-emerald-400/30">
+                                <TrendingUp className="w-5 h-5 text-emerald-300" />
                               </div>
-                              <h3 className="text-lg font-bold text-emerald-400">Pontos Fortes</h3>
+                              <h3 className="text-lg font-bold text-emerald-300">Pontos Fortes</h3>
                             </div>
                             <ul className="space-y-3">
                               {(evaluation.top_strengths || evaluation.strengths || []).map((item: string, idx: number) => (
                                 <li key={idx} className="flex items-start gap-3">
-                                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                  <div className="w-6 h-6 rounded-full bg-emerald-500/30 flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-400/30">
+                                    <CheckCircle className="w-4 h-4 text-emerald-300" />
                                   </div>
-                                  <span className="text-gray-300 text-sm">{item}</span>
+                                  <span className="text-gray-100 text-sm leading-relaxed">{item}</span>
                                 </li>
                               ))}
                             </ul>
@@ -1358,20 +1358,20 @@ export default function ChallengePage() {
                         {/* Gaps Críticos */}
                         {((evaluation.critical_gaps && evaluation.critical_gaps.length > 0) ||
                           (evaluation.improvements && evaluation.improvements.length > 0)) && (
-                          <div className="rounded-2xl bg-gradient-to-br from-red-500/10 to-orange-500/5 border border-red-500/30 p-5">
+                          <div className="rounded-2xl bg-gradient-to-br from-orange-500/15 to-red-500/10 border border-orange-500/40 p-5">
                             <div className="flex items-center gap-3 mb-4">
-                              <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
-                                <AlertCircle className="w-5 h-5 text-red-400" />
+                              <div className="w-11 h-11 rounded-xl bg-orange-500/30 flex items-center justify-center border border-orange-400/30">
+                                <AlertCircle className="w-5 h-5 text-orange-300" />
                               </div>
-                              <h3 className="text-lg font-bold text-red-400">Gaps Críticos</h3>
+                              <h3 className="text-lg font-bold text-orange-300">Pontos de Melhoria</h3>
                             </div>
                             <ul className="space-y-3">
                               {(evaluation.critical_gaps || evaluation.improvements || []).map((item: string, idx: number) => (
                                 <li key={idx} className="flex items-start gap-3">
-                                  <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <XCircle className="w-4 h-4 text-red-400" />
+                                  <div className="w-6 h-6 rounded-full bg-orange-500/30 flex items-center justify-center flex-shrink-0 mt-0.5 border border-orange-400/30">
+                                    <AlertCircle className="w-4 h-4 text-orange-300" />
                                   </div>
-                                  <span className="text-gray-300 text-sm">{item}</span>
+                                  <span className="text-gray-100 text-sm leading-relaxed">{item}</span>
                                 </li>
                               ))}
                             </ul>
@@ -1381,18 +1381,18 @@ export default function ChallengePage() {
 
                       {/* Lição Principal - Destacada */}
                       {evaluation.key_lesson && (
-                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 border border-blue-500/30 p-5">
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-blue-500/5 animate-pulse" />
+                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500/15 via-purple-500/15 to-blue-500/15 border border-blue-500/40 p-6">
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-400/10 via-purple-400/10 to-blue-400/10 animate-pulse" />
                           <div className="relative">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/30 to-purple-500/30 flex items-center justify-center">
-                                <Lightbulb className="w-5 h-5 text-blue-400" />
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/40 to-purple-500/40 flex items-center justify-center border border-blue-400/30">
+                                <Lightbulb className="w-6 h-6 text-blue-300" />
                               </div>
-                              <h3 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                              <h3 className="text-xl font-bold bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
                                 Lição Principal
                               </h3>
                             </div>
-                            <p className="text-gray-200 leading-relaxed text-sm sm:text-base">
+                            <p className="text-gray-100 leading-relaxed text-base">
                               {evaluation.key_lesson}
                             </p>
                           </div>
