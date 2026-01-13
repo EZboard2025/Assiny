@@ -10,7 +10,7 @@ interface Message {
   timestamp: Date
 }
 
-type Step = 'form' | 'roleplay' | 'evaluating' | 'completed'
+type Step = 'form' | 'context' | 'roleplay' | 'evaluating' | 'completed'
 
 interface SpinCategory {
   final_score: number
@@ -189,10 +189,7 @@ export default function ChallengePage() {
 
       setSessionId(newSessionId)
       setLeadId(data.leadId)
-      setStep('roleplay')
-
-      // Buscar primeira mensagem do agente N8N
-      await getInitialMessage(newSessionId, data.leadId)
+      setStep('context') // Mostrar contexto antes de iniciar o roleplay
 
     } catch (error: any) {
       console.error('Erro ao iniciar desafio:', error)
@@ -200,6 +197,13 @@ export default function ChallengePage() {
     } finally {
       setSubmittingForm(false)
     }
+  }
+
+  // Iniciar roleplay após ver o contexto
+  const startRoleplayAfterContext = async () => {
+    setStep('roleplay')
+    // Buscar primeira mensagem do agente
+    await getInitialMessage(sessionId, leadId)
   }
 
   // Iniciar gravação
@@ -464,7 +468,7 @@ export default function ChallengePage() {
       console.log('🔊 Gerando TTS:', text.substring(0, 50) + '...')
       setIsPlayingAudio(true)
 
-      const response = await fetch('/api/roleplay/tts', {
+      const response = await fetch('/api/challenge/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -758,18 +762,18 @@ export default function ChallengePage() {
                   {/* Ícone e Título */}
                   <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-green-400/20 rounded-2xl mb-4 border border-emerald-500/30">
-                      <PenTool className="w-10 h-10 text-emerald-400" />
+                      <span className="text-4xl">🪨</span>
                     </div>
 
                     <h1 className="text-3xl font-bold mb-3">
                       <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500">
-                        Venda uma Caneta
+                        Venda uma Pedra
                       </span>
                     </h1>
 
                     <p className="text-gray-400 text-sm leading-relaxed">
-                      O clássico desafio do <span className="text-emerald-400 font-semibold">Lobo de Wall Street</span>.
-                      Convença um executivo ocupado a comprar sua caneta.
+                      O desafio definitivo de vendas.
+                      Convença um desconhecido a comprar <span className="text-emerald-400 font-semibold">uma pedra do seu quintal</span>.
                     </p>
                   </div>
 
@@ -837,6 +841,85 @@ export default function ChallengePage() {
             </div>
           )}
 
+          {/* STEP 1.5: Modal de Contexto */}
+          {step === 'context' && (
+            <div className="w-full max-w-md animate-fade-in px-4">
+              <div className="relative">
+                {/* Glow Effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/30 to-green-500/20 rounded-2xl blur-2xl" />
+
+                <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-2xl border border-emerald-500/40 shadow-2xl shadow-emerald-500/20 overflow-hidden">
+                  {/* Header com ícone */}
+                  <div className="relative bg-gradient-to-r from-emerald-600/20 via-green-500/20 to-emerald-600/20 p-4 border-b border-emerald-500/20">
+                    <div className="relative flex items-center justify-center gap-2">
+                      <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                        <Target className="w-5 h-5 text-white" />
+                      </div>
+                      <h2 className="text-xl font-bold text-white">Sua Missão</h2>
+                    </div>
+                  </div>
+
+                  {/* Conteúdo do contexto */}
+                  <div className="p-4 space-y-3">
+                    {/* Cenário */}
+                    <div className="bg-gray-800/60 rounded-xl p-3 border border-emerald-500/20">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-emerald-500/20 rounded-lg flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
+                          <span className="text-lg">🪨</span>
+                        </div>
+                        <p className="text-gray-200 text-sm leading-relaxed">
+                          Você achou uma <span className="text-emerald-400 font-semibold">pedra no quintal</span> da sua casa. Ela tá lá há mais de 70 anos, era do seu avô.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Situação */}
+                    <div className="bg-gray-800/60 rounded-xl p-3 border border-emerald-500/20">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-emerald-500/20 rounded-lg flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
+                          <span className="text-lg">🤠</span>
+                        </div>
+                        <p className="text-gray-200 text-sm leading-relaxed">
+                          É de manhã, você tá na rua e vê um <span className="text-emerald-400 font-semibold">cara saindo de uma padaria</span>, ele está de chapéu, barba, óculos escuros, roupa de campo e bota.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Sua arma */}
+                    <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/10 rounded-xl p-3 border border-emerald-500/30">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-emerald-500/20 rounded-lg flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
+                          <span className="text-lg">💎</span>
+                        </div>
+                        <p className="text-gray-200 text-sm leading-relaxed">
+                          Tenta vender a <span className="text-emerald-400 font-semibold">pedra</span> pra ele!
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Call to action */}
+                    <div className="text-center pt-1">
+                      <p className="text-emerald-300 font-bold">
+                        Mostra que você sabe vender.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botão de iniciar */}
+                  <div className="p-4 pt-2">
+                    <button
+                      onClick={startRoleplayAfterContext}
+                      className="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
+                    >
+                      <Phone className="w-4 h-4" />
+                      Começar Simulação
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* STEP 2: Roleplay por Voz */}
           {step === 'roleplay' && (
             <div className="w-full max-w-2xl animate-fade-in">
@@ -847,8 +930,8 @@ export default function ChallengePage() {
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                     <span className="text-green-400 text-sm font-medium">Ligação em andamento</span>
                   </div>
-                  <h2 className="text-2xl font-bold text-white">Desafio: Venda uma Caneta</h2>
-                  <p className="text-gray-400 text-sm mt-1">Convença o executivo a comprar sua caneta</p>
+                  <h2 className="text-2xl font-bold text-white">Desafio: Venda uma Pedra</h2>
+                  <p className="text-gray-400 text-sm mt-1">Convença o desconhecido a comprar sua pedra</p>
                 </div>
 
                 {/* Blob Animado do Cliente */}
@@ -1069,13 +1152,13 @@ export default function ChallengePage() {
 
                           <div className="relative text-center space-y-3">
                             <p className="text-white font-bold text-lg leading-tight">
-                              Aqui foi caneta. Na <span className="text-yellow-300">Ramppy</span>, seu time treina SPIN Selling com o seu produto, suas objeções, seus clientes.
+                              Aqui foi pedra. Na <span className="text-yellow-300">Ramppy</span>, seu time treina SPIN Selling com o seu produto, suas objeções, seus clientes.
                             </p>
                             <p className="text-emerald-100 text-sm">
                               Todo dia, com IA.
                             </p>
                             <a
-                              href="https://wa.me/5531994713357?text=Oi!%20Acabei%20de%20fazer%20o%20desafio%20%22Venda%20uma%20Caneta%22%20e%20quero%20saber%20mais%20sobre%20a%20Ramppy!"
+                              href="https://wa.me/5531994713357?text=Oi!%20Acabei%20de%20fazer%20o%20desafio%20%22Venda%20uma%20Pedra%22%20e%20quero%20saber%20mais%20sobre%20a%20Ramppy!"
                               target="_blank"
                               rel="noopener noreferrer"
                               className="mt-2 inline-block px-6 py-3 bg-white hover:bg-gray-100 text-emerald-600 font-bold rounded-xl transition-all hover:scale-105 shadow-lg"
@@ -1227,7 +1310,7 @@ export default function ChallengePage() {
                   ) : (
                     <div className="p-6 sm:p-8 text-center">
                       <p className="text-gray-400">
-                        Obrigado por participar do desafio "Venda uma Caneta".
+                        Obrigado por participar do desafio "Venda uma Pedra".
                       </p>
                     </div>
                   )}
