@@ -996,7 +996,6 @@ export default function ChallengePage() {
                       onClick={startRoleplayAfterContext}
                       className="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
                     >
-                      <Phone className="w-4 h-4" />
                       Começar Simulação
                     </button>
                   </div>
