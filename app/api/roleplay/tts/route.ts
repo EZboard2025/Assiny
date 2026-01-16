@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Webhook do N8N para TTS
-const N8N_TTS_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/0ffb3d05-ba95-40e1-b3f1-9bd963fd2b59'
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
+const ELEVENLABS_VOICE_ID = 'RW887Krqkhkn77rPnjT9'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { text } = body
+    const { text } = await request.json()
 
     if (!text) {
       return NextResponse.json(
@@ -15,44 +14,59 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('🔊 TTS N8N - Gerando áudio para:', text)
+    if (!ELEVENLABS_API_KEY) {
+      console.error('ELEVENLABS_API_KEY não configurada')
+      return NextResponse.json(
+        { error: 'Configuração do servidor incompleta' },
+        { status: 500 }
+      )
+    }
 
-    // Enviar para o webhook do N8N
-    const response = await fetch(N8N_TTS_WEBHOOK, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text }),
-    })
+    console.log(`🔊 Gerando TTS para: ${text.substring(0, 50)}...`)
+
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.7,
+            similarity_boost: 0.85,
+            style: 0.0,
+            use_speaker_boost: true
+          },
+          output_format: 'mp3_44100_128'
+        })
+      }
+    )
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ Erro no webhook N8N:', response.status, errorText)
-      throw new Error(`N8N webhook error: ${response.status} - ${errorText}`)
+      console.error('❌ Erro no ElevenLabs:', response.status, errorText)
+      throw new Error(`ElevenLabs error: ${response.status}`)
     }
 
-    // Receber o áudio do N8N
     const audioBuffer = await response.arrayBuffer()
-    console.log('✅ Áudio recebido do N8N:', audioBuffer.byteLength, 'bytes')
-
-    // Determinar o tipo de conteúdo baseado na resposta
-    const contentType = response.headers.get('content-type') || 'audio/mpeg'
+    console.log(`✅ TTS gerado: ${audioBuffer.byteLength} bytes`)
 
     return new NextResponse(audioBuffer, {
       headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'no-cache',
-      },
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.byteLength.toString()
+      }
     })
 
   } catch (error: any) {
-    console.error('❌ Erro no TTS N8N:', error)
+    console.error('Erro no TTS do roleplay:', error)
     return NextResponse.json(
-      {
-        error: 'Erro ao gerar áudio',
-        details: error?.message || 'Erro desconhecido',
-      },
+      { error: error.message || 'Erro ao gerar áudio' },
       { status: 500 }
     )
   }
