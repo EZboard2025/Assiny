@@ -103,6 +103,9 @@ PERFIL DO CLIENTE B2C:
 
       console.log('📝 Enviando contexto para N8N...')
 
+      // PRIMEIRA MENSAGEM: Conta como 1 (mensagem inicial do sistema)
+      const numeroMensagens = 1
+
       // Enviar para N8N com variáveis separadas para System Prompt
       const response = await fetch(N8N_ROLEPLAY_WEBHOOK, {
         method: 'POST',
@@ -127,7 +130,8 @@ PERFIL DO CLIENTE B2C:
           objecoes: objectionsText,
           objetivo: config.objective?.name
             ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
-            : 'Não especificado'
+            : 'Não especificado',
+          numeroMensagens: numeroMensagens  // ← Nova variável para forçar Context Window
         }),
       })
 
@@ -170,6 +174,26 @@ PERFIL DO CLIENTE B2C:
         objectionsCount: objections?.length || 0
       })
       console.log('🔍 BODY COMPLETO recebido:', JSON.stringify(body, null, 2))
+
+      // Buscar número de mensagens da sessão atual
+      console.log('📊 Buscando número de mensagens da sessão:', sessionId)
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('roleplay_sessions')
+        .select('messages')
+        .eq('id', sessionId)
+        .single()
+
+      // Contar mensagens existentes + mensagem inicial + nova interação (usuário + resposta IA)
+      const messagesCount = sessionData?.messages?.length || 0
+      // Cada interação = 2 mensagens (usuário + IA)
+      // Total = 1 (inicial) + mensagens_existentes + 2 (nova mensagem usuário + resposta IA que vai vir)
+      const numeroMensagens = 1 + messagesCount + 2
+      console.log('📊 Mensagens no banco:', messagesCount)
+      console.log('📊 Total para Context Window (1 inicial + existentes + 2 novas):', numeroMensagens)
+
+      if (sessionError) {
+        console.warn('⚠️ Erro ao buscar mensagens da sessão:', sessionError)
+      }
 
       // Buscar dados da empresa (filtrado por company_id)
       console.log('🏢 Buscando dados da empresa para company_id:', companyId)
@@ -269,7 +293,8 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
           idade: age || '35',
           temperamento: temperament || 'Analítico',
           persona: personaText,
-          objecoes: objectionsText
+          objecoes: objectionsText,
+          numeroMensagens: numeroMensagens  // ← Nova variável para forçar Context Window
         }),
       })
 
