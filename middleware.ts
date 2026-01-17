@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // SISTEMA UNIFICADO: Verificar se está ativado
   const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
 
@@ -33,8 +34,32 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Se tem subdomínio, adicionar header para usar no app
+  // Se tem subdomínio, verificar se empresa está bloqueada
   if (subdomain && subdomain !== 'www' && subdomain !== 'ramppy') {
+    // Verificar se a empresa está bloqueada (exceto na página /locked)
+    if (!request.nextUrl.pathname.startsWith('/locked')) {
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        )
+
+        const { data: company } = await supabase
+          .from('companies')
+          .select('locked')
+          .eq('subdomain', subdomain)
+          .single()
+
+        // Se empresa está bloqueada, redirecionar para página de bloqueio
+        if (company?.locked === true) {
+          return NextResponse.redirect(new URL('/locked', request.url))
+        }
+      } catch (error) {
+        console.error('Error checking company lock status:', error)
+        // Em caso de erro, permitir acesso (fail-open para não bloquear por problemas técnicos)
+      }
+    }
+
     const response = NextResponse.next()
     response.headers.set('x-subdomain', subdomain)
     return response

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -17,6 +17,7 @@ interface Company {
   employee_limit: number | null
   training_plan?: PlanType
   selection_plan?: PlanType | null
+  locked?: boolean
   _count?: {
     employees: number
   }
@@ -124,6 +125,9 @@ export default function CompaniesAdmin() {
 
   // Toast system
   const { toasts, showToast, removeToast } = useToast()
+
+  // Toggle lock state
+  const [togglingLock, setTogglingLock] = useState<string | null>(null)
 
   // Metrics states
   const [metrics, setMetrics] = useState<CompanyMetrics[]>([])
@@ -645,6 +649,37 @@ export default function CompaniesAdmin() {
     }
   }
 
+  const toggleLock = async (company: Company) => {
+    setTogglingLock(company.id)
+
+    try {
+      const response = await fetch('/api/admin/companies/toggle-lock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ companyId: company.id })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao alterar bloqueio')
+      }
+
+      showToast('success', result.locked ? 'Empresa bloqueada!' : 'Empresa desbloqueada!', result.message)
+
+      // Recarregar lista
+      await loadCompanies()
+
+    } catch (error: any) {
+      console.error('Erro ao alterar bloqueio:', error)
+      showToast('error', 'Erro ao alterar bloqueio', error.message)
+    } finally {
+      setTogglingLock(null)
+    }
+  }
+
   // Tela de senha
   if (!isAuthenticated) {
     return (
@@ -946,7 +981,15 @@ export default function CompaniesAdmin() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white mb-1">{company.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-xl font-bold text-white">{company.name}</h3>
+                      {company.locked && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-500/20 border border-orange-500/30 rounded-full text-xs font-semibold text-orange-400">
+                          <Lock className="w-3 h-3" />
+                          BLOQUEADA
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-gray-400">
                       <Globe className="w-4 h-4" />
                       <span>Sistema Unificado</span>
@@ -1010,6 +1053,25 @@ export default function CompaniesAdmin() {
                       title="Editar limite de funcionários"
                     >
                       <UserCog className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => toggleLock(company)}
+                      disabled={togglingLock === company.id}
+                      className={`p-2 rounded-lg transition-colors ${
+                        company.locked
+                          ? 'text-orange-400 hover:bg-orange-500/10'
+                          : 'text-gray-400 hover:bg-gray-500/10'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={company.locked ? 'Desbloquear empresa' : 'Bloquear empresa'}
+                    >
+                      {togglingLock === company.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : company.locked ? (
+                        <Lock className="w-4 h-4" />
+                      ) : (
+                        <LockOpen className="w-4 h-4" />
+                      )}
                     </button>
 
                     <button
