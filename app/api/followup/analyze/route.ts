@@ -28,12 +28,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!avaliacao || !avaliacao.contexto) {
-      return NextResponse.json(
-        { error: 'Contexto é obrigatório' },
-        { status: 400 }
-      )
-    }
 
     try {
       // TESTE: Extrair o texto de todas as imagens usando GPT-4 Vision
@@ -193,9 +187,8 @@ Retorne as mensagens organizadas conforme o formato especificado.`
             tipo_venda: avaliacao.tipo_venda,         // B2B ou B2C
             canal: avaliacao.canal,                   // WhatsApp, E-mail, etc
             fase_funil: avaliacao.fase_funil,         // ID da fase selecionada
-            contexto: avaliacao.contexto,             // Contexto do momento (pós-proposta, cold, etc)
             dados_empresa: dadosEmpresa ? JSON.stringify(dadosEmpresa) : null,  // Stringify dos dados da empresa
-            funil: funil,                             // String formatada: "Fase 1: Prospecção, Fase 2: Qualificação, Fase 3: Proposta, etc"
+            funil: funil,                             // String formatada: "Fase 1: Prospecção | Descrição: xxx | Objetivo: yyy || Fase 2: ..."
             fase_do_lead: faseDoLead                  // String: "Fase 2: Qualificação" (fase atual do lead)
           })
         })
@@ -309,8 +302,7 @@ Retorne as mensagens organizadas conforme o formato especificado.`
               console.log('📝 Dados da avaliação:', {
                 tipo_venda: avaliacao.tipo_venda,
                 canal: avaliacao.canal,
-                fase_funil: avaliacao.fase_funil,
-                contexto: avaliacao.contexto
+                fase_funil: avaliacao.fase_funil
               })
               console.log('🎯 Notas finais:', {
                 nota_final: n8nResult.nota_final,
@@ -323,7 +315,6 @@ Retorne as mensagens organizadas conforme o formato especificado.`
                 tipo_venda: avaliacao.tipo_venda,
                 canal: avaliacao.canal,
                 fase_funil: avaliacao.fase_funil,
-                contexto: avaliacao.contexto,
                 transcricao_original: fullExtractedText,
                 transcricao_filtrada: filteredText,
                 avaliacao: n8nResult,
@@ -388,7 +379,6 @@ Retorne as mensagens organizadas conforme o formato especificado.`
                   tipo_venda: avaliacao.tipo_venda,
                   canal: avaliacao.canal,
                   fase_funil: avaliacao.fase_funil,
-                  contexto: avaliacao.contexto,
                   transcricao_original: fullExtractedText,
                   transcricao_filtrada: filteredText,
                   avaliacao: n8nResult,

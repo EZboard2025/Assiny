@@ -71,7 +71,6 @@ export default function FollowUpView() {
 
   // Context form state
   const [tipoVenda, setTipoVenda] = useState<'B2B' | 'B2C'>('B2B')
-  const [contexto, setContexto] = useState<string>('')
   const [canal, setCanal] = useState<string>('WhatsApp')
   const [faseFunil, setFaseFunil] = useState<string>('')
 
@@ -174,12 +173,6 @@ export default function FollowUpView() {
       return
     }
 
-    // Validate context form
-    if (!contexto.trim()) {
-      setError('Por favor, descreva o contexto do follow-up')
-      return
-    }
-
     setIsAnalyzing(true)
     setError(null)
 
@@ -238,7 +231,6 @@ export default function FollowUpView() {
           filenames: selectedImages.map(img => img.name),
           avaliacao: {
             tipo_venda: tipoVenda,
-            contexto: contexto,
             canal: canal,
             fase_funil: faseFunil
           },
@@ -360,7 +352,7 @@ export default function FollowUpView() {
               </div>
 
               {/* Fase do Funil */}
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-1">
                   <Target className="w-4 h-4 text-gray-400" />
                   Fase do Funil
@@ -386,32 +378,6 @@ export default function FollowUpView() {
                   </p>
                 )}
               </div>
-
-              {/* Contexto */}
-              <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-1">
-                  <Users className="w-4 h-4 text-gray-400" />
-                  Contexto do Momento
-                  <span className="text-red-400 ml-1">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={contexto}
-                  onChange={(e) => setContexto(e.target.value)}
-                  placeholder="Ex: pós-proposta, cold, pós-demo, retomada"
-                  className="w-full px-4 py-2 bg-gray-800/50 text-white placeholder-gray-500 border border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                />
-                {contexto.trim() === '' && error?.includes('contexto') && (
-                  <p className="text-red-400 text-xs mt-1">Campo obrigatório</p>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 p-3 bg-green-900/20 border border-green-500/20 rounded-lg">
-              <p className="text-xs text-green-400 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                <strong>Dica:</strong> Quanto mais detalhado o contexto, mais precisa será a análise do seu follow-up
-              </p>
             </div>
           </div>
         )}
