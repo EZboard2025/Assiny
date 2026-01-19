@@ -47,6 +47,17 @@ interface FollowUpAnalysis {
   dica_principal: string
 }
 
+interface FunnelStage {
+  id: string
+  company_id: string
+  stage_name: string
+  description: string
+  objective: string | null
+  stage_order: number
+  created_at: string
+  updated_at: string
+}
+
 export default function FollowUpView() {
   const [selectedImages, setSelectedImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -56,15 +67,15 @@ export default function FollowUpView() {
   const [extractedText, setExtractedText] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [companyData, setCompanyData] = useState<any>(null)
-
+  const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
 
   // Context form state
   const [tipoVenda, setTipoVenda] = useState<'B2B' | 'B2C'>('B2B')
   const [contexto, setContexto] = useState<string>('')
   const [canal, setCanal] = useState<string>('WhatsApp')
-  const [faseFunil, setFaseFunil] = useState<string>('prospeccao')
+  const [faseFunil, setFaseFunil] = useState<string>('')
 
-  // Carregar dados da empresa ao montar o componente
+  // Carregar dados da empresa e fases do funil ao montar o componente
   useEffect(() => {
     const loadCompanyData = async () => {
       try {
@@ -78,6 +89,7 @@ export default function FollowUpView() {
           return
         }
 
+        // Carregar dados da empresa
         const { data, error } = await supabase
           .from('company_data')
           .select('*')
@@ -88,8 +100,26 @@ export default function FollowUpView() {
           setCompanyData(data)
           console.log('✅ Dados da empresa carregados:', data)
         }
+
+        // Carregar fases do funil
+        const { data: stagesData, error: stagesError } = await supabase
+          .from('funnel_stages')
+          .select('*')
+          .eq('company_id', companyId)
+          .order('stage_order', { ascending: true })
+
+        if (stagesData && !stagesError) {
+          setFunnelStages(stagesData)
+          // Selecionar a primeira fase como padrão
+          if (stagesData.length > 0) {
+            setFaseFunil(stagesData[0].id)
+          }
+          console.log('✅ Fases do funil carregadas:', stagesData)
+        } else if (stagesError) {
+          console.warn('⚠️ Erro ao carregar fases do funil:', stagesError)
+        }
       } catch (error) {
-        console.error('Erro ao carregar dados da empresa:', error)
+        console.error('Erro ao carregar dados:', error)
       }
     }
 
@@ -317,11 +347,21 @@ export default function FollowUpView() {
                   onChange={(e) => setFaseFunil(e.target.value)}
                   className="w-full px-4 py-2 bg-gray-800/50 text-white border border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
                 >
-                  <option value="prospeccao">Prospecção</option>
-                  <option value="qualificacao">Qualificação</option>
-                  <option value="negociacao">Negociação</option>
-                  <option value="fechamento">Fechamento</option>
+                  {funnelStages.length === 0 ? (
+                    <option value="">Configure as fases no Config Hub</option>
+                  ) : (
+                    funnelStages.map((stage) => (
+                      <option key={stage.id} value={stage.id}>
+                        {stage.stage_name}
+                      </option>
+                    ))
+                  )}
                 </select>
+                {funnelStages.length === 0 && (
+                  <p className="text-xs text-yellow-400 mt-1">
+                    ⚠️ Nenhuma fase cadastrada. Configure no Config Hub primeiro.
+                  </p>
+                )}
               </div>
 
               {/* Contexto */}

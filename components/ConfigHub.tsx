@@ -1,8 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   getEmployees,
   addEmployee as addEmployeeDB,
@@ -55,6 +72,217 @@ import { useToast } from '@/components/Toast'
 
 interface ConfigHubProps {
   onClose: () => void
+}
+
+// Sortable Stage Card Component
+interface SortableStageCardProps {
+  stage: FunnelStage
+  index: number
+  totalStages: number
+  isEditing: boolean
+  editStageName: string
+  editStageDescription: string
+  editStageObjective: string
+  onStartEdit: (stage: FunnelStage) => void
+  onCancelEdit: () => void
+  onUpdate: (id: string) => void
+  onDelete: (id: string) => void
+  setEditStageName: (value: string) => void
+  setEditStageDescription: (value: string) => void
+  setEditStageObjective: (value: string) => void
+}
+
+function SortableStageCard({
+  stage,
+  index,
+  totalStages,
+  isEditing,
+  editStageName,
+  editStageDescription,
+  editStageObjective,
+  onStartEdit,
+  onCancelEdit,
+  onUpdate,
+  onDelete,
+  setEditStageName,
+  setEditStageDescription,
+  setEditStageObjective,
+}: SortableStageCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: stage.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  // Definir gradiente e borda baseado na posição
+  const isFirst = index === 0
+  const isLast = index === totalStages - 1
+
+  const getBorderColor = () => {
+    if (isFirst) return 'border-green-400/50' // Verde brilhante no topo
+    if (isLast) return 'border-purple-400/50' // Roxo no final
+    return 'border-green-500/20' // Padrão
+  }
+
+  const getGradient = () => {
+    if (isFirst) return 'from-green-900/30 to-green-800/20' // Topo
+    if (isLast) return 'from-purple-900/30 to-purple-800/20' // Final
+    return 'from-gray-800/50 to-gray-900/30' // Meio
+  }
+
+  const getLabel = () => {
+    if (isFirst) return '🚀 INÍCIO DO FUNIL'
+    if (isLast) return '🎯 FINAL DO FUNIL'
+    return `FASE ${index + 1}`
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative group ${
+        isDragging ? 'shadow-2xl shadow-green-500/50 z-50 scale-105' : ''
+      }`}
+    >
+      {/* Card principal com efeito empilhado */}
+      <div className={`relative bg-gradient-to-br ${getGradient()} border-2 ${getBorderColor()} rounded-2xl p-5 transition-all duration-300 ${
+        !isDragging && 'hover:border-green-400/60 hover:shadow-lg hover:shadow-green-500/20'
+      }`}>
+
+        {/* Label de posição */}
+        <div className={`absolute -top-3 left-4 px-3 py-1 rounded-full text-xs font-bold ${
+          isFirst ? 'bg-green-500/20 text-green-300 border border-green-400/50' :
+          isLast ? 'bg-purple-500/20 text-purple-300 border border-purple-400/50' :
+          'bg-gray-700/80 text-gray-300 border border-gray-600'
+        }`}>
+          {getLabel()}
+        </div>
+
+        {/* Efeito de sombra empilhada */}
+        <div className="absolute -bottom-1 left-2 right-2 h-1 bg-gradient-to-b from-gray-900/40 to-transparent rounded-b-xl -z-10" />
+        <div className="absolute -bottom-2 left-4 right-4 h-1 bg-gradient-to-b from-gray-900/20 to-transparent rounded-b-xl -z-20" />
+
+        {isEditing ? (
+          // Modo de edição
+          <div className="space-y-3 mt-2">
+            <input
+              type="text"
+              value={editStageName}
+              onChange={(e) => setEditStageName(e.target.value)}
+              placeholder="Nome da fase"
+              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+            />
+            <textarea
+              value={editStageDescription}
+              onChange={(e) => setEditStageDescription(e.target.value)}
+              placeholder="Descrição"
+              rows={2}
+              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+            />
+            <textarea
+              value={editStageObjective}
+              onChange={(e) => setEditStageObjective(e.target.value)}
+              placeholder="Objetivo (como passar para próxima fase)"
+              rows={2}
+              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => onUpdate(stage.id)}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                Salvar
+              </button>
+              <button
+                onClick={onCancelEdit}
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Modo de visualização
+          <div className="mt-2">
+            <div className="flex items-start gap-3">
+              {/* Drag Handle com visual melhorado */}
+              <button
+                {...attributes}
+                {...listeners}
+                className={`mt-1 p-2 rounded-lg transition-all ${
+                  isDragging
+                    ? 'bg-green-500/30 text-green-300'
+                    : 'text-gray-500 hover:text-green-400 hover:bg-green-500/10'
+                } cursor-grab active:cursor-grabbing`}
+                title="⬍ Arraste para reordenar"
+              >
+                <GripVertical className="w-5 h-5" />
+              </button>
+
+              <div className="flex-1 min-w-0">
+                {/* Nome da fase */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
+                    isFirst ? 'bg-green-500/20 text-green-300' :
+                    isLast ? 'bg-purple-500/20 text-purple-300' :
+                    'bg-gray-700/50 text-gray-300'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <h5 className="text-white font-bold text-lg">{stage.stage_name}</h5>
+                </div>
+
+                {/* Descrição */}
+                {stage.description && (
+                  <p className="text-sm text-gray-300 mb-2 pl-12 leading-relaxed">
+                    {stage.description}
+                  </p>
+                )}
+
+                {/* Objetivo */}
+                {stage.objective && (
+                  <div className="pl-12 bg-green-500/10 border-l-2 border-green-400 p-2 rounded-r-lg">
+                    <p className="text-xs text-green-300 flex items-start gap-1.5">
+                      <Target className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-green-200">Objetivo:</strong> {stage.objective}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões de ação */}
+              <div className="flex flex-col gap-1 flex-shrink-0">
+                <button
+                  onClick={() => onStartEdit(stage)}
+                  className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
+                  title="Editar fase"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onDelete(stage.id)}
+                  className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                  title="Excluir fase"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // Component for the main configuration interface
@@ -192,9 +420,11 @@ function ConfigurationInterface({
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
   const [newStageName, setNewStageName] = useState('')
   const [newStageDescription, setNewStageDescription] = useState('')
+  const [newStageObjective, setNewStageObjective] = useState('')
   const [editingStage, setEditingStage] = useState<string | null>(null)
   const [editStageName, setEditStageName] = useState('')
   const [editStageDescription, setEditStageDescription] = useState('')
+  const [editStageObjective, setEditStageObjective] = useState('')
 
   // Carregar dados do Supabase
   useEffect(() => {
@@ -1326,11 +1556,12 @@ function ConfigurationInterface({
       return
     }
 
-    const stage = await addFunnelStage(newStageName.trim(), newStageDescription.trim())
+    const stage = await addFunnelStage(newStageName.trim(), newStageDescription.trim(), newStageObjective.trim())
     if (stage) {
       setFunnelStages([...funnelStages, stage])
       setNewStageName('')
       setNewStageDescription('')
+      setNewStageObjective('')
       showToast('success', 'Fase criada com sucesso')
     } else {
       showToast('error', 'Erro ao criar fase')
@@ -1343,16 +1574,17 @@ function ConfigurationInterface({
       return
     }
 
-    const success = await updateFunnelStage(id, editStageName.trim(), editStageDescription.trim())
+    const success = await updateFunnelStage(id, editStageName.trim(), editStageDescription.trim(), editStageObjective.trim())
     if (success) {
       setFunnelStages(funnelStages.map(s =>
         s.id === id
-          ? { ...s, stage_name: editStageName.trim(), description: editStageDescription.trim() }
+          ? { ...s, stage_name: editStageName.trim(), description: editStageDescription.trim(), objective: editStageObjective.trim() }
           : s
       ))
       setEditingStage(null)
       setEditStageName('')
       setEditStageDescription('')
+      setEditStageObjective('')
       showToast('success', 'Fase atualizada')
     } else {
       showToast('error', 'Erro ao atualizar fase')
@@ -1375,13 +1607,51 @@ function ConfigurationInterface({
     setEditingStage(stage.id)
     setEditStageName(stage.stage_name)
     setEditStageDescription(stage.description || '')
+    setEditStageObjective(stage.objective || '')
   }
 
   const cancelEditingStage = () => {
     setEditingStage(null)
     setEditStageName('')
     setEditStageDescription('')
+    setEditStageObjective('')
   }
+
+  const handleDragEndFunnelStages = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const oldIndex = funnelStages.findIndex((stage) => stage.id === active.id)
+    const newIndex = funnelStages.findIndex((stage) => stage.id === over.id)
+
+    const newStages = arrayMove(funnelStages, oldIndex, newIndex)
+
+    // Atualizar ordem localmente primeiro (feedback instantâneo)
+    setFunnelStages(newStages)
+
+    // Atualizar ordem no banco de dados
+    const stagesWithNewOrder = newStages.map((stage, index) => ({
+      id: stage.id,
+      stage_order: index
+    }))
+
+    const success = await updateFunnelStageOrder(stagesWithNewOrder)
+    if (!success) {
+      // Se falhar, reverter para ordem anterior
+      setFunnelStages(funnelStages)
+      showToast('error', 'Erro ao reordenar fases')
+    }
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   const getQualityLabel = (score: number): string => {
     if (score >= 95) return 'Perfeito'
@@ -1562,73 +1832,73 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
   return (
     <div className="space-y-6">
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-green-500/20">
+      {/* Tabs - Redesenhadas */}
+      <div className="flex gap-2 pb-4 overflow-x-auto">
         <button
           onClick={() => setActiveTab('employees')}
-          className={`px-6 py-3 font-medium transition-all ${
+          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
             activeTab === 'employees'
-              ? 'border-b-2 border-green-500 text-white'
-              : 'text-gray-400 hover:text-gray-300'
+              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
           }`}
         >
-          <Users className="w-4 h-4 inline mr-2" />
-          Funcionários
+          <Users className="w-4 h-4" />
+          <span>Funcionários</span>
         </button>
         <button
           onClick={() => setActiveTab('personas')}
-          className={`px-6 py-3 font-medium transition-all ${
+          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
             activeTab === 'personas'
-              ? 'border-b-2 border-green-500 text-white'
-              : 'text-gray-400 hover:text-gray-300'
+              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
           }`}
         >
-          <UserCircle2 className="w-4 h-4 inline mr-2" />
-          Personas
+          <UserCircle2 className="w-4 h-4" />
+          <span>Personas</span>
         </button>
         <button
           onClick={() => setActiveTab('objections')}
-          className={`px-6 py-3 font-medium transition-all ${
+          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
             activeTab === 'objections'
-              ? 'border-b-2 border-green-500 text-white'
-              : 'text-gray-400 hover:text-gray-300'
+              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
           }`}
         >
-          <Target className="w-4 h-4 inline mr-2" />
-          Objeções
+          <Target className="w-4 h-4" />
+          <span>Objeções</span>
         </button>
         <button
           onClick={() => setActiveTab('objectives')}
-          className={`px-6 py-3 font-medium transition-all ${
+          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
             activeTab === 'objectives'
-              ? 'border-b-2 border-green-500 text-white'
-              : 'text-gray-400 hover:text-gray-300'
+              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
           }`}
         >
-          <CheckCircle className="w-4 h-4 inline mr-2" />
-          Objetivos de Roleplay
+          <CheckCircle className="w-4 h-4" />
+          <span>Objetivos</span>
         </button>
         <button
           onClick={() => setActiveTab('files')}
-          className={`px-6 py-3 font-medium transition-all ${
+          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
             activeTab === 'files'
-              ? 'border-b-2 border-green-500 text-white'
-              : 'text-gray-400 hover:text-gray-300'
+              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
           }`}
         >
-          <Building2 className="w-4 h-4 inline mr-2" />
-          Dados da Empresa
+          <Building2 className="w-4 h-4" />
+          <span>Dados da Empresa</span>
         </button>
         <button
           onClick={() => setActiveTab('funnel')}
-          className={`px-6 py-3 font-medium transition-all ${
+          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
             activeTab === 'funnel'
-              ? 'border-b-2 border-green-500 text-white'
-              : 'text-gray-400 hover:text-gray-300'
+              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
           }`}
         >
-          <Target className="w-4 h-4 inline mr-2" />
-          Fases do Funil
+          <Target className="w-4 h-4" />
+          <span>Fases do Funil</span>
         </button>
       </div>
 
@@ -3291,6 +3561,18 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Objetivo (Como passar para próxima fase)
+                    </label>
+                    <textarea
+                      value={newStageObjective}
+                      onChange={(e) => setNewStageObjective(e.target.value)}
+                      placeholder="Ex: Conseguir que o lead responda e demonstre interesse inicial"
+                      rows={2}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                    />
+                  </div>
                   <button
                     onClick={handleAddFunnelStage}
                     className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white font-medium rounded-xl hover:from-green-500 hover:to-green-400 transition-all flex items-center justify-center gap-2"
@@ -3312,80 +3594,44 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <p className="text-sm mt-2">Adicione as fases do seu funil de vendas acima.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {funnelStages.map((stage, index) => (
-                      <div
-                        key={stage.id}
-                        className="bg-gray-800/50 border border-green-500/20 rounded-xl p-4"
+                  <>
+                    <p className="text-sm text-gray-400 mb-4 flex items-center gap-2">
+                      <GripVertical className="w-4 h-4" />
+                      Arraste os cards para reordenar as fases do funil
+                    </p>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEndFunnelStages}
+                    >
+                      <SortableContext
+                        items={funnelStages.map((s) => s.id)}
+                        strategy={verticalListSortingStrategy}
                       >
-                        {editingStage === stage.id ? (
-                          // Modo de edição
-                          <div className="space-y-3">
-                            <input
-                              type="text"
-                              value={editStageName}
-                              onChange={(e) => setEditStageName(e.target.value)}
-                              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+                        <div className="space-y-3">
+                          {funnelStages.map((stage, index) => (
+                            <SortableStageCard
+                              key={stage.id}
+                              stage={stage}
+                              index={index}
+                              totalStages={funnelStages.length}
+                              isEditing={editingStage === stage.id}
+                              editStageName={editStageName}
+                              editStageDescription={editStageDescription}
+                              editStageObjective={editStageObjective}
+                              onStartEdit={startEditingStage}
+                              onCancelEdit={cancelEditingStage}
+                              onUpdate={handleUpdateFunnelStage}
+                              onDelete={handleDeleteFunnelStage}
+                              setEditStageName={setEditStageName}
+                              setEditStageDescription={setEditStageDescription}
+                              setEditStageObjective={setEditStageObjective}
                             />
-                            <textarea
-                              value={editStageDescription}
-                              onChange={(e) => setEditStageDescription(e.target.value)}
-                              rows={2}
-                              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleUpdateFunnelStage(stage.id)}
-                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors flex items-center justify-center gap-2"
-                              >
-                                <Check className="w-4 h-4" />
-                                Salvar
-                              </button>
-                              <button
-                                onClick={cancelEditingStage}
-                                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          // Modo de visualização
-                          <div>
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center text-green-400 font-bold text-sm">
-                                  {index + 1}
-                                </div>
-                                <div>
-                                  <h5 className="text-white font-semibold">{stage.stage_name}</h5>
-                                  {stage.description && (
-                                    <p className="text-sm text-gray-400 mt-1">{stage.description}</p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => startEditingStage(stage)}
-                                  className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
-                                  title="Editar fase"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteFunnelStage(stage.id)}
-                                  className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                                  title="Excluir fase"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </>
                 )}
               </div>
             </div>

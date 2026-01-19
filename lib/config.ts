@@ -726,6 +726,7 @@ export interface FunnelStage {
   company_id: string
   stage_name: string
   description: string
+  objective: string | null
   stage_order: number
   created_at: string
   updated_at: string
@@ -755,7 +756,8 @@ export async function getFunnelStages(): Promise<FunnelStage[]> {
 
 export async function addFunnelStage(
   stageName: string,
-  description: string = ''
+  description: string = '',
+  objective: string = ''
 ): Promise<FunnelStage | null> {
   const companyId = await getCompanyId()
 
@@ -782,6 +784,7 @@ export async function addFunnelStage(
       company_id: companyId,
       stage_name: stageName,
       description: description,
+      objective: objective || null,
       stage_order: nextOrder
     })
     .select()
@@ -798,13 +801,15 @@ export async function addFunnelStage(
 export async function updateFunnelStage(
   id: string,
   stageName: string,
-  description: string
+  description: string,
+  objective: string
 ): Promise<boolean> {
   const { error } = await supabase
     .from('funnel_stages')
     .update({
       stage_name: stageName,
       description: description,
+      objective: objective || null,
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
