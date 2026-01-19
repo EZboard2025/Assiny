@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, XCircle, Clock, ThumbsUp, ThumbsDown, MessageSquare, Target, Calendar, Loader2 } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, ThumbsUp, ThumbsDown, MessageSquare, Target, Calendar, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface FollowUpAnalysis {
   id: string
@@ -30,6 +30,7 @@ export default function FollowUpHistoryView() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedAnalysis, setSelectedAnalysis] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [expandedChats, setExpandedChats] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadHistory()
@@ -76,6 +77,18 @@ export default function FollowUpHistoryView() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const toggleChatExpansion = (analysisId: string) => {
+    setExpandedChats(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(analysisId)) {
+        newSet.delete(analysisId)
+      } else {
+        newSet.add(analysisId)
+      }
+      return newSet
+    })
   }
 
   const handleMarkResult = async (analysisId: string, funcionou: boolean) => {
@@ -155,6 +168,82 @@ export default function FollowUpHistoryView() {
     if (score >= 6) return 'text-yellow-400'
     if (score >= 4) return 'text-orange-400'
     return 'text-red-400'
+  }
+
+  // Função para parsear e formatar a transcrição como chat
+  const parseTranscriptionToChat = (transcription: string) => {
+    // Regex para encontrar padrões como [10:03] Vendedor: texto ou [10:03] Cliente: texto
+    const messageRegex = /\[(\d{2}:\d{2})\]\s+(Vendedor|Cliente):\s+([^[]+)/g
+    const messages: { time: string; role: 'Vendedor' | 'Cliente'; text: string }[] = []
+
+    let match
+    while ((match = messageRegex.exec(transcription)) !== null) {
+      messages.push({
+        time: match[1],
+        role: match[2] as 'Vendedor' | 'Cliente',
+        text: match[3].trim()
+      })
+    }
+
+    return messages
+  }
+
+  const renderChatMessages = (transcription: string, isExpanded: boolean) => {
+    const messages = parseTranscriptionToChat(transcription)
+
+    if (messages.length === 0) {
+      // Fallback: mostrar texto sem formatação
+      return (
+        <p className="text-sm text-gray-300 line-clamp-2">
+          {transcription}
+        </p>
+      )
+    }
+
+    // Mostrar apenas 2 mensagens quando colapsado, todas quando expandido
+    const displayMessages = isExpanded ? messages : messages.slice(0, 2)
+    const containerClass = isExpanded
+      ? 'max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent'
+      : 'max-h-[180px] overflow-hidden'
+
+    return (
+      <div className={`space-y-3 ${containerClass} pr-2 transition-all duration-300`}>
+        <div className="space-y-3">
+          {displayMessages.map((msg, index) => (
+            <div
+              key={index}
+              className={`flex ${msg.role === 'Vendedor' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`max-w-[75%] min-w-[200px] ${msg.role === 'Vendedor' ? 'order-2' : 'order-1'}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-xs font-medium ${
+                    msg.role === 'Vendedor' ? 'text-green-400' : 'text-blue-400'
+                  }`}>
+                    {msg.role}
+                  </span>
+                  <span className="text-[10px] text-gray-500">{msg.time}</span>
+                </div>
+                <div className={`rounded-2xl px-4 py-2 ${
+                  msg.role === 'Vendedor'
+                    ? 'bg-green-600/20 border border-green-500/30 text-gray-200'
+                    : 'bg-gray-700/50 border border-gray-600/30 text-gray-300'
+                }`}>
+                  <p className="text-sm leading-relaxed break-words">{msg.text}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {!isExpanded && messages.length > 2 && (
+          <div className="text-center">
+            <span className="text-xs text-gray-500">
+              +{messages.length - 2} mensagens
+            </span>
+          </div>
+        )}
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -253,11 +342,36 @@ export default function FollowUpHistoryView() {
                   </div>
                 </div>
 
-                {/* Preview do follow-up */}
-                <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-gray-300 line-clamp-3">
-                    {analysis.transcricao_filtrada}
-                  </p>
+                {/* Preview do follow-up em formato de chat */}
+                <div className="bg-gray-800/50 rounded-lg mb-4 overflow-hidden transition-all duration-300">
+                  {/* Header do chat com botão de expandir */}
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700/50">
+                    <span className="text-xs font-medium text-gray-400 flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Conversa do Follow-up
+                    </span>
+                    <button
+                      onClick={() => toggleChatExpansion(analysis.id)}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-400 transition-colors px-2 py-1 rounded hover:bg-gray-700/30"
+                    >
+                      {expandedChats.has(analysis.id) ? (
+                        <>
+                          <span>Recolher</span>
+                          <ChevronUp className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          <span>Expandir</span>
+                          <ChevronDown className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Conteúdo do chat */}
+                  <div className="p-4">
+                    {renderChatMessages(analysis.transcricao_filtrada, expandedChats.has(analysis.id))}
+                  </div>
                 </div>
 
                 {/* Ações */}

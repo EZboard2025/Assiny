@@ -11,7 +11,8 @@ import PerfilView from './PerfilView'
 import PDIView from './PDIView'
 import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock, FileSearch } from 'lucide-react'
+import FollowUpHistoryView from './FollowUpHistoryView'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock, FileSearch, History } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -34,7 +35,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -193,6 +194,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'followup') {
       return <FollowUpView />
+    }
+
+    if (currentView === 'followup-history') {
+      return <FollowUpHistoryView />
     }
 
     // Home view
@@ -373,11 +378,39 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </button>
 
+            {/* Histórico de Follow-ups Card */}
+            <button
+              onClick={() => handleViewChange('followup-history')}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '550ms' }}
+            >
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 hover:border-purple-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(168,85,247,0.4)] hover:shadow-[0_0_60px_rgba(168,85,247,0.6)]">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30">
+                    <History className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Histórico de Follow-ups</h3>
+                    <span className="text-xs text-purple-400">Feedback & Aprendizado</span>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  Revise seus follow-ups e marque resultados para melhorar a IA.
+                </p>
+                <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-purple-300 transition-colors">
+                  <span>Ver histórico</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+
             {/* Análise de Venda Real Card - HIDDEN
             <button
               onClick={() => handleViewChange('analise-venda-real')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '550ms' }}
+              style={{ animationDelay: '600ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-orange-500/20 hover:border-orange-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(251,146,60,0.4)] hover:shadow-[0_0_60px_rgba(251,146,60,0.6)]">
                 <div className="absolute top-3 right-3">
