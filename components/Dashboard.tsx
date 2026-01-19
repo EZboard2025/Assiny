@@ -10,7 +10,8 @@ import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
 import SalesDashboard from './SalesDashboard'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock } from 'lucide-react'
+import FollowUpView from './FollowUpView'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock, FileSearch } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -33,7 +34,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -190,6 +191,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       return <RoleplayLinksView />
     }
 
+    if (currentView === 'followup') {
+      return <FollowUpView />
+    }
+
     // Home view
     return (
       <div className="py-12 px-6 relative z-10">
@@ -335,8 +340,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div> */}
 
-            {/* Follow-up Analysis Card - TEMPORARIAMENTE OCULTO */}
-            {/* <button
+            {/* Follow-up Analysis Card */}
+            <button
               onClick={() => handleViewChange('followup')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '500ms' }}
@@ -366,7 +371,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   </svg>
                 </div>
               </div>
-            </button> */}
+            </button>
 
             {/* Análise de Venda Real Card - HIDDEN
             <button
