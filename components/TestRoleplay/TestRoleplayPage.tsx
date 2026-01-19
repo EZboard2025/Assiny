@@ -220,32 +220,6 @@ export default function TestRoleplayPage() {
     }
   }, [])
 
-  // Salvar configurações no localStorage
-  const saveConfig = () => {
-    const config = {
-      leadName,
-      leadEmail,
-      leadPhone,
-      companyInfo,
-      businessType,
-      selectedPersonaType,
-      personaB2B,
-      personaB2C,
-      objections,
-      clientAge,
-      clientTemperament,
-      objective
-    }
-    localStorage.setItem('testRoleplayConfig', JSON.stringify(config))
-    alert('Configurações salvas!')
-  }
-
-  // Limpar configurações do localStorage
-  const clearSavedConfig = () => {
-    localStorage.removeItem('testRoleplayConfig')
-    alert('Configurações removidas!')
-  }
-
   // Gerar estrelas de forma determinística (evita hydration mismatch)
   const stars = useMemo(() => {
     const seededRandom = (seed: number) => {
@@ -508,22 +482,6 @@ export default function TestRoleplayPage() {
                     {objections.filter(o => o.name.trim()).length} objeção(ões) configurada(s)
                   </p>
                 </div>
-              </div>
-
-              {/* Botões de salvar/limpar config */}
-              <div className="flex gap-2 mb-4">
-                <button
-                  onClick={saveConfig}
-                  className="flex-1 py-2 bg-blue-600/20 text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-600/30 transition-all border border-blue-500/30"
-                >
-                  💾 Salvar Config
-                </button>
-                <button
-                  onClick={clearSavedConfig}
-                  className="flex-1 py-2 bg-red-600/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-600/30 transition-all border border-red-500/30"
-                >
-                  🗑️ Limpar Config
-                </button>
               </div>
 
               {/* Erro */}

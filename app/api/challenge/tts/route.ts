@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('Erro no TTS do roleplay:', error)
+    console.error('Erro no TTS do desafio:', error)
     return NextResponse.json(
       { error: error.message || 'Erro ao gerar áudio' },
       { status: 500 }

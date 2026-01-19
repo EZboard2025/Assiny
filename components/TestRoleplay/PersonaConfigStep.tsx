@@ -73,7 +73,7 @@ export default function PersonaConfigStep({
   const currentPersona = effectiveType === 'B2B' ? personaB2B : personaB2C
 
   const isFieldComplete = (field: string) => {
-    const value = (currentPersona as Record<string, string>)[field]
+    const value = (currentPersona as unknown as Record<string, string>)[field]
     return value && value.trim().length > 2
   }
 
@@ -166,7 +166,7 @@ export default function PersonaConfigStep({
             {currentFields.map((field) => {
               const Icon = field.icon
               const isFocused = focusedField === field.key
-              const value = (currentPersona as Record<string, string>)[field.key] || ''
+              const value = (currentPersona as unknown as Record<string, string>)[field.key] || ''
 
               return (
                 <div

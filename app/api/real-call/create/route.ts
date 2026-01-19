@@ -185,7 +185,6 @@ async function launchBot(sessionId: string, meetLink: string, userId: string) {
           btn.getAttribute('aria-label')?.toLowerCase().includes('câmera')
         )
         if (cameraButton) {
-          console.log('Clicking camera button')
           cameraButton.click()
         }
       })
@@ -198,7 +197,6 @@ async function launchBot(sessionId: string, meetLink: string, userId: string) {
           btn.getAttribute('aria-label')?.toLowerCase().includes('microfone')
         )
         if (micButton) {
-          console.log('Clicking microphone button')
           micButton.click()
         }
       })
@@ -221,10 +219,7 @@ async function launchBot(sessionId: string, meetLink: string, userId: string) {
                text.includes('pedir para participar') || text.includes('ask to join')
       })
       if (joinButton) {
-        console.log('Clicking join button')
         (joinButton as HTMLButtonElement).click()
-      } else {
-        console.log('Join button not found')
       }
     })
 
@@ -256,11 +251,9 @@ async function launchBot(sessionId: string, meetLink: string, userId: string) {
                  text.includes('cc')
         })
         if (captionButton) {
-          console.log('Found caption button with label:', captionButton.getAttribute('aria-label'))
           ;(captionButton as HTMLButtonElement).click()
           return true
         } else {
-          console.log('Caption button not found')
           return false
         }
       })

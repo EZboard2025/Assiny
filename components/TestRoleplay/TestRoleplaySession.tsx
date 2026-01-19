@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Mic, MicOff, Square, Loader2, Volume2, User, Sparkles, Phone, Clock } from 'lucide-react'
+import { Mic, MicOff, Square, Loader2, Volume2, User, Sparkles, Clock } from 'lucide-react'
 import { PersonaB2B, PersonaB2C, Objection, CompanyInfo } from './TestRoleplayPage'
 
 interface TestRoleplaySessionProps {
@@ -46,6 +46,7 @@ export default function TestRoleplaySession({
   const [isEnding, setIsEnding] = useState(false)
   const [audioVolume, setAudioVolume] = useState(0)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -56,6 +57,7 @@ export default function TestRoleplaySession({
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animationRef = useRef<number | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const audioSourceCreatedRef = useRef(false)
 
   // Timer
   useEffect(() => {
@@ -102,22 +104,39 @@ export default function TestRoleplaySession({
     initFirstMessage()
   }, [])
 
-  // Audio visualizer
+  // Audio visualizer - simplificado para mobile
   const setupAudioVisualizer = (audio: HTMLAudioElement) => {
     try {
+      // Evitar criar múltiplas sources para o mesmo elemento
+      if (audioSourceCreatedRef.current) {
+        return
+      }
+
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext()
       }
 
       const audioContext = audioContextRef.current
+
+      // Resumir se suspenso
+      if (audioContext.state === 'suspended') {
+        audioContext.resume()
+      }
+
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 128
       analyser.smoothingTimeConstant = 0.3
       analyserRef.current = analyser
 
-      const source = audioContext.createMediaElementSource(audio)
-      source.connect(analyser)
-      analyser.connect(audioContext.destination)
+      try {
+        const source = audioContext.createMediaElementSource(audio)
+        source.connect(analyser)
+        analyser.connect(audioContext.destination)
+        audioSourceCreatedRef.current = true
+      } catch (sourceError) {
+        // Source já foi criada para este elemento, ignorar
+        console.warn('Audio source já existe:', sourceError)
+      }
 
       const updateVolume = () => {
         if (!analyserRef.current) return
@@ -139,6 +158,51 @@ export default function TestRoleplaySession({
     }
   }
 
+  // Função para reproduzir áudio pendente (quando usuário clica)
+  const playPendingAudio = async () => {
+    if (!pendingAudioUrl) return
+
+    try {
+      // Inicializar AudioContext na interação do usuário
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext()
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
+      const audio = new Audio(pendingAudioUrl)
+      audioRef.current = audio
+      audio.setAttribute('playsinline', 'true')
+
+      setIsPlayingAudio(true)
+
+      audio.onplay = () => {
+        setupAudioVisualizer(audio)
+      }
+
+      audio.onended = () => {
+        setIsPlayingAudio(false)
+        setAudioVolume(0)
+        setPendingAudioUrl(null)
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current)
+        }
+      }
+
+      audio.onerror = () => {
+        setIsPlayingAudio(false)
+        setPendingAudioUrl(null)
+      }
+
+      await audio.play()
+    } catch (error) {
+      console.error('Erro ao reproduzir áudio pendente:', error)
+      setIsPlayingAudio(false)
+      setPendingAudioUrl(null)
+    }
+  }
+
   const playTTS = async (text: string) => {
     try {
       setIsPlayingAudio(true)
@@ -154,26 +218,45 @@ export default function TestRoleplaySession({
         const audio = new Audio(audioUrl)
         audioRef.current = audio
 
+        // Configurações para mobile
+        audio.setAttribute('playsinline', 'true')
+        audio.setAttribute('webkit-playsinline', 'true')
+
         audio.onplay = () => {
+          // Resumir AudioContext se estiver suspenso (necessário para mobile)
+          if (audioContextRef.current?.state === 'suspended') {
+            audioContextRef.current.resume()
+          }
           setupAudioVisualizer(audio)
         }
 
         audio.onended = () => {
           setIsPlayingAudio(false)
           setAudioVolume(0)
+          setPendingAudioUrl(null)
           if (animationRef.current) {
             cancelAnimationFrame(animationRef.current)
           }
           URL.revokeObjectURL(audioUrl)
         }
 
-        audio.onerror = () => {
+        audio.onerror = (e) => {
+          console.error('Erro ao reproduzir áudio:', e)
           setIsPlayingAudio(false)
           setAudioVolume(0)
+          setPendingAudioUrl(null)
           URL.revokeObjectURL(audioUrl)
         }
 
-        await audio.play()
+        // Tentar reproduzir - se falhar no mobile, salvar URL para reproduzir depois
+        try {
+          await audio.play()
+        } catch (playError) {
+          console.warn('Autoplay bloqueado, salvando áudio para reprodução manual:', playError)
+          // Salvar URL do áudio para o usuário clicar e reproduzir
+          setPendingAudioUrl(audioUrl)
+          setIsPlayingAudio(false)
+        }
       } else {
         setIsPlayingAudio(false)
       }
@@ -185,6 +268,14 @@ export default function TestRoleplaySession({
 
   const startRecording = async () => {
     try {
+      // Inicializar/resumir AudioContext na interação do usuário (necessário para mobile)
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext()
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
@@ -364,31 +455,10 @@ export default function TestRoleplaySession({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Timer */}
-            <div className="flex items-center gap-2 bg-gray-800/60 px-4 py-2 rounded-xl border border-gray-700/50">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-white font-mono font-medium">{formatTime(elapsedTime)}</span>
-            </div>
-
-            {/* Botão Finalizar */}
-            <button
-              onClick={() => handleEndSession(false)}
-              disabled={isEnding || isLoading || messages.length < 2}
-              className="group px-5 py-2.5 bg-gradient-to-r from-red-600/20 to-orange-600/20 text-red-400 rounded-xl font-medium border border-red-500/30 hover:border-red-500/50 hover:from-red-600/30 hover:to-orange-600/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isEnding ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Avaliando...
-                </>
-              ) : (
-                <>
-                  <Phone className="w-4 h-4 group-hover:rotate-[135deg] transition-transform" />
-                  Encerrar Ligação
-                </>
-              )}
-            </button>
+          {/* Timer */}
+          <div className="flex items-center gap-2 bg-gray-800/60 px-4 py-2 rounded-xl border border-gray-700/50">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <span className="text-white font-mono font-medium">{formatTime(elapsedTime)}</span>
           </div>
         </div>
       </div>
@@ -437,6 +507,17 @@ export default function TestRoleplaySession({
           )}
 
           <div className="flex flex-col items-center">
+            {/* Botão para ouvir áudio pendente (mobile) */}
+            {pendingAudioUrl && !isPlayingAudio && (
+              <button
+                onClick={playPendingAudio}
+                className="mb-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-medium flex items-center gap-2 animate-pulse hover:animate-none hover:scale-105 transition-transform shadow-lg shadow-blue-500/30"
+              >
+                <Volume2 className="w-5 h-5" />
+                Toque para ouvir o cliente
+              </button>
+            )}
+
             {/* Botão principal de gravação */}
             <div className="relative">
               {/* Anel animado quando está tocando áudio */}
@@ -454,14 +535,18 @@ export default function TestRoleplaySession({
 
               <button
                 onClick={isRecording ? stopRecording : startRecording}
-                disabled={isLoading || isPlayingAudio}
+                disabled={isLoading || isPlayingAudio || isEnding || !!pendingAudioUrl}
                 className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  isRecording
+                  isEnding
+                    ? 'bg-gradient-to-br from-purple-500 to-violet-600 shadow-xl shadow-purple-500/30'
+                    : isRecording
                     ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-xl shadow-red-500/40 scale-105'
                     : 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-xl shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105'
                 }`}
               >
-                {isRecording ? (
+                {isEnding ? (
+                  <Loader2 className="w-10 h-10 text-white animate-spin" />
+                ) : isRecording ? (
                   <MicOff className="w-10 h-10 text-white" />
                 ) : (
                   <Mic className="w-10 h-10 text-white" />
@@ -471,13 +556,21 @@ export default function TestRoleplaySession({
 
             {/* Status text */}
             <p className={`mt-4 text-sm font-medium transition-all ${
-              isRecording
+              pendingAudioUrl
+                ? 'text-blue-400'
+                : isEnding
+                ? 'text-purple-400'
+                : isRecording
                 ? 'text-red-400'
                 : isPlayingAudio
                 ? 'text-green-400'
                 : 'text-gray-400'
             }`}>
-              {isRecording
+              {pendingAudioUrl
+                ? 'Áudio pronto - toque no botão acima para ouvir'
+                : isEnding
+                ? 'Processando sua avaliação...'
+                : isRecording
                 ? 'Gravando... Clique para enviar'
                 : isPlayingAudio
                 ? 'Ouça o cliente responder...'
@@ -487,7 +580,11 @@ export default function TestRoleplaySession({
             </p>
 
             {/* Dica */}
-            {!isRecording && !isPlayingAudio && !isLoading && messages.length > 0 && (
+            {isEnding ? (
+              <p className="mt-2 text-xs text-purple-400/70">
+                Aguarde enquanto analisamos sua performance...
+              </p>
+            ) : !isRecording && !isPlayingAudio && !isLoading && messages.length > 0 && (
               <p className="mt-2 text-xs text-gray-600">
                 Dica: Escute atentamente e responda de forma natural
               </p>

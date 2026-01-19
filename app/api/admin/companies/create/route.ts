@@ -34,10 +34,7 @@ export async function POST(request: NextRequest) {
       employeeLimit
     } = body
 
-    // Sistema unificado não requer subdomínio
-    const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
-
-    // Validações
+    // Validações - subdomínio não é mais obrigatório (sistema unificado)
     if (!companyName || !adminName || !adminEmail || !adminPassword || !businessType) {
       return NextResponse.json(
         { error: 'Todos os campos obrigatórios devem ser preenchidos' },
@@ -45,38 +42,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // No sistema legado, subdomínio é obrigatório
-    if (!USE_UNIFIED_SYSTEM && !subdomain) {
-      return NextResponse.json(
-        { error: 'Subdomínio é obrigatório no sistema com subdomínios' },
-        { status: 400 }
-      )
-    }
-
-    // Verificar se subdomínio já existe (apenas no sistema legado)
-    if (!USE_UNIFIED_SYSTEM && subdomain) {
-      const { data: existingCompany } = await supabaseAdmin
-        .from('companies')
-        .select('id')
-        .eq('subdomain', subdomain)
-        .single()
-
-      if (existingCompany) {
-        return NextResponse.json(
-          { error: 'Subdomínio já está em uso' },
-          { status: 400 }
-        )
-      }
-    }
-
-    console.log(`📦 Criando empresa: ${companyName} ${USE_UNIFIED_SYSTEM ? '(Sistema Unificado)' : `(${subdomain})`}`)
+    console.log(`📦 Criando empresa: ${companyName}`)
 
     // 1. Criar empresa
     const companyData: any = {
       name: companyName,
       employee_limit: employeeLimit || null,
-      // No sistema unificado, usar string vazia para subdomain
-      subdomain: USE_UNIFIED_SYSTEM ? '' : (subdomain || '')
+      subdomain: subdomain || '' // Subdomínio é opcional
     }
 
     const { data: company, error: companyError } = await supabaseAdmin
@@ -165,11 +137,7 @@ export async function POST(request: NextRequest) {
         email: adminEmail,
         name: adminName
       },
-      message: `Empresa "${companyName}" criada com sucesso! Configure os dados no ConfigHub.`,
-      urls: {
-        local: `http://${subdomain}.ramppy.local:3000`,
-        production: `https://${subdomain}.ramppy.site`
-      }
+      message: `Empresa "${companyName}" criada com sucesso! Configure os dados no ConfigHub.`
     })
 
   } catch (error: any) {
