@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
     const filenames = body.filenames || (body.filename ? [body.filename] : [])
     const avaliacao = body.avaliacao
     const dadosEmpresa = body.dados_empresa || null
+    const funil = body.funil || null  // String formatada: "Fase 1: xxx, Fase 2: xxx"
+    const faseDoLead = body.fase_do_lead || null  // String: "Fase X: Nome da Fase"
 
     if (!images || images.length === 0) {
       return NextResponse.json(
@@ -170,6 +172,12 @@ Retorne as mensagens organizadas conforme o formato especificado.`
       if (dadosEmpresa) {
         console.log('Dados da empresa incluídos:', Object.keys(dadosEmpresa))
       }
+      if (funil) {
+        console.log('Fases do funil:', funil)
+      }
+      if (faseDoLead) {
+        console.log('Fase do lead:', faseDoLead)
+      }
 
       const n8nWebhookUrl = 'https://ezboard.app.n8n.cloud/webhook/c025a4ee-aa92-4a89-82fe-54eb6710a139'
 
@@ -184,9 +192,11 @@ Retorne as mensagens organizadas conforme o formato especificado.`
             transcricao: filteredText,                // Apenas o texto filtrado (follow-up identificado)
             tipo_venda: avaliacao.tipo_venda,         // B2B ou B2C
             canal: avaliacao.canal,                   // WhatsApp, E-mail, etc
-            fase_funil: avaliacao.fase_funil,         // Prospecção, Qualificação, etc
+            fase_funil: avaliacao.fase_funil,         // ID da fase selecionada
             contexto: avaliacao.contexto,             // Contexto do momento (pós-proposta, cold, etc)
-            dados_empresa: dadosEmpresa ? JSON.stringify(dadosEmpresa) : null  // Stringify dos dados da empresa
+            dados_empresa: dadosEmpresa ? JSON.stringify(dadosEmpresa) : null,  // Stringify dos dados da empresa
+            funil: funil,                             // String formatada: "Fase 1: Prospecção, Fase 2: Qualificação, Fase 3: Proposta, etc"
+            fase_do_lead: faseDoLead                  // String: "Fase 2: Qualificação" (fase atual do lead)
           })
         })
 

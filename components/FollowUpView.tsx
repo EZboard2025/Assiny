@@ -208,6 +208,18 @@ export default function FollowUpView() {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
+      // Formatar fases do funil para N8N (Fase 1: Nome, Fase 2: Nome, etc.)
+      const funnelFormatted = funnelStages
+        .map((stage, index) => `Fase ${index + 1}: ${stage.stage_name}`)
+        .join(', ')
+
+      // Encontrar fase atual do lead
+      const currentStageIndex = funnelStages.findIndex(s => s.id === faseFunil)
+      const currentStage = funnelStages[currentStageIndex]
+      const leadStage = currentStage
+        ? `Fase ${currentStageIndex + 1}: ${currentStage.stage_name}`
+        : 'Não definida'
+
       // Send to API for OCR and analysis with context
       const response = await fetch('/api/followup/analyze', {
         method: 'POST',
@@ -221,7 +233,9 @@ export default function FollowUpView() {
             canal: canal,
             fase_funil: faseFunil
           },
-          dados_empresa: companyData // Enviando todos os dados da empresa
+          dados_empresa: companyData, // Enviando todos os dados da empresa
+          funil: funnelFormatted, // String formatada: "Fase 1: xxx, Fase 2: xxx, etc"
+          fase_do_lead: leadStage // String: "Fase X: Nome da Fase"
         })
       })
 
