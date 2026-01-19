@@ -28,13 +28,19 @@ import {
   addRoleplayObjective,
   updateRoleplayObjective,
   deleteRoleplayObjective,
+  getFunnelStages,
+  addFunnelStage,
+  updateFunnelStage,
+  updateFunnelStageOrder,
+  deleteFunnelStage,
   type Employee,
   type Objection,
   type Persona,
   type PersonaB2B,
   type PersonaB2C,
   type Tag,
-  type RoleplayObjective
+  type RoleplayObjective,
+  type FunnelStage
 } from '@/lib/config'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import {
@@ -91,7 +97,7 @@ function ConfigurationInterface({
     planUsage
   } = usePlanLimits()
 
-  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'funnel'>('employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
@@ -181,6 +187,14 @@ function ConfigurationInterface({
   const [companyDataId, setCompanyDataId] = useState<string | null>(null)
   const [savingCompanyData, setSavingCompanyData] = useState(false)
   const [companyDataEdited, setCompanyDataEdited] = useState(false)
+
+  // Estados para Fases do Funil
+  const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
+  const [newStageName, setNewStageName] = useState('')
+  const [newStageDescription, setNewStageDescription] = useState('')
+  const [editingStage, setEditingStage] = useState<string | null>(null)
+  const [editStageName, setEditStageName] = useState('')
+  const [editStageDescription, setEditStageDescription] = useState('')
 
   // Carregar dados do Supabase
   useEffect(() => {
@@ -407,12 +421,13 @@ function ConfigurationInterface({
   const loadData = async () => {
     setLoading(true)
     try {
-      const [employeesData, companyTypeData, personasData, objectionsData, objectivesData] = await Promise.all([
+      const [employeesData, companyTypeData, personasData, objectionsData, objectivesData, funnelStagesData] = await Promise.all([
         getEmployees(),
         getCompanyType(),
         getPersonas(),
         getObjections(),
-        getRoleplayObjectives()
+        getRoleplayObjectives(),
+        getFunnelStages()
       ])
 
       setEmployees(employeesData)
@@ -420,6 +435,7 @@ function ConfigurationInterface({
       setPersonas(personasData)
       setObjections(objectionsData)
       setObjectives(objectivesData)
+      setFunnelStages(funnelStagesData)
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
@@ -1303,6 +1319,70 @@ function ConfigurationInterface({
     setEditingObjectiveDescription('')
   }
 
+  // Funções para Fases do Funil
+  const handleAddFunnelStage = async () => {
+    if (!newStageName.trim()) {
+      showToast('warning', 'Preencha o nome da fase')
+      return
+    }
+
+    const stage = await addFunnelStage(newStageName.trim(), newStageDescription.trim())
+    if (stage) {
+      setFunnelStages([...funnelStages, stage])
+      setNewStageName('')
+      setNewStageDescription('')
+      showToast('success', 'Fase criada com sucesso')
+    } else {
+      showToast('error', 'Erro ao criar fase')
+    }
+  }
+
+  const handleUpdateFunnelStage = async (id: string) => {
+    if (!editStageName.trim()) {
+      showToast('warning', 'Preencha o nome da fase')
+      return
+    }
+
+    const success = await updateFunnelStage(id, editStageName.trim(), editStageDescription.trim())
+    if (success) {
+      setFunnelStages(funnelStages.map(s =>
+        s.id === id
+          ? { ...s, stage_name: editStageName.trim(), description: editStageDescription.trim() }
+          : s
+      ))
+      setEditingStage(null)
+      setEditStageName('')
+      setEditStageDescription('')
+      showToast('success', 'Fase atualizada')
+    } else {
+      showToast('error', 'Erro ao atualizar fase')
+    }
+  }
+
+  const handleDeleteFunnelStage = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta fase?')) return
+
+    const success = await deleteFunnelStage(id)
+    if (success) {
+      setFunnelStages(funnelStages.filter(s => s.id !== id))
+      showToast('success', 'Fase excluída')
+    } else {
+      showToast('error', 'Erro ao excluir fase')
+    }
+  }
+
+  const startEditingStage = (stage: FunnelStage) => {
+    setEditingStage(stage.id)
+    setEditStageName(stage.stage_name)
+    setEditStageDescription(stage.description || '')
+  }
+
+  const cancelEditingStage = () => {
+    setEditingStage(null)
+    setEditStageName('')
+    setEditStageDescription('')
+  }
+
   const getQualityLabel = (score: number): string => {
     if (score >= 95) return 'Perfeito'
     if (score >= 80) return 'Ótimo'
@@ -1538,6 +1618,17 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         >
           <Building2 className="w-4 h-4 inline mr-2" />
           Dados da Empresa
+        </button>
+        <button
+          onClick={() => setActiveTab('funnel')}
+          className={`px-6 py-3 font-medium transition-all ${
+            activeTab === 'funnel'
+              ? 'border-b-2 border-green-500 text-white'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          <Target className="w-4 h-4 inline mr-2" />
+          Fases do Funil
         </button>
       </div>
 
@@ -3158,6 +3249,144 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fases do Funil Tab */}
+        {activeTab === 'funnel' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-xl font-bold mb-4">Fases do Funil de Vendas</h3>
+              <p className="text-gray-400 mb-6">
+                Configure as fases do seu processo de vendas. Essas fases serão usadas para categorizar e analisar follow-ups.
+              </p>
+
+              {/* Formulário para adicionar nova fase */}
+              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">
+                <h4 className="text-lg font-semibold mb-4">Adicionar Nova Fase</h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Nome da Fase *
+                    </label>
+                    <input
+                      type="text"
+                      value={newStageName}
+                      onChange={(e) => setNewStageName(e.target.value)}
+                      placeholder="Ex: Primeiro Contato, Qualificação, Proposta..."
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Descrição
+                    </label>
+                    <textarea
+                      value={newStageDescription}
+                      onChange={(e) => setNewStageDescription(e.target.value)}
+                      placeholder="Descreva o que caracteriza essa fase do funil..."
+                      rows={2}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleAddFunnelStage}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white font-medium rounded-xl hover:from-green-500 hover:to-green-400 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Adicionar Fase
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista de fases */}
+              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6">
+                <h4 className="text-lg font-semibold mb-4">Fases Cadastradas</h4>
+
+                {funnelStages.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Nenhuma fase cadastrada ainda.</p>
+                    <p className="text-sm mt-2">Adicione as fases do seu funil de vendas acima.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {funnelStages.map((stage, index) => (
+                      <div
+                        key={stage.id}
+                        className="bg-gray-800/50 border border-green-500/20 rounded-xl p-4"
+                      >
+                        {editingStage === stage.id ? (
+                          // Modo de edição
+                          <div className="space-y-3">
+                            <input
+                              type="text"
+                              value={editStageName}
+                              onChange={(e) => setEditStageName(e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+                            />
+                            <textarea
+                              value={editStageDescription}
+                              onChange={(e) => setEditStageDescription(e.target.value)}
+                              rows={2}
+                              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdateFunnelStage(stage.id)}
+                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Check className="w-4 h-4" />
+                                Salvar
+                              </button>
+                              <button
+                                onClick={cancelEditingStage}
+                                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          // Modo de visualização
+                          <div>
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center text-green-400 font-bold text-sm">
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <h5 className="text-white font-semibold">{stage.stage_name}</h5>
+                                  {stage.description && (
+                                    <p className="text-sm text-gray-400 mt-1">{stage.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => startEditingStage(stage)}
+                                  className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
+                                  title="Editar fase"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFunnelStage(stage.id)}
+                                  className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                                  title="Excluir fase"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

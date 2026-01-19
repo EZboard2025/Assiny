@@ -718,3 +718,141 @@ export async function deleteRoleplayObjective(id: string): Promise<boolean> {
 
   return true
 }
+
+// ==================== FUNNEL STAGES ====================
+
+export interface FunnelStage {
+  id: string
+  company_id: string
+  stage_name: string
+  description: string
+  stage_order: number
+  created_at: string
+  updated_at: string
+}
+
+export async function getFunnelStages(): Promise<FunnelStage[]> {
+  const companyId = await getCompanyId()
+
+  if (!companyId) {
+    console.error('[getFunnelStages] Company ID não encontrado')
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from('funnel_stages')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('stage_order', { ascending: true })
+
+  if (error) {
+    console.error('[getFunnelStages] Erro ao buscar fases:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function addFunnelStage(
+  stageName: string,
+  description: string = ''
+): Promise<FunnelStage | null> {
+  const companyId = await getCompanyId()
+
+  if (!companyId) {
+    console.error('[addFunnelStage] Company ID não encontrado')
+    return null
+  }
+
+  // Buscar a maior ordem atual para adicionar no final
+  const { data: existingStages } = await supabase
+    .from('funnel_stages')
+    .select('stage_order')
+    .eq('company_id', companyId)
+    .order('stage_order', { ascending: false })
+    .limit(1)
+
+  const nextOrder = existingStages && existingStages.length > 0
+    ? existingStages[0].stage_order + 1
+    : 0
+
+  const { data, error } = await supabase
+    .from('funnel_stages')
+    .insert({
+      company_id: companyId,
+      stage_name: stageName,
+      description: description,
+      stage_order: nextOrder
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[addFunnelStage] Erro ao adicionar fase:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function updateFunnelStage(
+  id: string,
+  stageName: string,
+  description: string
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('funnel_stages')
+    .update({
+      stage_name: stageName,
+      description: description,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+
+  if (error) {
+    console.error('[updateFunnelStage] Erro ao atualizar fase:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function updateFunnelStageOrder(stages: { id: string; stage_order: number }[]): Promise<boolean> {
+  try {
+    // Atualizar todas as ordens em paralelo
+    const updates = stages.map(stage =>
+      supabase
+        .from('funnel_stages')
+        .update({ stage_order: stage.stage_order, updated_at: new Date().toISOString() })
+        .eq('id', stage.id)
+    )
+
+    const results = await Promise.all(updates)
+
+    // Verificar se algum update falhou
+    const hasError = results.some(result => result.error)
+    if (hasError) {
+      console.error('[updateFunnelStageOrder] Erro ao atualizar ordem das fases')
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('[updateFunnelStageOrder] Erro:', error)
+    return false
+  }
+}
+
+export async function deleteFunnelStage(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('funnel_stages')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('[deleteFunnelStage] Erro ao deletar fase:', error)
+    return false
+  }
+
+  return true
+}
