@@ -208,10 +208,19 @@ export default function FollowUpView() {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
-      // Formatar fases do funil para N8N (Fase 1: Nome, Fase 2: Nome, etc.)
+      // Formatar fases do funil para N8N com todos os 3 campos
       const funnelFormatted = funnelStages
-        .map((stage, index) => `Fase ${index + 1}: ${stage.stage_name}`)
-        .join(', ')
+        .map((stage, index) => {
+          const parts = [`Fase ${index + 1}: ${stage.stage_name}`]
+          if (stage.description) {
+            parts.push(`Descrição: ${stage.description}`)
+          }
+          if (stage.objective) {
+            parts.push(`Objetivo: ${stage.objective}`)
+          }
+          return parts.join(' | ')
+        })
+        .join(' || ')
 
       // Encontrar fase atual do lead
       const currentStageIndex = funnelStages.findIndex(s => s.id === faseFunil)
