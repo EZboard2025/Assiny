@@ -202,58 +202,58 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     // Home view
     return (
-      <div className="py-12 px-6 relative z-10">
-        <div className="max-w-[1600px] mx-auto">
-          {/* Welcome Section */}
-          <div className="mb-12 text-center">
+      <div className="py-16 px-6 relative z-10">
+        <div className="max-w-[1400px] mx-auto">
+          {/* Welcome Section - Modern Hero */}
+          <div className="mb-16 text-center">
             <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-              <h1 className="text-3xl md:text-4xl font-bold">
-                <span className="text-white">Bem-vindo de volta,</span>{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-lime-400">
-                  {userName || 'Vendedor'}!
+              <p className="text-green-400/80 text-sm font-medium tracking-widest uppercase mb-3">
+                Plataforma de Treinamento
+              </p>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
+                <span className="text-white">Olá, </span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-400 to-lime-400">
+                  {userName || 'Vendedor'}
                 </span>
               </h1>
+              <p className="text-gray-400 text-lg max-w-xl mx-auto">
+                Aprimore suas habilidades de vendas com IA
+              </p>
             </div>
           </div>
 
 
           {/* Features Grid Title */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold">
-              <span className="text-white">Funcionalidades</span>{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-lime-400">
-                Disponíveis
-              </span>
+          <div className="mb-10 text-center">
+            <h2 className="text-xl font-semibold text-gray-300 tracking-wide">
+              Escolha uma funcionalidade para começar
             </h2>
-            <p className="text-gray-400 mt-1">
-              Explore todas as ferramentas para melhorar suas vendas
-            </p>
           </div>
 
-          {/* Grid Container com ajuste para centralizar últimos elementos */}
-          <div className="flex flex-wrap justify-center gap-6">
+          {/* Features Grid - Flexbox para centralizar automaticamente */}
+          <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
             {/* Roleplay Card */}
             <button
               onClick={() => handleViewChange('roleplay')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
                     <Users className="w-6 h-6 text-green-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Roleplay</h3>
-                    <span className="text-xs text-green-400">Treinamento ativo</span>
+                    <span className="text-xs text-green-400/70">Treinamento ativo</span>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-300 text-sm leading-relaxed">
                   Simule conversas reais de vendas e receba feedback baseado na metodologia SPIN.
                 </p>
-                <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
+                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
                   <span>Iniciar treino</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -263,25 +263,25 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Meu Perfil Card */}
             <button
               onClick={() => handleViewChange('perfil')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '200ms' }}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '150ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
                     <User className="w-6 h-6 text-green-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Meu Perfil</h3>
-                    <span className="text-xs text-green-400">Análise de desempenho</span>
+                    <span className="text-xs text-green-400/70">Análise de desempenho</span>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-300 text-sm leading-relaxed">
                   Acompanhe sua evolução, métricas SPIN e performance geral nas vendas.
                 </p>
-                <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
+                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
                   <span>Ver perfil</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -291,87 +291,53 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Histórico Card */}
             <button
               onClick={() => handleViewChange('historico')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '300ms' }}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '200ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
                     <Clock className="w-6 h-6 text-green-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Histórico</h3>
-                    <span className="text-xs text-green-400">Sessões anteriores</span>
+                    <span className="text-xs text-green-400/70">Sessões anteriores</span>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-300 text-sm leading-relaxed">
                   Revise sessões anteriores com transcrições completas e análises detalhadas.
                 </p>
-                <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
+                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
                   <span>Ver histórico</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
               </div>
             </button>
 
-            {/* PDI Card - Desabilitado (temporariamente oculto) */}
-            {/* <div
-              className={`text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'} opacity-60 cursor-not-allowed`}
-              style={{ animationDelay: '400ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/40 to-gray-800/40 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20 h-full">
-                <div className="absolute top-3 right-3">
-                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-[10px] font-semibold rounded-full border border-yellow-500/30">
-                    Em breve
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-gray-600/20 to-gray-700/20 rounded-xl flex items-center justify-center border border-gray-600/30">
-                    <Target className="w-6 h-6 text-gray-500" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-400">PDI</h3>
-                    <span className="text-xs text-gray-500">Plano de desenvolvimento</span>
-                  </div>
-                </div>
-                <p className="text-gray-500 text-sm">
-                  Plano personalizado baseado na sua performance e áreas de melhoria.
-                </p>
-                <div className="mt-4 flex items-center text-gray-500 text-sm font-medium">
-                  <span>Disponível em breve</span>
-                </div>
-              </div>
-            </div> */}
-
             {/* Follow-up Analysis Card */}
             <button
               onClick={() => handleViewChange('followup')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '500ms' }}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '250ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
-                <div className="absolute top-3 right-3">
-                  <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-[10px] font-semibold rounded-full border border-purple-500/30">
-                    Novo
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30">
-                    <FileSearch className="w-6 h-6 text-purple-400" />
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
+                    <FileSearch className="w-6 h-6 text-green-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Análise de Follow-up</h3>
-                    <span className="text-xs text-purple-400">WhatsApp</span>
+                    <span className="text-xs text-green-400/70">WhatsApp</span>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-300 text-sm leading-relaxed">
                   Envie prints do WhatsApp e receba análise detalhada do seu follow-up.
                 </p>
-                <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-purple-300 transition-colors">
+                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
                   <span>Analisar follow-up</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -381,95 +347,59 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Histórico de Follow-ups Card */}
             <button
               onClick={() => handleViewChange('followup-history')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '550ms' }}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '300ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 hover:border-purple-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(168,85,247,0.4)] hover:shadow-[0_0_60px_rgba(168,85,247,0.6)]">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30">
-                    <History className="w-6 h-6 text-purple-400" />
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
+                    <History className="w-6 h-6 text-green-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">Histórico de Follow-ups</h3>
-                    <span className="text-xs text-purple-400">Feedback & Aprendizado</span>
+                    <span className="text-xs text-green-400/70">Feedback & Aprendizado</span>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-300 text-sm leading-relaxed">
                   Revise seus follow-ups e marque resultados para melhorar a IA.
                 </p>
-                <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-purple-300 transition-colors">
+                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
                   <span>Ver histórico</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
               </div>
             </button>
-
-            {/* Análise de Venda Real Card - HIDDEN
-            <button
-              onClick={() => handleViewChange('analise-venda-real')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '600ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-orange-500/20 hover:border-orange-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(251,146,60,0.4)] hover:shadow-[0_0_60px_rgba(251,146,60,0.6)]">
-                <div className="absolute top-3 right-3">
-                  <span className="px-2 py-1 bg-orange-500/20 text-orange-400 text-[10px] font-semibold rounded-full border border-orange-500/30">
-                    Beta
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-xl flex items-center justify-center border border-orange-500/30">
-                    <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Análise de Venda Real</h3>
-                    <span className="text-xs text-orange-400">Google Meet</span>
-                  </div>
-                </div>
-                <p className="text-gray-400 text-sm">
-                  Analise calls reais do Google Meet com transcrição ao vivo e avaliação SPIN.
-                </p>
-                <div className="mt-4 flex items-center text-orange-400 text-sm font-medium group-hover:text-orange-300 transition-colors">
-                  <span>Analisar call</span>
-                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </button>
-            */}
 
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
                 onClick={() => handleViewChange('roleplay-links')}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '600ms' }}
+                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                style={{ animationDelay: '350ms' }}
               >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
-                  <div className="absolute top-3 right-3">
-                    <span className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
+                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                  <div className="absolute top-4 right-4">
+                    <span className="px-2.5 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
                       Admin
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mb-4 pr-12">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                  <div className="flex items-center gap-4 mb-4 pr-12">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
                       <Link2 className="w-6 h-6 text-green-400" />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-white">Roleplay Público</h3>
-                      <span className="text-xs text-green-400">Links externos</span>
+                      <span className="text-xs text-green-400/70">Links externos</span>
                     </div>
                   </div>
-                  <p className="text-gray-400 text-sm">
+                  <p className="text-gray-300 text-sm leading-relaxed">
                     Gere links públicos para roleplays externos e acompanhe os resultados.
                   </p>
-                  <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
+                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
                     <span>Gerenciar links</span>
-                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -481,30 +411,30 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {userRole?.toLowerCase() === 'admin' && (
               <button
                 onClick={() => setShowSalesDashboard(true)}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '600ms' }}
+                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                style={{ animationDelay: '400ms' }}
               >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-green-500/20 hover:border-green-500/40 transition-all duration-300 h-full shadow-[0_0_40px_rgba(34,197,94,0.4)] hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]">
-                  <div className="absolute top-3 right-3">
-                    <span className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
+                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                  <div className="absolute top-4 right-4">
+                    <span className="px-2.5 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
                       Admin
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
                       <Users className="w-6 h-6 text-green-400" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white">Dashboard dos Vendedores</h3>
-                      <span className="text-xs text-green-400">Performance da equipe</span>
+                      <h3 className="text-lg font-bold text-white">Dashboard Vendedores</h3>
+                      <span className="text-xs text-green-400/70">Performance da equipe</span>
                     </div>
                   </div>
-                  <p className="text-gray-400 text-sm">
+                  <p className="text-gray-300 text-sm leading-relaxed">
                     Visualize métricas, performance SPIN e evolução de todos os vendedores.
                   </p>
-                  <div className="mt-4 flex items-center text-green-400 text-sm font-medium group-hover:text-green-300 transition-colors">
+                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
                     <span>Ver dashboard</span>
-                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
