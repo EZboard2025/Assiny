@@ -663,7 +663,16 @@ function ConfigurationInterface({
       setEmployees(employeesData)
       setBusinessType(companyTypeData)
       setPersonas(personasData)
-      setObjections(objectionsData)
+
+      // Normalizar objections: garantir que rebuttals sejam sempre strings
+      const normalizedObjections = objectionsData.map(obj => ({
+        ...obj,
+        rebuttals: (obj.rebuttals || []).map(r =>
+          typeof r === 'string' ? r : (typeof r === 'object' && r?.name ? r.name : JSON.stringify(r))
+        )
+      }))
+      setObjections(normalizedObjections)
+
       setObjectives(objectivesData)
       setFunnelStages(funnelStagesData)
     } catch (error) {
@@ -1396,7 +1405,9 @@ function ConfigurationInterface({
 
       if (objection.rebuttals && objection.rebuttals.length > 0) {
         objection.rebuttals.forEach((rebuttal, index) => {
-          objectionText += `\n${index + 1}. ${rebuttal}`
+          // Garantir que rebuttal é string (pode vir como objeto do banco)
+          const rebuttalText = typeof rebuttal === 'string' ? rebuttal : JSON.stringify(rebuttal)
+          objectionText += `\n${index + 1}. ${rebuttalText}`
         })
       } else {
         objectionText += `\nNenhuma forma de quebrar cadastrada.`
@@ -2918,7 +2929,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             {/* Lista de rebuttals */}
                             {objection.rebuttals && objection.rebuttals.length > 0 ? (
                               <div className="space-y-2 mb-3">
-                                {objection.rebuttals.map((rebuttal, index) => (
+                                {objection.rebuttals.map((rebuttal, index) => {
+                                  // Garantir que rebuttal é string
+                                  const rebuttalText = typeof rebuttal === 'string' ? rebuttal : String(rebuttal)
+
+                                  return (
                                   <div
                                     key={index}
                                     className="flex items-start gap-2 bg-gray-900/50 border border-green-500/10 rounded-lg px-3 py-2"
@@ -2959,11 +2974,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                       </>
                                     ) : (
                                       <>
-                                        <span className="text-gray-300 text-sm flex-1">{rebuttal}</span>
+                                        <span className="text-gray-300 text-sm flex-1">{rebuttalText}</span>
                                         <button
                                           onClick={() => {
                                             setEditingRebuttalId({ objectionId: objection.id, index })
-                                            setTempRebuttalText(rebuttal)
+                                            setTempRebuttalText(rebuttalText)
                                           }}
                                           className="text-green-400 hover:text-green-300 transition-colors"
                                         >
@@ -2978,7 +2993,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                       </>
                                     )}
                                   </div>
-                                ))}
+                                )})}
                               </div>
                             ) : (
                               <p className="text-gray-500 text-sm mb-3 italic">Nenhuma forma de quebra registrada ainda.</p>

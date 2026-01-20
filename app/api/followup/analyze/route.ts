@@ -161,7 +161,32 @@ Retorne as mensagens organizadas conforme o formato especificado.`
 
       console.log('Follow-up filtrado e organizado com sucesso')
 
-      // TERCEIRA ETAPA: Enviar para N8N para análise real
+      // TERCEIRA ETAPA: Buscar company_id do usuário para o N8N filtrar os exemplos
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+      let companyId = null
+      const authHeader = req.headers.get('authorization')
+
+      if (authHeader) {
+        const token = authHeader.replace('Bearer ', '')
+        const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+
+        if (user) {
+          const { data: employeeData } = await supabaseAdmin
+            .from('employees')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single()
+
+          companyId = employeeData?.company_id
+          console.log('🏢 Company ID para N8N:', companyId)
+        }
+      }
+
+      // QUARTA ETAPA: Enviar para N8N para análise
+      // Nota: Os exemplos de sucesso/falha são buscados pelo N8N via Supabase Vector Store usando company_id
       console.log('Enviando para N8N para análise...')
       if (dadosEmpresa) {
         console.log('Dados da empresa incluídos:', Object.keys(dadosEmpresa))
@@ -189,7 +214,8 @@ Retorne as mensagens organizadas conforme o formato especificado.`
             fase_funil: avaliacao.fase_funil,         // ID da fase selecionada
             dados_empresa: dadosEmpresa ? JSON.stringify(dadosEmpresa) : null,  // Stringify dos dados da empresa
             funil: funil,                             // String formatada: "Fase 1: Prospecção | Descrição: xxx | Objetivo: yyy || Fase 2: ..."
-            fase_do_lead: faseDoLead                  // String: "Fase 2: Qualificação" (fase atual do lead)
+            fase_do_lead: faseDoLead,                 // String: "Fase 2: Qualificação" (fase atual do lead)
+            company_id: companyId                     // Para filtrar exemplos no Supabase Vector Store
           })
         })
 
@@ -255,9 +281,16 @@ Retorne as mensagens organizadas conforme o formato especificado.`
           }
         }
 
+        // Log do resultado do N8N para debug
+        console.log('📦 N8N Result estrutura:', {
+          temResultado: !!n8nResult,
+          temNotas: !!(n8nResult && n8nResult.notas),
+          keys: n8nResult ? Object.keys(n8nResult) : []
+        })
+
         // Se conseguiu análise do N8N, retornar ela
         if (n8nResult && n8nResult.notas) {
-          console.log('Análise recebida do N8N com sucesso')
+          console.log('✅ Análise recebida do N8N com sucesso - ENTRANDO NO BLOCO DE SALVAMENTO')
 
           // Garantir que timing está presente (adicionar se não estiver)
           if (!n8nResult.notas.timing) {
@@ -309,17 +342,40 @@ Retorne as mensagens organizadas conforme o formato especificado.`
                 classificacao: n8nResult.classificacao
               })
 
+              // Buscar company_id do usuário através da tabela employees
+              const supabaseAdminClient = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!
+              )
+              const { data: employeeData } = await supabaseAdminClient
+                .from('employees')
+                .select('company_id')
+                .eq('user_id', user.id)
+                .single()
+
+              const userCompanyId = employeeData?.company_id
+              console.log('🏢 Company ID do usuário:', userCompanyId)
+
               // Preparar dados para inserção
-              const dataToInsert = {
+              const dataToInsert: any = {
                 user_id: user.id,
                 tipo_venda: avaliacao.tipo_venda,
                 canal: avaliacao.canal,
                 fase_funil: avaliacao.fase_funil,
+                contexto: `Tipo: ${avaliacao.tipo_venda}, Canal: ${avaliacao.canal}, Fase: ${avaliacao.fase_funil}`, // Campo obrigatório!
                 transcricao_original: fullExtractedText,
                 transcricao_filtrada: filteredText,
                 avaliacao: n8nResult,
                 nota_final: parseFloat(n8nResult.nota_final.toString()) || 0, // Garantir que é número
                 classificacao: n8nResult.classificacao || 'indefinido'
+              }
+
+              // Adicionar company_id se encontrado (para RAG funcionar)
+              if (userCompanyId) {
+                dataToInsert.company_id = userCompanyId
+                console.log('✅ company_id incluído na inserção:', userCompanyId)
+              } else {
+                console.warn('⚠️ company_id não encontrado - RAG pode não funcionar corretamente')
               }
 
               console.log('💾 Dados preparados para inserção:')
@@ -368,22 +424,30 @@ Retorne as mensagens organizadas conforme o formato especificado.`
 
               // Para teste, vamos pegar o primeiro usuário ou você pode passar o ID
               // Em produção, isso deveria vir do frontend
-              const { data: users } = await supabaseAdmin.from('employees').select('user_id').limit(1)
+              const { data: users } = await supabaseAdmin.from('employees').select('user_id, company_id').limit(1)
               const testUserId = users?.[0]?.user_id
+              const testCompanyId = users?.[0]?.company_id
 
               if (testUserId) {
                 console.log('📝 Salvando com user_id de teste:', testUserId)
+                console.log('🏢 Company ID de teste:', testCompanyId)
 
-                const dataToInsert = {
+                const dataToInsert: any = {
                   user_id: testUserId,
                   tipo_venda: avaliacao.tipo_venda,
                   canal: avaliacao.canal,
                   fase_funil: avaliacao.fase_funil,
+                  contexto: `Tipo: ${avaliacao.tipo_venda}, Canal: ${avaliacao.canal}, Fase: ${avaliacao.fase_funil}`, // Campo obrigatório!
                   transcricao_original: fullExtractedText,
                   transcricao_filtrada: filteredText,
                   avaliacao: n8nResult,
                   nota_final: parseFloat(n8nResult.nota_final.toString()) || 0,
                   classificacao: n8nResult.classificacao || 'indefinido'
+                }
+
+                // Adicionar company_id se encontrado
+                if (testCompanyId) {
+                  dataToInsert.company_id = testCompanyId
                 }
 
                 const { data: insertedData, error: insertError } = await supabaseAdmin
@@ -404,19 +468,23 @@ Retorne as mensagens organizadas conforme o formato especificado.`
             }
           }
 
+          console.log('🎉 SUCESSO! Retornando resposta com análise salva')
           return NextResponse.json({
             extractedText: filteredText,
             fullText: fullExtractedText,
             analysis: n8nResult
           })
+        } else {
+          console.error('❌ FALHA: N8N não retornou estrutura com "notas"')
+          console.log('Estrutura recebida:', JSON.stringify(n8nResult, null, 2))
         }
       } catch (n8nError) {
-        console.error('Erro ao enviar para N8N:', n8nError)
+        console.error('❌ ERRO ao enviar para N8N:', n8nError)
         // Continuar com resposta de teste se N8N falhar
       }
 
       // Se N8N não retornar análise válida, retornar erro
-      console.error('N8N não retornou análise válida')
+      console.error('❌ N8N não retornou análise válida - NÃO SALVOU NO BANCO')
 
       return NextResponse.json(
         {

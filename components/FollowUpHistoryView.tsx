@@ -58,12 +58,23 @@ export default function FollowUpHistoryView() {
         return
       }
 
-      // Buscar resultados
-      const analysisIds = analysesData?.map(a => a.id) || []
-      const { data: resultsData } = await supabase
-        .from('followup_results')
-        .select('*')
-        .in('followup_analysis_id', analysisIds)
+      // Buscar resultados (com fallback caso a tabela não exista)
+      let resultsData: any[] = []
+      try {
+        const analysisIds = analysesData?.map(a => a.id) || []
+        const { data, error: resultsError } = await supabase
+          .from('followup_results')
+          .select('*')
+          .in('followup_analysis_id', analysisIds)
+
+        if (resultsError) {
+          console.warn('⚠️ Tabela followup_results não encontrada. Execute o SQL primeiro:', resultsError.message)
+        } else {
+          resultsData = data || []
+        }
+      } catch (resultsError) {
+        console.warn('⚠️ Erro ao buscar resultados (não crítico):', resultsError)
+      }
 
       // Mapear resultados para análises
       const analysesWithResults = analysesData?.map(analysis => ({
@@ -139,6 +150,27 @@ export default function FollowUpHistoryView() {
           alert('Erro ao salvar resultado')
           return
         }
+      }
+
+      // Salvar exemplo na tabela correta (sucesso ou falha) com embedding
+      try {
+        console.log('🔄 Salvando exemplo para aprendizado da IA...')
+        const saveExampleResponse = await fetch('/api/followup/save-example', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ analysisId, funcionou })
+        })
+
+        if (saveExampleResponse.ok) {
+          const result = await saveExampleResponse.json()
+          console.log('✅ Exemplo salvo com sucesso em:', result.tableName)
+        } else {
+          const errorData = await saveExampleResponse.json()
+          console.warn('⚠️ Falha ao salvar exemplo:', errorData.error)
+        }
+      } catch (saveError) {
+        console.warn('⚠️ Erro ao salvar exemplo (não crítico):', saveError)
+        // Não bloquear o fluxo se falhar
       }
 
       // Recarregar histórico
