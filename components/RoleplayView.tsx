@@ -1427,23 +1427,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                             <span className={`text-sm font-medium ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`}>Finalizar Fala</span>
                           </button>
                         )}
-
-                        {/* Botão Finalizar Sessão - sempre visível ao lado do microfone */}
-                        {sessionId && !isEvaluating && (
-                          <button
-                            onClick={handleEndSession}
-                            disabled={showFinalizingMessage}
-                            className={`px-4 py-2 border rounded-lg transition-all flex items-center gap-2 text-sm ${
-                              showFinalizingMessage
-                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
-                                : 'bg-red-600/20 border-red-500/30 hover:bg-red-600/30'
-                            }`}
-                            title={showFinalizingMessage ? "Finalizando automaticamente..." : "Encerrar e avaliar sessão"}
-                          >
-                            <X className={`w-4 h-4 ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`} />
-                            <span className={`font-medium ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`}>Finalizar Sessão</span>
-                          </button>
-                        )}
                       </div>
                     </div>
                   )}
