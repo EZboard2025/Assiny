@@ -667,9 +667,13 @@ function ConfigurationInterface({
       // Normalizar objections: garantir que rebuttals sejam sempre strings
       const normalizedObjections = objectionsData.map(obj => ({
         ...obj,
-        rebuttals: (obj.rebuttals || []).map(r =>
-          typeof r === 'string' ? r : (typeof r === 'object' && r?.name ? r.name : JSON.stringify(r))
-        )
+        rebuttals: (obj.rebuttals || []).map((r: unknown) => {
+          if (typeof r === 'string') return r
+          if (typeof r === 'object' && r !== null && 'name' in r) {
+            return (r as { name: string }).name
+          }
+          return JSON.stringify(r)
+        })
       }))
       setObjections(normalizedObjections)
 
