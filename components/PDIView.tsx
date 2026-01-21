@@ -419,6 +419,8 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
 
   const renderRadarChart = (scores: { situacao: number; problema: number; implicacao: number; necessidade: number }) => {
     const labels = ['S', 'P', 'I', 'N']
+    const labelsFull = ['Situação', 'Problema', 'Implicação', 'Necessidade']
+    const colors = ['#06b6d4', '#8b5cf6', '#ec4899', '#10b981'] // cyan, purple, pink, green
     const values = [scores.situacao, scores.problema, scores.implicacao, scores.necessidade]
     const max = 10
     const centerX = 110
@@ -445,27 +447,108 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
 
     return (
       <svg viewBox="0 0 220 220" className="w-full h-full">
+        {/* Grid circles with gradient */}
+        <defs>
+          <linearGradient id="gridGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.1" />
+            <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.1" />
+            <stop offset="100%" stopColor="#ec4899" stopOpacity="0.1" />
+          </linearGradient>
+          <linearGradient id="fillGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.3" />
+            <stop offset="33%" stopColor="#8b5cf6" stopOpacity="0.3" />
+            <stop offset="66%" stopColor="#ec4899" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0.3" />
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Background circles */}
         {[0.25, 0.5, 0.75, 1].map((scale, i) => (
-          <circle key={i} cx={centerX} cy={centerY} r={radius * scale} fill="none" stroke="#374151" strokeWidth="0.5" opacity="0.3" />
+          <circle
+            key={i}
+            cx={centerX}
+            cy={centerY}
+            r={radius * scale}
+            fill="none"
+            stroke="url(#gridGradient)"
+            strokeWidth="1"
+            opacity={0.5 - i * 0.1}
+          />
         ))}
+
+        {/* Grid lines */}
         {labels.map((_, index) => {
           const angle = startAngle + angleStep * index
           const x = centerX + radius * Math.cos(angle)
           const y = centerY + radius * Math.sin(angle)
-          return <line key={index} x1={centerX} y1={centerY} x2={x} y2={y} stroke="#374151" strokeWidth="0.5" opacity="0.3" />
+          return (
+            <line
+              key={index}
+              x1={centerX}
+              y1={centerY}
+              x2={x}
+              y2={y}
+              stroke={colors[index]}
+              strokeWidth="1"
+              opacity="0.2"
+            />
+          )
         })}
-        <polygon points={points} fill="rgba(147, 51, 234, 0.3)" stroke="#a855f7" strokeWidth="2" />
+
+        {/* Data polygon with gradient fill */}
+        <polygon
+          points={points}
+          fill="url(#fillGradient)"
+          stroke="#8b5cf6"
+          strokeWidth="2.5"
+          filter="url(#glow)"
+        />
+
+        {/* Data points with colored circles */}
         {values.map((value, index) => {
           const angle = startAngle + angleStep * index
           const r = (value / max) * radius
           const x = centerX + r * Math.cos(angle)
           const y = centerY + r * Math.sin(angle)
-          return <circle key={index} cx={x} cy={y} r="3" fill="#a855f7" stroke="#fff" strokeWidth="1" />
+          return (
+            <g key={index}>
+              <circle cx={x} cy={y} r="5" fill={colors[index]} opacity="0.3" />
+              <circle cx={x} cy={y} r="3" fill={colors[index]} stroke="#fff" strokeWidth="1.5" filter="url(#glow)" />
+            </g>
+          )
         })}
+
+        {/* Labels with full names and values */}
         {labelPositions.map((pos, index) => (
           <g key={index}>
-            <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="middle" className="fill-gray-300 font-bold text-sm">{pos.label}</text>
-            <text x={pos.x} y={pos.y + 12} textAnchor="middle" dominantBaseline="middle" className="fill-green-400 font-semibold text-xs">{pos.value.toFixed(1)}</text>
+            <circle cx={pos.x} cy={pos.y - 8} r="16" fill={colors[index]} opacity="0.15" />
+            <text
+              x={pos.x}
+              y={pos.y - 8}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="font-bold text-base"
+              fill={colors[index]}
+            >
+              {pos.label}
+            </text>
+            <text
+              x={pos.x}
+              y={pos.y + 8}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="font-bold text-sm"
+              fill={colors[index]}
+            >
+              {pos.value.toFixed(1)}
+            </text>
           </g>
         ))}
       </svg>
@@ -636,27 +719,39 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         </div>
 
         {/* Diagnóstico Geral */}
-        <div className="bg-gray-800/50 rounded-2xl p-6 md:p-8 border border-gray-700/50 shadow-xl">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <span className="text-3xl">🎯</span>
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-purple-500/20 shadow-xl shadow-purple-500/10">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
             Diagnóstico Geral
           </h2>
 
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-300 font-medium">Nota Geral</span>
-              <span className="text-2xl font-bold text-gray-500">{hasData ? pdiData.diagnostico.nota_geral.toFixed(1) : '---'}</span>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-gray-300 font-medium text-lg">Nota Geral</span>
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg blur-lg opacity-50 animate-pulse"></div>
+                <span className="relative text-4xl font-black bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  {hasData ? pdiData.diagnostico.nota_geral.toFixed(1) : '---'}
+                </span>
+              </div>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
+            <div className="relative w-full bg-gray-900/50 rounded-full h-5 overflow-hidden border border-gray-700/50">
               <div
-                className="h-full bg-gradient-to-r from-gray-600 to-gray-500 rounded-full transition-all duration-1000"
+                className="h-full bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000 shadow-lg shadow-purple-500/50"
                 style={{ width: hasData ? `${(pdiData.diagnostico.nota_geral / 10) * 100}%` : '0%' }}
-              ></div>
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+              </div>
             </div>
           </div>
 
-          <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
-            <p className="text-gray-400 leading-relaxed italic">
+          <div className="relative p-5 bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-xl border border-blue-500/20 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5"></div>
+            <p className="relative text-gray-300 leading-relaxed">
               {hasData ? pdiData.diagnostico.resumo : 'O resumo do seu diagnóstico aparecerá aqui após a geração do PDI...'}
             </p>
           </div>
@@ -664,9 +759,13 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Notas SPIN */}
-          <div className="bg-gray-800/50 rounded-2xl p-6 md:p-8 border border-gray-700/50 shadow-xl">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="text-3xl">📊</span>
+          <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-cyan-500/20 shadow-xl shadow-cyan-500/10">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                </svg>
+              </div>
               Notas SPIN
             </h2>
             <div className="aspect-square max-w-sm mx-auto">
@@ -693,9 +792,13 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
           </div>
 
           {/* Foco da Semana */}
-          <div className="bg-gray-800/50 rounded-2xl p-6 md:p-8 border border-gray-700/50 shadow-xl">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="text-3xl">🎯</span>
+          <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-green-500/20 shadow-xl shadow-green-500/10">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/50">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
               Foco da Semana
             </h2>
 
@@ -761,9 +864,14 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         </div>
 
         {/* Simulações */}
-        <div className="bg-gray-800/50 rounded-2xl p-6 md:p-8 border border-gray-700/50 shadow-xl">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <span className="text-3xl">🎮</span>
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-pink-500/20 shadow-xl shadow-pink-500/10">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center shadow-lg shadow-pink-500/50">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
             Simulações Recomendadas
           </h2>
           <div className="space-y-4">
@@ -858,12 +966,17 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         </div>
 
         {/* Próximo Ciclo */}
-        <div className="bg-gradient-to-r from-green-900/60 to-blue-900/60 rounded-2xl p-6 md:p-8 border border-green-500/40 shadow-xl">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <span className="text-3xl">🚀</span>
+        <div className="relative bg-gradient-to-br from-indigo-900/60 to-purple-900/60 rounded-2xl p-6 md:p-8 border border-indigo-500/40 shadow-xl shadow-indigo-500/20 overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-3xl"></div>
+          <h2 className="relative text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/50">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
             Próximo Ciclo
           </h2>
-          <p className="text-gray-300 leading-relaxed italic">
+          <p className="relative text-gray-200 leading-relaxed">
             {hasData ? (pdiData.proximo_ciclo || pdiData.proximos_passos || 'Orientações sobre o próximo ciclo aparecerão aqui após a geração do PDI...') : 'Orientações sobre o próximo ciclo aparecerão aqui após a geração do PDI...'}
           </p>
         </div>
