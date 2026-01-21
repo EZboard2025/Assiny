@@ -44,7 +44,6 @@ export default function PDIView() {
   const [lastPdiDate, setLastPdiDate] = useState<string | null>(null)
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [isUpdatingSummary, setIsUpdatingSummary] = useState(false)
   const hasData = pdiData !== null
 
   // Carregar PDI mais recente ao montar o componente
@@ -91,47 +90,6 @@ export default function PDIView() {
     loadLatestPDI()
   }, [])
 
-  const handleUpdateSummary = async () => {
-    setIsUpdatingSummary(true)
-    setErrorMessage(null)
-
-    try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        setErrorMessage('Usuário não autenticado.')
-        setIsUpdatingSummary(false)
-        return
-      }
-
-      console.log('🔄 Atualizando resumo de performance...')
-
-      const response = await fetch('/api/performance-summary/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id })
-      })
-
-      if (!response.ok) {
-        throw new Error('Falha ao atualizar resumo')
-      }
-
-      const result = await response.json()
-      console.log('✅ Resumo atualizado:', result)
-
-      // Tentar gerar PDI novamente
-      setErrorMessage(null)
-      await handleGeneratePDI()
-
-    } catch (error) {
-      console.error('Erro ao atualizar resumo:', error)
-      setErrorMessage('Erro ao atualizar resumo de performance. Verifique se você tem sessões de roleplay com avaliações.')
-    } finally {
-      setIsUpdatingSummary(false)
-    }
-  }
-
   const handleGeneratePDI = async () => {
     // Limpar mensagem de erro anterior
     setErrorMessage(null)
@@ -171,76 +129,102 @@ export default function PDIView() {
         console.log('PDI antigo removido com sucesso')
       }
 
-      // Buscar resumo de performance do usuário
-      const { data: performanceSummary, error } = await supabase
-        .from('user_performance_summaries')
+      // Buscar TODAS as sessões do usuário (mesma lógica do PerfilView)
+      const { data: allSessions, error: sessionsError } = await supabase
+        .from('roleplay_sessions')
         .select('*')
         .eq('user_id', user.id)
-        .single()
+        .order('created_at', { ascending: true })
 
-      console.log('🔍 DEBUG PDI - Performance Summary:', { performanceSummary, error })
+      console.log('🔍 DEBUG PDI - Sessões encontradas:', allSessions?.length)
 
-      if (error || !performanceSummary) {
-        // Verificar se usuário tem sessões de roleplay
-        const { data: sessions, error: sessionsError } = await supabase
-          .from('roleplay_sessions')
-          .select('id')
-          .eq('user_id', user.id)
-
-        console.log('🔍 DEBUG PDI - Roleplay Sessions:', { sessions, sessionsError })
-
-        if (sessions && sessions.length > 0) {
-          setErrorMessage(`Você tem ${sessions.length} sessões de roleplay, mas o resumo de performance não foi gerado. Por favor, complete mais uma sessão para atualizar seus dados.`)
-        } else {
-          setErrorMessage('Você precisa completar algumas sessões de roleplay antes de gerar o PDI.')
-        }
+      if (sessionsError || !allSessions || allSessions.length === 0) {
+        setErrorMessage('Você precisa completar algumas sessões de roleplay antes de gerar o PDI.')
         setIsLoading(false)
         return
       }
 
-      // Formatar resumo de performance em texto único
+      // Filtrar sessões com avaliação válida (mesma lógica do PerfilView)
+      const completedSessions = allSessions.filter(session => {
+        const evaluation = (session as any).evaluation
+        return evaluation && typeof evaluation === 'object'
+      })
+
+      console.log('🔍 DEBUG PDI - Sessões com avaliação:', completedSessions.length)
+
+      if (completedSessions.length === 0) {
+        setErrorMessage('Nenhuma sessão avaliada encontrada. Complete um roleplay e aguarde a avaliação.')
+        setIsLoading(false)
+        return
+      }
+
+      // Processar avaliações (mesma lógica do PerfilView)
+      const getProcessedEvaluation = (session: any) => {
+        let evaluation = session.evaluation
+        if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+          try {
+            evaluation = JSON.parse(evaluation.output)
+          } catch (e) {
+            return null
+          }
+        }
+        return evaluation
+      }
+
+      const allEvaluations = completedSessions
+        .map(s => getProcessedEvaluation(s))
+        .filter(e => e !== null)
+
+      // Calcular médias gerais
+      let totalScore = 0
+      let countScore = 0
+      const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
+      const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
+
+      allEvaluations.forEach((e: any) => {
+        if (e?.overall_score !== undefined) {
+          let scoreValue = e.overall_score
+          if (scoreValue > 10) scoreValue = scoreValue / 10
+          totalScore += scoreValue
+          countScore++
+        }
+
+        if (e?.spin_evaluation) {
+          const spin = e.spin_evaluation
+          if (spin.S?.final_score !== undefined) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
+          if (spin.P?.final_score !== undefined) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
+          if (spin.I?.final_score !== undefined) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
+          if (spin.N?.final_score !== undefined) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
+        }
+      })
+
+      const overallAverage = countScore > 0 ? totalScore / countScore : 0
+      const spinS = spinCounts.S > 0 ? spinTotals.S / spinCounts.S : 0
+      const spinP = spinCounts.P > 0 ? spinTotals.P / spinCounts.P : 0
+      const spinI = spinCounts.I > 0 ? spinTotals.I / spinCounts.I : 0
+      const spinN = spinCounts.N > 0 ? spinTotals.N / spinCounts.N : 0
+
+      // Coletar pontos fortes e gaps dos últimos 5 roleplays
+      const last5Sessions = completedSessions.slice(-5)
+      const last5Evaluations = last5Sessions.map(s => getProcessedEvaluation(s)).filter(e => e !== null)
+
+      const allStrengths: string[] = []
+      const allGaps: string[] = []
+
+      last5Evaluations.forEach((e: any) => {
+        if (e.top_strengths) allStrengths.push(...e.top_strengths)
+        if (e.critical_gaps) allGaps.push(...e.critical_gaps)
+      })
+
       const userName = user.user_metadata?.name || user.email?.split('@')[0] || 'Vendedor'
-
-      // Extrair médias SPIN corretamente (a tabela usa colunas separadas, não um objeto)
-      const spinS = performanceSummary.spin_s_average !== undefined && performanceSummary.spin_s_average !== null
-        ? parseFloat(performanceSummary.spin_s_average)
-        : 0
-      const spinP = performanceSummary.spin_p_average !== undefined && performanceSummary.spin_p_average !== null
-        ? parseFloat(performanceSummary.spin_p_average)
-        : 0
-      const spinI = performanceSummary.spin_i_average !== undefined && performanceSummary.spin_i_average !== null
-        ? parseFloat(performanceSummary.spin_i_average)
-        : 0
-      const spinN = performanceSummary.spin_n_average !== undefined && performanceSummary.spin_n_average !== null
-        ? parseFloat(performanceSummary.spin_n_average)
-        : 0
-
-      // Extrair pontos fortes (podem ser objetos ou strings)
-      const topStrengths = performanceSummary.top_strengths || []
-      const strengthsList = topStrengths.map((item: any) => {
-        if (typeof item === 'string') return item
-        if (item.strength) return item.strength
-        if (item.text) return item.text
-        return JSON.stringify(item)
-      }).filter((s: string) => s && s.trim() !== '')
-
-      // Extrair gaps críticos (podem ser objetos ou strings)
-      const criticalGaps = performanceSummary.critical_gaps || []
-      const gapsList = criticalGaps.map((item: any) => {
-        if (typeof item === 'string') return item
-        if (item.gap) return item.gap
-        if (item.text) return item.text
-        return JSON.stringify(item)
-      }).filter((g: string) => g && g.trim() !== '')
 
       const resumoTexto = `
 RESUMO DE PERFORMANCE - ${userName}
 
 DADOS GERAIS:
 - Nome: ${userName}
-- Empresa: Ramppy
-- Total de Sessões: ${performanceSummary.total_sessions}
-- Nota Média Geral: ${performanceSummary.overall_average?.toFixed(1) || 'N/A'}
+- Total de Sessões: ${completedSessions.length}
+- Nota Média Geral: ${overallAverage.toFixed(1)}
 
 MÉDIAS SPIN:
 - Situação (S): ${spinS.toFixed(1)}
@@ -249,25 +233,17 @@ MÉDIAS SPIN:
 - Necessidade (N): ${spinN.toFixed(1)}
 
 PONTOS FORTES RECORRENTES:
-${strengthsList.length > 0 ? strengthsList.map((s: string) => `- ${s}`).join('\n') : '- Nenhum ponto forte identificado ainda'}
+${allStrengths.length > 0 ? allStrengths.map(s => `- ${s}`).join('\n') : '- Nenhum ponto forte identificado ainda'}
 
 GAPS CRÍTICOS RECORRENTES:
-${gapsList.length > 0 ? gapsList.map((g: string) => `- ${g}`).join('\n') : '- Nenhum gap identificado ainda'}
-
-MELHORIAS PRIORITÁRIAS:
-${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.priority_improvements.map((improvement: any, index: number) =>
-  `${index + 1}. Área: ${improvement.area || 'N/A'}
-   - Prioridade: ${improvement.priority || 'N/A'}
-   - Gap Atual: ${improvement.current_gap || 'N/A'}
-   - Ação Sugerida: ${improvement.action_plan || 'N/A'}`
-).join('\n\n') : '- Nenhuma melhoria prioritária identificada ainda'}
+${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap identificado ainda'}
       `.trim()
 
       console.log('=== DEBUG PDI ===')
-      console.log('Performance Summary Raw:', performanceSummary)
+      console.log('Sessões processadas:', completedSessions.length)
       console.log('SPIN Averages:', { spinS, spinP, spinI, spinN })
-      console.log('Strengths List:', strengthsList)
-      console.log('Gaps List:', gapsList)
+      console.log('Strengths:', allStrengths.length)
+      console.log('Gaps:', allGaps.length)
       console.log('Resumo formatado:', resumoTexto)
 
       // Enviar para o webhook do N8N (produção)
@@ -302,7 +278,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
         parsedPDI.vendedor = {
           nome: userName,
           empresa: 'Ramppy',
-          total_sessoes: performanceSummary.total_sessions
+          total_sessoes: completedSessions.length
         }
       }
 
@@ -497,28 +473,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-yellow-300 mb-2">Atenção</h3>
-                <p className="text-yellow-100/90 leading-relaxed mb-3">{errorMessage}</p>
-
-                {/* Botão de atualizar resumo se mensagem contém info sobre sessões */}
-                {errorMessage.includes('sessões de roleplay, mas o resumo') && (
-                  <button
-                    onClick={handleUpdateSummary}
-                    disabled={isUpdatingSummary}
-                    className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm transition-all duration-200 hover:scale-105 disabled:scale-100 flex items-center gap-2"
-                  >
-                    {isUpdatingSummary ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                        Atualizando...
-                      </>
-                    ) : (
-                      <>
-                        <span>🔄</span>
-                        Atualizar Resumo
-                      </>
-                    )}
-                  </button>
-                )}
+                <p className="text-yellow-100/90 leading-relaxed">{errorMessage}</p>
               </div>
               <button
                 onClick={() => setErrorMessage(null)}
