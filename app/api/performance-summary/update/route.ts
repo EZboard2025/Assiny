@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
     }
 
     const userName = userData.user.user_metadata?.name || userData.user.email?.split('@')[0] || 'Usuário'
-    const userEmail = userData.user.email || ''
 
     // Buscar todas as sessões completadas do usuário
     const { data: sessions, error: sessionsError } = await supabase
@@ -47,11 +46,14 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: true })
 
     if (sessionsError) {
+      console.error('❌ Erro ao buscar sessões:', sessionsError)
       return NextResponse.json(
         { error: 'Failed to fetch sessions' },
         { status: 500 }
       )
     }
+
+    console.log(`📊 Total de sessões com status 'completed': ${sessions?.length || 0}`)
 
     // Filtrar sessões com avaliação válida
     const completedSessions = sessions.filter(session => {
@@ -59,9 +61,27 @@ export async function POST(request: NextRequest) {
       return evaluation && typeof evaluation === 'object'
     })
 
+    console.log(`✅ Sessões com avaliação válida: ${completedSessions.length}`)
+
     if (completedSessions.length === 0) {
+      // Debug: verificar se existem sessões sem status completed
+      const { data: allSessions } = await supabase
+        .from('roleplay_sessions')
+        .select('id, status, evaluation')
+        .eq('user_id', userId)
+
+      console.log(`🔍 DEBUG - Total de sessões (qualquer status): ${allSessions?.length || 0}`)
+      console.log(`🔍 DEBUG - Status das sessões:`, allSessions?.map(s => ({ id: s.id, status: s.status, hasEval: !!s.evaluation })))
+
       return NextResponse.json(
-        { message: 'No completed sessions to summarize' },
+        {
+          message: 'No completed sessions to summarize',
+          debug: {
+            totalSessions: allSessions?.length || 0,
+            completedSessions: sessions.length,
+            withEvaluation: completedSessions.length
+          }
+        },
         { status: 200 }
       )
     }
@@ -206,7 +226,6 @@ export async function POST(request: NextRequest) {
       .upsert({
         user_id: userId,
         user_name: userName,
-        user_email: userEmail,
         total_sessions: completedSessions.length,
         overall_average: overallAverage,
         spin_s_average: spinAverages.S,
