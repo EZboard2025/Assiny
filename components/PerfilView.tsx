@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History, Users, MessageSquare, FileSearch, Award, Calendar, CheckCircle, AlertCircle, Sparkles, X } from 'lucide-react'
+import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History, Users, MessageSquare, FileSearch, Award, Calendar, CheckCircle, AlertCircle, Sparkles, X, AlertTriangle, Lightbulb } from 'lucide-react'
 import { getUserRoleplaySessions, type RoleplaySession } from '@/lib/roleplay'
 import { getFollowUpAnalyses, getFollowUpStats } from '@/lib/followup'
 
@@ -611,50 +611,69 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
   return (
     <div className="min-h-screen py-20 px-6 relative z-10">
       <div className="max-w-7xl mx-auto">
-        {/* Header Card */}
-        <div className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 mb-6 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          <div className="flex items-center justify-between gap-6">
-            {/* User Info */}
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-1">{userName || 'Carregando...'}</h1>
-              <p className="text-gray-400 text-lg">{userEmail || 'carregando@email.com'}</p>
+        {/* Header Card - Design Futurista */}
+        <div className={`relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30 mb-8 shadow-[0_0_40px_rgba(34,197,94,0.15)] hover:shadow-[0_0_60px_rgba(34,197,94,0.25)] transition-all duration-500 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+          {/* Efeito de brilho no background */}
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 rounded-2xl"></div>
+
+          <div className="relative flex items-center justify-between gap-6 flex-wrap">
+            {/* User Info com Avatar */}
+            <div className="flex items-center gap-6 flex-1">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-2xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                <User className="w-10 h-10 text-green-400" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                  {userName || 'Carregando...'}
+                </h1>
+                <p className="text-gray-400 text-lg flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                  {userEmail || 'carregando@email.com'}
+                </p>
+              </div>
             </div>
 
-            {/* Média Geral e Botão Resumo */}
+            {/* Stats e Ações */}
             <div className="flex items-center gap-4">
               {totalSessions > 0 && (
                 <>
-                  <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-2xl p-6 border border-green-500/30">
-                    <div className="text-center">
-                      <p className="text-sm text-gray-400 mb-1">Nota Média Geral</p>
-                      <div className="text-4xl font-bold text-green-400">
-                        {overallAverage.toFixed(1)}
-                        <span className="text-lg text-gray-400">/10</span>
+                  {/* Card de Média Geral - Design atualizado */}
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 to-emerald-500/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+                    <div className="relative bg-gradient-to-br from-gray-900/80 to-gray-800/60 rounded-2xl p-6 border border-green-500/40 backdrop-blur-sm">
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <Award className="w-4 h-4 text-green-400" />
+                          <p className="text-xs text-gray-400 uppercase tracking-wider">Média Geral</p>
+                        </div>
+                        <div className="text-5xl font-bold bg-gradient-to-br from-green-400 via-emerald-300 to-green-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,197,94,0.5)]">
+                          {overallAverage.toFixed(1)}
+                        </div>
+                        <div className="text-gray-400 text-sm mt-1">
+                          <span className="text-green-400 font-semibold">{totalSessions}</span> sessões
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">{totalSessions} sessões</p>
                     </div>
                   </div>
 
-                  {/* Botões de Ação */}
+                  {/* Botões de Ação - Design melhorado */}
                   <div className="flex flex-col gap-3">
-                    {/* Botão Resumo Geral */}
                     <button
                       onClick={generateSummary}
-                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-green-500/30"
+                      className="group relative px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl font-medium transition-all hover:scale-105 hover:-translate-y-1 flex items-center gap-2 shadow-[0_0_25px_rgba(34,197,94,0.3)] hover:shadow-[0_0_40px_rgba(34,197,94,0.5)]"
                     >
-                      <FileText className="w-5 h-5" />
+                      <FileText className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                       <span>
                         Resumo<br />
                         <span className="text-xs opacity-90">Detalhado</span>
                       </span>
                     </button>
 
-                    {/* Botão Histórico */}
                     <button
                       onClick={() => onViewChange?.('historico')}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30"
+                      className="group relative px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-500 text-white rounded-xl font-medium transition-all hover:scale-105 hover:-translate-y-1 flex items-center gap-2 shadow-[0_0_25px_rgba(147,51,234,0.3)] hover:shadow-[0_0_40px_rgba(147,51,234,0.5)]"
                     >
-                      <History className="w-5 h-5" />
+                      <History className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                       <span>
                         Histórico<br />
                         <span className="text-xs opacity-90">Roleplays</span>
@@ -667,53 +686,47 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6">
+        {/* Tab Navigation - Design futurista */}
+        <div className="flex gap-3 mb-8 p-2 bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700/50">
           <button
             onClick={() => setActiveTab('geral')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
               activeTab === 'geral'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
+                ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)] scale-105'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
             }`}
           >
-            Visão Geral
+            <span className="flex items-center justify-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Visão Geral
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('personas')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
               activeTab === 'personas'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
+                ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)] scale-105'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
             }`}
           >
-            Por Persona
+            <span className="flex items-center justify-center gap-2">
+              <Users className="w-4 h-4" />
+              Por Persona
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('objecoes')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
               activeTab === 'objecoes'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
+                ? 'bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)] scale-105'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
             }`}
           >
-            Por Objeção
-          </button>
-          {/* TEMPORARIAMENTE OCULTO
-          <button
-            onClick={() => setActiveTab('followups')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              activeTab === 'followups'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <FileSearch className="w-4 h-4" />
-              Follow-ups
+            <span className="flex items-center justify-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Por Objeção
             </span>
           </button>
-          */}
         </div>
 
         {/* Tab Content - Visão Geral */}
@@ -721,22 +734,40 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Evolution Chart */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Evolution Card */}
-            <div className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
-              <div className="flex items-center justify-between mb-6">
+            {/* Evolution Card - Design Futurista */}
+            <div className={`relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30 shadow-[0_0_30px_rgba(34,197,94,0.12)] hover:shadow-[0_0_50px_rgba(34,197,94,0.2)] transition-all duration-500 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
+              {/* Efeito de grid futurista no fundo */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(34, 197, 94, .15) 25%, rgba(34, 197, 94, .15) 26%, transparent 27%, transparent 74%, rgba(34, 197, 94, .15) 75%, rgba(34, 197, 94, .15) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(34, 197, 94, .15) 25%, rgba(34, 197, 94, .15) 26%, transparent 27%, transparent 74%, rgba(34, 197, 94, .15) 75%, rgba(34, 197, 94, .15) 76%, transparent 77%, transparent)',
+                  backgroundSize: '50px 50px'
+                }}></div>
+              </div>
+
+              <div className="relative flex items-center justify-between mb-6 flex-wrap gap-4">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <TrendingUp className="w-6 h-6 text-green-400" />
-                    <h2 className="text-2xl font-bold">Evolução nos Roleplays</h2>
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
+                      <TrendingUp className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">Evolução nos Roleplays</h2>
+                      <p className="text-gray-400 text-sm">Média geral das últimas simulações</p>
+                    </div>
                   </div>
-                  <p className="text-gray-400">Média geral das últimas simulações</p>
                 </div>
                 {latestSession && (
-                  <div className="text-right">
-                    <div className="text-sm text-gray-400 mb-1">Sessão {latestSession.label} - Nota: {latestSession.score.toFixed(1)}</div>
-                    <div className={`text-3xl font-bold flex items-center gap-2 ${latestSession.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
-                      <TrendingUp className="w-6 h-6" />
-                      {latestSession.improvement >= 0 ? '+' : ''}{latestSession.improvement.toFixed(1)}
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all"></div>
+                    <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-xl p-4 border border-green-500/30">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-400 mb-1">Sessão {latestSession.label}</div>
+                        <div className="text-sm text-gray-300 mb-2">Nota: <span className="text-green-400 font-bold">{latestSession.score.toFixed(1)}</span></div>
+                        <div className={`text-3xl font-bold flex items-center justify-center gap-2 ${latestSession.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
+                          <TrendingUp className={`w-5 h-5 ${latestSession.improvement < 0 ? 'rotate-180' : ''}`} />
+                          {latestSession.improvement >= 0 ? '+' : ''}{latestSession.improvement.toFixed(1)}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -744,9 +775,18 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
               {/* Chart */}
               {loading ? (
-                <div className="text-center text-gray-400 py-20">Carregando evolução...</div>
+                <div className="relative text-center text-gray-400 py-20">
+                  <div className="w-12 h-12 border-4 border-green-500/30 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-gray-300">Carregando evolução...</p>
+                </div>
               ) : evolutionData.length === 0 ? (
-                <div className="text-center text-gray-400 py-20">Nenhuma sessão avaliada ainda</div>
+                <div className="relative text-center py-20">
+                  <div className="w-20 h-20 bg-gradient-to-br from-gray-700/20 to-gray-600/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-gray-600/30">
+                    <TrendingUp className="w-10 h-10 text-gray-500" />
+                  </div>
+                  <p className="text-gray-300 text-lg font-semibold mb-2">Nenhuma sessão avaliada ainda</p>
+                  <p className="text-gray-500 text-sm">Complete um roleplay para ver sua evolução</p>
+                </div>
               ) : (
                 <>
                   <div className="relative h-80">
@@ -874,36 +914,60 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           </div>
 
           {/* Right Column - SPIN Metrics */}
-          <div className="space-y-4">
-            <div className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '150ms' }}>
-              <h2 className="text-xl font-bold mb-6 text-center">Métricas SPIN Selling</h2>
+          <div className="space-y-6">
+            <div className={`relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 shadow-[0_0_30px_rgba(34,197,94,0.12)] hover:shadow-[0_0_50px_rgba(34,197,94,0.2)] transition-all duration-500 ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '150ms' }}>
+              {/* Título com ícone */}
+              <div className="flex items-center justify-center gap-3 mb-8">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
+                  <Target className="w-5 h-5 text-green-400" />
+                </div>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-green-50 bg-clip-text text-transparent">
+                  Métricas SPIN Selling
+                </h2>
+              </div>
 
               <div className="space-y-4">
                 {loading ? (
-                  <div className="text-center text-gray-400 py-8">Carregando métricas...</div>
+                  <div className="text-center text-gray-400 py-8">
+                    <div className="w-8 h-8 border-4 border-green-500/30 border-t-green-500 rounded-full animate-spin mx-auto mb-2"></div>
+                    Carregando métricas...
+                  </div>
                 ) : (
                   spinMetrics.map((metric, i) => {
                     const Icon = metric.icon
                     return (
-                      <div key={i} className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 hover:border-green-500/50 transition-all">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${metric.color} flex items-center justify-center`}>
-                              <Icon className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="font-semibold text-gray-300">{metric.label}</span>
-                          </div>
-                          <span className="text-3xl font-bold text-white">
-                            {metric.score > 0 ? metric.score.toFixed(1) : 'N/A'}
-                          </span>
-                        </div>
+                      <div
+                        key={i}
+                        className="group relative bg-gray-800/30 backdrop-blur-sm rounded-xl p-5 border border-gray-700/50 hover:border-green-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(34,197,94,0.15)]"
+                      >
+                        {/* Glow effect on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
 
-                        {/* Progress bar */}
-                        <div className="h-2 bg-gray-700/50 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full bg-gradient-to-r ${metric.color} rounded-full transition-all duration-1000`}
-                            style={{ width: mounted && metric.score > 0 ? `${(metric.score / 10) * 100}%` : '0%' }}
-                          ></div>
+                        <div className="relative">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${metric.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+                                <Icon className="w-6 h-6 text-white drop-shadow-lg" />
+                              </div>
+                              <span className="font-bold text-gray-200 group-hover:text-white transition-colors">{metric.label}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-4xl font-bold bg-gradient-to-br from-white via-green-50 to-white bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(34,197,94,0.3)]">
+                                {metric.score > 0 ? metric.score.toFixed(1) : 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Progress bar melhorada */}
+                          <div className="relative h-3 bg-gray-900/50 rounded-full overflow-hidden border border-gray-700/30">
+                            <div
+                              className={`h-full bg-gradient-to-r ${metric.color} rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(34,197,94,0.5)]`}
+                              style={{ width: mounted && metric.score > 0 ? `${(metric.score / 10) * 100}%` : '0%' }}
+                            >
+                              {/* Efeito de brilho na barra */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )
@@ -919,10 +983,14 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
         {activeTab === 'personas' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {personaStats.size === 0 ? (
-              <div className="col-span-full bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-12 border border-gray-500/30 text-center">
-                <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg">Nenhuma prática com personas ainda</p>
-                <p className="text-gray-500 text-sm mt-2">Complete sessões de roleplay para ver estatísticas por persona</p>
+              <div className="col-span-full relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-16 border border-gray-700/50 text-center shadow-[0_0_30px_rgba(34,197,94,0.08)]">
+                <div className="relative">
+                  <div className="w-24 h-24 bg-gradient-to-br from-gray-700/20 to-gray-600/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-gray-600/30">
+                    <Users className="w-12 h-12 text-gray-500" />
+                  </div>
+                  <p className="text-gray-300 text-xl font-semibold mb-2">Nenhuma prática com personas ainda</p>
+                  <p className="text-gray-500 text-sm">Complete sessões de roleplay para ver estatísticas por persona</p>
+                </div>
               </div>
             ) : (
               Array.from(personaStats.values()).map((stat, i) => {
@@ -931,20 +999,31 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 const bgGradient = stat.average >= 7 ? 'from-green-600/10 to-green-400/5' : stat.average >= 5 ? 'from-yellow-600/10 to-yellow-400/5' : 'from-red-600/10 to-red-400/5'
 
                 return (
-                  <div key={i} className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border ${borderColor} ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mb-2 drop-shadow-[0_0_20px_rgba(34,197,94,0.5)]">
-                          {stat.persona.cargo || stat.persona.job_title || 'Cargo não especificado'}
-                        </h3>
-                        <p className="text-sm text-gray-400">
-                          {stat.persona.tipo_empresa_faturamento || stat.persona.company_type || 'Empresa não especificada'}
-                        </p>
+                  <div key={i} className={`group relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border ${borderColor} shadow-[0_0_25px_rgba(34,197,94,0.1)] hover:shadow-[0_0_45px_rgba(34,197,94,0.2)] transition-all duration-500 hover:-translate-y-2 ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
+                    {/* Efeito de brilho no hover */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"></div>
+
+                    <div className="relative flex items-start justify-between mb-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)] flex-shrink-0">
+                          <User className="w-6 h-6 text-green-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mb-1 drop-shadow-[0_0_20px_rgba(34,197,94,0.5)]">
+                            {stat.persona.cargo || stat.persona.job_title || 'Cargo não especificado'}
+                          </h3>
+                          <p className="text-sm text-gray-400">
+                            {stat.persona.tipo_empresa_faturamento || stat.persona.company_type || 'Empresa não especificada'}
+                          </p>
+                        </div>
                       </div>
-                      <div className={`bg-gradient-to-br ${bgGradient} rounded-xl px-3 py-1`}>
-                        <div className="text-xs text-gray-400">Nota Média</div>
-                        <div className={`text-2xl font-bold ${scoreColor}`}>
-                          {stat.average.toFixed(1)}
+                      <div className="relative group/badge">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl blur-md group-hover/badge:blur-lg transition-all"></div>
+                        <div className={`relative bg-gradient-to-br ${bgGradient} backdrop-blur-sm rounded-xl px-4 py-2 border border-green-500/20`}>
+                          <div className="text-xs text-gray-400 text-center">Média</div>
+                          <div className={`text-3xl font-bold ${scoreColor} text-center`}>
+                            {stat.average.toFixed(1)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1073,10 +1152,14 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
         {activeTab === 'objecoes' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {objectionStats.size === 0 ? (
-              <div className="col-span-full bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-12 border border-gray-500/30 text-center">
-                <MessageSquare className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg">Nenhuma objeção enfrentada ainda</p>
-                <p className="text-gray-500 text-sm mt-2">Complete sessões de roleplay para ver estatísticas por objeção</p>
+              <div className="col-span-full relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-16 border border-gray-700/50 text-center shadow-[0_0_30px_rgba(34,197,94,0.08)]">
+                <div className="relative">
+                  <div className="w-24 h-24 bg-gradient-to-br from-gray-700/20 to-gray-600/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-gray-600/30">
+                    <MessageSquare className="w-12 h-12 text-gray-500" />
+                  </div>
+                  <p className="text-gray-300 text-xl font-semibold mb-2">Nenhuma objeção enfrentada ainda</p>
+                  <p className="text-gray-500 text-sm">Complete sessões de roleplay para ver estatísticas por objeção</p>
+                </div>
               </div>
             ) : (
               Array.from(objectionStats.values()).map((stat, i) => {
@@ -1085,17 +1168,28 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 const bgGradient = stat.average >= 7 ? 'from-green-600/10 to-green-400/5' : stat.average >= 5 ? 'from-yellow-600/10 to-yellow-400/5' : 'from-red-600/10 to-red-400/5'
 
                 return (
-                  <div key={i} className={`bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl p-6 border ${borderColor} ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1 pr-4">
-                        <h3 className="text-lg font-bold text-white mb-2 line-clamp-2">
-                          {stat.name}
-                        </h3>
+                  <div key={i} className={`group relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border ${borderColor} shadow-[0_0_25px_rgba(34,197,94,0.1)] hover:shadow-[0_0_45px_rgba(34,197,94,0.2)] transition-all duration-500 hover:-translate-y-2 ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${i * 100}ms` }}>
+                    {/* Efeito de brilho no hover */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"></div>
+
+                    <div className="relative flex items-start justify-between mb-4 gap-4">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)] flex-shrink-0">
+                          <MessageSquare className="w-6 h-6 text-green-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-bold text-white mb-1 line-clamp-2">
+                            {stat.name}
+                          </h3>
+                        </div>
                       </div>
-                      <div className={`bg-gradient-to-br ${bgGradient} rounded-xl px-3 py-1 text-center`}>
-                        <div className="text-xs text-gray-400">Média</div>
-                        <div className={`text-2xl font-bold ${scoreColor}`}>
-                          {stat.average.toFixed(1)}
+                      <div className="relative group/badge flex-shrink-0">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl blur-md group-hover/badge:blur-lg transition-all"></div>
+                        <div className={`relative bg-gradient-to-br ${bgGradient} backdrop-blur-sm rounded-xl px-4 py-2 border border-green-500/20`}>
+                          <div className="text-xs text-gray-400 text-center">Média</div>
+                          <div className={`text-3xl font-bold ${scoreColor} text-center`}>
+                            {stat.average.toFixed(1)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1134,51 +1228,80 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           </div>
         )}
 
-        {/* Modal de Resumo Geral */}
+        {/* Modal de Resumo Geral - Design Futurista */}
         {showSummary && summaryData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-24 bg-black/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-6xl max-h-[85vh] overflow-y-auto bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl border border-green-500/30 shadow-2xl">
-              <div className="sticky top-0 bg-gray-900/95 backdrop-blur-xl border-b border-green-500/20 p-6 flex items-center justify-between">
-                <div>
-                  <h2 className="text-3xl font-bold flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-green-400" />
-                    Resumo Geral de Performance - <span className="text-green-400">{userName}</span>
-                  </h2>
-                  <p className="text-gray-400 mt-1">
-                    Análise consolidada de {summaryData.totalSessions} sessões completadas
-                  </p>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-24 bg-black/90 backdrop-blur-md animate-fade-in">
+            <div className="relative w-full max-w-6xl max-h-[85vh] overflow-y-auto bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-xl rounded-2xl border border-green-500/30 shadow-[0_0_60px_rgba(34,197,94,0.3)] animate-scale-in custom-scrollbar">
+              {/* Header com gradiente */}
+              <div className="sticky top-0 bg-gradient-to-r from-gray-900/95 via-gray-900/98 to-gray-900/95 backdrop-blur-xl border-b border-green-500/30 p-8 z-10">
+                <div className="flex items-center justify-between gap-6">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-2xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+                      <FileText className="w-8 h-8 text-green-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-bold mb-1">
+                        Resumo Geral de Performance
+                      </h2>
+                      <p className="text-gray-400 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                        <span className="text-green-400 font-semibold">{userName}</span>
+                        <span className="text-gray-500">·</span>
+                        <span>{summaryData.totalSessions} sessões completadas</span>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowSummary(false)}
+                    className="group px-6 py-3 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 rounded-xl font-semibold transition-all hover:scale-105 flex items-center gap-2 border border-gray-600/50 shadow-lg"
+                  >
+                    <X className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                    Fechar
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowSummary(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl font-medium transition-colors"
-                >
-                  Fechar
-                </button>
               </div>
 
               <div className="p-8 space-y-8">
-                {/* Média Geral */}
-                <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-2xl p-8 border border-green-500/30">
-                  <h3 className="text-2xl font-bold mb-4 text-center">Nota Média Geral</h3>
-                  <div className="text-6xl font-bold text-center text-green-400">
-                    {summaryData.avgScore.toFixed(1)}
-                    <span className="text-2xl text-gray-400">/10</span>
+                {/* Média Geral - Card destacado */}
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 to-emerald-500/30 rounded-2xl blur-2xl group-hover:blur-3xl transition-all"></div>
+                  <div className="relative bg-gradient-to-br from-green-600/15 to-emerald-600/10 rounded-2xl p-10 border border-green-500/40 backdrop-blur-sm shadow-[0_0_30px_rgba(34,197,94,0.2)]">
+                    <div className="flex items-center justify-center gap-3 mb-6">
+                      <Award className="w-8 h-8 text-green-400" />
+                      <h3 className="text-3xl font-bold bg-gradient-to-r from-white to-green-50 bg-clip-text text-transparent">
+                        Nota Média Geral
+                      </h3>
+                    </div>
+                    <div className="text-7xl font-bold text-center bg-gradient-to-br from-green-400 via-emerald-300 to-green-500 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(34,197,94,0.6)]">
+                      {summaryData.avgScore.toFixed(1)}
+                      <span className="text-3xl text-gray-400">/10</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Médias SPIN */}
+                {/* Médias SPIN - Grid modernizado */}
                 <div>
-                  <h3 className="text-2xl font-bold mb-4">Médias SPIN Selling</h3>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30">
+                      <Target className="w-5 h-5 text-green-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white">Médias SPIN Selling</h3>
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {Object.entries(summaryData.spinAverages).map(([key, value]: [string, any]) => (
-                      <div key={key} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-                        <div className="text-sm text-gray-400 mb-2">
-                          {key === 'S' && 'Situação'}
-                          {key === 'P' && 'Problema'}
-                          {key === 'I' && 'Implicação'}
-                          {key === 'N' && 'Necessidade'}
+                      <div key={key} className="group relative bg-gray-800/40 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-green-500/50 transition-all hover:-translate-y-1 shadow-lg hover:shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+                        <div className="relative">
+                          <div className="text-xs text-gray-400 uppercase tracking-wider mb-3">
+                            {key === 'S' && 'Situação'}
+                            {key === 'P' && 'Problema'}
+                            {key === 'I' && 'Implicação'}
+                            {key === 'N' && 'Necessidade'}
+                          </div>
+                          <div className="text-4xl font-bold bg-gradient-to-br from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                            {value.toFixed(1)}
+                          </div>
                         </div>
-                        <div className="text-3xl font-bold text-green-400">{value.toFixed(1)}</div>
                       </div>
                     ))}
                   </div>
@@ -1187,17 +1310,30 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 {/* Pontos Fortes Mais Frequentes */}
                 {summaryData.topStrengths.length > 0 && (
                   <div>
-                    <h3 className="text-2xl font-bold mb-4 text-green-400">🎯 Pontos Fortes Recorrentes</h3>
-                    <div className="space-y-3">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.3)]">
+                        <Target className="w-6 h-6 text-green-400" />
+                      </div>
+                      <h3 className="text-2xl font-bold bg-gradient-to-r from-green-400 via-emerald-300 to-green-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,197,94,0.4)]">
+                        Pontos Fortes Recorrentes
+                      </h3>
+                    </div>
+                    <div className="space-y-4">
                       {summaryData.topStrengths.map((strength: any, i: number) => (
-                        <div key={i} className="bg-green-600/10 border border-green-500/30 rounded-xl p-4">
-                          <div className="flex items-start gap-4">
+                        <div key={i} className="group relative bg-gradient-to-br from-green-900/30 to-emerald-900/20 backdrop-blur-sm border border-green-500/30 rounded-xl p-5 hover:border-green-400/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(34,197,94,0.2)]">
+                          {/* Glow effect on hover */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+
+                          <div className="relative flex items-start gap-4">
+                            <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0 border border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.2)]">
+                              <span className="text-green-400 font-bold">{i + 1}</span>
+                            </div>
                             <div className="flex-1">
-                              <p className="text-gray-300">{strength.text}</p>
-                              <div className="flex gap-1 mt-2">
+                              <p className="text-gray-200 leading-relaxed group-hover:text-white transition-colors">{strength.text}</p>
+                              <div className="flex gap-2 mt-3">
                                 {strength.sessions?.map((session: number, idx: number) => (
-                                  <span key={idx} className="text-xs px-2 py-0.5 bg-green-600/30 text-green-300 rounded">
-                                    #{session}
+                                  <span key={idx} className="text-xs px-3 py-1 bg-gradient-to-r from-green-600/40 to-emerald-600/30 text-green-300 rounded-lg border border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.2)] font-medium">
+                                    Sessão #{session}
                                   </span>
                                 ))}
                               </div>
@@ -1212,17 +1348,30 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 {/* Gaps Críticos Mais Frequentes */}
                 {summaryData.topGaps.length > 0 && (
                   <div>
-                    <h3 className="text-2xl font-bold mb-4 text-orange-400">⚠️ Gaps Críticos Recorrentes</h3>
-                    <div className="space-y-3">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-xl flex items-center justify-center border border-orange-500/30 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+                        <AlertTriangle className="w-6 h-6 text-orange-400" />
+                      </div>
+                      <h3 className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-amber-300 to-orange-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(249,115,22,0.4)]">
+                        Gaps Críticos Recorrentes
+                      </h3>
+                    </div>
+                    <div className="space-y-4">
                       {summaryData.topGaps.map((gap: any, i: number) => (
-                        <div key={i} className="bg-orange-600/10 border border-orange-500/30 rounded-xl p-4">
-                          <div className="flex items-start gap-4">
+                        <div key={i} className="group relative bg-gradient-to-br from-orange-900/30 to-amber-900/20 backdrop-blur-sm border border-orange-500/30 rounded-xl p-5 hover:border-orange-400/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(249,115,22,0.2)]">
+                          {/* Glow effect on hover */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+
+                          <div className="relative flex items-start gap-4">
+                            <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0 border border-orange-500/30 shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                              <AlertTriangle className="w-4 h-4 text-orange-400" />
+                            </div>
                             <div className="flex-1">
-                              <p className="text-gray-300">{gap.text}</p>
-                              <div className="flex gap-1 mt-2">
+                              <p className="text-gray-200 leading-relaxed group-hover:text-white transition-colors">{gap.text}</p>
+                              <div className="flex gap-2 mt-3">
                                 {gap.sessions?.map((session: number, idx: number) => (
-                                  <span key={idx} className="text-xs px-2 py-0.5 bg-orange-600/30 text-orange-300 rounded">
-                                    #{session}
+                                  <span key={idx} className="text-xs px-3 py-1 bg-gradient-to-r from-orange-600/40 to-amber-600/30 text-orange-300 rounded-lg border border-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.2)] font-medium">
+                                    Sessão #{session}
                                   </span>
                                 ))}
                               </div>
@@ -1237,30 +1386,50 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 {/* Melhorias Prioritárias */}
                 {summaryData.allImprovements.length > 0 && (
                   <div>
-                    <h3 className="text-2xl font-bold mb-4 text-blue-400">📈 Melhorias Prioritárias</h3>
-                    <div className="space-y-3">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 rounded-xl flex items-center justify-center border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                        <TrendingUp className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                        Melhorias Prioritárias
+                      </h3>
+                    </div>
+                    <div className="space-y-4">
                       {summaryData.allImprovements.map((improvement: any, i: number) => (
-                        <div key={i} className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-4">
-                          <div className="flex items-start gap-3">
-                            <div className={`px-2 py-1 rounded text-xs font-bold ${
-                              improvement.priority === 'critical' ? 'bg-red-600/20 text-red-400' :
-                              improvement.priority === 'high' ? 'bg-orange-600/20 text-orange-400' :
-                              'bg-blue-600/20 text-blue-400'
+                        <div key={i} className="group relative bg-gradient-to-br from-blue-900/30 to-cyan-900/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-5 hover:border-blue-400/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(59,130,246,0.2)]">
+                          {/* Glow effect on hover */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+
+                          <div className="relative flex items-start gap-4">
+                            <div className={`px-3 py-1.5 rounded-lg text-xs font-bold border shadow-lg ${
+                              improvement.priority === 'critical'
+                                ? 'bg-gradient-to-r from-red-600/40 to-rose-600/30 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.3)]' :
+                              improvement.priority === 'high'
+                                ? 'bg-gradient-to-r from-orange-600/40 to-amber-600/30 text-orange-300 border-orange-500/30 shadow-[0_0_10px_rgba(249,115,22,0.3)]' :
+                                'bg-gradient-to-r from-blue-600/40 to-cyan-600/30 text-blue-300 border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
                             }`}>
                               {improvement.priority === 'critical' ? 'CRÍTICO' :
                                improvement.priority === 'high' ? 'ALTO' : 'MÉDIO'}
                             </div>
                             <div className="flex-1">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <p className="font-semibold text-white">{improvement.area}</p>
+                              <div className="flex items-start justify-between gap-3 mb-3">
+                                <p className="font-bold text-lg text-white group-hover:text-blue-100 transition-colors">{improvement.area}</p>
                                 {improvement.session && (
-                                  <span className="text-xs px-2 py-0.5 bg-blue-600/30 text-blue-300 rounded">
-                                    #{improvement.session}
+                                  <span className="text-xs px-3 py-1 bg-gradient-to-r from-blue-600/40 to-cyan-600/30 text-blue-300 rounded-lg border border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.2)] font-medium whitespace-nowrap">
+                                    Sessão #{improvement.session}
                                   </span>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-400 mb-2">{improvement.current_gap}</p>
-                              <p className="text-sm text-blue-300">💡 {improvement.action_plan}</p>
+                              <div className="space-y-2">
+                                <div className="flex items-start gap-2">
+                                  <span className="text-gray-400 text-sm font-medium whitespace-nowrap">Gap:</span>
+                                  <p className="text-sm text-gray-300 leading-relaxed">{improvement.current_gap}</p>
+                                </div>
+                                <div className="flex items-start gap-2 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                  <Lightbulb className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                                  <p className="text-sm text-blue-200 leading-relaxed">{improvement.action_plan}</p>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
