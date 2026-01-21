@@ -43,6 +43,7 @@ export default function PDIView() {
   const [isLoading, setIsLoading] = useState(false)
   const [lastPdiDate, setLastPdiDate] = useState<string | null>(null)
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasData = pdiData !== null
 
   // Carregar PDI mais recente ao montar o componente
@@ -90,9 +91,12 @@ export default function PDIView() {
   }, [])
 
   const handleGeneratePDI = async () => {
+    // Limpar mensagem de erro anterior
+    setErrorMessage(null)
+
     // Verificar cooldown
     if (cooldownRemaining > 0) {
-      alert(`Você só pode gerar um novo PDI após ${cooldownRemaining} dia(s). Aguarde o período de cooldown.`)
+      setErrorMessage(`Você só pode gerar um novo PDI após ${cooldownRemaining} dia(s). Aguarde o período de cooldown.`)
       return
     }
 
@@ -103,7 +107,7 @@ export default function PDIView() {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        alert('Usuário não autenticado')
+        setErrorMessage('Usuário não autenticado. Faça login novamente.')
         setIsLoading(false)
         return
       }
@@ -118,7 +122,7 @@ export default function PDIView() {
 
         if (deleteError) {
           console.error('Erro ao deletar PDI antigo:', deleteError)
-          alert('Erro ao remover PDI antigo. Tente novamente.')
+          setErrorMessage('Erro ao remover PDI antigo. Tente novamente.')
           setIsLoading(false)
           return
         }
@@ -133,7 +137,7 @@ export default function PDIView() {
         .single()
 
       if (error || !performanceSummary) {
-        alert('Você precisa completar algumas sessões de roleplay antes de gerar o PDI.')
+        setErrorMessage('Você precisa completar algumas sessões de roleplay antes de gerar o PDI.')
         setIsLoading(false)
         return
       }
@@ -277,7 +281,8 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
 
       if (insertError) {
         console.error('Erro ao salvar PDI no banco:', insertError)
-        alert('PDI gerado com sucesso, mas houve um erro ao salvar. Tente novamente.')
+        setErrorMessage('PDI gerado com sucesso, mas houve um erro ao salvar. Tente novamente.')
+        setIsLoading(false)
         return
       }
 
@@ -289,7 +294,7 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
       setCooldownRemaining(7)
     } catch (error) {
       console.error('Erro ao gerar PDI:', error)
-      alert('Erro ao gerar PDI. Tente novamente.')
+      setErrorMessage('Erro ao gerar PDI. Verifique sua conexão e tente novamente.')
     } finally {
       setIsLoading(false)
     }
@@ -424,6 +429,29 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
 
       <div className="relative z-10 p-4 md:p-8 min-h-screen">
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
+
+        {/* Error/Warning Message */}
+        {errorMessage && (
+          <div className="bg-gradient-to-r from-yellow-900/40 via-orange-900/30 to-yellow-900/40 backdrop-blur-sm rounded-2xl p-6 border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.2)] animate-slide-in">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 rounded-full bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-yellow-300 mb-2">Atenção</h3>
+                <p className="text-yellow-100/90 leading-relaxed">{errorMessage}</p>
+              </div>
+              <button
+                onClick={() => setErrorMessage(null)}
+                className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center transition-all duration-200 hover:scale-110"
+              >
+                <span className="text-yellow-300 text-lg">×</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Header */}
         <div className="bg-gradient-to-r from-green-900/40 to-blue-900/40 rounded-2xl p-6 md:p-8 border border-green-500/20 shadow-2xl">
