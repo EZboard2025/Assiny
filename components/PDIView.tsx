@@ -6,6 +6,10 @@ interface PDIData {
   versao?: string
   gerado_em: string
   periodo: string
+  empresa: {
+    nome: string
+    tipo: string
+  }
   vendedor?: {
     nome: string
     empresa: string
@@ -21,21 +25,40 @@ interface PDIData {
     implicacao: number
     necessidade: number
   }
-  meta_7_dias: {
+  foco_da_semana: {
+    area: string
+    motivo: string
+    nota_atual: number
+    nota_meta: number
+  }
+  simulacoes: Array<{
+    objetivo: string
+    persona_sugerida: string
+    objecao_para_treinar?: string
+    criterio_sucesso: string
+    quantidade: number
+  }>
+  meta_semanal: {
+    total_simulacoes: number
+    resultado_esperado: string
+  }
+  checkpoint: {
+    quando: string
+    como_avaliar: string
+  }
+  proximo_ciclo: string
+  // Campos legados (retrocompatibilidade)
+  meta_7_dias?: {
     objetivo: string
     nota_atual: number
     nota_meta: number
     como_medir: string
   }
-  acoes: Array<{
+  acoes?: Array<{
     acao: string
     resultado_esperado: string
   }>
-  checkpoint: {
-    quando: string
-    como_avaliar: string
-  }
-  proximos_passos: string
+  proximos_passos?: string
 }
 
 export default function PDIView() {
@@ -218,6 +241,47 @@ export default function PDIView() {
 
       const userName = user.user_metadata?.name || user.email?.split('@')[0] || 'Vendedor'
 
+      // Buscar dados da empresa (personas, objeções, company_data)
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+      const companyId = await getCompanyId()
+
+      // Buscar company_type e company_data
+      const { data: companyType } = await supabase
+        .from('company_type')
+        .select('business_type')
+        .eq('company_id', companyId)
+        .single()
+
+      const { data: companyDataRecord } = await supabase
+        .from('company_data')
+        .select('nome, descricao')
+        .eq('company_id', companyId)
+        .single()
+
+      // Buscar personas
+      const { data: personas } = await supabase
+        .from('personas')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true })
+
+      // Buscar objeções
+      const { data: objections } = await supabase
+        .from('objections')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true })
+
+      // Formatar personas para o agente
+      const personasFormatted = personas?.map(p =>
+        `${p.cargo} - ${p.tipo_empresa_faturamento} (${p.contexto})`
+      ).join('\n') || 'Nenhuma persona cadastrada'
+
+      // Formatar objeções para o agente
+      const objectionsFormatted = objections?.map(o =>
+        `"${o.name}" → Rebatidas: ${Array.isArray(o.rebuttals) ? o.rebuttals.join(', ') : 'N/A'}`
+      ).join('\n') || 'Nenhuma objeção cadastrada'
+
       const resumoTexto = `
 RESUMO DE PERFORMANCE - ${userName}
 
@@ -255,7 +319,12 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         body: JSON.stringify({
           userId: user.id,
           userName: userName,
-          resumoPerformance: resumoTexto
+          resumoPerformance: resumoTexto,
+          companyName: companyDataRecord?.nome || 'Empresa',
+          companyDescription: companyDataRecord?.descricao || '',
+          companyType: companyType?.business_type || 'B2B',
+          personas: personasFormatted,
+          objections: objectionsFormatted
         })
       })
 
@@ -277,12 +346,18 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
       if (!parsedPDI.vendedor) {
         parsedPDI.vendedor = {
           nome: userName,
-          empresa: 'Ramppy',
+          empresa: parsedPDI.empresa?.nome || 'Ramppy',
           total_sessoes: completedSessions.length
         }
       }
 
-      // Salvar PDI no banco de dados
+      // Converter simulações em acoes (formato do banco)
+      const acoes = parsedPDI.simulacoes?.map((sim: any) => ({
+        acao: `${sim.quantidade}x ${sim.objetivo} (Persona: ${sim.persona_sugerida}${sim.objecao_para_treinar ? ', Objeção: ' + sim.objecao_para_treinar : ''})`,
+        resultado_esperado: sim.criterio_sucesso
+      })) || parsedPDI.acoes || []
+
+      // Salvar PDI no banco de dados (suporta v1 e v2)
       const { error: insertError } = await supabase
         .from('pdis')
         .insert({
@@ -290,7 +365,7 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
           vendedor_nome: parsedPDI.vendedor.nome,
           vendedor_empresa: parsedPDI.vendedor.empresa,
           total_sessoes: parsedPDI.vendedor.total_sessoes,
-          versao: parsedPDI.versao || 'pdi.7dias.v1',
+          versao: parsedPDI.versao || 'pdi.7dias.v2',
           periodo: parsedPDI.periodo,
           gerado_em: parsedPDI.gerado_em,
           nota_geral: parsedPDI.diagnostico.nota_geral,
@@ -299,14 +374,15 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
           nota_problema: parsedPDI.notas_spin.problema,
           nota_implicacao: parsedPDI.notas_spin.implicacao,
           nota_necessidade: parsedPDI.notas_spin.necessidade,
-          meta_objetivo: parsedPDI.meta_7_dias.objetivo,
-          meta_nota_atual: parsedPDI.meta_7_dias.nota_atual,
-          meta_nota_meta: parsedPDI.meta_7_dias.nota_meta,
-          meta_como_medir: parsedPDI.meta_7_dias.como_medir,
-          acoes: parsedPDI.acoes,
+          // Suporta v2 (foco_da_semana) com fallback para v1 (meta_7_dias)
+          meta_objetivo: parsedPDI.foco_da_semana?.motivo || parsedPDI.meta_7_dias?.objetivo || '',
+          meta_nota_atual: parsedPDI.foco_da_semana?.nota_atual || parsedPDI.meta_7_dias?.nota_atual || 0,
+          meta_nota_meta: parsedPDI.foco_da_semana?.nota_meta || parsedPDI.meta_7_dias?.nota_meta || 0,
+          meta_como_medir: parsedPDI.meta_semanal?.resultado_esperado || parsedPDI.meta_7_dias?.como_medir || '',
+          acoes: acoes,
           checkpoint_quando: parsedPDI.checkpoint.quando,
           checkpoint_como_avaliar: parsedPDI.checkpoint.como_avaliar,
-          proximos_passos: parsedPDI.proximos_passos,
+          proximos_passos: parsedPDI.proximo_ciclo || parsedPDI.proximos_passos || '',
           status: 'ativo',
           pdi_json: parsedPDI
         })
@@ -616,52 +692,117 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
             </div>
           </div>
 
-          {/* Meta 7 Dias */}
+          {/* Foco da Semana */}
           <div className="bg-gray-800/50 rounded-2xl p-6 md:p-8 border border-gray-700/50 shadow-xl">
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
               <span className="text-3xl">🎯</span>
-              Meta de 7 Dias
+              Foco da Semana
             </h2>
 
             <div className="p-5 bg-gradient-to-r from-green-900/40 to-blue-900/40 rounded-xl border border-green-500/30 mb-4">
-              <p className="text-green-300 font-semibold mb-2 text-sm">OBJETIVO</p>
-              <p className="text-gray-400 text-base italic mb-4">{hasData ? pdiData.meta_7_dias.objetivo : 'Seu objetivo será definido aqui...'}</p>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="px-4 py-2 bg-green-500/20 border border-green-500/40 rounded-lg">
+                  <p className="text-green-300 font-bold text-2xl">
+                    {hasData ? pdiData.foco_da_semana?.area || pdiData.meta_7_dias?.objetivo.split(' ')[0] || '?' : '?'}
+                  </p>
+                </div>
+                <div className="flex-1">
+                  <p className="text-green-300 font-semibold text-sm">ÁREA PRIORITÁRIA</p>
+                  <p className="text-gray-400 text-xs">
+                    {hasData && pdiData.foco_da_semana?.area ?
+                      `${pdiData.foco_da_semana.area === 'S' ? 'Situação' :
+                         pdiData.foco_da_semana.area === 'P' ? 'Problema' :
+                         pdiData.foco_da_semana.area === 'I' ? 'Implicação' : 'Necessidade'}`
+                      : 'Será definida após análise...'}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-gray-300 text-sm mb-4">
+                {hasData ? pdiData.foco_da_semana?.motivo || pdiData.meta_7_dias?.objetivo || 'Motivo será definido aqui...' : 'Motivo será definido aqui...'}
+              </p>
 
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-300 text-sm">Progresso</span>
+                  <span className="text-gray-300 text-sm">Meta de Evolução</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-bold">{hasData ? pdiData.meta_7_dias.nota_atual.toFixed(1) : '---'}</span>
+                    <span className="text-orange-400 font-bold">
+                      {hasData ? (pdiData.foco_da_semana?.nota_atual || pdiData.meta_7_dias?.nota_atual || 0).toFixed(1) : '---'}
+                    </span>
                     <span className="text-gray-500">→</span>
-                    <span className="text-gray-500 font-bold">{hasData ? pdiData.meta_7_dias.nota_meta.toFixed(1) : '---'}</span>
+                    <span className="text-green-400 font-bold">
+                      {hasData ? (pdiData.foco_da_semana?.nota_meta || pdiData.meta_7_dias?.nota_meta || 0).toFixed(1) : '---'}
+                    </span>
                   </div>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-gray-600 to-gray-500 rounded-full transition-all duration-1000"
+                    className="h-full bg-gradient-to-r from-orange-500 to-green-500 rounded-full transition-all duration-1000"
                     style={{
-                      width: hasData ? `${(pdiData.meta_7_dias.nota_atual / pdiData.meta_7_dias.nota_meta) * 100}%` : '0%'
+                      width: hasData && (pdiData.foco_da_semana || pdiData.meta_7_dias) ?
+                        `${((pdiData.foco_da_semana?.nota_atual || pdiData.meta_7_dias?.nota_atual || 0) /
+                            (pdiData.foco_da_semana?.nota_meta || pdiData.meta_7_dias?.nota_meta || 10)) * 100}%` : '0%'
                     }}
                   ></div>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
-              <p className="text-gray-400 text-xs mb-1 font-semibold">COMO MEDIR</p>
-              <p className="text-gray-400 text-sm italic">{hasData ? pdiData.meta_7_dias.como_medir : 'Critérios de medição serão definidos...'}</p>
-            </div>
+            {hasData && pdiData.meta_semanal && (
+              <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                <p className="text-gray-400 text-xs mb-1 font-semibold">META SEMANAL</p>
+                <p className="text-white text-sm mb-2">
+                  <span className="text-green-400 font-bold">{pdiData.meta_semanal.total_simulacoes}</span> simulações na Ramppy
+                </p>
+                <p className="text-gray-400 text-xs italic">{pdiData.meta_semanal.resultado_esperado}</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Ações */}
+        {/* Simulações */}
         <div className="bg-gray-800/50 rounded-2xl p-6 md:p-8 border border-gray-700/50 shadow-xl">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <span className="text-3xl">📋</span>
-            Ações para os Próximos 7 Dias
+            <span className="text-3xl">🎮</span>
+            Simulações Recomendadas
           </h2>
           <div className="space-y-4">
-            {hasData ? (
+            {hasData && pdiData.simulacoes ? (
+              pdiData.simulacoes.map((simulacao, index) => (
+                <div
+                  key={index}
+                  className="p-5 bg-gray-900/50 rounded-xl border border-gray-700 hover:border-purple-500/50 transition-all duration-300"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
+                      <span className="text-purple-400 font-bold">{simulacao.quantidade}x</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-semibold mb-3">{simulacao.objetivo}</p>
+
+                      <div className="space-y-2 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-400 text-xs font-semibold">PERSONA:</span>
+                          <span className="text-gray-300 text-sm">{simulacao.persona_sugerida}</span>
+                        </div>
+                        {simulacao.objecao_para_treinar && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-orange-400 text-xs font-semibold">OBJEÇÃO:</span>
+                            <span className="text-gray-300 text-sm">{simulacao.objecao_para_treinar}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                        <p className="text-gray-500 text-xs mb-1">Critério de Sucesso</p>
+                        <p className="text-green-400 text-sm">{simulacao.criterio_sucesso}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : hasData && pdiData.acoes ? (
+              // Retrocompatibilidade com formato antigo
               pdiData.acoes.map((acao, index) => (
                 <div
                   key={index}
@@ -716,14 +857,14 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
           </div>
         </div>
 
-        {/* Próximos Passos */}
+        {/* Próximo Ciclo */}
         <div className="bg-gradient-to-r from-green-900/60 to-blue-900/60 rounded-2xl p-6 md:p-8 border border-green-500/40 shadow-xl">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <span className="text-3xl">🚀</span>
-            Próximos Passos
+            Próximo Ciclo
           </h2>
           <p className="text-gray-300 leading-relaxed italic">
-            {hasData ? pdiData.proximos_passos : 'Orientações sobre os próximos passos aparecerão aqui após a geração do PDI...'}
+            {hasData ? (pdiData.proximo_ciclo || pdiData.proximos_passos || 'Orientações sobre o próximo ciclo aparecerão aqui após a geração do PDI...') : 'Orientações sobre o próximo ciclo aparecerão aqui após a geração do PDI...'}
           </p>
         </div>
 
