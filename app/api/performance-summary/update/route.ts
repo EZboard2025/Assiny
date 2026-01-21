@@ -37,12 +37,12 @@ export async function POST(request: NextRequest) {
 
     const userName = userData.user.user_metadata?.name || userData.user.email?.split('@')[0] || 'Usuário'
 
-    // Buscar todas as sessões completadas do usuário
+    // Buscar TODAS as sessões do usuário (não filtrar por status)
+    // Isso permite capturar sessões que têm avaliação mas status não foi setado corretamente
     const { data: sessions, error: sessionsError } = await supabase
       .from('roleplay_sessions')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'completed')
       .order('created_at', { ascending: true })
 
     if (sessionsError) {
@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`📊 Total de sessões com status 'completed': ${sessions?.length || 0}`)
+    console.log(`📊 Total de sessões do usuário: ${sessions?.length || 0}`)
 
-    // Filtrar sessões com avaliação válida
+    // Filtrar sessões com avaliação válida (mesmo lógica que PerfilView)
     const completedSessions = sessions.filter(session => {
       const evaluation = session.evaluation
       return evaluation && typeof evaluation === 'object'
@@ -64,21 +64,19 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Sessões com avaliação válida: ${completedSessions.length}`)
 
     if (completedSessions.length === 0) {
-      // Debug: verificar se existem sessões sem status completed
-      const { data: allSessions } = await supabase
-        .from('roleplay_sessions')
-        .select('id, status, evaluation')
-        .eq('user_id', userId)
-
-      console.log(`🔍 DEBUG - Total de sessões (qualquer status): ${allSessions?.length || 0}`)
-      console.log(`🔍 DEBUG - Status das sessões:`, allSessions?.map(s => ({ id: s.id, status: s.status, hasEval: !!s.evaluation })))
+      // Debug: mostrar detalhes de todas as sessões
+      console.log(`🔍 DEBUG - Sessões encontradas:`, sessions?.map(s => ({
+        id: s.id,
+        status: s.status,
+        hasEval: !!s.evaluation,
+        evalType: s.evaluation ? typeof s.evaluation : 'none'
+      })))
 
       return NextResponse.json(
         {
-          message: 'No completed sessions to summarize',
+          message: 'No sessions with valid evaluation to summarize',
           debug: {
-            totalSessions: allSessions?.length || 0,
-            completedSessions: sessions.length,
+            totalSessions: sessions?.length || 0,
             withEvaluation: completedSessions.length
           }
         },
