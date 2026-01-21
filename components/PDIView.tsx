@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Target, TrendingUp, Zap, CheckCircle, Calendar, Award, Sparkles, AlertTriangle } from 'lucide-react'
 
 interface PDIData {
   versao?: string
@@ -418,49 +419,23 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
   }
 
   const renderRadarChart = (scores: { situacao: number; problema: number; implicacao: number; necessidade: number }) => {
-    const labels = ['S', 'P', 'I', 'N']
-    const labelsFull = ['Situação', 'Problema', 'Implicação', 'Necessidade']
-    const colors = ['#10b981', '#22c55e', '#4ade80', '#86efac'] // All green shades (Ramppy brand)
-    const values = [scores.situacao, scores.problema, scores.implicacao, scores.necessidade]
-    const max = 10
-    const centerX = 110
-    const centerY = 110
-    const radius = 65
-    const angleStep = (Math.PI * 2) / 4
-    const startAngle = -Math.PI / 2
+    const S = scores.situacao || 0
+    const P = scores.problema || 0
+    const I = scores.implicacao || 0
+    const N = scores.necessidade || 0
 
-    const points = values.map((value, index) => {
-      const angle = startAngle + angleStep * index
-      const r = (value / max) * radius
-      const x = centerX + r * Math.cos(angle)
-      const y = centerY + r * Math.sin(angle)
-      return `${x},${y}`
-    }).join(' ')
-
-    const labelPositions = labels.map((label, index) => {
-      const angle = startAngle + angleStep * index
-      const r = radius + 30
-      const x = centerX + r * Math.cos(angle)
-      const y = centerY + r * Math.sin(angle)
-      return { label, x, y, value: values[index], color: colors[index] }
-    })
+    // Calculate positions for diamond (4 vertices)
+    const sY = 120 - (S * 8)  // Top (S)
+    const pX = 120 + (P * 8)  // Right (P)
+    const iY = 120 + (I * 8)  // Bottom (I)
+    const nX = 120 - (N * 8)  // Left (N)
 
     return (
-      <svg viewBox="0 0 220 220" className="w-full h-full">
-        {/* Grid circles with gradient */}
+      <svg viewBox="0 0 240 240" className="w-full h-full drop-shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+        {/* Filtro de glow verde */}
         <defs>
-          <linearGradient id="gridGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
-            <stop offset="50%" stopColor="#22c55e" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#4ade80" stopOpacity="0.15" />
-          </linearGradient>
-          <linearGradient id="fillGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-            <stop offset="50%" stopColor="#22c55e" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#4ade80" stopOpacity="0.3" />
-          </linearGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+          <filter id="greenGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
             <feMerge>
               <feMergeNode in="coloredBlur"/>
               <feMergeNode in="SourceGraphic"/>
@@ -468,121 +443,117 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
           </filter>
         </defs>
 
-        {/* Background circles */}
-        {[0.25, 0.5, 0.75, 1].map((scale, i) => (
-          <circle
-            key={i}
-            cx={centerX}
-            cy={centerY}
-            r={radius * scale}
-            fill="none"
-            stroke="url(#gridGradient)"
-            strokeWidth="1"
-            opacity={0.6 - i * 0.12}
-          />
-        ))}
-
-        {/* Grid lines */}
-        {labels.map((_, index) => {
-          const angle = startAngle + angleStep * index
-          const x = centerX + radius * Math.cos(angle)
-          const y = centerY + radius * Math.sin(angle)
+        {/* Background diamonds (losangos) - 10 níveis */}
+        {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
+          const size = level * 8;
           return (
-            <line
-              key={index}
-              x1={centerX}
-              y1={centerY}
-              x2={x}
-              y2={y}
-              stroke={colors[index]}
-              strokeWidth="1"
-              opacity="0.3"
+            <polygon
+              key={level}
+              points={`120,${120-size} ${120+size},120 120,${120+size} ${120-size},120`}
+              fill="none"
+              stroke={level % 2 === 0 ? "rgba(34, 197, 94, 0.15)" : "rgba(34, 197, 94, 0.08)"}
+              strokeWidth="0.5"
             />
-          )
+          );
         })}
 
-        {/* Data polygon with gradient fill */}
-        <polygon
-          points={points}
-          fill="url(#fillGradient)"
-          stroke="#10b981"
-          strokeWidth="2.5"
-          filter="url(#glow)"
-        />
+        {/* Diagonal lines - verde tech */}
+        <line x1="120" y1="40" x2="120" y2="200" stroke="rgba(34, 197, 94, 0.3)" strokeWidth="0.5" />
+        <line x1="40" y1="120" x2="200" y2="120" stroke="rgba(34, 197, 94, 0.3)" strokeWidth="0.5" />
 
-        {/* Data points with colored circles */}
-        {values.map((value, index) => {
-          const angle = startAngle + angleStep * index
-          const r = (value / max) * radius
-          const x = centerX + r * Math.cos(angle)
-          const y = centerY + r * Math.sin(angle)
-          return (
-            <g key={index}>
-              <circle cx={x} cy={y} r="5" fill={colors[index]} opacity="0.3" />
-              <circle cx={x} cy={y} r="3" fill={colors[index]} stroke="#fff" strokeWidth="1.5" filter="url(#glow)" />
-            </g>
-          )
-        })}
+        {/* Data polygon */}
+        <>
+          {/* Glow effect verde */}
+          <polygon
+            points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
+            fill="rgba(34, 197, 94, 0.15)"
+            stroke="rgb(34, 197, 94)"
+            strokeWidth="3"
+            filter="url(#greenGlow)"
+          />
+          <polygon
+            points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
+            fill="rgba(34, 197, 94, 0.3)"
+            stroke="rgb(34, 197, 94)"
+            strokeWidth="2.5"
+          />
+          {/* Data points com efeito tech */}
+          <circle cx="120" cy={sY} r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+          <circle cx="120" cy={sY} r="4" fill="rgb(34, 197, 94)" />
+          <circle cx="120" cy={sY} r="2" fill="rgb(255, 255, 255)" />
 
-        {/* Labels with values */}
-        {labelPositions.map((pos, index) => (
-          <g key={index}>
-            <text
-              x={pos.x}
-              y={pos.y - 4}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="font-bold text-lg"
-              fill={pos.color}
-            >
-              {pos.label}
-            </text>
-            <text
-              x={pos.x}
-              y={pos.y + 10}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="font-bold text-sm"
-              fill={pos.color}
-            >
-              {pos.value.toFixed(1)}
-            </text>
-          </g>
-        ))}
+          <circle cx={pX} cy="120" r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+          <circle cx={pX} cy="120" r="4" fill="rgb(34, 197, 94)" />
+          <circle cx={pX} cy="120" r="2" fill="rgb(255, 255, 255)" />
+
+          <circle cx="120" cy={iY} r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+          <circle cx="120" cy={iY} r="4" fill="rgb(34, 197, 94)" />
+          <circle cx="120" cy={iY} r="2" fill="rgb(255, 255, 255)" />
+
+          <circle cx={nX} cy="120" r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+          <circle cx={nX} cy="120" r="4" fill="rgb(34, 197, 94)" />
+          <circle cx={nX} cy="120" r="2" fill="rgb(255, 255, 255)" />
+        </>
+
+        {/* Labels tech com borda verde */}
+        <g>
+          <rect x="100" y="15" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+          <text x="120" y="32" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">S</text>
+        </g>
+        <g>
+          <rect x="200" y="108" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+          <text x="220" y="125" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">P</text>
+        </g>
+        <g>
+          <rect x="100" y="201" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+          <text x="120" y="218" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">I</text>
+        </g>
+        <g>
+          <rect x="0" y="108" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+          <text x="20" y="125" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">N</text>
+        </g>
       </svg>
     )
   }
 
   const renderEmptyRadarChart = () => {
-    const labels = ['S', 'P', 'I', 'N']
-    const centerX = 110
-    const centerY = 110
-    const radius = 70
-    const angleStep = (Math.PI * 2) / 4
-    const startAngle = -Math.PI / 2
-
-    const labelPositions = labels.map((label, index) => {
-      const angle = startAngle + angleStep * index
-      const r = radius + 25
-      const x = centerX + r * Math.cos(angle)
-      const y = centerY + r * Math.sin(angle)
-      return { label, x, y }
-    })
-
     return (
-      <svg viewBox="0 0 220 220" className="w-full h-full opacity-30">
-        {[0.25, 0.5, 0.75, 1].map((scale, i) => (
-          <circle key={i} cx={centerX} cy={centerY} r={radius * scale} fill="none" stroke="#374151" strokeWidth="0.5" />
-        ))}
-        {labels.map((_, index) => {
-          const angle = startAngle + angleStep * index
-          const x = centerX + radius * Math.cos(angle)
-          const y = centerY + radius * Math.sin(angle)
-          return <line key={index} x1={centerX} y1={centerY} x2={x} y2={y} stroke="#374151" strokeWidth="0.5" />
+      <svg viewBox="0 0 240 240" className="w-full h-full opacity-30">
+        {/* Background diamonds (losangos) - 10 níveis */}
+        {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
+          const size = level * 8;
+          return (
+            <polygon
+              key={level}
+              points={`120,${120-size} ${120+size},120 120,${120+size} ${120-size},120`}
+              fill="none"
+              stroke="rgba(107, 114, 128, 0.3)"
+              strokeWidth="0.5"
+            />
+          );
         })}
-        {labelPositions.map((pos, index) => (
-          <text key={index} x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="middle" className="fill-gray-500 font-bold text-sm">{pos.label}</text>
-        ))}
+
+        {/* Diagonal lines */}
+        <line x1="120" y1="40" x2="120" y2="200" stroke="rgba(107, 114, 128, 0.3)" strokeWidth="0.5" />
+        <line x1="40" y1="120" x2="200" y2="120" stroke="rgba(107, 114, 128, 0.3)" strokeWidth="0.5" />
+
+        {/* Labels */}
+        <g>
+          <rect x="100" y="15" width="40" height="24" rx="6" fill="rgba(107, 114, 128, 0.1)" stroke="rgba(107, 114, 128, 0.3)" strokeWidth="1.5" />
+          <text x="120" y="32" textAnchor="middle" fill="rgb(107, 114, 128)" fontSize="14" fontWeight="bold">S</text>
+        </g>
+        <g>
+          <rect x="200" y="108" width="40" height="24" rx="6" fill="rgba(107, 114, 128, 0.1)" stroke="rgba(107, 114, 128, 0.3)" strokeWidth="1.5" />
+          <text x="220" y="125" textAnchor="middle" fill="rgb(107, 114, 128)" fontSize="14" fontWeight="bold">P</text>
+        </g>
+        <g>
+          <rect x="100" y="201" width="40" height="24" rx="6" fill="rgba(107, 114, 128, 0.1)" stroke="rgba(107, 114, 128, 0.3)" strokeWidth="1.5" />
+          <text x="120" y="218" textAnchor="middle" fill="rgb(107, 114, 128)" fontSize="14" fontWeight="bold">I</text>
+        </g>
+        <g>
+          <rect x="0" y="108" width="40" height="24" rx="6" fill="rgba(107, 114, 128, 0.1)" stroke="rgba(107, 114, 128, 0.3)" strokeWidth="1.5" />
+          <text x="20" y="125" textAnchor="middle" fill="rgb(107, 114, 128)" fontSize="14" fontWeight="bold">N</text>
+        </g>
       </svg>
     )
   }
@@ -608,16 +579,8 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative">
-      {/* Animated background particles - fixed position */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="stars"></div>
-        <div className="stars2"></div>
-        <div className="stars3"></div>
-      </div>
-
-      <div className="relative z-10 p-4 md:p-8 min-h-screen">
-        <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
+    <div className="min-h-screen py-20 px-6 relative z-10">
+      <div className="max-w-6xl mx-auto space-y-6">
 
         {/* Error/Warning Message */}
         {errorMessage && (
@@ -643,103 +606,127 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         )}
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-900/40 to-blue-900/40 rounded-2xl p-6 md:p-8 border border-green-500/20 shadow-2xl">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                PDI - Plano de Desenvolvimento Individual
-              </h1>
-              <p className="text-gray-300 text-lg">
-                {hasData && pdiData.vendedor ? `${pdiData.vendedor.nome} • ${pdiData.vendedor.empresa}` : 'Aguardando dados...'}
-              </p>
+        <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] hover:shadow-[0_0_60px_rgba(34,197,94,0.25)] transition-all duration-500">
+          {/* Efeito de brilho */}
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 rounded-2xl"></div>
+
+          <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-2xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                <Target className="w-8 h-8 text-green-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-1 bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                  PDI • 7 Dias
+                </h1>
+                <p className="text-gray-400 text-lg flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                  {hasData && pdiData.vendedor ? `${pdiData.vendedor.nome} • ${pdiData.vendedor.empresa}` : 'Aguardando dados...'}
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-4">
               {!hasData ? (
                 <button
                   onClick={handleGeneratePDI}
                   disabled={isLoading}
-                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-green-500/50 transition-all duration-300 hover:scale-105 disabled:scale-100 flex items-center gap-2 justify-center"
-                  style={{ boxShadow: '0 0 30px rgba(34, 197, 94, 0.5), 0 0 60px rgba(34, 197, 94, 0.3)' }}
+                  className="group relative px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl font-bold transition-all hover:scale-105 hover:-translate-y-1 flex items-center gap-3 shadow-[0_0_30px_rgba(34,197,94,0.4)] hover:shadow-[0_0_50px_rgba(34,197,94,0.6)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0"
                 >
                   {isLoading ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                      Gerando...
+                      <span>Gerando...</span>
                     </>
                   ) : (
                     <>
-                      <span className="text-2xl">✨</span>
-                      Gerar PDI
+                      <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                      <span>Gerar PDI</span>
                     </>
                   )}
                 </button>
               ) : (
-                <button
-                  onClick={handleGeneratePDI}
-                  disabled={isLoading || cooldownRemaining > 0}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105 disabled:scale-100 flex items-center gap-2 justify-center"
-                  title={cooldownRemaining > 0 ? `Disponível em ${cooldownRemaining} dia(s)` : 'Gerar novo PDI'}
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                      Gerando...
-                    </>
-                  ) : cooldownRemaining > 0 ? (
-                    <>
-                      <span className="text-2xl">🔒</span>
-                      Aguarde {cooldownRemaining} dia(s)
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-2xl">🔄</span>
-                      Gerar Novo PDI
-                    </>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={handleGeneratePDI}
+                    disabled={isLoading || cooldownRemaining > 0}
+                    className="group relative px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-xl font-medium transition-all hover:scale-105 hover:-translate-y-1 flex items-center gap-2 shadow-[0_0_25px_rgba(34,197,94,0.3)] hover:shadow-[0_0_40px_rgba(34,197,94,0.5)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0"
+                    title={cooldownRemaining > 0 ? `Disponível em ${cooldownRemaining} dia(s)` : 'Gerar novo PDI'}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                        <span>Gerando...</span>
+                      </>
+                    ) : cooldownRemaining > 0 ? (
+                      <>
+                        <AlertTriangle className="w-5 h-5" />
+                        <span>Aguarde {cooldownRemaining} dia(s)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                        <span>Gerar Novo</span>
+                      </>
+                    )}
+                  </button>
+                  {hasData && pdiData.vendedor && (
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all"></div>
+                      <div className="relative bg-gradient-to-br from-gray-900/80 to-gray-800/60 rounded-xl p-4 border border-green-500/30 backdrop-blur-sm text-center">
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <Award className="w-3 h-3 text-green-400" />
+                          <p className="text-xs text-gray-400 uppercase tracking-wider">Sessões</p>
+                        </div>
+                        <p className="text-2xl font-bold text-white">{pdiData.vendedor.total_sessoes}</p>
+                      </div>
+                    </div>
                   )}
-                </button>
-              )}
-              <span className="px-4 py-2 rounded-lg border font-semibold text-center bg-green-500/20 text-green-400 border-green-500/30">
-                {hasData ? pdiData.periodo : '7 dias'}
-              </span>
-              {hasData && pdiData.vendedor && (
-                <div className="text-right md:text-center">
-                  <p className="text-sm text-gray-400">Total de Sessões</p>
-                  <p className="text-2xl font-bold text-white">{pdiData.vendedor.total_sessoes}</p>
                 </div>
               )}
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-700">
-            <p className="text-sm text-gray-400">
-              {hasData ? `Gerado em ${formatDate(pdiData.gerado_em)}` : 'PDI será gerado após completar sessões de roleplay'}
-            </p>
-          </div>
+          {hasData && (
+            <div className="relative mt-6 pt-4 border-t border-gray-700/50">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Calendar className="w-4 h-4 text-green-400" />
+                  <span>Gerado em {formatDate(pdiData.gerado_em)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                  <span className="text-green-400 font-semibold">{pdiData.periodo}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Diagnóstico Geral */}
-        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-purple-500/20 shadow-xl shadow-purple-500/10">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+        <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 md:p-8 border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] hover:shadow-[0_0_60px_rgba(34,197,94,0.25)] transition-all duration-500">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 rounded-2xl"></div>
+
+          <h2 className="relative text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+              <Award className="w-6 h-6 text-green-400" />
             </div>
-            Diagnóstico Geral
+            <span className="bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent">
+              Diagnóstico Geral
+            </span>
           </h2>
 
-          <div className="mb-6">
+          <div className="relative mb-6">
             <div className="flex items-center justify-between mb-3">
               <span className="text-gray-300 font-medium text-lg">Nota Geral</span>
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg blur-lg opacity-50 animate-pulse"></div>
-                <span className="relative text-4xl font-black bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/50 to-emerald-500/50 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
+                <span className="relative text-5xl font-black bg-gradient-to-br from-green-400 via-emerald-300 to-green-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,197,94,0.5)]">
                   {hasData ? pdiData.diagnostico.nota_geral.toFixed(1) : '---'}
                 </span>
               </div>
             </div>
-            <div className="relative w-full bg-gray-900/50 rounded-full h-5 overflow-hidden border border-gray-700/50">
+            <div className="relative w-full bg-gray-900/50 rounded-full h-4 overflow-hidden border border-gray-700/50 shadow-inner">
               <div
-                className="h-full bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000 shadow-lg shadow-purple-500/50"
+                className="h-full bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(34,197,94,0.5)] relative overflow-hidden"
                 style={{ width: hasData ? `${(pdiData.diagnostico.nota_geral / 10) * 100}%` : '0%' }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
@@ -747,9 +734,9 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
             </div>
           </div>
 
-          <div className="relative p-5 bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-xl border border-blue-500/20 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5"></div>
-            <p className="relative text-gray-300 leading-relaxed">
+          <div className="relative p-6 bg-gray-900/40 backdrop-blur-sm rounded-xl border border-green-500/20 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent"></div>
+            <p className="relative text-gray-300 leading-relaxed text-base">
               {hasData ? pdiData.diagnostico.resumo : 'O resumo do seu diagnóstico aparecerá aqui após a geração do PDI...'}
             </p>
           </div>
@@ -757,47 +744,71 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Notas SPIN */}
-          <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-cyan-500/20 shadow-xl shadow-cyan-500/10">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                </svg>
+          <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 md:p-8 border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] hover:shadow-[0_0_60px_rgba(34,197,94,0.25)] transition-all duration-500">
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 rounded-2xl"></div>
+
+            <h2 className="relative text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                <TrendingUp className="w-6 h-6 text-green-400" />
               </div>
-              Notas SPIN
+              <span className="bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent">
+                Notas SPIN
+              </span>
             </h2>
             <div className="aspect-square max-w-sm mx-auto">
               {hasData ? renderRadarChart(pdiData.notas_spin) : renderEmptyRadarChart()}
             </div>
-            <div className="mt-6 grid grid-cols-4 gap-2">
-              <div className="text-center p-3 bg-green-900/30 rounded-lg">
-                <p className="text-gray-400 text-xs mb-1">Situação</p>
-                <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.situacao.toFixed(1) : '---'}</p>
+            <div className="relative mt-6 grid grid-cols-4 gap-3">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all"></div>
+                <div className="relative text-center p-3 bg-green-900/20 backdrop-blur-sm rounded-xl border border-green-500/20 hover:border-green-500/40 transition-all">
+                  <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Situação</p>
+                  <p className="text-2xl font-bold bg-gradient-to-br from-green-400 to-emerald-400 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]">
+                    {hasData ? pdiData.notas_spin.situacao.toFixed(1) : '---'}
+                  </p>
+                </div>
               </div>
-              <div className="text-center p-3 bg-green-900/30 rounded-lg">
-                <p className="text-gray-400 text-xs mb-1">Problema</p>
-                <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.problema.toFixed(1) : '---'}</p>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all"></div>
+                <div className="relative text-center p-3 bg-green-900/20 backdrop-blur-sm rounded-xl border border-green-500/20 hover:border-green-500/40 transition-all">
+                  <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Problema</p>
+                  <p className="text-2xl font-bold bg-gradient-to-br from-green-400 to-emerald-400 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]">
+                    {hasData ? pdiData.notas_spin.problema.toFixed(1) : '---'}
+                  </p>
+                </div>
               </div>
-              <div className="text-center p-3 bg-green-900/30 rounded-lg">
-                <p className="text-gray-400 text-xs mb-1">Implicação</p>
-                <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.implicacao.toFixed(1) : '---'}</p>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all"></div>
+                <div className="relative text-center p-3 bg-green-900/20 backdrop-blur-sm rounded-xl border border-green-500/20 hover:border-green-500/40 transition-all">
+                  <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Implicação</p>
+                  <p className="text-2xl font-bold bg-gradient-to-br from-green-400 to-emerald-400 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]">
+                    {hasData ? pdiData.notas_spin.implicacao.toFixed(1) : '---'}
+                  </p>
+                </div>
               </div>
-              <div className="text-center p-3 bg-green-900/30 rounded-lg">
-                <p className="text-gray-400 text-xs mb-1">Necessidade</p>
-                <p className="text-gray-500 font-bold text-lg">{hasData ? pdiData.notas_spin.necessidade.toFixed(1) : '---'}</p>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-all"></div>
+                <div className="relative text-center p-3 bg-green-900/20 backdrop-blur-sm rounded-xl border border-green-500/20 hover:border-green-500/40 transition-all">
+                  <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Necessidade</p>
+                  <p className="text-2xl font-bold bg-gradient-to-br from-green-400 to-emerald-400 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]">
+                    {hasData ? pdiData.notas_spin.necessidade.toFixed(1) : '---'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Foco da Semana */}
-          <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-green-500/20 shadow-xl shadow-green-500/10">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/50">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+          <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 md:p-8 border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] hover:shadow-[0_0_60px_rgba(34,197,94,0.25)] transition-all duration-500">
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 rounded-2xl"></div>
+
+            <h2 className="relative text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                <Zap className="w-6 h-6 text-green-400" />
               </div>
-              Foco da Semana
+              <span className="bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent">
+                Foco da Semana
+              </span>
             </h2>
 
             <div className="p-5 bg-gradient-to-r from-green-900/40 to-blue-900/40 rounded-xl border border-green-500/30 mb-4">
@@ -862,46 +873,54 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         </div>
 
         {/* Simulações */}
-        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl p-6 md:p-8 border border-pink-500/20 shadow-xl shadow-pink-500/10">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center shadow-lg shadow-pink-500/50">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+        <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 md:p-8 border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] hover:shadow-[0_0_60px_rgba(34,197,94,0.25)] transition-all duration-500">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-transparent to-green-500/5 rounded-2xl"></div>
+
+          <h2 className="relative text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+              <CheckCircle className="w-6 h-6 text-green-400" />
             </div>
-            Simulações Recomendadas
+            <span className="bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent">
+              Simulações Recomendadas
+            </span>
           </h2>
-          <div className="space-y-4">
+          <div className="relative space-y-4">
             {hasData && pdiData.simulacoes ? (
               pdiData.simulacoes.map((simulacao, index) => (
                 <div
                   key={index}
-                  className="p-5 bg-gray-900/50 rounded-xl border border-gray-700 hover:border-purple-500/50 transition-all duration-300"
+                  className="relative group"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
-                      <span className="text-purple-400 font-bold">{simulacao.quantidade}x</span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-white font-semibold mb-3">{simulacao.objetivo}</p>
-
-                      <div className="space-y-2 mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-blue-400 text-xs font-semibold">PERSONA:</span>
-                          <span className="text-gray-300 text-sm">{simulacao.persona_sugerida}</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/5 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative p-5 bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-700/50 hover:border-green-500/30 transition-all duration-300">
+                    <div className="flex items-start gap-4">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-green-500/20 rounded-full blur-lg"></div>
+                        <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-green-500/30 to-emerald-500/20 border border-green-500/40 flex items-center justify-center flex-shrink-0">
+                          <span className="text-green-400 font-bold text-lg">{simulacao.quantidade}x</span>
                         </div>
-                        {simulacao.objecao_para_treinar && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-orange-400 text-xs font-semibold">OBJEÇÃO:</span>
-                            <span className="text-gray-300 text-sm">{simulacao.objecao_para_treinar}</span>
-                          </div>
-                        )}
                       </div>
+                      <div className="flex-1">
+                        <p className="text-white font-semibold text-lg mb-3">{simulacao.objetivo}</p>
 
-                      <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                        <p className="text-gray-500 text-xs mb-1">Critério de Sucesso</p>
-                        <p className="text-green-400 text-sm">{simulacao.criterio_sucesso}</p>
+                        <div className="space-y-2 mb-3">
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                            <span className="text-blue-400 text-xs font-semibold uppercase tracking-wider">Persona:</span>
+                            <span className="text-gray-200 text-sm">{simulacao.persona_sugerida}</span>
+                          </div>
+                          {simulacao.objecao_para_treinar && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                              <span className="text-orange-400 text-xs font-semibold uppercase tracking-wider">Objeção:</span>
+                              <span className="text-gray-200 text-sm">{simulacao.objecao_para_treinar}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="relative p-3 bg-gradient-to-br from-green-900/20 to-emerald-900/10 rounded-lg border border-green-500/20 overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-transparent"></div>
+                          <p className="relative text-gray-400 text-xs mb-1 uppercase tracking-wider font-semibold">Critério de Sucesso</p>
+                          <p className="relative text-green-300 text-sm font-medium">{simulacao.criterio_sucesso}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -912,17 +931,24 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
               pdiData.acoes.map((acao, index) => (
                 <div
                   key={index}
-                  className="p-5 bg-gray-900/50 rounded-xl border border-gray-700 hover:border-green-500/50 transition-all duration-300"
+                  className="relative group"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-green-900/40 border border-green-500/40 flex items-center justify-center flex-shrink-0">
-                      <span className="text-green-400 font-bold">{index + 1}</span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-white font-semibold mb-3">{acao.acao}</p>
-                      <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                        <p className="text-gray-500 text-xs mb-1">Resultado Esperado</p>
-                        <p className="text-green-400 text-sm">{acao.resultado_esperado}</p>
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-emerald-500/5 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative p-5 bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-700/50 hover:border-green-500/30 transition-all duration-300">
+                    <div className="flex items-start gap-4">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-green-500/20 rounded-full blur-lg"></div>
+                        <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-green-500/30 to-emerald-500/20 border border-green-500/40 flex items-center justify-center flex-shrink-0">
+                          <span className="text-green-400 font-bold text-lg">{index + 1}</span>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-semibold text-lg mb-3">{acao.acao}</p>
+                        <div className="relative p-3 bg-gradient-to-br from-green-900/20 to-emerald-900/10 rounded-lg border border-green-500/20 overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-transparent"></div>
+                          <p className="relative text-gray-400 text-xs mb-1 uppercase tracking-wider font-semibold">Resultado Esperado</p>
+                          <p className="relative text-green-300 text-sm font-medium">{acao.resultado_esperado}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -930,29 +956,29 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
               ))
             ) : (
               <>
-                <div className="p-5 bg-gray-900/50 rounded-xl border border-gray-700">
+                <div className="p-5 bg-gray-900/20 backdrop-blur-sm rounded-xl border border-gray-700/30 opacity-50">
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-700/40 border border-gray-600/40 flex items-center justify-center flex-shrink-0">
-                      <span className="text-gray-500 font-bold">1</span>
+                    <div className="w-12 h-12 rounded-full bg-gray-700/20 border border-gray-600/30 flex items-center justify-center flex-shrink-0">
+                      <span className="text-gray-500 font-bold text-lg">1</span>
                     </div>
                     <div className="flex-1">
-                      <p className="text-gray-400 font-semibold mb-3 italic">Ação 1 será definida aqui...</p>
-                      <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                        <p className="text-gray-500 text-xs mb-1">Resultado Esperado</p>
+                      <p className="text-gray-400 font-semibold text-lg mb-3 italic">Simulação 1 será definida aqui...</p>
+                      <div className="p-3 bg-gray-800/30 rounded-lg border border-gray-700/30">
+                        <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Critério de Sucesso</p>
                         <p className="text-gray-500 text-sm italic">---</p>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="p-5 bg-gray-900/50 rounded-xl border border-gray-700">
+                <div className="p-5 bg-gray-900/20 backdrop-blur-sm rounded-xl border border-gray-700/30 opacity-50">
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-700/40 border border-gray-600/40 flex items-center justify-center flex-shrink-0">
-                      <span className="text-gray-500 font-bold">2</span>
+                    <div className="w-12 h-12 rounded-full bg-gray-700/20 border border-gray-600/30 flex items-center justify-center flex-shrink-0">
+                      <span className="text-gray-500 font-bold text-lg">2</span>
                     </div>
                     <div className="flex-1">
-                      <p className="text-gray-400 font-semibold mb-3 italic">Ação 2 será definida aqui...</p>
-                      <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                        <p className="text-gray-500 text-xs mb-1">Resultado Esperado</p>
+                      <p className="text-gray-400 font-semibold text-lg mb-3 italic">Simulação 2 será definida aqui...</p>
+                      <div className="p-3 bg-gray-800/30 rounded-lg border border-gray-700/30">
+                        <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Critério de Sucesso</p>
                         <p className="text-gray-500 text-sm italic">---</p>
                       </div>
                     </div>
@@ -964,15 +990,16 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         </div>
 
         {/* Próximo Ciclo */}
-        <div className="relative bg-gradient-to-br from-indigo-900/60 to-purple-900/60 rounded-2xl p-6 md:p-8 border border-indigo-500/40 shadow-xl shadow-indigo-500/20 overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 md:p-8 border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] hover:shadow-[0_0_60px_rgba(34,197,94,0.25)] transition-all duration-500 overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-full blur-3xl"></div>
+
           <h2 className="relative text-2xl font-bold text-white mb-6 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/50">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+              <Sparkles className="w-6 h-6 text-green-400" />
             </div>
-            Próximo Ciclo
+            <span className="bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent">
+              Próximo Ciclo
+            </span>
           </h2>
           <p className="relative text-gray-200 leading-relaxed">
             {hasData ? (pdiData.proximo_ciclo || pdiData.proximos_passos || 'Orientações sobre o próximo ciclo aparecerão aqui após a geração do PDI...') : 'Orientações sobre o próximo ciclo aparecerão aqui após a geração do PDI...'}
@@ -984,7 +1011,6 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
           <p className="text-gray-500 text-sm">
             PDI gerado automaticamente pela plataforma Ramppy • Foco em resultados em 7 dias
           </p>
-        </div>
         </div>
       </div>
     </div>
