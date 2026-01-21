@@ -222,7 +222,24 @@ Retorne as mensagens organizadas conforme o formato especificado.`
         let n8nResult = null
 
         if (n8nResponse.ok) {
-          const n8nData = await n8nResponse.json()
+          // Tentar ler como texto primeiro para detectar erros HTML
+          const responseText = await n8nResponse.text()
+          console.log('📥 N8N Raw Response (primeiros 500 chars):', responseText.substring(0, 500))
+
+          // Verificar se é HTML
+          if (responseText.trim().startsWith('<')) {
+            console.error('❌ N8N retornou HTML ao invés de JSON')
+            throw new Error('N8N retornou uma página HTML ao invés de JSON. O webhook pode estar com erro ou inativo.')
+          }
+
+          let n8nData
+          try {
+            n8nData = JSON.parse(responseText)
+          } catch (parseError) {
+            console.error('❌ Erro ao fazer parse da resposta do N8N:', parseError)
+            console.error('Resposta recebida:', responseText)
+            throw new Error('N8N retornou dados em formato inválido')
+          }
 
           // N8N pode retornar em diferentes formatos
           if (n8nData && typeof n8nData === 'object') {
