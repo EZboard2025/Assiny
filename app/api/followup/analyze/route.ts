@@ -373,13 +373,29 @@ Retorne as mensagens organizadas conforme o formato especificado.`
               const userCompanyId = employeeData?.company_id
               console.log('🏢 Company ID do usuário:', userCompanyId)
 
+              // Buscar o nome da fase do funil ao invés de salvar o ID
+              let faseNome = avaliacao.fase_funil // Fallback para o ID caso não encontre
+              if (userCompanyId && avaliacao.fase_funil) {
+                const { data: faseData } = await supabaseAdminClient
+                  .from('funnel_stages')
+                  .select('stage_name')
+                  .eq('id', avaliacao.fase_funil)
+                  .eq('company_id', userCompanyId)
+                  .single()
+
+                if (faseData?.stage_name) {
+                  faseNome = faseData.stage_name
+                  console.log('✅ Nome da fase encontrado:', faseNome)
+                }
+              }
+
               // Preparar dados para inserção
               const dataToInsert: any = {
                 user_id: user.id,
                 tipo_venda: avaliacao.tipo_venda,
                 canal: avaliacao.canal,
-                fase_funil: avaliacao.fase_funil,
-                contexto: `Tipo: ${avaliacao.tipo_venda}, Canal: ${avaliacao.canal}, Fase: ${avaliacao.fase_funil}`, // Campo obrigatório!
+                fase_funil: faseNome, // Usar nome da fase ao invés do ID
+                contexto: `Tipo: ${avaliacao.tipo_venda}, Canal: ${avaliacao.canal}, Fase: ${faseNome}`, // Campo obrigatório!
                 transcricao_original: fullExtractedText,
                 transcricao_filtrada: filteredText,
                 avaliacao: n8nResult,
@@ -449,12 +465,27 @@ Retorne as mensagens organizadas conforme o formato especificado.`
                 console.log('📝 Salvando com user_id de teste:', testUserId)
                 console.log('🏢 Company ID de teste:', testCompanyId)
 
+                // Buscar o nome da fase do funil (fallback também precisa)
+                let faseNomeFallback = avaliacao.fase_funil
+                if (testCompanyId && avaliacao.fase_funil) {
+                  const { data: faseData } = await supabaseAdmin
+                    .from('funnel_stages')
+                    .select('stage_name')
+                    .eq('id', avaliacao.fase_funil)
+                    .eq('company_id', testCompanyId)
+                    .single()
+
+                  if (faseData?.stage_name) {
+                    faseNomeFallback = faseData.stage_name
+                  }
+                }
+
                 const dataToInsert: any = {
                   user_id: testUserId,
                   tipo_venda: avaliacao.tipo_venda,
                   canal: avaliacao.canal,
-                  fase_funil: avaliacao.fase_funil,
-                  contexto: `Tipo: ${avaliacao.tipo_venda}, Canal: ${avaliacao.canal}, Fase: ${avaliacao.fase_funil}`, // Campo obrigatório!
+                  fase_funil: faseNomeFallback,
+                  contexto: `Tipo: ${avaliacao.tipo_venda}, Canal: ${avaliacao.canal}, Fase: ${faseNomeFallback}`, // Campo obrigatório!
                   transcricao_original: fullExtractedText,
                   transcricao_filtrada: filteredText,
                   avaliacao: n8nResult,
