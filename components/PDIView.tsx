@@ -44,6 +44,7 @@ export default function PDIView() {
   const [lastPdiDate, setLastPdiDate] = useState<string | null>(null)
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isUpdatingSummary, setIsUpdatingSummary] = useState(false)
   const hasData = pdiData !== null
 
   // Carregar PDI mais recente ao montar o componente
@@ -89,6 +90,47 @@ export default function PDIView() {
 
     loadLatestPDI()
   }, [])
+
+  const handleUpdateSummary = async () => {
+    setIsUpdatingSummary(true)
+    setErrorMessage(null)
+
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        setErrorMessage('Usuário não autenticado.')
+        setIsUpdatingSummary(false)
+        return
+      }
+
+      console.log('🔄 Atualizando resumo de performance...')
+
+      const response = await fetch('/api/performance-summary/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      })
+
+      if (!response.ok) {
+        throw new Error('Falha ao atualizar resumo')
+      }
+
+      const result = await response.json()
+      console.log('✅ Resumo atualizado:', result)
+
+      // Tentar gerar PDI novamente
+      setErrorMessage(null)
+      await handleGeneratePDI()
+
+    } catch (error) {
+      console.error('Erro ao atualizar resumo:', error)
+      setErrorMessage('Erro ao atualizar resumo de performance. Verifique se você tem sessões de roleplay com avaliações.')
+    } finally {
+      setIsUpdatingSummary(false)
+    }
+  }
 
   const handleGeneratePDI = async () => {
     // Limpar mensagem de erro anterior
@@ -136,8 +178,22 @@ export default function PDIView() {
         .eq('user_id', user.id)
         .single()
 
+      console.log('🔍 DEBUG PDI - Performance Summary:', { performanceSummary, error })
+
       if (error || !performanceSummary) {
-        setErrorMessage('Você precisa completar algumas sessões de roleplay antes de gerar o PDI.')
+        // Verificar se usuário tem sessões de roleplay
+        const { data: sessions, error: sessionsError } = await supabase
+          .from('roleplay_sessions')
+          .select('id')
+          .eq('user_id', user.id)
+
+        console.log('🔍 DEBUG PDI - Roleplay Sessions:', { sessions, sessionsError })
+
+        if (sessions && sessions.length > 0) {
+          setErrorMessage(`Você tem ${sessions.length} sessões de roleplay, mas o resumo de performance não foi gerado. Por favor, complete mais uma sessão para atualizar seus dados.`)
+        } else {
+          setErrorMessage('Você precisa completar algumas sessões de roleplay antes de gerar o PDI.')
+        }
         setIsLoading(false)
         return
       }
@@ -441,7 +497,28 @@ ${performanceSummary.priority_improvements?.length > 0 ? performanceSummary.prio
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-yellow-300 mb-2">Atenção</h3>
-                <p className="text-yellow-100/90 leading-relaxed">{errorMessage}</p>
+                <p className="text-yellow-100/90 leading-relaxed mb-3">{errorMessage}</p>
+
+                {/* Botão de atualizar resumo se mensagem contém info sobre sessões */}
+                {errorMessage.includes('sessões de roleplay, mas o resumo') && (
+                  <button
+                    onClick={handleUpdateSummary}
+                    disabled={isUpdatingSummary}
+                    className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm transition-all duration-200 hover:scale-105 disabled:scale-100 flex items-center gap-2"
+                  >
+                    {isUpdatingSummary ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                        Atualizando...
+                      </>
+                    ) : (
+                      <>
+                        <span>🔄</span>
+                        Atualizar Resumo
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => setErrorMessage(null)}
