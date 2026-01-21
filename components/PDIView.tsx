@@ -420,12 +420,12 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
   const renderRadarChart = (scores: { situacao: number; problema: number; implicacao: number; necessidade: number }) => {
     const labels = ['S', 'P', 'I', 'N']
     const labelsFull = ['Situação', 'Problema', 'Implicação', 'Necessidade']
-    const colors = ['#06b6d4', '#8b5cf6', '#ec4899', '#10b981'] // cyan, purple, pink, green
+    const colors = ['#10b981', '#22c55e', '#4ade80', '#86efac'] // All green shades (Ramppy brand)
     const values = [scores.situacao, scores.problema, scores.implicacao, scores.necessidade]
     const max = 10
     const centerX = 110
     const centerY = 110
-    const radius = 70
+    const radius = 65
     const angleStep = (Math.PI * 2) / 4
     const startAngle = -Math.PI / 2
 
@@ -439,10 +439,10 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
 
     const labelPositions = labels.map((label, index) => {
       const angle = startAngle + angleStep * index
-      const r = radius + 25
+      const r = radius + 30
       const x = centerX + r * Math.cos(angle)
       const y = centerY + r * Math.sin(angle)
-      return { label, x, y, value: values[index] }
+      return { label, x, y, value: values[index], color: colors[index] }
     })
 
     return (
@@ -450,18 +450,17 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         {/* Grid circles with gradient */}
         <defs>
           <linearGradient id="gridGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.1" />
-            <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#ec4899" stopOpacity="0.1" />
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
+            <stop offset="50%" stopColor="#22c55e" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#4ade80" stopOpacity="0.15" />
           </linearGradient>
           <linearGradient id="fillGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.3" />
-            <stop offset="33%" stopColor="#8b5cf6" stopOpacity="0.3" />
-            <stop offset="66%" stopColor="#ec4899" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0.3" />
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+            <stop offset="50%" stopColor="#22c55e" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#4ade80" stopOpacity="0.3" />
           </linearGradient>
           <filter id="glow">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
             <feMerge>
               <feMergeNode in="coloredBlur"/>
               <feMergeNode in="SourceGraphic"/>
@@ -479,7 +478,7 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
             fill="none"
             stroke="url(#gridGradient)"
             strokeWidth="1"
-            opacity={0.5 - i * 0.1}
+            opacity={0.6 - i * 0.12}
           />
         ))}
 
@@ -497,7 +496,7 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
               y2={y}
               stroke={colors[index]}
               strokeWidth="1"
-              opacity="0.2"
+              opacity="0.3"
             />
           )
         })}
@@ -506,7 +505,7 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         <polygon
           points={points}
           fill="url(#fillGradient)"
-          stroke="#8b5cf6"
+          stroke="#10b981"
           strokeWidth="2.5"
           filter="url(#glow)"
         />
@@ -525,27 +524,26 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
           )
         })}
 
-        {/* Labels with full names and values */}
+        {/* Labels with values */}
         {labelPositions.map((pos, index) => (
           <g key={index}>
-            <circle cx={pos.x} cy={pos.y - 8} r="16" fill={colors[index]} opacity="0.15" />
             <text
               x={pos.x}
-              y={pos.y - 8}
+              y={pos.y - 4}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="font-bold text-base"
-              fill={colors[index]}
+              className="font-bold text-lg"
+              fill={pos.color}
             >
               {pos.label}
             </text>
             <text
               x={pos.x}
-              y={pos.y + 8}
+              y={pos.y + 10}
               textAnchor="middle"
               dominantBaseline="middle"
               className="font-bold text-sm"
-              fill={colors[index]}
+              fill={pos.color}
             >
               {pos.value.toFixed(1)}
             </text>
