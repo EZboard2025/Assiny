@@ -69,6 +69,9 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
   const [selectedSeller, setSelectedSeller] = useState<SellerPerformance | null>(null)
   const [viewMode, setViewMode] = useState<'roleplay' | 'followup'>('roleplay')
   const [selectedFollowUp, setSelectedFollowUp] = useState<any>(null)
+  const [selectedSellerForPDI, setSelectedSellerForPDI] = useState<{userId: string, userName: string} | null>(null)
+  const [pdiData, setPdiData] = useState<any>(null)
+  const [pdiLoading, setPdiLoading] = useState(false)
 
   useEffect(() => {
     if (viewMode === 'roleplay') {
@@ -77,6 +80,81 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
       loadFollowupData()
     }
   }, [viewMode])
+
+  useEffect(() => {
+    if (selectedSellerForPDI) {
+      loadPDI(selectedSellerForPDI.userId)
+    } else {
+      setPdiData(null)
+    }
+  }, [selectedSellerForPDI])
+
+  const loadPDI = async (userId: string) => {
+    try {
+      setPdiLoading(true)
+      const { supabase } = await import('@/lib/supabase')
+
+      // Obter o token de autenticação do usuário atual
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        console.error('Erro: Usuário não autenticado')
+        setPdiData(null)
+        return
+      }
+
+      // Chamar API route com service role para bypassar RLS
+      const response = await fetch(`/api/admin/get-pdi?userId=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Erro ao carregar PDI:', errorData)
+        setPdiData(null)
+        return
+      }
+
+      const result = await response.json()
+      if (result.success && result.pdi) {
+        console.log('✅ PDI carregado com sucesso:', result.pdi)
+
+        // O PDI vem com os campos no nível raiz do objeto (não dentro de content)
+        // Precisamos construir a estrutura esperada pela modal
+        const pdiContent = {
+          diagnostico: {
+            nota_geral: result.pdi.nota_geral || 0,
+            resumo: result.pdi.resumo || 'Sem resumo disponível'
+          },
+          notas_spin: {
+            situacao: result.pdi.nota_situacao || 0,
+            problema: result.pdi.nota_problema || 0,
+            implicacao: result.pdi.nota_implicacao || 0,
+            necessidade: result.pdi.nota_necessidade || 0
+          },
+          meta_7_dias: result.pdi.meta_objetivo ? {
+            objetivo: result.pdi.meta_objetivo,
+            meta_numerica: result.pdi.meta_nota_meta || result.pdi.meta_nota_atual
+          } : null,
+          simulacoes: result.pdi.simulacoes || [],
+          proximo_ciclo: result.pdi.proximo_ciclo || result.pdi.proximos_passos || null
+        }
+
+        console.log('🎯 PDI formatado:', pdiContent)
+        setPdiData(pdiContent)
+      } else {
+        console.log('❌ Nenhum PDI retornado')
+        setPdiData(null)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar PDI:', error)
+      setPdiData(null)
+    } finally {
+      setPdiLoading(false)
+    }
+  }
 
   const loadSellersData = async () => {
     try {
@@ -410,8 +488,20 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-center text-sm">
+                      <div className="flex items-center justify-between text-sm mt-4">
                         <span className="text-gray-400">Total de Sessões: <span className="text-white font-medium">{seller.total_sessions}</span></span>
+
+                        {/* Botão Ver PDI */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedSellerForPDI({ userId: seller.user_id, userName: seller.user_name })
+                          }}
+                          className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white text-sm font-medium rounded-lg transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-green-500/25 hover:scale-105"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Ver PDI
+                        </button>
                       </div>
                     </div>
                   ) : (
@@ -905,6 +995,171 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                         Dica Principal
                       </p>
                       <p className="text-gray-200">{selectedFollowUp.avaliacao.dica_principal}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal PDI do Vendedor */}
+      {selectedSellerForPDI && (
+        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-black rounded-3xl border border-green-500/30 max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl shadow-green-500/20">
+            {/* Header do Modal */}
+            <div className="bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-b border-green-500/30 p-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-1">
+                  PDI - {selectedSellerForPDI.userName}
+                </h2>
+                <p className="text-sm text-gray-400">Plano de Desenvolvimento Individual</p>
+              </div>
+              <button
+                onClick={() => setSelectedSellerForPDI(null)}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+
+            {/* Conteúdo PDI */}
+            <div className="overflow-y-auto max-h-[calc(90vh-100px)] p-6">
+              {pdiLoading ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <Loader2 className="w-12 h-12 text-green-400 animate-spin mb-4" />
+                  <p className="text-gray-400">Carregando PDI...</p>
+                </div>
+              ) : !pdiData ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <FileText className="w-16 h-16 text-gray-600 mb-4" />
+                  <p className="text-gray-400 text-lg font-medium mb-2">Nenhum PDI encontrado</p>
+                  <p className="text-gray-500 text-sm">
+                    {selectedSellerForPDI.userName} ainda não gerou um PDI
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Diagnóstico Geral */}
+                  <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                      <Award className="w-5 h-5 text-green-400" />
+                      Diagnóstico Geral
+                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-gray-300">Nota Geral</span>
+                      <span className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                        {pdiData.diagnostico?.nota_geral?.toFixed(1) || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-900/50 rounded-full h-3 overflow-hidden mb-4">
+                      <div
+                        className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all"
+                        style={{ width: `${((pdiData.diagnostico?.nota_geral || 0) / 10) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-gray-300 text-sm leading-relaxed">
+                      {pdiData.diagnostico?.resumo || 'Sem resumo disponível'}
+                    </p>
+                  </div>
+
+                  {/* Notas SPIN */}
+                  <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-green-400" />
+                      Notas SPIN
+                    </h3>
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
+                        <p className="text-gray-400 text-xs mb-1">Situação</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          {pdiData.notas_spin?.situacao?.toFixed(1) || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
+                        <p className="text-gray-400 text-xs mb-1">Problema</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          {pdiData.notas_spin?.problema?.toFixed(1) || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
+                        <p className="text-gray-400 text-xs mb-1">Implicação</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          {pdiData.notas_spin?.implicacao?.toFixed(1) || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
+                        <p className="text-gray-400 text-xs mb-1">Necessidade</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          {pdiData.notas_spin?.necessidade?.toFixed(1) || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Meta de 7 Dias */}
+                  {pdiData.meta_7_dias && (
+                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Target className="w-5 h-5 text-green-400" />
+                        Meta de 7 Dias
+                      </h3>
+                      <p className="text-gray-300 mb-3">{pdiData.meta_7_dias.objetivo}</p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">Progresso Esperado</span>
+                        <span className="text-green-400 font-semibold">{pdiData.meta_7_dias.meta_numerica || 'Em andamento'}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Simulações */}
+                  {pdiData.simulacoes && pdiData.simulacoes.length > 0 && (
+                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-green-400" />
+                        Simulações Recomendadas
+                      </h3>
+                      <div className="space-y-3">
+                        {pdiData.simulacoes.map((sim: any, idx: number) => (
+                          <div key={idx} className="p-4 bg-gray-900/40 rounded-lg border border-gray-700/50">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center flex-shrink-0">
+                                <span className="text-green-400 font-bold text-sm">{sim.quantidade}x</span>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-white font-medium mb-2">{sim.objetivo}</p>
+                                <div className="space-y-1 text-xs">
+                                  <p className="text-blue-300">
+                                    <span className="text-gray-400">Persona:</span> {sim.persona_sugerida}
+                                  </p>
+                                  {sim.objecao_para_treinar && (
+                                    <p className="text-orange-300">
+                                      <span className="text-gray-400">Objeção:</span> {sim.objecao_para_treinar}
+                                    </p>
+                                  )}
+                                  <p className="text-green-300 mt-2">
+                                    <span className="text-gray-400">Sucesso:</span> {sim.criterio_sucesso}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Próximo Ciclo */}
+                  {(pdiData.proximo_ciclo || pdiData.proximos_passos) && (
+                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-green-400" />
+                        Próximo Ciclo
+                      </h3>
+                      <p className="text-gray-300 text-sm leading-relaxed">
+                        {pdiData.proximo_ciclo || pdiData.proximos_passos}
+                      </p>
                     </div>
                   )}
                 </div>
