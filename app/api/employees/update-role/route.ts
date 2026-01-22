@@ -26,10 +26,28 @@ export async function PUT(request: Request) {
       )
     }
 
-    // Verificar autenticação
+    // Extrair token de autenticação do header
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Token de autenticação não fornecido' },
+        { status: 401 }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+
+    // Verificar autenticação usando o token
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      }
     )
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -41,13 +59,20 @@ export async function PUT(request: Request) {
     }
 
     // Verificar se o usuário atual é Admin ou Gestor
-    const { data: currentEmployee } = await supabaseAdmin
+    const { data: currentEmployee, error: employeeError } = await supabaseAdmin
       .from('employees')
       .select('role, company_id')
       .eq('user_id', user.id)
       .single()
 
-    if (!currentEmployee || (currentEmployee.role !== 'Admin' && currentEmployee.role !== 'Gestor')) {
+    console.log('🔍 Debug - User ID:', user.id)
+    console.log('🔍 Debug - Current Employee:', currentEmployee)
+    console.log('🔍 Debug - Employee Error:', employeeError)
+
+    // Check role (case-insensitive)
+    const currentRole = currentEmployee?.role?.toLowerCase()
+    if (!currentEmployee || (currentRole !== 'admin' && currentRole !== 'gestor')) {
+      console.log('❌ Permission denied - Role:', currentEmployee?.role)
       return NextResponse.json(
         { error: 'Apenas Admin ou Gestor podem alterar roles' },
         { status: 403 }

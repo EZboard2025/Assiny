@@ -872,11 +872,23 @@ function ConfigurationInterface({
 
   const handleRoleChange = async (employeeId: string, newRole: string) => {
     try {
+      // Dynamic import of supabase
+      const { supabase } = await import('@/lib/supabase')
+
+      // Get current session for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
       const response = await fetch('/api/employees/update-role', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           employeeId,
           role: newRole
