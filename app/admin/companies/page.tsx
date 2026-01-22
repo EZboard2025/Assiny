@@ -683,11 +683,11 @@ export default function CompaniesAdmin() {
   // Tela de senha
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center px-6">
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center px-6">
         <div className="max-w-md w-full">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 border border-purple-500/30">
+          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 border border-emerald-500/30">
             <div className="text-center mb-6">
-              <Building2 className="w-16 h-16 text-purple-400 mx-auto mb-4" />
+              <Building2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
               <h1 className="text-3xl font-bold text-white mb-2">Gerenciar Empresas</h1>
               <p className="text-gray-400">Digite a senha para acessar</p>
             </div>
@@ -698,12 +698,12 @@ export default function CompaniesAdmin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Senha de acesso"
-                className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none mb-4"
+                className="w-full px-4 py-3 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none mb-4"
                 autoFocus
               />
               <button
                 type="submit"
-                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-xl font-medium hover:scale-105 transition-all shadow-lg shadow-purple-500/30"
+                className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 text-white rounded-xl font-medium hover:scale-105 transition-all shadow-lg shadow-emerald-500/30"
               >
                 Acessar
               </button>
@@ -719,39 +719,44 @@ export default function CompaniesAdmin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 py-20 px-6">
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black py-20 px-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-              <Building2 className="w-10 h-10 text-purple-400" />
-              Gerenciar Empresas
+            <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+              <Building2 className="w-10 h-10 text-emerald-400" />
+              <span className="bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500 bg-clip-text text-transparent">
+                Gerenciar Empresas
+              </span>
             </h1>
-            <p className="text-gray-400">Administre as empresas do sistema multi-tenant</p>
+            <p className="text-gray-400 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+              Administre as empresas do sistema multi-tenant
+            </p>
 
             {/* Timer para reset semanal */}
-            <div className="mt-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
-              <Clock className="w-5 h-5 text-blue-400" />
+            <div className="mt-4 bg-gradient-to-r from-emerald-900/20 to-green-900/20 border border-emerald-500/30 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
+              <Clock className="w-5 h-5 text-emerald-400" />
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-400">Reset semanal em:</span>
                 <div className="flex items-center gap-4 text-white font-mono">
                   {timeUntilReset.days > 0 && (
                     <div className="flex items-center gap-1">
-                      <span className="text-xl font-bold text-blue-400">{timeUntilReset.days}</span>
+                      <span className="text-xl font-bold text-emerald-400">{timeUntilReset.days}</span>
                       <span className="text-xs text-gray-400">dias</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-purple-400">{String(timeUntilReset.hours).padStart(2, '0')}</span>
+                    <span className="text-xl font-bold text-green-400">{String(timeUntilReset.hours).padStart(2, '0')}</span>
                     <span className="text-xs text-gray-400">h</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-pink-400">{String(timeUntilReset.minutes).padStart(2, '0')}</span>
+                    <span className="text-xl font-bold text-emerald-300">{String(timeUntilReset.minutes).padStart(2, '0')}</span>
                     <span className="text-xs text-gray-400">m</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-yellow-400">{String(timeUntilReset.seconds).padStart(2, '0')}</span>
+                    <span className="text-xl font-bold text-green-300">{String(timeUntilReset.seconds).padStart(2, '0')}</span>
                     <span className="text-xs text-gray-400">s</span>
                   </div>
                 </div>
@@ -772,7 +777,7 @@ export default function CompaniesAdmin() {
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30"
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/30"
             >
               <Plus className="w-5 h-5" />
               Nova Empresa
@@ -791,44 +796,44 @@ export default function CompaniesAdmin() {
             ) : metricsTotals && (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/30 rounded-2xl p-5 border border-blue-500/30">
+                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-emerald-500/30">
                     <div className="flex items-center gap-3 mb-2">
-                      <PlayCircle className="w-6 h-6 text-blue-400" />
+                      <PlayCircle className="w-6 h-6 text-emerald-400" />
                       <span className="text-sm text-gray-400">Total de Roleplays</span>
                     </div>
-                    <p className="text-3xl font-bold text-white">{metricsTotals.totalRoleplays}</p>
+                    <p className="text-3xl font-bold bg-gradient-to-br from-emerald-400 to-green-500 bg-clip-text text-transparent">{metricsTotals.totalRoleplays}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 rounded-2xl p-5 border border-purple-500/30">
+                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-green-500/30">
                     <div className="flex items-center gap-3 mb-2">
-                      <Users className="w-6 h-6 text-purple-400" />
+                      <Users className="w-6 h-6 text-green-400" />
                       <span className="text-sm text-gray-400">Treinamento</span>
                     </div>
-                    <p className="text-3xl font-bold text-white">{metricsTotals.trainingRoleplays}</p>
+                    <p className="text-3xl font-bold bg-gradient-to-br from-green-400 to-emerald-500 bg-clip-text text-transparent">{metricsTotals.trainingRoleplays}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-green-900/50 to-green-800/30 rounded-2xl p-5 border border-green-500/30">
+                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-cyan-500/30">
                     <div className="flex items-center gap-3 mb-2">
-                      <Globe className="w-6 h-6 text-green-400" />
+                      <Globe className="w-6 h-6 text-cyan-400" />
                       <span className="text-sm text-gray-400">Públicos</span>
                     </div>
-                    <p className="text-3xl font-bold text-white">{metricsTotals.publicRoleplays}</p>
+                    <p className="text-3xl font-bold bg-gradient-to-br from-cyan-400 to-blue-500 bg-clip-text text-transparent">{metricsTotals.publicRoleplays}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-orange-900/50 to-orange-800/30 rounded-2xl p-5 border border-orange-500/30">
+                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-yellow-500/30">
                     <div className="flex items-center gap-3 mb-2">
-                      <Settings className="w-6 h-6 text-orange-400" />
+                      <Settings className="w-6 h-6 text-yellow-400" />
                       <span className="text-sm text-gray-400">Empresas Configuradas</span>
                     </div>
-                    <p className="text-3xl font-bold text-white">
+                    <p className="text-3xl font-bold bg-gradient-to-br from-yellow-400 to-orange-500 bg-clip-text text-transparent">
                       {metricsTotals.fullyConfiguredCompanies}/{metricsTotals.totalCompanies}
                     </p>
                   </div>
                 </div>
 
                 {/* Per Company Metrics */}
-                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-2xl border border-gray-700 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-700 bg-gray-800/50">
+                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl border border-emerald-500/30 overflow-hidden shadow-2xl">
+                  <div className="px-6 py-4 border-b border-gray-700/50 bg-gray-800/50">
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                       <BarChart3 className="w-5 h-5 text-blue-400" />
                       Métricas por Empresa
@@ -921,7 +926,7 @@ export default function CompaniesAdmin() {
                                     e.stopPropagation()
                                     setShowUsersForCompany(showUsersForCompany === metric.companyId ? null : metric.companyId)
                                   }}
-                                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg text-sm font-medium transition-colors"
+                                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-lg text-sm font-medium transition-colors"
                                 >
                                   <Users className="w-4 h-4" />
                                   {showUsersForCompany === metric.companyId ? 'Ocultar' : 'Ver'} Usuários ({metric.usersWithRoleplays.length})
@@ -937,8 +942,8 @@ export default function CompaniesAdmin() {
                                           <p className="text-xs text-gray-400">{user.email}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          <PlayCircle className="w-4 h-4 text-purple-400" />
-                                          <span className="text-sm font-semibold text-purple-300">{user.roleplayCount}</span>
+                                          <PlayCircle className="w-4 h-4 text-emerald-400" />
+                                          <span className="text-sm font-semibold text-emerald-300">{user.roleplayCount}</span>
                                           <span className="text-xs text-gray-500">roleplays</span>
                                         </div>
                                       </div>
@@ -965,10 +970,10 @@ export default function CompaniesAdmin() {
         {/* Companies Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
           </div>
         ) : companies.length === 0 ? (
-          <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl p-20 text-center border border-purple-500/20">
+          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-20 text-center border border-emerald-500/30">
             <Building2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400">Nenhuma empresa cadastrada</p>
           </div>
@@ -977,7 +982,7 @@ export default function CompaniesAdmin() {
             {companies.map((company) => (
               <div
                 key={company.id}
-                className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/20 hover:border-purple-500/40 transition-all"
+                className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-emerald-500/30 hover:border-emerald-500/40 transition-all"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -996,9 +1001,9 @@ export default function CompaniesAdmin() {
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {company.training_plan && (
-                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-full">
-                          <Package className="w-3 h-3 text-purple-400" />
-                          <span className="text-xs font-medium text-purple-300">
+                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-emerald-600/20 to-green-600/20 rounded-full">
+                          <Package className="w-3 h-3 text-emerald-400" />
+                          <span className="text-xs font-medium text-emerald-300">
                             {PLAN_NAMES[company.training_plan]}
                           </span>
                         </div>
@@ -1017,7 +1022,7 @@ export default function CompaniesAdmin() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleEditPlanClick(company)}
-                      className="p-2 text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                      className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
                       title="Editar plano"
                     >
                       <Package className="w-4 h-4" />
@@ -1086,7 +1091,7 @@ export default function CompaniesAdmin() {
 
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-gray-300">
-                    <Users className="w-4 h-4 text-purple-400" />
+                    <Users className="w-4 h-4 text-emerald-400" />
                     <span>
                       {company._count?.employees || 0}
                       {company.employee_limit ? ` / ${company.employee_limit}` : ''} funcionários
@@ -1097,7 +1102,7 @@ export default function CompaniesAdmin() {
                   </div>
 
                   <div className="flex items-center gap-2 text-gray-300">
-                    <Calendar className="w-4 h-4 text-purple-400" />
+                    <Calendar className="w-4 h-4 text-emerald-400" />
                     <span>
                       Criada em {new Date(company.created_at).toLocaleDateString('pt-BR')}
                     </span>
@@ -1116,7 +1121,7 @@ export default function CompaniesAdmin() {
                           href={`http://${company.subdomain}.ramppy.local:3000`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg text-sm font-medium text-center transition-colors"
+                          className="flex-1 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-lg text-sm font-medium text-center transition-colors"
                         >
                           Acessar Local
                         </a>
@@ -1150,10 +1155,14 @@ export default function CompaniesAdmin() {
 
         {/* Create Company Modal */}
         {showCreateModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-2xl w-full border border-purple-500/30 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 max-w-2xl w-full border border-emerald-500/30 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Criar Nova Empresa</h2>
+                <h2 className="text-2xl font-bold">
+                  <span className="bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500 bg-clip-text text-transparent">
+                    Criar Nova Empresa
+                  </span>
+                </h2>
                 <button
                   onClick={() => setShowCreateModal(false)}
                   className="p-2 text-gray-400 hover:text-white transition-colors"
@@ -1189,7 +1198,7 @@ export default function CompaniesAdmin() {
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
                         placeholder="Ex: Tech Solutions"
-                        className="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
                       />
                     </div>
 
@@ -1201,7 +1210,7 @@ export default function CompaniesAdmin() {
                       <select
                         value={businessType}
                         onChange={(e) => setBusinessType(e.target.value as 'B2B' | 'B2C')}
-                        className="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white focus:border-purple-500/50 focus:outline-none"
+                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white focus:border-emerald-400/60 focus:outline-none"
                       >
                         <option value="B2B">B2B (Empresa para Empresa)</option>
                         <option value="B2C">B2C (Empresa para Consumidor)</option>
@@ -1218,7 +1227,7 @@ export default function CompaniesAdmin() {
                         onChange={(e) => setEmployeeLimit(e.target.value)}
                         placeholder="10"
                         min="1"
-                        className="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Deixe vazio para sem limite
@@ -1241,7 +1250,7 @@ export default function CompaniesAdmin() {
                         value={adminName}
                         onChange={(e) => setAdminName(e.target.value)}
                         placeholder="João Silva"
-                        className="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
                       />
                     </div>
 
@@ -1254,7 +1263,7 @@ export default function CompaniesAdmin() {
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
                         placeholder="admin@techsolutions.com"
-                        className="w-full px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
                       />
                     </div>
 
@@ -1268,12 +1277,12 @@ export default function CompaniesAdmin() {
                           value={adminPassword}
                           onChange={(e) => setAdminPassword(e.target.value)}
                           placeholder="Mínimo 6 caracteres"
-                          className="flex-1 px-4 py-2 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                          className="flex-1 px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={generatePassword}
-                          className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-xl text-sm font-medium transition-colors"
+                          className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-xl text-sm font-medium transition-colors"
                         >
                           Gerar Senha
                         </button>
@@ -1295,7 +1304,7 @@ export default function CompaniesAdmin() {
                 <button
                   onClick={handleCreateCompany}
                   disabled={creating}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {creating ? (
                     <>
@@ -1317,7 +1326,7 @@ export default function CompaniesAdmin() {
         {/* Edit Limit Modal */}
         {showEditLimitModal && companyToEditLimit && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-md w-full border border-purple-500/30">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-md w-full border border-emerald-500/30">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-white">Editar Limite de Funcionários</h2>
                 <button
@@ -1338,7 +1347,7 @@ export default function CompaniesAdmin() {
                     Empresa: <strong className="text-white">{companyToEditLimit.name}</strong>
                   </p>
                   <p className="text-sm text-gray-400 mb-4">
-                    Funcionários atuais: <strong className="text-purple-400">{companyToEditLimit._count?.employees || 0}</strong>
+                    Funcionários atuais: <strong className="text-emerald-400">{companyToEditLimit._count?.employees || 0}</strong>
                   </p>
                 </div>
 
@@ -1352,7 +1361,7 @@ export default function CompaniesAdmin() {
                     onChange={(e) => setNewEmployeeLimit(e.target.value)}
                     placeholder="Ex: 20"
                     min="1"
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/20 rounded-xl text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none"
+                    className="w-full px-4 py-3 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
                   />
                   <p className="text-xs text-gray-500 mt-2">
                     Deixe vazio para remover o limite (ilimitado)
@@ -1384,7 +1393,7 @@ export default function CompaniesAdmin() {
                 <button
                   onClick={confirmUpdateLimit}
                   disabled={updatingLimit}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {updatingLimit ? (
                     <>
@@ -1445,7 +1454,7 @@ export default function CompaniesAdmin() {
         {/* Manage Users Modal */}
         {showManageUsersModal && companyToManageUsers && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-4xl w-full border border-purple-500/30 max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-4xl w-full border border-emerald-500/30 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-white">Gerenciar Usuários</h2>
@@ -1465,7 +1474,7 @@ export default function CompaniesAdmin() {
 
               {loadingUsers ? (
                 <div className="py-12 text-center">
-                  <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-4" />
+                  <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto mb-4" />
                   <p className="text-gray-400">Carregando usuários...</p>
                 </div>
               ) : companyUsers.length === 0 ? (
@@ -1478,7 +1487,7 @@ export default function CompaniesAdmin() {
                   {companyUsers.map(user => (
                     <div
                       key={user.user_id}
-                      className="bg-gray-800/50 border border-purple-500/20 rounded-xl p-4 flex items-center justify-between"
+                      className="bg-gray-800/60 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between"
                     >
                       <div className="flex-1">
                         <h4 className="text-white font-medium">{user.name}</h4>
@@ -1488,7 +1497,7 @@ export default function CompaniesAdmin() {
                         <select
                           value={user.role}
                           onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
-                          className="px-4 py-2 bg-gray-700/50 border border-purple-500/30 rounded-lg text-white focus:border-purple-500/50 focus:outline-none"
+                          className="px-4 py-2 bg-gray-700/50 border border-emerald-500/30 rounded-lg text-white focus:border-emerald-400/60 focus:outline-none"
                         >
                           <option value="Admin">Admin</option>
                           <option value="Vendedor">Vendedor</option>
@@ -1503,8 +1512,8 @@ export default function CompaniesAdmin() {
                 <div className="text-sm text-gray-400">
                   <p className="mb-2">📌 Notas:</p>
                   <ul className="space-y-1 ml-4">
-                    <li>• <strong className="text-purple-400">Admin:</strong> Acesso total, incluindo ConfigHub</li>
-                    <li>• <strong className="text-purple-400">Vendedor:</strong> Acesso apenas aos treinamentos</li>
+                    <li>• <strong className="text-emerald-400">Admin:</strong> Acesso total, incluindo ConfigHub</li>
+                    <li>• <strong className="text-emerald-400">Vendedor:</strong> Acesso apenas aos treinamentos</li>
                     <li>• As alterações são aplicadas imediatamente</li>
                   </ul>
                 </div>
@@ -1633,12 +1642,12 @@ export default function CompaniesAdmin() {
         {/* Plan Selection Modal */}
         {showPlanModal && companyToEditPlan && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-2xl w-full border border-purple-500/30 max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-2xl w-full border border-emerald-500/30 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-white">Selecionar Plano</h2>
                   <p className="text-sm text-gray-400 mt-1">
-                    Empresa: <span className="text-purple-400 font-medium">{companyToEditPlan.name}</span>
+                    Empresa: <span className="text-emerald-400 font-medium">{companyToEditPlan.name}</span>
                   </p>
                 </div>
                 <button
@@ -1656,7 +1665,7 @@ export default function CompaniesAdmin() {
                 {/* Planos de Treinamento */}
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-purple-400" />
+                    <Users className="w-5 h-5 text-emerald-400" />
                     Planos de Treinamento
                   </h3>
                   <div className="space-y-2">
@@ -1676,15 +1685,15 @@ export default function CompaniesAdmin() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-bold text-white">{PLAN_NAMES[PlanType.OG]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-purple-600/50 to-pink-600/50 text-purple-300 rounded-full">
+                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-purple-600/50 to-pink-600/50 text-emerald-300 rounded-full">
                             Early Adopters
                           </span>
                         </div>
                         <p className="text-sm text-gray-400 mb-2">Para nossos primeiros clientes - tudo ilimitado!</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">∞ Roleplays/semana</span>
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">∞ Personas</span>
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">∞ Objeções</span>
+                          <span className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-300 rounded">∞ Roleplays/semana</span>
+                          <span className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-300 rounded">∞ Personas</span>
+                          <span className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-300 rounded">∞ Objeções</span>
                           <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">✓ Todos os recursos</span>
                         </div>
                       </div>
@@ -1943,7 +1952,7 @@ export default function CompaniesAdmin() {
                 <button
                   onClick={handleUpdatePlan}
                   disabled={updatingPlan}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {updatingPlan ? (
                     <>
@@ -2238,7 +2247,7 @@ export default function CompaniesAdmin() {
                             >
                               <div className="flex items-center gap-2 mb-1">
                                 <span className={`text-xs font-medium ${
-                                  msg.role === 'seller' || msg.role === 'user' ? 'text-cyan-400' : 'text-purple-400'
+                                  msg.role === 'seller' || msg.role === 'user' ? 'text-cyan-400' : 'text-emerald-400'
                                 }`}>
                                   {msg.role === 'seller' || msg.role === 'user' ? 'Vendedor' : 'Cliente'}
                                 </span>
