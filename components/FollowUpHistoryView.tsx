@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, XCircle, Clock, ThumbsUp, ThumbsDown, MessageSquare, Target, Calendar, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, ThumbsUp, ThumbsDown, MessageSquare, Target, Calendar, Loader2, ChevronDown, ChevronUp, Eye, AlertCircle, TrendingUp } from 'lucide-react'
 
 interface FollowUpAnalysis {
   id: string
@@ -31,6 +31,7 @@ export default function FollowUpHistoryView() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [expandedChats, setExpandedChats] = useState<Set<string>>(new Set())
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadHistory()
@@ -92,6 +93,18 @@ export default function FollowUpHistoryView() {
 
   const toggleChatExpansion = (analysisId: string) => {
     setExpandedChats(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(analysisId)) {
+        newSet.delete(analysisId)
+      } else {
+        newSet.add(analysisId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleDetailsExpansion = (analysisId: string) => {
+    setExpandedDetails(prev => {
       const newSet = new Set(prev)
       if (newSet.has(analysisId)) {
         newSet.delete(analysisId)
@@ -404,6 +417,105 @@ export default function FollowUpHistoryView() {
                   <div className="p-4">
                     {renderChatMessages(analysis.transcricao_filtrada, expandedChats.has(analysis.id))}
                   </div>
+                </div>
+
+                {/* Detalhes da Avaliação */}
+                <div className="bg-gray-800/50 rounded-lg mb-4 overflow-hidden transition-all duration-300">
+                  {/* Header dos detalhes */}
+                  <button
+                    onClick={() => toggleDetailsExpansion(analysis.id)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-700/30 transition-colors"
+                  >
+                    <span className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-green-400" />
+                      Detalhes da Avaliação
+                    </span>
+                    {expandedDetails.has(analysis.id) ? (
+                      <ChevronUp className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
+
+                  {/* Conteúdo expandido */}
+                  {expandedDetails.has(analysis.id) && analysis.avaliacao && (
+                    <div className="px-4 pb-4 space-y-4 border-t border-gray-700/50 pt-4">
+                      {/* Resumo Executivo */}
+                      {analysis.avaliacao.resumo_executivo && (
+                        <div className="bg-gray-900/40 rounded-lg p-4 border border-gray-700/30">
+                          <h4 className="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-green-400" />
+                            Resumo Executivo
+                          </h4>
+                          <p className="text-sm text-gray-400 leading-relaxed">{analysis.avaliacao.resumo_executivo}</p>
+                        </div>
+                      )}
+
+                      {/* Pontos Positivos */}
+                      {analysis.avaliacao.pontos_positivos && analysis.avaliacao.pontos_positivos.length > 0 && (
+                        <div className="bg-green-900/10 rounded-lg p-4 border border-green-500/20">
+                          <h4 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            Pontos Positivos
+                          </h4>
+                          <ul className="space-y-2">
+                            {analysis.avaliacao.pontos_positivos.map((ponto: string, idx: number) => (
+                              <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                                <span className="text-green-400 mt-1">•</span>
+                                <span>{ponto}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Pontos Negativos */}
+                      {analysis.avaliacao.pontos_negativos && analysis.avaliacao.pontos_negativos.length > 0 && (
+                        <div className="bg-red-900/10 rounded-lg p-4 border border-red-500/20">
+                          <h4 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            Pontos Negativos
+                          </h4>
+                          <ul className="space-y-2">
+                            {analysis.avaliacao.pontos_negativos.map((ponto: string, idx: number) => (
+                              <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                                <span className="text-red-400 mt-1">•</span>
+                                <span>{ponto}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Sugestões de Melhoria */}
+                      {analysis.avaliacao.sugestoes_melhoria && analysis.avaliacao.sugestoes_melhoria.length > 0 && (
+                        <div className="bg-blue-900/10 rounded-lg p-4 border border-blue-500/20">
+                          <h4 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                            <Target className="w-4 h-4" />
+                            Sugestões de Melhoria
+                          </h4>
+                          <ul className="space-y-2">
+                            {analysis.avaliacao.sugestoes_melhoria.map((sugestao: string, idx: number) => (
+                              <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                                <span className="text-blue-400 mt-1">•</span>
+                                <span>{sugestao}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Próximos Passos */}
+                      {analysis.avaliacao.proximos_passos && (
+                        <div className="bg-purple-900/10 rounded-lg p-4 border border-purple-500/20">
+                          <h4 className="text-sm font-semibold text-purple-400 mb-2">
+                            Próximos Passos
+                          </h4>
+                          <p className="text-sm text-gray-400 leading-relaxed">{analysis.avaliacao.proximos_passos}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Ações */}
