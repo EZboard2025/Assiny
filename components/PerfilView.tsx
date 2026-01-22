@@ -584,21 +584,19 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
   // Funções de navegação do gráfico
   const handlePrevious = () => {
-    if (scrollIndex > 0) {
-      setScrollIndex(scrollIndex - 1)
-    }
+    const newIndex = Math.max(0, scrollIndex - maxVisibleSessions)
+    setScrollIndex(newIndex)
   }
 
   const handleNext = () => {
-    if (scrollIndex < evolutionData.length - maxVisibleSessions) {
-      setScrollIndex(scrollIndex + 1)
-    }
+    const newIndex = Math.min(evolutionData.length - maxVisibleSessions, scrollIndex + maxVisibleSessions)
+    setScrollIndex(newIndex)
   }
 
   // Dados visíveis no gráfico
   const visibleData = evolutionData.slice(scrollIndex, scrollIndex + maxVisibleSessions)
   const canScrollLeft = scrollIndex > 0
-  const canScrollRight = scrollIndex < evolutionData.length - maxVisibleSessions
+  const canScrollRight = scrollIndex + maxVisibleSessions < evolutionData.length
 
   const spinMetrics = [
     { label: 'Situação', icon: Search, score: spinAverages.S, color: 'from-cyan-500 to-blue-500' },
@@ -759,12 +757,26 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 {latestSession && (
                   <div className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all"></div>
-                    <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-xl p-4 border border-green-500/30">
+                    <div className="relative bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-xl rounded-xl p-3 border border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.12)]">
                       <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">Sessão {latestSession.label}</div>
-                        <div className="text-sm text-gray-300 mb-2">Nota: <span className="text-green-400 font-bold">{latestSession.score.toFixed(1)}</span></div>
-                        <div className={`text-3xl font-bold flex items-center justify-center gap-2 ${latestSession.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
-                          <TrendingUp className={`w-5 h-5 ${latestSession.improvement < 0 ? 'rotate-180' : ''}`} />
+                        <div className="text-[10px] font-bold text-green-400 mb-1 tracking-wider uppercase">Sessão {latestSession.label.replace('#', '')}</div>
+                        <div className="flex items-center justify-center gap-1.5 mb-2">
+                          <span className="text-xs font-semibold text-gray-300">Nota:</span>
+                          <span className={`text-xl font-bold ${
+                            latestSession.score <= 3 ? 'text-red-400' :
+                            latestSession.score <= 5 ? 'text-yellow-400' :
+                            latestSession.score <= 7 ? 'text-green-400' :
+                            'text-emerald-400'
+                          }`}>
+                            {latestSession.score.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-2xl ${
+                          latestSession.improvement >= 0
+                            ? 'bg-green-500/10 border border-green-500/30 text-green-400'
+                            : 'bg-orange-500/10 border border-orange-500/30 text-orange-400'
+                        }`}>
+                          <TrendingUp className={`w-4 h-4 ${latestSession.improvement < 0 ? 'rotate-180' : ''}`} />
                           {latestSession.improvement >= 0 ? '+' : ''}{latestSession.improvement.toFixed(1)}
                         </div>
                       </div>
@@ -789,83 +801,142 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                 </div>
               ) : (
                 <>
-                  <div className="relative h-80">
-                    <svg className="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet">
-                      {/* Grid lines - 10 linhas para escala 0-10 */}
-                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((line) => (
+                  <div className="relative h-80 transition-all duration-500 ease-out" key={scrollIndex}>
+                    <svg className="w-full h-full animate-fade-in" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet">
+                      {/* Grid lines - estilo corporativo minimalista */}
+                      {[0, 2, 4, 6, 8, 10].map((line) => (
                         <line
                           key={line}
                           x1="70"
                           y1={260 - (line * 24)}
                           x2="580"
                           y2={260 - (line * 24)}
-                          stroke={line === 0 ? "rgba(139, 92, 246, 0.3)" : "rgba(139, 92, 246, 0.1)"}
-                          strokeWidth={line === 0 ? "2" : "1"}
+                          stroke="rgba(75, 85, 99, 0.2)"
+                          strokeWidth="1"
+                          strokeDasharray={line === 0 || line === 10 ? "0" : "4 4"}
                         />
                       ))}
 
-                      {/* Y-axis labels - 0 a 10 */}
+                      {/* Y-axis labels - estilo corporativo */}
                       {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                         <text
                           key={num}
                           x="55"
                           y={264 - (num * 24)}
-                          fill="rgba(156, 163, 175, 0.8)"
-                          fontSize="13"
+                          fill="#9CA3AF"
+                          fontSize="12"
                           textAnchor="end"
-                          fontWeight="500"
+                          fontWeight="600"
                         >
                           {num}
                         </text>
                       ))}
 
-                      {/* Line path */}
-                      {visibleData.length > 1 && (
-                        <path
-                          d={visibleData.map((point, i) => {
-                            const totalWidth = 500
-                            const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
-                            const x = 80 + (i * spacing)
-                            const y = 260 - (point.score * 24)
-                            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-                          }).join(' ')}
-                          fill="none"
-                          stroke="url(#lineGradient)"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                        />
-                      )}
-
-                      {/* Gradient definition */}
+                      {/* Gradient definitions - baseado em notas */}
                       <defs>
-                        <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#8b5cf6" />
-                          <stop offset="100%" stopColor="#ec4899" />
-                        </linearGradient>
+                        {/* Filtro de glow */}
+                        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                          <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                          </feMerge>
+                        </filter>
                       </defs>
 
-                      {/* Points */}
+                      {/* Linha principal - estilo corporativo com toques sutis */}
+                      {visibleData.length > 1 && (
+                        <>
+                          {/* Área preenchida suave sob a linha */}
+                          <path
+                            d={(() => {
+                              const pathData = visibleData.map((point, i) => {
+                                const totalWidth = 500
+                                const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
+                                const x = 80 + (i * spacing)
+                                const y = 260 - (point.score * 24)
+                                return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
+                              }).join(' ')
+
+                              const totalWidth = 500
+                              const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
+                              const lastX = 80 + ((visibleData.length - 1) * spacing)
+                              const firstX = 80
+
+                              return `${pathData} L ${lastX} 260 L ${firstX} 260 Z`
+                            })()}
+                            fill="rgba(16, 185, 129, 0.08)"
+                          />
+
+                          {/* Sombra leve da linha */}
+                          <path
+                            d={visibleData.map((point, i) => {
+                              const totalWidth = 500
+                              const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
+                              const x = 80 + (i * spacing)
+                              const y = 260 - (point.score * 24)
+                              return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
+                            }).join(' ')}
+                            fill="none"
+                            stroke="#10b981"
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            opacity="0.2"
+                          />
+
+                          {/* Linha principal */}
+                          <path
+                            d={visibleData.map((point, i) => {
+                              const totalWidth = 500
+                              const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
+                              const x = 80 + (i * spacing)
+                              const y = 260 - (point.score * 24)
+                              return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
+                            }).join(' ')}
+                            fill="none"
+                            stroke="#10b981"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </>
+                      )}
+
+                      {/* Points - estilo corporativo minimalista */}
                       {visibleData.map((point, i) => {
                         const totalWidth = 500
                         const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
                         const x = 80 + (i * spacing)
                         const y = 260 - (point.score * 24)
+
                         return (
                           <g key={i}>
-                            {/* Glow */}
-                            <circle cx={x} cy={y} r="10" fill="#8b5cf6" opacity="0.3" />
-                            {/* Point */}
-                            <circle cx={x} cy={y} r="6" fill="#8b5cf6" />
+                            {/* Ponto com borda */}
+                            <circle cx={x} cy={y} r="5" fill="#10b981" stroke="#fff" strokeWidth="2" />
+
                             {/* X-axis label - session number */}
                             <text
                               x={x}
                               y="285"
-                              fill="rgba(156, 163, 175, 0.8)"
-                              fontSize="13"
+                              fill="#9CA3AF"
+                              fontSize="11"
                               textAnchor="middle"
                               fontWeight="600"
                             >
-                              {point.label}
+                              {point.label.replace('#', '')}
+                            </text>
+
+                            {/* Nota acima do ponto - simples */}
+                            <text
+                              x={x}
+                              y={y - 10}
+                              fill="#10b981"
+                              fontSize="11"
+                              textAnchor="middle"
+                              fontWeight="700"
+                            >
+                              {point.score.toFixed(1)}
                             </text>
                           </g>
                         )
@@ -875,13 +946,13 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
                   {/* Navigation Controls */}
                   {evolutionData.length > maxVisibleSessions && (
-                    <div className="flex items-center justify-between mt-4 px-4">
+                    <div className="relative flex items-center justify-between mt-4 px-4 z-10">
                       <button
                         onClick={handlePrevious}
                         disabled={!canScrollLeft}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                        className={`relative z-20 flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
                           canScrollLeft
-                            ? 'bg-green-600 hover:bg-green-500 text-white'
+                            ? 'bg-green-600 hover:bg-green-500 text-white cursor-pointer'
                             : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                         }`}
                       >
@@ -889,16 +960,22 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                         Anterior
                       </button>
 
-                      <div className="text-sm text-gray-400">
-                        Mostrando {scrollIndex + 1} - {Math.min(scrollIndex + maxVisibleSessions, evolutionData.length)} de {evolutionData.length} sessões
+                      <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-800/60 to-gray-900/60 backdrop-blur-xl rounded-xl border border-green-500/20">
+                        <span className="text-sm text-gray-400">Mostrando</span>
+                        <span className="text-sm font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                          {scrollIndex + 1} - {Math.min(scrollIndex + maxVisibleSessions, evolutionData.length)}
+                        </span>
+                        <span className="text-sm text-gray-400">de</span>
+                        <span className="text-sm font-bold text-green-400">{evolutionData.length}</span>
+                        <span className="text-sm text-gray-400">sessões</span>
                       </div>
 
                       <button
                         onClick={handleNext}
                         disabled={!canScrollRight}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                        className={`relative z-20 flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
                           canScrollRight
-                            ? 'bg-green-600 hover:bg-green-500 text-white'
+                            ? 'bg-green-600 hover:bg-green-500 text-white cursor-pointer'
                             : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                         }`}
                       >
