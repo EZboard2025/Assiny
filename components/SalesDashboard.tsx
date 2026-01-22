@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, TrendingUp, Award, Target, ArrowLeft, Loader2, MessageSquare, Activity, TrendingDown, Eye, X, FileText, ChevronRight, Sparkles, BarChart3 } from 'lucide-react'
+import { Users, TrendingUp, Award, Target, ArrowLeft, Loader2, MessageSquare, Activity, TrendingDown, Eye, X, FileText, ChevronRight, Sparkles, BarChart3, AlertTriangle, Calendar, CheckCircle, Zap } from 'lucide-react'
 
 interface SessionTimeline {
   session_id: string
@@ -121,9 +121,32 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
       if (result.success && result.pdi) {
         console.log('✅ PDI carregado com sucesso:', result.pdi)
 
+        // Tentar extrair simulações do pdi_json primeiro (se disponível)
+        let simulacoes = []
+        if (result.pdi.pdi_json) {
+          // Se pdi_json existe, tenta pegar simulacoes de lá
+          if (typeof result.pdi.pdi_json === 'string') {
+            try {
+              const parsed = JSON.parse(result.pdi.pdi_json)
+              simulacoes = parsed.simulacoes || parsed.acoes || []
+            } catch (e) {
+              console.error('Erro ao parsear pdi_json:', e)
+            }
+          } else {
+            simulacoes = result.pdi.pdi_json.simulacoes || result.pdi.pdi_json.acoes || []
+          }
+        }
+
+        // Fallback: usar acoes da coluna direta
+        if (simulacoes.length === 0 && result.pdi.acoes) {
+          simulacoes = typeof result.pdi.acoes === 'string' ? JSON.parse(result.pdi.acoes) : result.pdi.acoes
+        }
+
         // O PDI vem com os campos no nível raiz do objeto (não dentro de content)
         // Precisamos construir a estrutura esperada pela modal
         const pdiContent = {
+          gerado_em: result.pdi.created_at || result.pdi.gerado_em,
+          periodo: result.pdi.periodo || '7 dias',
           diagnostico: {
             nota_geral: result.pdi.nota_geral || 0,
             resumo: result.pdi.resumo || 'Sem resumo disponível'
@@ -134,15 +157,21 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
             implicacao: result.pdi.nota_implicacao || 0,
             necessidade: result.pdi.nota_necessidade || 0
           },
+          foco_da_semana: result.pdi.pdi_json?.foco_da_semana || (result.pdi.meta_objetivo ? {
+            area: result.pdi.meta_objetivo.split(' ')[0],
+            objetivo: result.pdi.meta_objetivo
+          } : null),
           meta_7_dias: result.pdi.meta_objetivo ? {
             objetivo: result.pdi.meta_objetivo,
             meta_numerica: result.pdi.meta_nota_meta || result.pdi.meta_nota_atual
           } : null,
-          simulacoes: result.pdi.simulacoes || [],
+          simulacoes: simulacoes,
+          acoes: simulacoes,
           proximo_ciclo: result.pdi.proximo_ciclo || result.pdi.proximos_passos || null
         }
 
         console.log('🎯 PDI formatado:', pdiContent)
+        console.log('📋 Simulações extraídas:', pdiContent.simulacoes)
         setPdiData(pdiContent)
       } else {
         console.log('❌ Nenhum PDI retornado')
@@ -1006,26 +1035,21 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
 
       {/* Modal PDI do Vendedor */}
       {selectedSellerForPDI && (
-        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-gray-900 to-black rounded-3xl border border-green-500/30 max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl shadow-green-500/20">
-            {/* Header do Modal */}
-            <div className="bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-b border-green-500/30 p-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-1">
-                  PDI - {selectedSellerForPDI.userName}
-                </h2>
-                <p className="text-sm text-gray-400">Plano de Desenvolvimento Individual</p>
+        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-sm overflow-y-auto p-4">
+          <div className="min-h-screen flex items-start justify-center py-8">
+            <div className="bg-black rounded-3xl max-w-6xl w-full">
+              {/* Header com botão fechar */}
+              <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-sm flex justify-end p-4 border-b border-gray-800/50">
+                <button
+                  onClick={() => setSelectedSellerForPDI(null)}
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-400" />
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedSellerForPDI(null)}
-                className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-              >
-                <X className="w-6 h-6 text-gray-400" />
-              </button>
-            </div>
 
-            {/* Conteúdo PDI */}
-            <div className="overflow-y-auto max-h-[calc(90vh-100px)] p-6">
+              {/* Conteúdo PDI */}
+              <div className="px-6 pb-12 space-y-6">
               {pdiLoading ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <Loader2 className="w-12 h-12 text-green-400 animate-spin mb-4" />
@@ -1033,137 +1057,259 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
                 </div>
               ) : !pdiData ? (
                 <div className="flex flex-col items-center justify-center py-20">
-                  <FileText className="w-16 h-16 text-gray-600 mb-4" />
-                  <p className="text-gray-400 text-lg font-medium mb-2">Nenhum PDI encontrado</p>
-                  <p className="text-gray-500 text-sm">
-                    {selectedSellerForPDI.userName} ainda não gerou um PDI
-                  </p>
+                  <AlertTriangle className="w-16 h-16 text-yellow-400 mb-4" />
+                  <p className="text-xl text-gray-300 mb-2">PDI não encontrado</p>
+                  <p className="text-sm text-gray-500">{selectedSellerForPDI.userName} ainda não gerou um PDI</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <>
+                  {/* Header do PDI */}
+                  <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-16 h-16 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-2xl flex items-center justify-center border border-green-500/30">
+                        <Target className="w-8 h-8 text-green-400" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent">
+                          PDI • 7 Dias
+                        </h1>
+                        <p className="text-gray-400">{selectedSellerForPDI.userName}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm mt-4 pt-4 border-t border-gray-700/50">
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <Calendar className="w-4 h-4 text-green-400" />
+                        <span>Gerado em {pdiData.gerado_em ? new Date(pdiData.gerado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data não disponível'}</span>
+                      </div>
+                      <span className="text-green-400 font-semibold">{pdiData.periodo || '7 dias'}</span>
+                    </div>
+                  </div>
+
                   {/* Diagnóstico Geral */}
-                  <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
-                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                      <Award className="w-5 h-5 text-green-400" />
+                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30">
+                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                      <Award className="w-6 h-6 text-green-400" />
                       Diagnóstico Geral
-                    </h3>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-gray-300">Nota Geral</span>
-                      <span className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                        {pdiData.diagnostico?.nota_geral?.toFixed(1) || 'N/A'}
-                      </span>
+                    </h2>
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-gray-300 font-medium">Nota Geral</span>
+                        <span className="text-4xl font-black bg-gradient-to-br from-green-400 to-emerald-500 bg-clip-text text-transparent">
+                          {pdiData.diagnostico?.nota_geral?.toFixed(1) || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-900/50 rounded-full h-3 overflow-hidden border border-gray-700/50">
+                        <div
+                          className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"
+                          style={{ width: `${((pdiData.diagnostico?.nota_geral || 0) / 10) * 100}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-900/50 rounded-full h-3 overflow-hidden mb-4">
-                      <div
-                        className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all"
-                        style={{ width: `${((pdiData.diagnostico?.nota_geral || 0) / 10) * 100}%` }}
-                      />
-                    </div>
-                    <p className="text-gray-300 text-sm leading-relaxed">
-                      {pdiData.diagnostico?.resumo || 'Sem resumo disponível'}
-                    </p>
+                    <p className="text-gray-300 leading-relaxed">{pdiData.diagnostico?.resumo || 'Sem resumo disponível'}</p>
                   </div>
 
-                  {/* Notas SPIN */}
-                  <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
-                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-green-400" />
-                      Notas SPIN
-                    </h3>
-                    <div className="grid grid-cols-4 gap-3">
-                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
-                        <p className="text-gray-400 text-xs mb-1">Situação</p>
-                        <p className="text-2xl font-bold text-green-400">
-                          {pdiData.notas_spin?.situacao?.toFixed(1) || 'N/A'}
-                        </p>
+                  <div className="grid lg:grid-cols-2 gap-6">
+                    {/* SPIN com Radar Chart */}
+                    <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30">
+                      <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                        <TrendingUp className="w-6 h-6 text-green-400" />
+                        Notas SPIN
+                      </h2>
+                      <div className="aspect-square max-w-sm mx-auto">
+                        {(() => {
+                          const S = pdiData.notas_spin?.situacao || 0
+                          const P = pdiData.notas_spin?.problema || 0
+                          const I = pdiData.notas_spin?.implicacao || 0
+                          const N = pdiData.notas_spin?.necessidade || 0
+
+                          const sY = 120 - (S * 8)
+                          const pX = 120 + (P * 8)
+                          const iY = 120 + (I * 8)
+                          const nX = 120 - (N * 8)
+
+                          return (
+                            <svg viewBox="0 0 240 240" className="w-full h-full drop-shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                              <defs>
+                                <filter id="greenGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                  <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                                  <feMerge>
+                                    <feMergeNode in="coloredBlur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                  </feMerge>
+                                </filter>
+                              </defs>
+
+                              {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
+                                const size = level * 8
+                                return (
+                                  <polygon
+                                    key={level}
+                                    points={`120,${120-size} ${120+size},120 120,${120+size} ${120-size},120`}
+                                    fill="none"
+                                    stroke={level % 2 === 0 ? "rgba(34, 197, 94, 0.15)" : "rgba(34, 197, 94, 0.08)"}
+                                    strokeWidth="0.5"
+                                  />
+                                )
+                              })}
+
+                              <line x1="120" y1="40" x2="120" y2="200" stroke="rgba(34, 197, 94, 0.3)" strokeWidth="0.5" />
+                              <line x1="40" y1="120" x2="200" y2="120" stroke="rgba(34, 197, 94, 0.3)" strokeWidth="0.5" />
+
+                              <polygon
+                                points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
+                                fill="rgba(34, 197, 94, 0.15)"
+                                stroke="rgb(34, 197, 94)"
+                                strokeWidth="3"
+                                filter="url(#greenGlow)"
+                              />
+                              <polygon
+                                points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
+                                fill="rgba(34, 197, 94, 0.3)"
+                                stroke="rgb(34, 197, 94)"
+                                strokeWidth="2.5"
+                              />
+
+                              <circle cx="120" cy={sY} r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+                              <circle cx="120" cy={sY} r="4" fill="rgb(34, 197, 94)" />
+                              <circle cx="120" cy={sY} r="2" fill="rgb(255, 255, 255)" />
+
+                              <circle cx={pX} cy="120" r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+                              <circle cx={pX} cy="120" r="4" fill="rgb(34, 197, 94)" />
+                              <circle cx={pX} cy="120" r="2" fill="rgb(255, 255, 255)" />
+
+                              <circle cx="120" cy={iY} r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+                              <circle cx="120" cy={iY} r="4" fill="rgb(34, 197, 94)" />
+                              <circle cx="120" cy={iY} r="2" fill="rgb(255, 255, 255)" />
+
+                              <circle cx={nX} cy="120" r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
+                              <circle cx={nX} cy="120" r="4" fill="rgb(34, 197, 94)" />
+                              <circle cx={nX} cy="120" r="2" fill="rgb(255, 255, 255)" />
+
+                              <g>
+                                <rect x="100" y="15" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+                                <text x="120" y="32" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">S</text>
+                              </g>
+                              <g>
+                                <rect x="200" y="108" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+                                <text x="220" y="125" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">P</text>
+                              </g>
+                              <g>
+                                <rect x="100" y="201" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+                                <text x="120" y="218" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">I</text>
+                              </g>
+                              <g>
+                                <rect x="0" y="108" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
+                                <text x="20" y="125" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">N</text>
+                              </g>
+                            </svg>
+                          )
+                        })()}
                       </div>
-                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
-                        <p className="text-gray-400 text-xs mb-1">Problema</p>
-                        <p className="text-2xl font-bold text-green-400">
-                          {pdiData.notas_spin?.problema?.toFixed(1) || 'N/A'}
-                        </p>
+                      <div className="grid grid-cols-4 gap-3 mt-6">
+                        <div className="text-center p-3 bg-green-900/20 rounded-xl border border-green-500/20">
+                          <p className="text-gray-400 text-xs mb-1">Situação</p>
+                          <p className="text-xl font-bold text-green-400">{pdiData.notas_spin?.situacao?.toFixed(1) || '0.0'}</p>
+                        </div>
+                        <div className="text-center p-3 bg-green-900/20 rounded-xl border border-green-500/20">
+                          <p className="text-gray-400 text-xs mb-1">Problema</p>
+                          <p className="text-xl font-bold text-green-400">{pdiData.notas_spin?.problema?.toFixed(1) || '0.0'}</p>
+                        </div>
+                        <div className="text-center p-3 bg-green-900/20 rounded-xl border border-green-500/20">
+                          <p className="text-gray-400 text-xs mb-1">Implicação</p>
+                          <p className="text-xl font-bold text-green-400">{pdiData.notas_spin?.implicacao?.toFixed(1) || '0.0'}</p>
+                        </div>
+                        <div className="text-center p-3 bg-green-900/20 rounded-xl border border-green-500/20">
+                          <p className="text-gray-400 text-xs mb-1">Necessidade</p>
+                          <p className="text-xl font-bold text-green-400">{pdiData.notas_spin?.necessidade?.toFixed(1) || '0.0'}</p>
+                        </div>
                       </div>
-                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
-                        <p className="text-gray-400 text-xs mb-1">Implicação</p>
-                        <p className="text-2xl font-bold text-green-400">
-                          {pdiData.notas_spin?.implicacao?.toFixed(1) || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="text-center p-3 bg-green-900/20 rounded-lg border border-green-500/20">
-                        <p className="text-gray-400 text-xs mb-1">Necessidade</p>
-                        <p className="text-2xl font-bold text-green-400">
-                          {pdiData.notas_spin?.necessidade?.toFixed(1) || 'N/A'}
-                        </p>
+                    </div>
+
+                    {/* Foco da Semana */}
+                    <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30">
+                      <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                        <Zap className="w-6 h-6 text-green-400" />
+                        Foco da Semana
+                      </h2>
+                      <div className="p-5 bg-gradient-to-r from-green-900/40 to-blue-900/40 rounded-xl border border-green-500/30">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="px-4 py-2 bg-green-500/20 border border-green-500/40 rounded-lg">
+                            <p className="text-green-300 font-bold text-2xl">
+                              {pdiData.foco_da_semana?.area || pdiData.meta_7_dias?.objetivo?.split(' ')[0] || '?'}
+                            </p>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white font-semibold">
+                              {pdiData.foco_da_semana?.objetivo || pdiData.meta_7_dias?.objetivo || 'Definir objetivo'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Meta de 7 Dias */}
-                  {pdiData.meta_7_dias && (
-                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
-                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <Target className="w-5 h-5 text-green-400" />
-                        Meta de 7 Dias
-                      </h3>
-                      <p className="text-gray-300 mb-3">{pdiData.meta_7_dias.objetivo}</p>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400">Progresso Esperado</span>
-                        <span className="text-green-400 font-semibold">{pdiData.meta_7_dias.meta_numerica || 'Em andamento'}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Simulações */}
-                  {pdiData.simulacoes && pdiData.simulacoes.length > 0 && (
-                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
-                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <Zap className="w-5 h-5 text-green-400" />
-                        Simulações Recomendadas
-                      </h3>
-                      <div className="space-y-3">
-                        {pdiData.simulacoes.map((sim: any, idx: number) => (
-                          <div key={idx} className="p-4 bg-gray-900/40 rounded-lg border border-gray-700/50">
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center flex-shrink-0">
-                                <span className="text-green-400 font-bold text-sm">{sim.quantidade}x</span>
+                  {/* Simulações Recomendadas */}
+                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30">
+                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                      <CheckCircle className="w-6 h-6 text-green-400" />
+                      Simulações Recomendadas
+                    </h2>
+                    <div className="space-y-4">
+                      {pdiData.simulacoes && pdiData.simulacoes.length > 0 ? (
+                        pdiData.simulacoes.map((sim: any, idx: number) => (
+                          <div key={idx} className="p-5 bg-gray-900/40 rounded-xl border border-gray-700/50">
+                            <div className="flex gap-4">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500/30 to-emerald-500/20 border border-green-500/40 flex items-center justify-center flex-shrink-0">
+                                <span className="text-green-400 font-bold">{sim.quantidade}x</span>
                               </div>
                               <div className="flex-1">
-                                <p className="text-white font-medium mb-2">{sim.objetivo}</p>
-                                <div className="space-y-1 text-xs">
-                                  <p className="text-blue-300">
-                                    <span className="text-gray-400">Persona:</span> {sim.persona_sugerida}
-                                  </p>
+                                <p className="text-white font-semibold mb-2">{sim.objetivo}</p>
+                                <div className="space-y-2 mb-2">
+                                  <div className="px-3 py-1.5 bg-blue-500/10 rounded-lg border border-blue-500/20 inline-block">
+                                    <span className="text-blue-400 text-xs font-semibold">Persona: </span>
+                                    <span className="text-gray-200 text-sm">{sim.persona_sugerida}</span>
+                                  </div>
                                   {sim.objecao_para_treinar && (
-                                    <p className="text-orange-300">
-                                      <span className="text-gray-400">Objeção:</span> {sim.objecao_para_treinar}
-                                    </p>
+                                    <div className="px-3 py-1.5 bg-orange-500/10 rounded-lg border border-orange-500/20 inline-block ml-2">
+                                      <span className="text-orange-400 text-xs font-semibold">Objeção: </span>
+                                      <span className="text-gray-200 text-sm">{sim.objecao_para_treinar}</span>
+                                    </div>
                                   )}
-                                  <p className="text-green-300 mt-2">
-                                    <span className="text-gray-400">Sucesso:</span> {sim.criterio_sucesso}
-                                  </p>
+                                </div>
+                                <div className="p-3 bg-gradient-to-br from-green-900/20 to-emerald-900/10 rounded-lg border border-green-500/20">
+                                  <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider font-semibold">Critério de Sucesso</p>
+                                  <p className="text-green-300 text-sm">{sim.criterio_sucesso}</p>
                                 </div>
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        ))
+                      ) : pdiData.acoes && pdiData.acoes.length > 0 ? (
+                        pdiData.acoes.map((acao: any, idx: number) => (
+                          <div key={idx} className="p-5 bg-gray-900/40 rounded-xl border border-gray-700/50">
+                            <p className="text-white font-semibold mb-2">{acao.acao}</p>
+                            <p className="text-gray-400 text-sm">{acao.resultado_esperado}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 text-center py-4">Nenhuma simulação definida ainda</p>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Próximo Ciclo */}
-                  {(pdiData.proximo_ciclo || pdiData.proximos_passos) && (
-                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl p-6 border border-green-500/20">
-                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-green-400" />
-                        Próximo Ciclo
-                      </h3>
-                      <p className="text-gray-300 text-sm leading-relaxed">
-                        {pdiData.proximo_ciclo || pdiData.proximos_passos}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-8 border border-green-500/30">
+                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                      <Sparkles className="w-6 h-6 text-green-400" />
+                      Próximo Ciclo
+                    </h2>
+                    <p className="text-gray-200 leading-relaxed">
+                      {pdiData.proximo_ciclo || pdiData.proximos_passos || 'Orientações aparecerão aqui...'}
+                    </p>
+                  </div>
+                </>
               )}
+              </div>
             </div>
           </div>
         </div>
