@@ -45,6 +45,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Hook para verificar limites do plano
   const {
     trainingPlan,
+    selectionPlan,
     planUsage,
     checkChatIAAccess,
     checkPDIAccess,
@@ -55,6 +56,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [hasChatIA, setHasChatIA] = useState(true)
   const [hasPDI, setHasPDI] = useState(true)
   const [hasFollowUp, setHasFollowUp] = useState(true)
+  const [showSelectionPlanModal, setShowSelectionPlanModal] = useState(false)
 
   // Sempre usar tema Ramppy (verde espacial) para TODAS as empresas
   const isRamppy = true
@@ -440,11 +442,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
-                onClick={() => handleViewChange('roleplay-links')}
+                onClick={() => {
+                  if (selectionPlan) {
+                    handleViewChange('roleplay-links')
+                  } else {
+                    setShowSelectionPlanModal(true)
+                  }
+                }}
                 className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '400ms' }}
               >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                <div className={`relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2 ${!selectionPlan ? 'opacity-50' : ''}`}>
+                  {!selectionPlan && (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10">
+                      <Lock className="w-12 h-12 text-gray-400" />
+                    </div>
+                  )}
                   <div className="absolute top-4 right-4">
                     <span className="px-2.5 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
                       Admin
@@ -597,6 +610,67 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       {/* Sales Dashboard Modal */}
       {showSalesDashboard && (
         <SalesDashboard onClose={() => setShowSalesDashboard(false)} />
+      )}
+
+      {/* Modal de Plano de Processo Seletivo */}
+      {showSelectionPlanModal && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-yellow-500/30 shadow-2xl shadow-yellow-500/20 animate-scale-in">
+            {/* Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-yellow-500/20 to-orange-500/10 rounded-2xl flex items-center justify-center border border-yellow-500/30">
+                <Lock className="w-10 h-10 text-yellow-400" />
+              </div>
+            </div>
+
+            {/* Título */}
+            <h2 className="text-2xl font-bold text-white text-center mb-4">
+              <span className="bg-gradient-to-r from-yellow-400 via-orange-300 to-yellow-500 bg-clip-text text-transparent">
+                Recurso Bloqueado
+              </span>
+            </h2>
+
+            {/* Mensagem */}
+            <p className="text-gray-300 text-center mb-6 leading-relaxed">
+              Para acessar o <span className="text-yellow-400 font-semibold">Roleplay Público</span> e criar links para processos seletivos externos, é necessário assinar o <span className="text-yellow-400 font-semibold">Plano de Processo Seletivo</span>.
+            </p>
+
+            {/* Benefícios */}
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
+              <p className="text-yellow-300 font-semibold text-sm mb-2">Com o Plano de Processo Seletivo:</p>
+              <ul className="space-y-1.5 text-gray-300 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5">✓</span>
+                  <span>Crie links públicos para candidatos externos</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5">✓</span>
+                  <span>Acompanhe resultados em tempo real</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5">✓</span>
+                  <span>Avalie competências SPIN dos candidatos</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Botões */}
+            <div className="space-y-3">
+              <button
+                onClick={() => setShowSelectionPlanModal(false)}
+                className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-400 hover:from-yellow-400 hover:to-orange-300 rounded-xl font-bold text-white transition-all shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50 hover:scale-[1.02]"
+              >
+                Entendi
+              </button>
+              <button
+                onClick={() => setShowSelectionPlanModal(false)}
+                className="w-full py-3 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-semibold text-gray-300 transition-colors border border-gray-700/50"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
