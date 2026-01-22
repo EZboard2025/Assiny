@@ -223,15 +223,19 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           </div>
 
 
-          {/* Features Grid Title */}
-          <div className="mb-10 text-center">
-            <h2 className="text-xl font-semibold text-gray-300 tracking-wide">
-              Escolha uma funcionalidade para começar
-            </h2>
-          </div>
+          {/* Setor 1: Treinamento */}
+          <div className="mb-16">
+            <div className="mb-8 flex items-center gap-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
+                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  Treinamento
+                </span>
+              </h2>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+            </div>
 
-          {/* Features Grid - Flexbox para centralizar automaticamente */}
-          <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
+            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
             {/* Roleplay Card */}
             <button
               onClick={() => handleViewChange('roleplay')}
@@ -315,7 +319,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </div>
             </button>
+            </div>
+          </div>
 
+          {/* Setor 2: Follow-ups */}
+          <div className="mb-16">
+            <div className="mb-8 flex items-center gap-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
+                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  Follow-ups
+                </span>
+              </h2>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
             {/* Follow-up Analysis Card */}
             <button
               onClick={() => handleViewChange('followup')}
@@ -371,7 +390,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </div>
             </button>
+            </div>
+          </div>
 
+          {/* Setor 3: Gestão */}
+          <div className="mb-16">
+            <div className="mb-8 flex items-center gap-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
+                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  Gestão
+                </span>
+              </h2>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
             {/* PDI Card */}
             {hasPDI && (
               <button
@@ -471,6 +505,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </button>
             )}
+            </div>
           </div>
         </div>
       </div>
