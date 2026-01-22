@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, XCircle, Clock, ThumbsUp, ThumbsDown, MessageSquare, Target, Calendar, Loader2, ChevronDown, ChevronUp, Eye, AlertCircle, TrendingUp } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, ThumbsUp, ThumbsDown, MessageSquare, Target, Calendar, Loader2, ChevronDown, ChevronUp, Eye, AlertCircle, TrendingUp, Award, Star, Lightbulb, Edit3, Zap } from 'lucide-react'
 
 interface FollowUpAnalysis {
   id: string
@@ -440,14 +440,51 @@ export default function FollowUpHistoryView() {
                   {/* Conteúdo expandido */}
                   {expandedDetails.has(analysis.id) && analysis.avaliacao && (
                     <div className="px-4 pb-4 space-y-4 border-t border-gray-700/50 pt-4">
-                      {/* Resumo Executivo */}
-                      {analysis.avaliacao.resumo_executivo && (
+                      {/* Notas por Critério */}
+                      {analysis.avaliacao.notas && (
                         <div className="bg-gray-900/40 rounded-lg p-4 border border-gray-700/30">
-                          <h4 className="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4 text-green-400" />
-                            Resumo Executivo
+                          <h4 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                            <Award className="w-4 h-4 text-yellow-400" />
+                            Notas Detalhadas por Critério
                           </h4>
-                          <p className="text-sm text-gray-400 leading-relaxed">{analysis.avaliacao.resumo_executivo}</p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {Object.entries(analysis.avaliacao.notas).map(([criterio, dados]: [string, any]) => {
+                              const getNoteColor = (nota: number) => {
+                                if (nota >= 8) return 'text-green-400'
+                                if (nota >= 6) return 'text-yellow-400'
+                                if (nota >= 4) return 'text-orange-400'
+                                return 'text-red-400'
+                              }
+
+                              const criterioLabels: Record<string, string> = {
+                                valor_agregado: 'Valor Agregado',
+                                personalizacao: 'Personalização',
+                                tom_consultivo: 'Tom Consultivo',
+                                objetividade: 'Objetividade',
+                                cta: 'Call-to-Action',
+                                timing: 'Timing'
+                              }
+
+                              return (
+                                <div key={criterio} className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                      {criterioLabels[criterio] || criterio}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-lg font-bold ${getNoteColor(dados.nota)}`}>
+                                        {dados.nota.toFixed(1)}
+                                      </span>
+                                      <span className="text-[10px] text-gray-500">
+                                        (peso {dados.peso})
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-gray-400 leading-relaxed">{dados.comentario}</p>
+                                </div>
+                              )
+                            })}
+                          </div>
                         </div>
                       )}
 
@@ -455,13 +492,13 @@ export default function FollowUpHistoryView() {
                       {analysis.avaliacao.pontos_positivos && analysis.avaliacao.pontos_positivos.length > 0 && (
                         <div className="bg-green-900/10 rounded-lg p-4 border border-green-500/20">
                           <h4 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
+                            <Star className="w-4 h-4" />
                             Pontos Positivos
                           </h4>
                           <ul className="space-y-2">
                             {analysis.avaliacao.pontos_positivos.map((ponto: string, idx: number) => (
                               <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                                <span className="text-green-400 mt-1">•</span>
+                                <span className="text-green-400 mt-1 flex-shrink-0">✓</span>
                                 <span>{ponto}</span>
                               </li>
                             ))}
@@ -469,49 +506,57 @@ export default function FollowUpHistoryView() {
                         </div>
                       )}
 
-                      {/* Pontos Negativos */}
-                      {analysis.avaliacao.pontos_negativos && analysis.avaliacao.pontos_negativos.length > 0 && (
-                        <div className="bg-red-900/10 rounded-lg p-4 border border-red-500/20">
-                          <h4 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+                      {/* Pontos a Melhorar */}
+                      {analysis.avaliacao.pontos_melhorar && analysis.avaliacao.pontos_melhorar.length > 0 && (
+                        <div className="bg-orange-900/10 rounded-lg p-4 border border-orange-500/20">
+                          <h4 className="text-sm font-semibold text-orange-400 mb-3 flex items-center gap-2">
                             <AlertCircle className="w-4 h-4" />
-                            Pontos Negativos
+                            Pontos a Melhorar
                           </h4>
-                          <ul className="space-y-2">
-                            {analysis.avaliacao.pontos_negativos.map((ponto: string, idx: number) => (
-                              <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                                <span className="text-red-400 mt-1">•</span>
-                                <span>{ponto}</span>
-                              </li>
+                          <div className="space-y-3">
+                            {analysis.avaliacao.pontos_melhorar.map((item: any, idx: number) => (
+                              <div key={idx} className="bg-gray-800/30 rounded-lg p-3 border border-orange-500/10">
+                                <div className="flex items-start gap-2 mb-2">
+                                  <span className="text-orange-400 mt-1 flex-shrink-0">⚠</span>
+                                  <p className="text-sm text-gray-300 font-medium">{item.problema}</p>
+                                </div>
+                                <div className="ml-5 flex items-start gap-2">
+                                  <Lightbulb className="w-3 h-3 text-yellow-400 mt-1 flex-shrink-0" />
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="text-yellow-400 font-medium">Como resolver:</span> {item.como_resolver}
+                                  </p>
+                                </div>
+                              </div>
                             ))}
-                          </ul>
+                          </div>
                         </div>
                       )}
 
-                      {/* Sugestões de Melhoria */}
-                      {analysis.avaliacao.sugestoes_melhoria && analysis.avaliacao.sugestoes_melhoria.length > 0 && (
+                      {/* Versão Reescrita */}
+                      {analysis.avaliacao.versao_reescrita && (
                         <div className="bg-blue-900/10 rounded-lg p-4 border border-blue-500/20">
                           <h4 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
-                            <Target className="w-4 h-4" />
-                            Sugestões de Melhoria
+                            <Edit3 className="w-4 h-4" />
+                            Versão Reescrita Sugerida
                           </h4>
-                          <ul className="space-y-2">
-                            {analysis.avaliacao.sugestoes_melhoria.map((sugestao: string, idx: number) => (
-                              <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                                <span className="text-blue-400 mt-1">•</span>
-                                <span>{sugestao}</span>
-                              </li>
-                            ))}
-                          </ul>
+                          <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
+                            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                              {analysis.avaliacao.versao_reescrita}
+                            </p>
+                          </div>
                         </div>
                       )}
 
-                      {/* Próximos Passos */}
-                      {analysis.avaliacao.proximos_passos && (
+                      {/* Dica Principal */}
+                      {analysis.avaliacao.dica_principal && (
                         <div className="bg-purple-900/10 rounded-lg p-4 border border-purple-500/20">
-                          <h4 className="text-sm font-semibold text-purple-400 mb-2">
-                            Próximos Passos
+                          <h4 className="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                            <Zap className="w-4 h-4" />
+                            Dica Principal
                           </h4>
-                          <p className="text-sm text-gray-400 leading-relaxed">{analysis.avaliacao.proximos_passos}</p>
+                          <p className="text-sm text-gray-300 leading-relaxed italic">
+                            "{analysis.avaliacao.dica_principal}"
+                          </p>
                         </div>
                       )}
                     </div>
