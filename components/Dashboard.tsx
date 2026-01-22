@@ -423,7 +423,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
           </div>
 
-          {/* Setor 3: Gestão */}
+          {/* Setor 3: Gestão - Only for Admin and Gestor */}
+          {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
           <div className="mb-16">
             <div className="mb-8 flex items-center gap-4">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
@@ -507,6 +508,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             )}
             </div>
           </div>
+          )}
         </div>
       </div>
     )
