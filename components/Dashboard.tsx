@@ -319,6 +319,36 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </div>
             </button>
+
+            {/* PDI Card */}
+            {hasPDI && (
+              <button
+                onClick={() => handleViewChange('pdi')}
+                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                style={{ animationDelay: '250ms' }}
+              >
+                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
+                      <Target className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">PDI</h3>
+                      <span className="text-xs text-green-400/70">Plano de desenvolvimento</span>
+                    </div>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    Plano personalizado de 7 dias baseado na sua performance SPIN.
+                  </p>
+                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
+                    <span>Ver PDI</span>
+                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </button>
+            )}
             </div>
           </div>
 
@@ -339,7 +369,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <button
               onClick={() => handleViewChange('followup')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '250ms' }}
+              style={{ animationDelay: '300ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
                 <div className="flex items-center gap-4 mb-4">
@@ -367,7 +397,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <button
               onClick={() => handleViewChange('followup-history')}
               className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '300ms' }}
+              style={{ animationDelay: '350ms' }}
             >
               <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
                 <div className="flex items-center gap-4 mb-4">
@@ -406,36 +436,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
 
             <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
-            {/* PDI Card */}
-            {hasPDI && (
-              <button
-                onClick={() => handleViewChange('pdi')}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '350ms' }}
-              >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                      <Target className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">PDI</h3>
-                      <span className="text-xs text-green-400/70">Plano de desenvolvimento</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    Plano personalizado de 7 dias baseado na sua performance SPIN.
-                  </p>
-                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                    <span>Ver PDI</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </button>
-            )}
-
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
