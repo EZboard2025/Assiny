@@ -329,7 +329,9 @@ function ConfigurationInterface({
     planUsage
   } = usePlanLimits()
 
-  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'funnel'>('employees')
+  // Plano Individual não tem acesso à aba de funcionários
+  const isIndividualPlan = trainingPlan === PlanType.INDIVIDUAL
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'funnel'>(isIndividualPlan ? 'personas' : 'employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
@@ -506,6 +508,13 @@ function ConfigurationInterface({
     }
     checkLimits()
   }, [personas.length, objections.length, trainingPlan, planUsage])
+
+  // Redirecionar para 'personas' se plano Individual estiver na aba 'employees'
+  useEffect(() => {
+    if (trainingPlan === PlanType.INDIVIDUAL && activeTab === 'employees') {
+      setActiveTab('personas')
+    }
+  }, [trainingPlan, activeTab])
 
   // Carregar dados da empresa
   const loadCompanyData = async () => {
@@ -2255,17 +2264,20 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
     <div className="space-y-6">
       {/* Tabs - Redesenhadas */}
       <div className="flex gap-2 pb-4 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('employees')}
-          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
-            activeTab === 'employees'
-              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Funcionários</span>
-        </button>
+        {/* Funcionários - Apenas para planos Team, Business e Enterprise */}
+        {trainingPlan !== PlanType.INDIVIDUAL && (
+          <button
+            onClick={() => setActiveTab('employees')}
+            className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
+              activeTab === 'employees'
+                ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+                : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Funcionários</span>
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('personas')}
           className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
@@ -2325,8 +2337,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
       {/* Content */}
       <div className="py-4">
-        {/* Funcionários Tab */}
-        {activeTab === 'employees' && (
+        {/* Funcionários Tab - Apenas para planos Team, Business e Enterprise */}
+        {activeTab === 'employees' && trainingPlan !== PlanType.INDIVIDUAL && (
           <div className="space-y-6">
             <div>
               <h3 className="text-xl font-bold mb-4">Gerenciar Funcionários</h3>

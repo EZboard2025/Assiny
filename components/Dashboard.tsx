@@ -485,8 +485,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </button>
             )}
 
-            {/* Dashboard dos Vendedores Card - Admin only */}
-            {userRole?.toLowerCase() === 'admin' && (
+            {/* Dashboard dos Vendedores Card - Admin only, não disponível no plano Individual */}
+            {userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
               <button
                 onClick={() => setShowSalesDashboard(true)}
                 className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
