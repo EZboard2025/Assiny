@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, User, MessageCircle, Calendar, ChevronRight, Trash2, Eye, Download, Settings, BarChart3, FileText, Target } from 'lucide-react'
+import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 
 export default function HistoricoView() {
@@ -9,6 +9,7 @@ export default function HistoricoView() {
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [activeTab, setActiveTab] = useState<'resumo' | 'spin' | 'transcricao'>('resumo')
 
   useEffect(() => {
     setMounted(true)
@@ -17,8 +18,11 @@ export default function HistoricoView() {
 
   const loadSessions = async () => {
     setLoading(true)
-    const data = await getUserRoleplaySessions(50) // Carregar últimas 50 sessões
+    const data = await getUserRoleplaySessions(50)
     setSessions(data)
+    if (data.length > 0) {
+      setSelectedSession(data[0])
+    }
     setLoading(false)
   }
 
@@ -29,665 +33,713 @@ export default function HistoricoView() {
     if (success) {
       setSessions(sessions.filter(s => s.id !== sessionId))
       if (selectedSession?.id === sessionId) {
-        setSelectedSession(null)
+        setSelectedSession(sessions.length > 1 ? sessions.find(s => s.id !== sessionId) || null : null)
       }
-      alert('Sessão excluída com sucesso!')
-    } else {
-      alert('Erro ao excluir sessão')
     }
   }
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'N/A'
+    if (!seconds) return null
     const minutes = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${minutes}min ${secs}s`
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleString('pt-BR', {
+    return new Date(date).toLocaleDateString('pt-BR', {
       day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    })
+  }
+
+  const formatTime = (date: string) => {
+    return new Date(date).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit'
     })
   }
 
-  const filteredSessions = sessions
-
-  // Processar evaluation antes de usar
   const getProcessedEvaluation = (session: RoleplaySession) => {
     let evaluation = (session as any).evaluation
-
-    // Se evaluation tem estrutura N8N {output: "..."}, fazer parse
     if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
-      console.log('🔄 Parseando evaluation do histórico...')
       try {
         evaluation = JSON.parse(evaluation.output)
       } catch (e) {
-        console.error('❌ Erro ao parsear evaluation:', e)
         return null
       }
     }
-
     return evaluation
   }
 
+  const getScoreColor = (score: number) => {
+    if (score >= 8) return 'text-green-400'
+    if (score >= 6) return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
+  const getScoreBg = (score: number) => {
+    if (score >= 8) return 'bg-green-500/20 border-green-500/30'
+    if (score >= 6) return 'bg-yellow-500/20 border-yellow-500/30'
+    return 'bg-red-500/20 border-red-500/30'
+  }
+
+  const getPerformanceLabel = (level: string) => {
+    const labels: Record<string, string> = {
+      'legendary': 'Lendário',
+      'excellent': 'Excelente',
+      'very_good': 'Muito Bom',
+      'good': 'Bom',
+      'needs_improvement': 'Precisa Melhorar',
+      'poor': 'Em Desenvolvimento'
+    }
+    return labels[level] || level
+  }
+
+  const translateIndicator = (key: string) => {
+    const translations: Record<string, string> = {
+      // Indicadores SPIN - Situação (S)
+      'adaptability_score': 'Adaptabilidade',
+      'open_questions_score': 'Perguntas Abertas',
+      'scenario_mapping_score': 'Mapeamento de Cenário',
+      'depth_score': 'Profundidade',
+      'relevance_score': 'Relevância',
+      'context_score': 'Contexto',
+      'discovery_score': 'Descoberta',
+      'exploration_score': 'Exploração',
+      'investigation_score': 'Investigação',
+
+      // Indicadores SPIN - Problema (P)
+      'problem_identification_score': 'Identificação de Problemas',
+      'empathy_score': 'Empatia',
+      'consequences_exploration_score': 'Exploração de Consequências',
+      'impact_understanding_score': 'Compreensão de Impacto',
+      'pain_identification_score': 'Identificação de Dores',
+      'challenge_discovery_score': 'Descoberta de Desafios',
+
+      // Indicadores SPIN - Implicação (I)
+      'emotional_impact_score': 'Impacto Emocional',
+      'logical_flow_score': 'Fluxo Lógico',
+      'quantification_score': 'Quantificação',
+      'future_projection_score': 'Projeção Futura',
+      'business_impact_score': 'Impacto no Negócio',
+      'consequence_development_score': 'Desenvolvimento de Consequências',
+      'amplification_score': 'Amplificação',
+      'concrete_risks': 'Riscos Concretos',
+      'inaction_consequences': 'Consequências da Inação',
+      'urgency_amplification': 'Amplificação de Urgência',
+      'non_aggressive_urgency': 'Urgência Não Agressiva',
+
+      // Indicadores SPIN - Necessidade (N)
+      'value_articulation_score': 'Articulação de Valor',
+      'solution_fit_score': 'Adequação da Solução',
+      'commitment_score': 'Comprometimento',
+      'benefit_clarity_score': 'Clareza de Benefícios',
+      'roi_demonstration_score': 'Demonstração de ROI',
+      'outcome_score': 'Resultado',
+      'value_proposition_score': 'Proposta de Valor',
+      'credibility': 'Credibilidade',
+      'personalization': 'Personalização',
+      'benefits_clarity': 'Clareza de Benefícios',
+      'solution_clarity': 'Clareza da Solução',
+      'cta_effectiveness': 'Eficácia do CTA',
+
+      // Indicadores gerais de vendas (com _score)
+      'timing_score': 'Timing',
+      'impact_score': 'Impacto',
+      'clarity_score': 'Clareza',
+      'connection_score': 'Conexão',
+      'rapport_score': 'Rapport',
+      'listening_score': 'Escuta Ativa',
+      'active_listening_score': 'Escuta Ativa',
+      'questioning_score': 'Questionamento',
+      'probing_score': 'Investigação',
+      'urgency_score': 'Urgência',
+      'pain_exploration_score': 'Exploração de Dores',
+      'need_development_score': 'Desenvolvimento de Necessidade',
+      'solution_presentation_score': 'Apresentação de Solução',
+      'objection_handling_score': 'Tratamento de Objeções',
+      'closing_score': 'Fechamento',
+      'engagement_score': 'Engajamento',
+      'trust_score': 'Confiança',
+      'persuasion_score': 'Persuasão',
+      'negotiation_score': 'Negociação',
+      'presentation_score': 'Apresentação',
+      'communication_score': 'Comunicação',
+      'responsiveness_score': 'Responsividade',
+      'strategy_score': 'Estratégia',
+      'tactics_score': 'Táticas',
+      'alignment_score': 'Alinhamento',
+      'qualification_score': 'Qualificação',
+      'follow_up_score': 'Acompanhamento',
+      'handling_score': 'Manejo',
+      'recovery_score': 'Recuperação',
+      'flexibility_score': 'Flexibilidade',
+      'confidence_score': 'Confiança',
+      'assertiveness_score': 'Assertividade',
+      'patience_score': 'Paciência',
+      'persistence_score': 'Persistência',
+      'creativity_score': 'Criatividade',
+      'knowledge_score': 'Conhecimento',
+      'preparation_score': 'Preparação',
+      'professionalism_score': 'Profissionalismo',
+
+      // Indicadores sem sufixo _score (formato N8N)
+      'timing': 'Timing',
+      'impact': 'Impacto',
+      'clarity': 'Clareza',
+      'connection': 'Conexão',
+      'rapport': 'Rapport',
+      'listening': 'Escuta Ativa',
+      'active_listening': 'Escuta Ativa',
+      'questioning': 'Questionamento',
+      'probing': 'Investigação',
+      'urgency': 'Urgência',
+      'engagement': 'Engajamento',
+      'trust': 'Confiança',
+      'persuasion': 'Persuasão',
+      'negotiation': 'Negociação',
+      'presentation': 'Apresentação',
+      'communication': 'Comunicação',
+      'flexibility': 'Flexibilidade',
+      'confidence': 'Confiança',
+      'assertiveness': 'Assertividade',
+      'patience': 'Paciência',
+      'persistence': 'Persistência',
+      'creativity': 'Criatividade',
+      'knowledge': 'Conhecimento',
+      'preparation': 'Preparação',
+      'professionalism': 'Profissionalismo',
+      'depth': 'Profundidade',
+      'relevance': 'Relevância',
+      'context': 'Contexto',
+      'discovery': 'Descoberta',
+      'exploration': 'Exploração',
+      'investigation': 'Investigação',
+      'empathy': 'Empatia',
+      'adaptability': 'Adaptabilidade',
+      'outcome': 'Resultado',
+      'commitment': 'Comprometimento',
+      'qualification': 'Qualificação',
+      'alignment': 'Alinhamento',
+      'strategy': 'Estratégia',
+      'tactics': 'Táticas',
+      'handling': 'Manejo',
+      'recovery': 'Recuperação',
+      'follow_up': 'Acompanhamento',
+      'responsiveness': 'Responsividade',
+      'quantification': 'Quantificação',
+      'amplification': 'Amplificação',
+    }
+    // Normaliza: lowercase e substitui espaços por underscores
+    const normalized = key.toLowerCase().replace(/\s+/g, '_')
+    if (translations[normalized]) return translations[normalized]
+    if (translations[key]) return translations[key]
+
+    // Tenta sem o sufixo _score
+    const withoutScore = normalized.replace(/_score$/, '')
+    if (translations[withoutScore]) return translations[withoutScore]
+
+    // Fallback: formata a chave em formato legível
+    const cleaned = key
+      .replace(/_score$/i, '')
+      .replace(/\s+score$/i, '')
+      .replace(/_/g, ' ')
+      .trim()
+    // Capitaliza primeira letra
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+  }
 
   return (
-    <div className="min-h-screen py-20 px-6 relative z-10">
+    <div className="min-h-screen py-8 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header - Design Futurista */}
-        <div className={`text-center mb-12 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-white via-green-50 to-white bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(34,197,94,0.3)]">
-            Histórico de Roleplays
-          </h1>
-          <p className="text-xl text-gray-400">
-            Revise suas sessões de treinamento e acompanhe sua evolução.
-          </p>
+        {/* Header simples */}
+        <div className={`mb-8 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+          <h1 className="text-3xl font-bold text-white mb-2">Histórico de Sessões</h1>
+          <p className="text-gray-400">Analise suas sessões de roleplay e acompanhe sua evolução</p>
         </div>
 
-
-        {/* Grid de Sessões vs Detalhes */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Lista de Sessões */}
-          <div className={`${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '100ms' }}>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-3xl blur-2xl"></div>
-              <div className="relative bg-gradient-to-br from-gray-900/70 to-gray-800/50 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)]">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
-                    <MessageCircle className="w-5 h-5 text-green-400" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-white">
-                    Sessões <span className="text-green-400">({filteredSessions.length})</span>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-green-500/30 border-t-green-500 rounded-full animate-spin"></div>
+          </div>
+        ) : sessions.length === 0 ? (
+          <div className="text-center py-20">
+            <MessageCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400 text-lg">Nenhuma sessão encontrada</p>
+            <p className="text-gray-500 text-sm mt-2">Comece um roleplay para ver seu histórico aqui</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Lista de sessões - Coluna estreita */}
+            <div className="lg:col-span-4 xl:col-span-3">
+              <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+                <div className="p-4 border-b border-gray-800">
+                  <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                    {sessions.length} Sessões
                   </h2>
                 </div>
+                <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
+                  {sessions.map((session) => {
+                    const evaluation = getProcessedEvaluation(session)
+                    const score = evaluation?.overall_score !== undefined
+                      ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
+                      : null
 
-                {loading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-12 h-12 border-4 border-green-500/30 border-t-green-500 rounded-full animate-spin shadow-[0_0_20px_rgba(34,197,94,0.3)]"></div>
-                      <p className="text-gray-300 font-medium">Carregando sessões...</p>
-                    </div>
-                  </div>
-                ) : filteredSessions.length === 0 ? (
-                  <div className="text-center py-16">
-                    <div className="w-20 h-20 bg-gradient-to-br from-gray-700/20 to-gray-600/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-gray-600/30">
-                      <MessageCircle className="w-10 h-10 text-gray-500" />
-                    </div>
-                    <p className="text-gray-300 text-lg font-semibold mb-2">Nenhuma sessão encontrada</p>
-                    <p className="text-sm text-gray-500">
-                      Comece um roleplay para ver seu histórico aqui
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                    {filteredSessions.map((session) => (
+                    return (
                       <button
                         key={session.id}
                         onClick={() => setSelectedSession(session)}
-                        className={`relative w-full text-left p-5 rounded-2xl transition-all duration-300 group overflow-hidden ${
+                        className={`w-full text-left p-3 border-b border-gray-800/50 transition-colors ${
                           selectedSession?.id === session.id
-                            ? 'bg-gradient-to-r from-green-600/30 to-emerald-600/20 border-2 border-green-400/60 shadow-[0_0_30px_rgba(34,197,94,0.3)] scale-[1.02]'
-                            : 'bg-gradient-to-br from-gray-800/40 to-gray-900/30 border border-green-500/20 hover:border-green-400/50 hover:shadow-[0_0_20px_rgba(34,197,94,0.15)] hover:-translate-y-1'
+                            ? 'bg-green-500/10 border-l-2 border-l-green-500'
+                            : 'hover:bg-gray-800/50 border-l-2 border-l-transparent'
                         }`}
                       >
-                        {/* Glow effect */}
-                        <div className={`absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl ${
-                          selectedSession?.id === session.id ? 'opacity-100' : ''
-                        }`}></div>
-
-                        <div className="relative flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-300 ${
-                                selectedSession?.id === session.id
-                                  ? 'bg-gradient-to-br from-green-500/40 to-emerald-500/30 border-green-400/40 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
-                                  : 'bg-gradient-to-br from-green-500/15 to-emerald-500/10 border-green-500/20 group-hover:from-green-500/25 group-hover:to-emerald-500/15 group-hover:border-green-400/30'
+                        <div className="flex items-center gap-3">
+                          {/* Nota em destaque */}
+                          {score !== null ? (
+                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              score >= 8 ? 'bg-green-500/20' :
+                              score >= 6 ? 'bg-yellow-500/20' :
+                              'bg-red-500/20'
+                            }`}>
+                              <span className={`text-lg font-bold ${
+                                score >= 8 ? 'text-green-400' :
+                                score >= 6 ? 'text-yellow-400' :
+                                'text-red-400'
                               }`}>
-                                <MessageCircle className={`w-6 h-6 transition-colors ${
-                                  selectedSession?.id === session.id ? 'text-green-300 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'text-green-400'
-                                }`} />
-                              </div>
-                              <div>
-                                <p className={`font-bold text-base transition-colors ${
-                                  selectedSession?.id === session.id ? 'text-white' : 'text-gray-200 group-hover:text-white'
-                                }`}>
-                                  {session.messages.length} mensagens
-                                </p>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  {formatDuration(session.duration_seconds) !== 'N/A'
-                                    ? `⏱️ ${formatDuration(session.duration_seconds)}`
-                                    : '📝 Sessão de treino'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm ml-[60px]">
-                              <Calendar className={`w-4 h-4 ${
-                                selectedSession?.id === session.id ? 'text-green-400' : 'text-green-500/50'
-                              }`} />
-                              <span className={`${
-                                selectedSession?.id === session.id ? 'text-gray-200' : 'text-gray-400'
-                              }`}>
-                                {formatDate(session.created_at)}
+                                {score.toFixed(1)}
                               </span>
                             </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gray-800/50 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs text-gray-500">--</span>
+                            </div>
+                          )}
+
+                          {/* Info da sessão */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-white mb-0.5">
+                              {formatDuration(session.duration_seconds) || 'Sem duração'}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span>{session.messages.length} mensagens</span>
+                              <span className="text-gray-700">•</span>
+                              <span>{formatDate(session.created_at)}</span>
+                            </div>
                           </div>
-                          <ChevronRight className={`w-5 h-5 transition-all duration-300 flex-shrink-0 ${
-                            selectedSession?.id === session.id
-                              ? 'text-green-300 translate-x-1 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]'
-                              : 'text-gray-500 group-hover:text-green-400 group-hover:translate-x-1'
-                          }`} />
                         </div>
                       </button>
-                    ))}
-                  </div>
-                )}
+                    )
+                  })}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Detalhes da Sessão */}
-          <div className={`${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-3xl blur-2xl"></div>
-              <div className="relative bg-gradient-to-br from-gray-900/70 to-gray-800/50 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 min-h-[600px] shadow-[0_0_40px_rgba(34,197,94,0.15)]">
-                {!selectedSession ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <div className="w-24 h-24 bg-gradient-to-br from-gray-700/20 to-gray-600/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-gray-600/30">
-                        <Eye className="w-12 h-12 text-gray-500" />
-                      </div>
-                      <p className="text-gray-300 text-lg font-semibold">Selecione uma sessão para ver os detalhes</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Header da Sessão */}
-                    <div className="flex items-start justify-between pb-4 border-b border-green-500/30">
+            {/* Detalhes da sessão - Coluna larga */}
+            <div className="lg:col-span-8 xl:col-span-9">
+              {!selectedSession ? (
+                <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-12 text-center">
+                  <p className="text-gray-500">Selecione uma sessão para ver os detalhes</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Header da sessão */}
+                  <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                    {/* Linha superior: Data, tempo e ações */}
+                    <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
-                          <Eye className="w-5 h-5 text-green-400" />
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-green-400" />
+                          <span className="text-white font-medium">{formatDate(selectedSession.created_at)}</span>
+                          <span className="text-gray-500">{formatTime(selectedSession.created_at)}</span>
                         </div>
-                        <h3 className="text-2xl font-bold text-white">Detalhes da Sessão</h3>
-                      </div>
-                      <button
-                        onClick={() => handleDelete(selectedSession.id)}
-                        className="group p-2.5 text-red-400 hover:bg-red-500/15 rounded-xl transition-all border border-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]"
-                        title="Excluir sessão"
-                      >
-                        <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                      </button>
-                    </div>
-
-                    {/* Configurações */}
-                    <div className="relative bg-gradient-to-br from-gray-800/40 to-gray-900/30 rounded-xl p-5 border border-green-500/20 shadow-lg">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Settings className="w-5 h-5 text-green-400" />
-                        <h4 className="font-bold text-white">Configurações</h4>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-gray-400 min-w-[100px]">Idade:</span>
-                          <span className="text-sm font-medium text-gray-200">{selectedSession.config.age} anos</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-gray-400 min-w-[100px]">Temperamento:</span>
-                          <span className="text-sm font-medium text-gray-200">{selectedSession.config.temperament}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-gray-400 min-w-[100px]">Persona:</span>
-                          <span className="text-sm font-medium text-gray-200">{selectedSession.config.segment}</span>
-                        </div>
-                        {selectedSession.config.objections && selectedSession.config.objections.length > 0 && (
-                          <div>
-                            <span className="text-sm text-gray-400 block mb-2">Objeções:</span>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedSession.config.objections.map((obj: string | { name: string }, i: number) => (
-                                <span key={i} className="px-3 py-1.5 bg-gradient-to-r from-green-600/30 to-emerald-600/20 text-green-300 rounded-lg text-xs font-medium border border-green-500/30">
-                                  {typeof obj === 'string' ? obj : obj.name}
-                                </span>
-                              ))}
-                            </div>
+                        {selectedSession.duration_seconds && (
+                          <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded-lg">
+                            <Clock className="w-3.5 h-3.5 text-green-400" />
+                            <span className="text-sm text-green-400 font-medium">{formatDuration(selectedSession.duration_seconds)}</span>
                           </div>
                         )}
                       </div>
+                      <button
+                        onClick={() => handleDelete(selectedSession.id)}
+                        className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Excluir sessão"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
 
-                    {/* Avaliação de Performance */}
-                    {(() => {
-                      const evaluation = selectedSession ? getProcessedEvaluation(selectedSession) : null
-                      if (!evaluation) return null
+                    {/* Cards de configuração */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="bg-gray-800/50 rounded-lg p-3">
+                        <span className="text-xs text-purple-400 block mb-1">Temperamento</span>
+                        <span className="text-white">{selectedSession.config.temperament}</span>
+                      </div>
+                      <div className="bg-gray-800/50 rounded-lg p-3">
+                        <span className="text-xs text-blue-400 block mb-1">Idade</span>
+                        <span className="text-white">{selectedSession.config.age} anos</span>
+                      </div>
+                      <div className="bg-gray-800/50 rounded-lg p-3 sm:col-span-1">
+                        <span className="text-xs text-amber-400 block mb-1">Persona</span>
+                        <span className="text-white text-sm leading-snug">{selectedSession.config.segment}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabs de navegação */}
+                  <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1">
+                    {['resumo', 'spin', 'transcricao'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab as typeof activeTab)}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                          activeTab === tab
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                        }`}
+                      >
+                        {tab === 'resumo' && 'Resumo'}
+                        {tab === 'spin' && 'Análise SPIN'}
+                        {tab === 'transcricao' && 'Transcrição'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Conteúdo das tabs */}
+                  {(() => {
+                    const evaluation = getProcessedEvaluation(selectedSession)
+
+                    if (activeTab === 'resumo') {
+                      if (!evaluation) {
+                        return (
+                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center">
+                            <p className="text-gray-500">Esta sessão não possui avaliação</p>
+                          </div>
+                        )
+                      }
+
+                      const score = evaluation.overall_score !== undefined
+                        ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
+                        : null
 
                       return (
-                        <div className="mb-6">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
-                              <BarChart3 className="w-5 h-5 text-green-400" />
+                        <div className="space-y-4">
+                          {/* Score principal */}
+                          <div className={`rounded-xl border p-6 text-center ${getScoreBg(score || 0)}`}>
+                            <div className={`text-5xl font-bold mb-1 ${getScoreColor(score || 0)}`}>
+                              {score?.toFixed(1) || 'N/A'}
                             </div>
-                            <h4 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                              Avaliação de Performance
-                            </h4>
-                          </div>
-
-                          {/* Score Geral */}
-                          <div className="relative group mb-6">
-                            <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 to-emerald-500/30 rounded-2xl blur-xl group-hover:blur-2xl transition-all"></div>
-                            <div className="relative bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/40 rounded-2xl p-6 text-center shadow-lg">
-                              <div className="text-6xl font-bold bg-gradient-to-br from-green-400 via-emerald-300 to-green-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,197,94,0.5)] mb-2">
-                                {evaluation.overall_score !== undefined && evaluation.overall_score !== null
-                                  ? `${(evaluation.overall_score / 10).toFixed(1)}`
-                                  : 'N/A'}
-                              </div>
-                              <div className="text-sm text-green-300 uppercase tracking-wider font-bold">
-                                {evaluation.performance_level === 'legendary' && '🏆 Lendário'}
-                                {evaluation.performance_level === 'excellent' && '⭐ Excelente'}
-                                {evaluation.performance_level === 'very_good' && '✨ Muito Bom'}
-                                {evaluation.performance_level === 'good' && '👍 Bom'}
-                                {evaluation.performance_level === 'needs_improvement' && '📈 Precisa Melhorar'}
-                                {evaluation.performance_level === 'poor' && '📚 Em Desenvolvimento'}
-                              </div>
+                            <div className="text-sm text-gray-400">
+                              {evaluation.performance_level && getPerformanceLabel(evaluation.performance_level)}
                             </div>
                           </div>
 
-                          {/* Resumo Executivo */}
+                          {/* Resumo executivo */}
                           {evaluation.executive_summary && (
-                            <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/30 border border-green-500/20 rounded-xl p-5 mb-4 shadow-lg">
-                              <h5 className="font-bold text-white mb-3 flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-green-400" />
+                            <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                              <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
                                 Resumo Executivo
-                              </h5>
-                              <p className="text-sm text-gray-300 leading-relaxed">
+                              </h4>
+                              <p className="text-gray-300 text-sm leading-relaxed">
                                 {evaluation.executive_summary}
                               </p>
                             </div>
                           )}
 
-                          {/* Avaliação SPIN com Gráfico Radar */}
-                          {evaluation.spin_evaluation && (
-                            <div className="relative bg-gradient-to-br from-gray-800/40 to-gray-900/30 border border-green-500/30 rounded-2xl p-6 mb-4 shadow-[0_0_30px_rgba(34,197,94,0.15)]">
-                              {/* Grid futurista no fundo */}
-                              <div className="absolute inset-0 opacity-5 rounded-2xl overflow-hidden">
-                                <div className="absolute inset-0" style={{
-                                  backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(34, 197, 94, .15) 25%, rgba(34, 197, 94, .15) 26%, transparent 27%, transparent 74%, rgba(34, 197, 94, .15) 75%, rgba(34, 197, 94, .15) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(34, 197, 94, .15) 25%, rgba(34, 197, 94, .15) 26%, transparent 27%, transparent 74%, rgba(34, 197, 94, .15) 75%, rgba(34, 197, 94, .15) 76%, transparent 77%, transparent)',
-                                  backgroundSize: '30px 30px'
-                                }}></div>
+                          {/* Grid de insights */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Pontos fortes */}
+                            {evaluation.top_strengths?.length > 0 && (
+                              <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                                <h4 className="flex items-center gap-2 text-sm font-medium text-green-400 mb-3">
+                                  <TrendingUp className="w-4 h-4" />
+                                  Pontos Fortes
+                                </h4>
+                                <ul className="space-y-2">
+                                  {evaluation.top_strengths.map((strength: string, i: number) => (
+                                    <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                      <span className="text-green-400 mt-0.5">•</span>
+                                      {strength}
+                                    </li>
+                                  ))}
+                                </ul>
                               </div>
+                            )}
 
-                              <div className="relative flex items-center justify-center gap-3 mb-8">
-                                <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
-                                  <Target className="w-5 h-5 text-green-400" />
-                                </div>
-                                <h5 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                                  Metodologia SPIN
-                                </h5>
+                            {/* Gaps críticos */}
+                            {evaluation.critical_gaps?.length > 0 && (
+                              <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                                <h4 className="flex items-center gap-2 text-sm font-medium text-red-400 mb-3">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  Pontos a Melhorar
+                                </h4>
+                                <ul className="space-y-2">
+                                  {evaluation.critical_gaps.map((gap: string, i: number) => (
+                                    <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                      <span className="text-red-400 mt-0.5">•</span>
+                                      {gap}
+                                    </li>
+                                  ))}
+                                </ul>
                               </div>
+                            )}
+                          </div>
 
-                              {/* Radar Chart - Diamond Shape */}
-                              <div className="relative w-full aspect-square max-w-md mx-auto mb-6">
-                                <svg viewBox="0 0 240 240" className="w-full h-full drop-shadow-[0_0_30px_rgba(34,197,94,0.3)]">
-                                  {/* Filtro de glow verde */}
-                                  <defs>
-                                    <filter id="greenGlow" x="-50%" y="-50%" width="200%" height="200%">
-                                      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                                      <feMerge>
-                                        <feMergeNode in="coloredBlur"/>
-                                        <feMergeNode in="SourceGraphic"/>
-                                      </feMerge>
-                                    </filter>
-                                  </defs>
-
-                                  {/* Background diamonds (losangos) - 10 níveis */}
-                                  {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
-                                    const size = level * 8;
-                                    return (
-                                      <polygon
-                                        key={level}
-                                        points={`120,${120-size} ${120+size},120 120,${120+size} ${120-size},120`}
-                                        fill="none"
-                                        stroke={level % 2 === 0 ? "rgba(34, 197, 94, 0.15)" : "rgba(34, 197, 94, 0.08)"}
-                                        strokeWidth="0.5"
-                                      />
-                                    );
-                                  })}
-
-                                  {/* Diagonal lines - verde tech */}
-                                  <line x1="120" y1="40" x2="120" y2="200" stroke="rgba(34, 197, 94, 0.3)" strokeWidth="0.5" />
-                                  <line x1="40" y1="120" x2="200" y2="120" stroke="rgba(34, 197, 94, 0.3)" strokeWidth="0.5" />
-
-                                  {/* Data polygon */}
-                                  {(() => {
-                                    const S = evaluation.spin_evaluation.S?.final_score || 0
-                                    const P = evaluation.spin_evaluation.P?.final_score || 0
-                                    const I = evaluation.spin_evaluation.I?.final_score || 0
-                                    const N = evaluation.spin_evaluation.N?.final_score || 0
-
-                                    // Calculate positions for diamond (4 vertices)
-                                    const sY = 120 - (S * 8)  // Top (S)
-                                    const pX = 120 + (P * 8)  // Right (P)
-                                    const iY = 120 + (I * 8)  // Bottom (I)
-                                    const nX = 120 - (N * 8)  // Left (N)
-
-                                    return (
-                                      <>
-                                        {/* Glow effect verde */}
-                                        <polygon
-                                          points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
-                                          fill="rgba(34, 197, 94, 0.15)"
-                                          stroke="rgb(34, 197, 94)"
-                                          strokeWidth="3"
-                                          filter="url(#greenGlow)"
-                                        />
-                                        <polygon
-                                          points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
-                                          fill="rgba(34, 197, 94, 0.3)"
-                                          stroke="rgb(34, 197, 94)"
-                                          strokeWidth="2.5"
-                                        />
-                                        {/* Data points com efeito tech */}
-                                        <circle cx="120" cy={sY} r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
-                                        <circle cx="120" cy={sY} r="4" fill="rgb(34, 197, 94)" />
-                                        <circle cx="120" cy={sY} r="2" fill="rgb(255, 255, 255)" />
-
-                                        <circle cx={pX} cy="120" r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
-                                        <circle cx={pX} cy="120" r="4" fill="rgb(34, 197, 94)" />
-                                        <circle cx={pX} cy="120" r="2" fill="rgb(255, 255, 255)" />
-
-                                        <circle cx="120" cy={iY} r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
-                                        <circle cx="120" cy={iY} r="4" fill="rgb(34, 197, 94)" />
-                                        <circle cx="120" cy={iY} r="2" fill="rgb(255, 255, 255)" />
-
-                                        <circle cx={nX} cy="120" r="7" fill="rgb(34, 197, 94)" opacity="0.4" />
-                                        <circle cx={nX} cy="120" r="4" fill="rgb(34, 197, 94)" />
-                                        <circle cx={nX} cy="120" r="2" fill="rgb(255, 255, 255)" />
-                                      </>
-                                    )
-                                  })()}
-
-                                  {/* Labels tech com borda verde */}
-                                  <g>
-                                    <rect x="100" y="15" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
-                                    <text x="120" y="32" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">S</text>
-                                  </g>
-                                  <g>
-                                    <rect x="200" y="108" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
-                                    <text x="220" y="125" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">P</text>
-                                  </g>
-                                  <g>
-                                    <rect x="100" y="201" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
-                                    <text x="120" y="218" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">I</text>
-                                  </g>
-                                  <g>
-                                    <rect x="0" y="108" width="40" height="24" rx="6" fill="rgba(34, 197, 94, 0.2)" stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1.5" />
-                                    <text x="20" y="125" textAnchor="middle" fill="rgb(34, 197, 94)" fontSize="14" fontWeight="bold">N</text>
-                                  </g>
-                                </svg>
-                              </div>
-
-                              {/* SPIN Scores Grid - Destacado */}
-                              <div className="grid grid-cols-4 gap-3 mb-4">
-                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
-                                  <div className="text-xs text-green-300 mb-1 font-semibold">Situação</div>
-                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.S?.final_score?.toFixed(1) || '0'}</div>
-                                </div>
-                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
-                                  <div className="text-xs text-green-300 mb-1 font-semibold">Problema</div>
-                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.P?.final_score?.toFixed(1) || '0'}</div>
-                                </div>
-                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
-                                  <div className="text-xs text-green-300 mb-1 font-semibold">Implicação</div>
-                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.I?.final_score?.toFixed(1) || '0'}</div>
-                                </div>
-                                <div className="text-center bg-gradient-to-br from-green-600/20 to-green-400/10 rounded-lg p-3 border border-green-500/20">
-                                  <div className="text-xs text-green-300 mb-1 font-semibold">Necessidade</div>
-                                  <div className="text-2xl font-bold text-white">{evaluation.spin_evaluation.N?.final_score?.toFixed(1) || '0'}</div>
-                                </div>
-                              </div>
-
-                              {/* Média Geral SPIN */}
-                              <div className="relative group mt-6">
-                                <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 to-emerald-500/30 rounded-xl blur-lg group-hover:blur-xl transition-all"></div>
-                                <div className="relative bg-gradient-to-r from-green-600 to-emerald-500 rounded-xl px-6 py-5 text-center shadow-[0_0_25px_rgba(34,197,94,0.3)]">
-                                  <div className="text-sm text-white/80 mb-1 font-semibold uppercase tracking-wider">Média Geral SPIN</div>
-                                  <div className="text-4xl font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
-                                    {(() => {
-                                      const avg = (
-                                        (evaluation.spin_evaluation.S?.final_score || 0) +
-                                        (evaluation.spin_evaluation.P?.final_score || 0) +
-                                        (evaluation.spin_evaluation.I?.final_score || 0) +
-                                        (evaluation.spin_evaluation.N?.final_score || 0)
-                                      ) / 4;
-                                      return avg.toFixed(1);
-                                    })()}<span className="text-xl text-white/70">/10</span>
+                          {/* Prioridades de melhoria */}
+                          {evaluation.priority_improvements?.length > 0 && (
+                            <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                              <h4 className="flex items-center gap-2 text-sm font-medium text-yellow-400 mb-3">
+                                <Lightbulb className="w-4 h-4" />
+                                Prioridades de Melhoria
+                              </h4>
+                              <div className="space-y-3">
+                                {evaluation.priority_improvements.map((imp: any, i: number) => (
+                                  <div key={i} className="bg-gray-800/50 rounded-lg p-3">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`text-xs px-2 py-0.5 rounded ${
+                                        imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                        imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                        'bg-yellow-500/20 text-yellow-400'
+                                      }`}>
+                                        {imp.priority === 'critical' ? 'Crítico' :
+                                         imp.priority === 'high' ? 'Alta' : 'Média'}
+                                      </span>
+                                      <span className="text-sm font-medium text-white">{imp.area}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400">{imp.action_plan}</p>
                                   </div>
-                                </div>
+                                ))}
                               </div>
                             </div>
                           )}
+                        </div>
+                      )
+                    }
 
-                        {/* Feedback Detalhado SPIN */}
-                        {evaluation.spin_evaluation && (
-                          <details className="group relative bg-gradient-to-br from-gray-800/40 to-gray-900/30 border border-green-500/20 rounded-xl p-5 mb-4 shadow-lg hover:shadow-[0_0_20px_rgba(34,197,94,0.1)] transition-all">
-                            <summary className="flex items-center gap-3 font-bold text-white cursor-pointer hover:text-green-400 transition-colors">
-                              <div className="w-8 h-8 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-lg flex items-center justify-center border border-green-500/30">
-                                <ChevronRight className="w-4 h-4 text-green-400 group-open:rotate-90 transition-transform" />
-                              </div>
-                              Análise Detalhada SPIN
-                            </summary>
-                            <div className="mt-4 space-y-6">
-                              {['S', 'P', 'I', 'N'].map((letter) => {
-                                const spinData = evaluation.spin_evaluation[letter]
-                                if (!spinData) return null
+                    if (activeTab === 'spin') {
+                      if (!evaluation?.spin_evaluation) {
+                        return (
+                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center">
+                            <p className="text-gray-500">Esta sessão não possui análise SPIN</p>
+                          </div>
+                        )
+                      }
 
-                                const letterNames: any = {
-                                  'S': 'Situação',
-                                  'P': 'Problema',
-                                  'I': 'Implicação',
-                                  'N': 'Necessidade'
-                                }
+                      const spin = evaluation.spin_evaluation
 
-                                return (
-                                  <div key={letter} className="bg-gray-900/50 rounded-lg p-4 border border-green-500/10">
-                                    {/* Header com nome e score */}
-                                    <div className="flex items-center justify-between mb-3">
-                                      <h6 className="font-semibold text-green-400">
-                                        {letterNames[letter]} ({letter})
-                                      </h6>
-                                      <span className="text-xl font-bold text-white">
-                                        {spinData.final_score?.toFixed(1)}
-                                      </span>
-                                    </div>
-
-                                    {/* Indicadores detalhados */}
-                                    {spinData.indicators && Object.keys(spinData.indicators).length > 0 && (
-                                      <div className="grid grid-cols-2 gap-2 mb-3">
-                                        {Object.entries(spinData.indicators).map(([key, value]: [string, any]) => (
-                                          <div key={key} className="bg-gray-800/50 rounded px-2 py-1">
-                                            <span className="text-xs text-gray-400">
-                                              {key.replace(/_/g, ' ').replace('score', '')}:
-                                            </span>
-                                            <span className="text-xs font-semibold text-gray-300 ml-1">
-                                              {value}/10
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {/* Feedback técnico */}
-                                    <div className="mb-3">
-                                      <p className="text-sm text-gray-300 leading-relaxed">
-                                        {spinData.technical_feedback}
-                                      </p>
-                                    </div>
-
-                                    {/* Oportunidades perdidas */}
-                                    {spinData.missed_opportunities?.length > 0 && (
-                                      <div className="bg-orange-500/10 border border-orange-500/20 rounded p-2">
-                                        <h6 className="text-xs font-semibold text-orange-400 mb-1">
-                                          Oportunidades Perdidas:
-                                        </h6>
-                                        <ul className="space-y-1">
-                                          {spinData.missed_opportunities.map((opp: string, i: number) => (
-                                            <li key={i} className="text-xs text-orange-300 flex items-start">
-                                              <span className="text-orange-400 mr-1">•</span>
-                                              <span>{opp}</span>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
+                      return (
+                        <div className="space-y-4">
+                          {/* Grid de scores SPIN */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {[
+                              { key: 'S', label: 'Situação', color: 'text-blue-400' },
+                              { key: 'P', label: 'Problema', color: 'text-purple-400' },
+                              { key: 'I', label: 'Implicação', color: 'text-orange-400' },
+                              { key: 'N', label: 'Necessidade', color: 'text-green-400' }
+                            ].map(({ key, label, color }) => {
+                              const score = spin[key]?.final_score || 0
+                              return (
+                                <div key={key} className="bg-gray-900/50 rounded-xl border border-gray-800 p-4 text-center">
+                                  <div className={`text-3xl font-bold mb-1 ${color}`}>
+                                    {score.toFixed(1)}
                                   </div>
-                                )
-                              })}
+                                  <div className="text-xs text-gray-500 uppercase tracking-wider">
+                                    {label}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {/* Média SPIN */}
+                          <div className="bg-green-500/10 rounded-xl border border-green-500/20 p-4 text-center">
+                            <div className="text-2xl font-bold text-green-400 mb-1">
+                              {(
+                                ((spin.S?.final_score || 0) +
+                                (spin.P?.final_score || 0) +
+                                (spin.I?.final_score || 0) +
+                                (spin.N?.final_score || 0)) / 4
+                              ).toFixed(1)}
                             </div>
-                          </details>
-                        )}
+                            <div className="text-xs text-gray-400 uppercase tracking-wider">
+                              Média Geral SPIN
+                            </div>
+                          </div>
 
-                        {/* Análise de Objeções */}
-                        {evaluation.objections_analysis?.length > 0 && (
-                          <details className="group relative bg-gradient-to-br from-gray-800/40 to-gray-900/30 border border-green-500/20 rounded-xl p-5 mb-4 shadow-lg hover:shadow-[0_0_20px_rgba(34,197,94,0.1)] transition-all">
-                            <summary className="flex items-center gap-3 font-bold text-white cursor-pointer hover:text-green-400 transition-colors">
-                              <div className="w-8 h-8 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-lg flex items-center justify-center border border-green-500/30">
-                                <ChevronRight className="w-4 h-4 text-green-400 group-open:rotate-90 transition-transform" />
-                              </div>
-                              Análise Detalhada de Objeções
-                              <span className="ml-auto text-sm px-3 py-1 bg-green-500/20 text-green-400 rounded-lg border border-green-500/30">
-                                {evaluation.objections_analysis.length}
-                              </span>
-                            </summary>
-                            <div className="mt-4 space-y-4">
-                              {evaluation.objections_analysis.map((obj: any, idx: number) => (
-                                <div key={idx} className="bg-gray-900/50 rounded-lg p-4 border border-green-500/10">
-                                  {/* Header com tipo e score */}
-                                  <div className="flex items-center justify-between mb-3">
-                                    <span className="text-sm font-semibold text-green-400 uppercase bg-green-500/10 px-2 py-1 rounded">
-                                      {obj.objection_type}
+                          {/* Detalhes de cada pilar */}
+                          {['S', 'P', 'I', 'N'].map((letter) => {
+                            const data = spin[letter]
+                            if (!data) return null
+
+                            const labels: Record<string, string> = {
+                              'S': 'Situação',
+                              'P': 'Problema',
+                              'I': 'Implicação',
+                              'N': 'Necessidade'
+                            }
+
+                            return (
+                              <details key={letter} className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
+                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                                  <div className="flex items-center gap-3">
+                                    <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-sm font-bold text-green-400">
+                                      {letter}
                                     </span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-2xl font-bold text-white">{obj.score}</span>
-                                      <span className="text-gray-400">/10</span>
-                                    </div>
+                                    <span className="font-medium text-white">{labels[letter]}</span>
                                   </div>
-
-                                  {/* Texto da objeção */}
-                                  <div className="bg-gray-800/50 rounded-lg p-3 mb-3 border-l-2 border-green-500/30">
-                                    <p className="text-sm text-gray-300 italic">
-                                      <span className="text-green-400 mr-1">Cliente:</span>
-                                      "{obj.objection_text}"
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-lg font-bold text-white">
+                                      {data.final_score?.toFixed(1)}
+                                    </span>
+                                    <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
+                                  </div>
+                                </summary>
+                                <div className="p-4 pt-0 space-y-3">
+                                  {/* Feedback */}
+                                  {data.technical_feedback && (
+                                    <p className="text-sm text-gray-300 leading-relaxed">
+                                      {data.technical_feedback}
                                     </p>
-                                  </div>
+                                  )}
 
-                                  {/* Análise detalhada */}
-                                  <div className="mb-3">
-                                    <h6 className="text-xs font-semibold text-gray-400 uppercase mb-1">Análise</h6>
-                                    <p className="text-sm text-gray-300 leading-relaxed">{obj.detailed_analysis}</p>
-                                  </div>
+                                  {/* Indicadores */}
+                                  {data.indicators && Object.keys(data.indicators).length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {Object.entries(data.indicators).map(([key, value]: [string, any]) => {
+                                        const score = typeof value === 'number' ? value : 0
+                                        const getIndicatorStyle = (s: number) => {
+                                          if (s >= 8) return 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-300'
+                                          if (s >= 6) return 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30 text-yellow-300'
+                                          return 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-500/30 text-red-300'
+                                        }
+                                        const getScoreStyle = (s: number) => {
+                                          if (s >= 8) return 'text-green-400 font-semibold'
+                                          if (s >= 6) return 'text-yellow-400 font-semibold'
+                                          return 'text-red-400 font-semibold'
+                                        }
+                                        return (
+                                          <span
+                                            key={key}
+                                            className={`text-xs px-3 py-1.5 rounded-lg border backdrop-blur-sm transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
+                                          >
+                                            {translateIndicator(key)}: <span className={getScoreStyle(score)}>{value}/10</span>
+                                          </span>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
 
-                                  {/* Erros críticos */}
-                                  {obj.critical_errors?.length > 0 && (
-                                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-3">
-                                      <h6 className="text-xs font-semibold text-red-400 uppercase mb-2">⚠️ Erros Críticos</h6>
+                                  {/* Oportunidades perdidas */}
+                                  {data.missed_opportunities?.length > 0 && (
+                                    <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
+                                      <p className="text-xs font-medium text-orange-400 mb-2">Oportunidades Perdidas</p>
                                       <ul className="space-y-1">
-                                        {obj.critical_errors.map((error: string, i: number) => (
-                                          <li key={i} className="text-sm text-red-300 flex items-start">
-                                            <span className="text-red-400 mr-2">•</span>
-                                            <span>{error}</span>
-                                          </li>
+                                        {data.missed_opportunities.map((opp: string, i: number) => (
+                                          <li key={i} className="text-xs text-orange-300">• {opp}</li>
                                         ))}
                                       </ul>
                                     </div>
                                   )}
+                                </div>
+                              </details>
+                            )
+                          })}
 
-                                  {/* Resposta ideal */}
-                                  {obj.ideal_response && (
-                                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                                      <h6 className="text-xs font-semibold text-green-400 uppercase mb-2">✅ Resposta Ideal</h6>
-                                      <p className="text-sm text-green-300 italic leading-relaxed">"{obj.ideal_response}"</p>
+                          {/* Análise de objeções */}
+                          {evaluation.objections_analysis?.length > 0 && (
+                            <details className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
+                              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center">
+                                    <Target className="w-4 h-4 text-green-400" />
+                                  </span>
+                                  <span className="font-medium text-white">Análise de Objeções</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-gray-400">
+                                    {evaluation.objections_analysis.length} objeções
+                                  </span>
+                                  <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
+                                </div>
+                              </summary>
+                              <div className="p-4 pt-0 space-y-3">
+                                {evaluation.objections_analysis.map((obj: any, idx: number) => (
+                                  <div key={idx} className="bg-gray-800/50 rounded-lg p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs px-2 py-0.5 bg-gray-700 rounded text-gray-300">
+                                        {obj.objection_type}
+                                      </span>
+                                      <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
+                                        {obj.score}/10
+                                      </span>
                                     </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </details>
-                        )}
-
-                        {/* Plano de Melhorias */}
-                        {evaluation.priority_improvements?.length > 0 && (
-                          <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
-                            <h5 className="font-semibold text-orange-400 mb-3">🎯 Prioridades de Melhoria</h5>
-                            <div className="space-y-3">
-                              {evaluation.priority_improvements.map((imp: any, idx: number) => (
-                                <div key={idx} className="bg-gray-900/50 rounded-lg p-3">
-                                  <div className="flex items-start gap-2 mb-2">
-                                    <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                                      imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                      imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                      'bg-yellow-500/20 text-yellow-400'
-                                    }`}>
-                                      {imp.priority.toUpperCase()}
-                                    </span>
-                                    <span className="text-sm font-semibold text-white">{imp.area}</span>
+                                    <p className="text-sm text-gray-300 italic mb-2">
+                                      "{obj.objection_text}"
+                                    </p>
+                                    {obj.detailed_analysis && (
+                                      <p className="text-xs text-gray-400">{obj.detailed_analysis}</p>
+                                    )}
                                   </div>
-                                  <p className="text-xs text-gray-400 mb-2">{imp.current_gap}</p>
-                                  <p className="text-xs text-gray-300">{imp.action_plan}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                                ))}
+                              </div>
+                            </details>
+                          )}
                         </div>
                       )
-                    })()}
+                    }
 
-                    {/* Transcrição */}
-                    <div>
-                      <h4 className="font-semibold mb-3 text-green-400">
-                        Transcrição ({selectedSession.messages.length} mensagens)
-                      </h4>
-                      <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
-                        {selectedSession.messages.map((msg, index) => (
-                          <div
-                            key={index}
-                            className={`flex gap-3 ${msg.role === 'seller' ? 'justify-end' : ''}`}
-                          >
-                            {msg.role === 'client' && (
-                              <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                                <User className="w-4 h-4 text-green-400" />
-                              </div>
-                            )}
-                            <div className={`flex-1 ${msg.role === 'seller' ? 'flex flex-col items-end' : ''}`}>
-                              <div className="text-xs text-gray-500 mb-1">
-                                {msg.role === 'client' ? 'Cliente (IA)' : 'Você'}
-                              </div>
+                    if (activeTab === 'transcricao') {
+                      return (
+                        <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                          <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">
+                            {selectedSession.messages.length} mensagens
+                          </h4>
+                          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                            {selectedSession.messages.map((msg, index) => (
                               <div
-                                className={`${
-                                  msg.role === 'client'
-                                    ? 'bg-gray-800/50 rounded-2xl rounded-tl-none'
-                                    : 'bg-green-600/20 rounded-2xl rounded-tr-none max-w-md'
-                                } p-3 text-sm text-gray-300`}
+                                key={index}
+                                className={`flex gap-3 ${msg.role === 'seller' ? 'flex-row-reverse' : ''}`}
                               >
-                                {msg.text}
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  msg.role === 'client'
+                                    ? 'bg-gray-800'
+                                    : 'bg-green-500/20'
+                                }`}>
+                                  <User className={`w-4 h-4 ${
+                                    msg.role === 'client' ? 'text-gray-400' : 'text-green-400'
+                                  }`} />
+                                </div>
+                                <div className={`flex-1 max-w-[80%] ${msg.role === 'seller' ? 'text-right' : ''}`}>
+                                  <div className="text-xs text-gray-500 mb-1">
+                                    {msg.role === 'client' ? 'Cliente' : 'Você'} • {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </div>
+                                  <div className={`inline-block p-3 rounded-xl text-sm ${
+                                    msg.role === 'client'
+                                      ? 'bg-gray-800 text-gray-300 rounded-tl-none'
+                                      : 'bg-green-500/20 text-green-100 rounded-tr-none'
+                                  }`}>
+                                    {msg.text}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-600 mt-1">
-                                {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </div>
-                            </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                        </div>
+                      )
+                    }
+
+                    return null
+                  })()}
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
