@@ -439,6 +439,7 @@ function ConfigurationInterface({
   const [aiGeneratedObjections, setAIGeneratedObjections] = useState<Array<{name: string, rebuttals: string[]}> | null>(null)
   const [aiGeneratedPersonas, setAIGeneratedPersonas] = useState<Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string}> | null>(null)
   const [aiGeneratedObjectives, setAIGeneratedObjectives] = useState<Array<{name: string, description: string}> | null>(null)
+  const [aiRefining, setAIRefining] = useState(false)
 
   // Estados para Fases do Funil
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
@@ -781,6 +782,56 @@ function ConfigurationInterface({
       showToast('error', 'Erro', 'Não foi possível gerar conteúdo')
     } finally {
       setAIGenerateLoading(false)
+    }
+  }
+
+  // Refinar conteúdo com IA baseado em feedback do usuário
+  const handleAIRefineContent = async (contentType: 'objections' | 'personas' | 'objectives', feedback: string) => {
+    setAIRefining(true)
+
+    try {
+      // Pegar o conteúdo atual para refinar
+      let currentContent
+      if (contentType === 'objections') {
+        currentContent = { objections: aiGeneratedObjections }
+      } else if (contentType === 'personas') {
+        currentContent = { personas: aiGeneratedPersonas }
+      } else {
+        currentContent = { objectives: aiGeneratedObjectives }
+      }
+
+      const response = await fetch('/api/company/ai-refine-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentType,
+          currentContent,
+          feedback
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao refinar conteúdo')
+      }
+
+      // Atualizar dados refinados no estado apropriado
+      if (contentType === 'objections' && result.data.objections) {
+        setAIGeneratedObjections(result.data.objections)
+      } else if (contentType === 'personas' && result.data.personas) {
+        setAIGeneratedPersonas(result.data.personas)
+      } else if (contentType === 'objectives' && result.data.objectives) {
+        setAIGeneratedObjectives(result.data.objectives)
+      }
+
+      showToast('success', 'Conteúdo Refinado', 'Revise as alterações aplicadas')
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      showToast('error', 'Erro', errorMessage)
+    } finally {
+      setAIRefining(false)
     }
   }
 
@@ -4170,6 +4221,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setAIGeneratedObjections(null)
                         setAIGenerateError(null)
                       }}
+                      onRefine={(feedback) => handleAIRefineContent('objections', feedback)}
+                      isRefining={aiRefining}
                     />
                   )}
 
@@ -4182,6 +4235,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setAIGeneratedPersonas(null)
                         setAIGenerateError(null)
                       }}
+                      onRefine={(feedback) => handleAIRefineContent('personas', feedback)}
+                      isRefining={aiRefining}
                     />
                   )}
 
@@ -4194,6 +4249,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setAIGeneratedObjectives(null)
                         setAIGenerateError(null)
                       }}
+                      onRefine={(feedback) => handleAIRefineContent('objectives', feedback)}
+                      isRefining={aiRefining}
                     />
                   )}
                 </div>
@@ -4210,13 +4267,19 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 function AIGeneratedObjectionsPreview({
   objections,
   onApply,
-  onBack
+  onBack,
+  onRefine,
+  isRefining
 }: {
   objections: Array<{name: string, rebuttals: string[]}>
   onApply: (selectedIndexes: number[]) => void
   onBack: () => void
+  onRefine: (feedback: string) => void
+  isRefining: boolean
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(objections.map((_, i) => i)))
+  const [feedback, setFeedback] = useState('')
+  const [showFeedback, setShowFeedback] = useState(false)
 
   const toggleSelect = (index: number) => {
     const newSelected = new Set(selected)
@@ -4237,7 +4300,7 @@ function AIGeneratedObjectionsPreview({
         </p>
       </div>
 
-      <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
         {objections.map((obj, index) => (
           <div
             key={index}
@@ -4267,16 +4330,65 @@ function AIGeneratedObjectionsPreview({
         ))}
       </div>
 
+      {/* Seção de Refinamento */}
+      <div className="border-t border-purple-500/20 pt-4">
+        <button
+          onClick={() => setShowFeedback(!showFeedback)}
+          className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors mb-3"
+        >
+          <Edit2 className="w-4 h-4" />
+          {showFeedback ? 'Esconder opções de refinamento' : 'Quer alterar algo? Refine com IA'}
+        </button>
+
+        {showFeedback && (
+          <div className="space-y-3 bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
+            <p className="text-xs text-gray-400">
+              Descreva o que deseja alterar (ex: "adicione objeções sobre prazo de entrega", "torne as respostas mais diretas")
+            </p>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Ex: Quero objeções mais específicas para o setor de tecnologia..."
+              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
+              rows={2}
+              disabled={isRefining}
+            />
+            <button
+              onClick={() => {
+                if (feedback.trim()) {
+                  onRefine(feedback)
+                }
+              }}
+              disabled={!feedback.trim() || isRefining}
+              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+            >
+              {isRefining ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Refinando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Refinar com IA
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-3 pt-4 border-t border-purple-500/20">
         <button
           onClick={onBack}
-          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+          disabled={isRefining}
+          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
-          disabled={selected.size === 0}
+          disabled={selected.size === 0 || isRefining}
           className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
         >
           <Plus className="w-5 h-5" />
@@ -4291,13 +4403,19 @@ function AIGeneratedObjectionsPreview({
 function AIGeneratedPersonasPreview({
   personas,
   onApply,
-  onBack
+  onBack,
+  onRefine,
+  isRefining
 }: {
   personas: Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string}>
   onApply: (selectedIndexes: number[]) => void
   onBack: () => void
+  onRefine: (feedback: string) => void
+  isRefining: boolean
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(personas.map((_, i) => i)))
+  const [feedback, setFeedback] = useState('')
+  const [showFeedback, setShowFeedback] = useState(false)
 
   const toggleSelect = (index: number) => {
     const newSelected = new Set(selected)
@@ -4318,7 +4436,7 @@ function AIGeneratedPersonasPreview({
         </p>
       </div>
 
-      <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
         {personas.map((persona, index) => (
           <div
             key={index}
@@ -4352,16 +4470,65 @@ function AIGeneratedPersonasPreview({
         ))}
       </div>
 
+      {/* Seção de Refinamento */}
+      <div className="border-t border-purple-500/20 pt-4">
+        <button
+          onClick={() => setShowFeedback(!showFeedback)}
+          className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors mb-3"
+        >
+          <Edit2 className="w-4 h-4" />
+          {showFeedback ? 'Esconder opções de refinamento' : 'Quer alterar algo? Refine com IA'}
+        </button>
+
+        {showFeedback && (
+          <div className="space-y-3 bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
+            <p className="text-xs text-gray-400">
+              Descreva o que deseja alterar (ex: "adicione mais personas B2C", "foque em pequenas empresas")
+            </p>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Ex: Quero personas mais focadas em startups de tecnologia..."
+              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
+              rows={2}
+              disabled={isRefining}
+            />
+            <button
+              onClick={() => {
+                if (feedback.trim()) {
+                  onRefine(feedback)
+                }
+              }}
+              disabled={!feedback.trim() || isRefining}
+              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+            >
+              {isRefining ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Refinando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Refinar com IA
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-3 pt-4 border-t border-purple-500/20">
         <button
           onClick={onBack}
-          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+          disabled={isRefining}
+          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
-          disabled={selected.size === 0}
+          disabled={selected.size === 0 || isRefining}
           className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
         >
           <Plus className="w-5 h-5" />
@@ -4376,13 +4543,19 @@ function AIGeneratedPersonasPreview({
 function AIGeneratedObjectivesPreview({
   objectives,
   onApply,
-  onBack
+  onBack,
+  onRefine,
+  isRefining
 }: {
   objectives: Array<{name: string, description: string}>
   onApply: (selectedIndexes: number[]) => void
   onBack: () => void
+  onRefine: (feedback: string) => void
+  isRefining: boolean
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(objectives.map((_, i) => i)))
+  const [feedback, setFeedback] = useState('')
+  const [showFeedback, setShowFeedback] = useState(false)
 
   const toggleSelect = (index: number) => {
     const newSelected = new Set(selected)
@@ -4403,7 +4576,7 @@ function AIGeneratedObjectivesPreview({
         </p>
       </div>
 
-      <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
         {objectives.map((obj, index) => (
           <div
             key={index}
@@ -4427,16 +4600,65 @@ function AIGeneratedObjectivesPreview({
         ))}
       </div>
 
+      {/* Seção de Refinamento */}
+      <div className="border-t border-purple-500/20 pt-4">
+        <button
+          onClick={() => setShowFeedback(!showFeedback)}
+          className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors mb-3"
+        >
+          <Edit2 className="w-4 h-4" />
+          {showFeedback ? 'Esconder opções de refinamento' : 'Quer alterar algo? Refine com IA'}
+        </button>
+
+        {showFeedback && (
+          <div className="space-y-3 bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
+            <p className="text-xs text-gray-400">
+              Descreva o que deseja alterar (ex: "adicione objetivos de fechamento", "foque em técnicas de qualificação")
+            </p>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Ex: Quero objetivos mais focados em negociação de preço..."
+              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
+              rows={2}
+              disabled={isRefining}
+            />
+            <button
+              onClick={() => {
+                if (feedback.trim()) {
+                  onRefine(feedback)
+                }
+              }}
+              disabled={!feedback.trim() || isRefining}
+              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+            >
+              {isRefining ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Refinando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Refinar com IA
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-3 pt-4 border-t border-purple-500/20">
         <button
           onClick={onBack}
-          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+          disabled={isRefining}
+          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
-          disabled={selected.size === 0}
+          disabled={selected.size === 0 || isRefining}
           className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
         >
           <Plus className="w-5 h-5" />
