@@ -300,7 +300,9 @@ function ConfigurationInterface({
   showCompanyEvaluationModal,
   setShowCompanyEvaluationModal,
   showAIModal,
-  setShowAIModal
+  setShowAIModal,
+  showAIGenerateModal,
+  setShowAIGenerateModal
 }: {
   personaEvaluation: any
   setPersonaEvaluation: (val: any) => void
@@ -316,6 +318,8 @@ function ConfigurationInterface({
   setShowCompanyEvaluationModal: (val: boolean) => void
   showAIModal: boolean
   setShowAIModal: (val: boolean) => void
+  showAIGenerateModal: 'objections' | 'personas' | 'objectives' | null
+  setShowAIGenerateModal: (val: 'objections' | 'personas' | 'objectives' | null) => void
 }) {
   const { currentCompany } = useCompany()
   const { showToast } = useToast()
@@ -426,6 +430,15 @@ function ConfigurationInterface({
   const [aiPreviewData, setAIPreviewData] = useState<typeof companyData | null>(null)
   const [aiConfidence, setAIConfidence] = useState<Record<string, number>>({})
   const [aiError, setAIError] = useState<string | null>(null)
+
+  // Estados para IA Geração de Conteúdo (Objeções, Personas, Objetivos)
+  // showAIGenerateModal e setShowAIGenerateModal vem como props
+  const [aiGenerateUrl, setAIGenerateUrl] = useState('')
+  const [aiGenerateLoading, setAIGenerateLoading] = useState(false)
+  const [aiGenerateError, setAIGenerateError] = useState<string | null>(null)
+  const [aiGeneratedObjections, setAIGeneratedObjections] = useState<Array<{name: string, rebuttals: string[]}> | null>(null)
+  const [aiGeneratedPersonas, setAIGeneratedPersonas] = useState<Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string}> | null>(null)
+  const [aiGeneratedObjectives, setAIGeneratedObjectives] = useState<Array<{name: string, description: string}> | null>(null)
 
   // Estados para Fases do Funil
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
@@ -722,6 +735,131 @@ function ConfigurationInterface({
     setAIUrl('')
 
     showToast('success', 'Dados Aplicados', 'Revise e salve os dados')
+  }
+
+  // Gerar conteúdo com IA (Objeções, Personas ou Objetivos)
+  const handleAIGenerateContent = async (contentType: 'objections' | 'personas' | 'objectives') => {
+    if (!aiGenerateUrl.trim()) {
+      showToast('warning', 'URL Vazia', 'Digite a URL do site da empresa')
+      return
+    }
+
+    setAIGenerateLoading(true)
+    setAIGenerateError(null)
+
+    try {
+      const response = await fetch('/api/company/ai-generate-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: aiGenerateUrl,
+          contentType,
+          businessType: businessType
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao gerar conteúdo')
+      }
+
+      // Armazenar dados gerados no estado apropriado
+      if (contentType === 'objections' && result.data.objections) {
+        setAIGeneratedObjections(result.data.objections)
+      } else if (contentType === 'personas' && result.data.personas) {
+        setAIGeneratedPersonas(result.data.personas)
+      } else if (contentType === 'objectives' && result.data.objectives) {
+        setAIGeneratedObjectives(result.data.objectives)
+      }
+
+      showToast('success', 'Conteúdo Gerado', 'Revise e selecione o que deseja adicionar')
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      setAIGenerateError(errorMessage)
+      showToast('error', 'Erro', 'Não foi possível gerar conteúdo')
+    } finally {
+      setAIGenerateLoading(false)
+    }
+  }
+
+  // Aplicar objeções geradas
+  const handleApplyGeneratedObjections = async (selectedIndexes: number[]) => {
+    if (!aiGeneratedObjections) return
+
+    for (const index of selectedIndexes) {
+      const obj = aiGeneratedObjections[index]
+      await addObjection(obj.name, obj.rebuttals)
+    }
+
+    // Recarregar objeções
+    const updatedObjections = await getObjections()
+    setObjections(updatedObjections)
+
+    // Limpar e fechar modal
+    setAIGeneratedObjections(null)
+    setShowAIGenerateModal(null)
+    setAIGenerateUrl('')
+
+    showToast('success', 'Objeções Adicionadas', `${selectedIndexes.length} objeções foram criadas`)
+  }
+
+  // Aplicar personas geradas
+  const handleApplyGeneratedPersonas = async (selectedIndexes: number[]) => {
+    if (!aiGeneratedPersonas) return
+
+    for (const index of selectedIndexes) {
+      const p = aiGeneratedPersonas[index]
+      // Criar objeto persona com estrutura correta baseada no tipo
+      const personaData = p.tipo === 'B2B' ? {
+        business_type: 'B2B' as const,
+        job_title: p.cargo,
+        company_type: p.tipo_empresa_faturamento,
+        context: p.contexto,
+        company_goals: p.busca,
+        business_challenges: p.dores
+      } : {
+        business_type: 'B2C' as const,
+        profession: p.cargo,
+        context: p.contexto,
+        what_seeks: p.busca,
+        main_pains: p.dores
+      }
+      await addPersona(personaData)
+    }
+
+    // Recarregar personas
+    const updatedPersonas = await getPersonas()
+    setPersonas(updatedPersonas)
+
+    // Limpar e fechar modal
+    setAIGeneratedPersonas(null)
+    setShowAIGenerateModal(null)
+    setAIGenerateUrl('')
+
+    showToast('success', 'Personas Adicionadas', `${selectedIndexes.length} personas foram criadas`)
+  }
+
+  // Aplicar objetivos gerados
+  const handleApplyGeneratedObjectives = async (selectedIndexes: number[]) => {
+    if (!aiGeneratedObjectives) return
+
+    for (const index of selectedIndexes) {
+      const obj = aiGeneratedObjectives[index]
+      await addRoleplayObjective(obj.name, obj.description)
+    }
+
+    // Recarregar objetivos
+    const updatedObjectives = await getRoleplayObjectives()
+    setObjectives(updatedObjectives)
+
+    // Limpar e fechar modal
+    setAIGeneratedObjectives(null)
+    setShowAIGenerateModal(null)
+    setAIGenerateUrl('')
+
+    showToast('success', 'Objetivos Adicionados', `${selectedIndexes.length} objetivos foram criados`)
   }
 
   const loadData = async () => {
@@ -2155,6 +2293,14 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  {/* Botão Gerar com IA */}
+                  <button
+                    onClick={() => setShowAIGenerateModal('personas')}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Gerar com IA
+                  </button>
                   {/* Filtro por Tag */}
                   {tags.length > 0 && (
                     <select
@@ -2869,6 +3015,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     {planUsage?.training?.objections?.used || objections.length || 0}/{planUsage?.training?.objections?.limit || '∞'} objeções
                   </div>
                 </div>
+                <button
+                  onClick={() => setShowAIGenerateModal('objections')}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Gerar com IA
+                </button>
               </div>
               <p className="text-gray-400 mb-6 text-sm">
                 Registre objeções comuns e adicione múltiplas formas de quebrá-las para cada uma.
@@ -3210,7 +3363,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {activeTab === 'objectives' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-xl font-bold mb-4">Objetivos de Roleplay</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Objetivos de Roleplay</h3>
+                <button
+                  onClick={() => setShowAIGenerateModal('objectives')}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Gerar com IA
+                </button>
+              </div>
               <p className="text-gray-400 mb-6 text-sm">
                 Defina os objetivos que os vendedores devem alcançar durante os roleplays (ex: marcar reunião, fechar venda, identificar necessidades).
               </p>
@@ -3913,6 +4075,373 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             </div>
           </div>
         )}
+
+        {/* Modal de Geração de Conteúdo com IA - Tela Cheia */}
+        {showAIGenerateModal && (
+          <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center p-4">
+            <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden">
+              {/* Gradient background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/10 rounded-3xl blur-xl"></div>
+
+              <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-purple-500/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">
+                        Gerar {showAIGenerateModal === 'objections' ? 'Objeções' : showAIGenerateModal === 'personas' ? 'Personas' : 'Objetivos'} com IA
+                      </h3>
+                      <p className="text-sm text-gray-400">Analise o site e gere conteúdo automaticamente</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowAIGenerateModal(null)
+                      setAIGeneratedObjections(null)
+                      setAIGeneratedPersonas(null)
+                      setAIGeneratedObjectives(null)
+                      setAIGenerateError(null)
+                      setAIGenerateUrl('')
+                    }}
+                    className="w-10 h-10 bg-gray-800/50 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 max-h-[calc(90vh-100px)] overflow-y-auto">
+                  {/* Input de URL - Mostrar apenas se não tiver dados gerados */}
+                  {!aiGeneratedObjections && !aiGeneratedPersonas && !aiGeneratedObjectives && (
+                    <div className="max-w-xl mx-auto space-y-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          URL do Site da Empresa
+                        </label>
+                        <input
+                          type="url"
+                          value={aiGenerateUrl}
+                          onChange={(e) => setAIGenerateUrl(e.target.value)}
+                          placeholder="https://www.empresa.com.br"
+                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-lg"
+                          disabled={aiGenerateLoading}
+                        />
+                      </div>
+
+                      {aiGenerateError && (
+                        <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
+                          <p className="text-sm text-red-300">{aiGenerateError}</p>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => handleAIGenerateContent(showAIGenerateModal)}
+                        disabled={aiGenerateLoading || !aiGenerateUrl.trim()}
+                        className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-lg hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3"
+                      >
+                        {aiGenerateLoading ? (
+                          <>
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                            Gerando {showAIGenerateModal === 'objections' ? 'objeções' : showAIGenerateModal === 'personas' ? 'personas' : 'objetivos'}...
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="w-6 h-6" />
+                            Gerar {showAIGenerateModal === 'objections' ? 'Objeções' : showAIGenerateModal === 'personas' ? 'Personas' : 'Objetivos'}
+                          </>
+                        )}
+                      </button>
+
+                      <p className="text-sm text-gray-500 text-center">
+                        A IA irá analisar o site e gerar {showAIGenerateModal === 'objections' ? 'objeções com formas de quebrá-las' : showAIGenerateModal === 'personas' ? 'personas de clientes' : 'objetivos de roleplay'}.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Preview de Objeções Geradas */}
+                  {aiGeneratedObjections && (
+                    <AIGeneratedObjectionsPreview
+                      objections={aiGeneratedObjections}
+                      onApply={handleApplyGeneratedObjections}
+                      onBack={() => {
+                        setAIGeneratedObjections(null)
+                        setAIGenerateError(null)
+                      }}
+                    />
+                  )}
+
+                  {/* Preview de Personas Geradas */}
+                  {aiGeneratedPersonas && (
+                    <AIGeneratedPersonasPreview
+                      personas={aiGeneratedPersonas}
+                      onApply={handleApplyGeneratedPersonas}
+                      onBack={() => {
+                        setAIGeneratedPersonas(null)
+                        setAIGenerateError(null)
+                      }}
+                    />
+                  )}
+
+                  {/* Preview de Objetivos Gerados */}
+                  {aiGeneratedObjectives && (
+                    <AIGeneratedObjectivesPreview
+                      objectives={aiGeneratedObjectives}
+                      onApply={handleApplyGeneratedObjectives}
+                      onBack={() => {
+                        setAIGeneratedObjectives(null)
+                        setAIGenerateError(null)
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Componente de Preview para Objeções Geradas
+function AIGeneratedObjectionsPreview({
+  objections,
+  onApply,
+  onBack
+}: {
+  objections: Array<{name: string, rebuttals: string[]}>
+  onApply: (selectedIndexes: number[]) => void
+  onBack: () => void
+}) {
+  const [selected, setSelected] = useState<Set<number>>(new Set(objections.map((_, i) => i)))
+
+  const toggleSelect = (index: number) => {
+    const newSelected = new Set(selected)
+    if (newSelected.has(index)) {
+      newSelected.delete(index)
+    } else {
+      newSelected.add(index)
+    }
+    setSelected(newSelected)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
+        <p className="text-sm text-green-300 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          {objections.length} objeções geradas! Selecione as que deseja adicionar.
+        </p>
+      </div>
+
+      <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+        {objections.map((obj, index) => (
+          <div
+            key={index}
+            className={`bg-gray-900/50 border rounded-xl p-4 cursor-pointer transition-all ${
+              selected.has(index) ? 'border-purple-500/50 bg-purple-900/10' : 'border-gray-700/50'
+            }`}
+            onClick={() => toggleSelect(index)}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                selected.has(index) ? 'border-purple-500 bg-purple-500' : 'border-gray-500'
+              }`}>
+                {selected.has(index) && <Check className="w-3 h-3 text-white" />}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-white mb-2">"{obj.name}"</p>
+                <div className="space-y-1">
+                  {obj.rebuttals.map((rebuttal, ri) => (
+                    <p key={ri} className="text-xs text-gray-400 pl-3 border-l border-green-500/30">
+                      {rebuttal}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+        <button
+          onClick={onBack}
+          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+        >
+          Voltar
+        </button>
+        <button
+          onClick={() => onApply(Array.from(selected))}
+          disabled={selected.size === 0}
+          className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Adicionar {selected.size} Objeções
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Componente de Preview para Personas Geradas
+function AIGeneratedPersonasPreview({
+  personas,
+  onApply,
+  onBack
+}: {
+  personas: Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string}>
+  onApply: (selectedIndexes: number[]) => void
+  onBack: () => void
+}) {
+  const [selected, setSelected] = useState<Set<number>>(new Set(personas.map((_, i) => i)))
+
+  const toggleSelect = (index: number) => {
+    const newSelected = new Set(selected)
+    if (newSelected.has(index)) {
+      newSelected.delete(index)
+    } else {
+      newSelected.add(index)
+    }
+    setSelected(newSelected)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
+        <p className="text-sm text-green-300 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          {personas.length} personas geradas! Selecione as que deseja adicionar.
+        </p>
+      </div>
+
+      <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+        {personas.map((persona, index) => (
+          <div
+            key={index}
+            className={`bg-gray-900/50 border rounded-xl p-4 cursor-pointer transition-all ${
+              selected.has(index) ? 'border-purple-500/50 bg-purple-900/10' : 'border-gray-700/50'
+            }`}
+            onClick={() => toggleSelect(index)}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                selected.has(index) ? 'border-purple-500 bg-purple-500' : 'border-gray-500'
+              }`}>
+                {selected.has(index) && <Check className="w-3 h-3 text-white" />}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    persona.tipo === 'B2B' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'
+                  }`}>
+                    {persona.tipo}
+                  </span>
+                  <p className="font-medium text-white">{persona.cargo}</p>
+                </div>
+                <p className="text-xs text-gray-400 mb-1"><strong>Empresa:</strong> {persona.tipo_empresa_faturamento}</p>
+                <p className="text-xs text-gray-400 mb-1"><strong>Contexto:</strong> {persona.contexto}</p>
+                <p className="text-xs text-gray-400 mb-1"><strong>Busca:</strong> {persona.busca}</p>
+                <p className="text-xs text-gray-400"><strong>Dores:</strong> {persona.dores}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+        <button
+          onClick={onBack}
+          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+        >
+          Voltar
+        </button>
+        <button
+          onClick={() => onApply(Array.from(selected))}
+          disabled={selected.size === 0}
+          className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Adicionar {selected.size} Personas
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Componente de Preview para Objetivos Gerados
+function AIGeneratedObjectivesPreview({
+  objectives,
+  onApply,
+  onBack
+}: {
+  objectives: Array<{name: string, description: string}>
+  onApply: (selectedIndexes: number[]) => void
+  onBack: () => void
+}) {
+  const [selected, setSelected] = useState<Set<number>>(new Set(objectives.map((_, i) => i)))
+
+  const toggleSelect = (index: number) => {
+    const newSelected = new Set(selected)
+    if (newSelected.has(index)) {
+      newSelected.delete(index)
+    } else {
+      newSelected.add(index)
+    }
+    setSelected(newSelected)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
+        <p className="text-sm text-green-300 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          {objectives.length} objetivos gerados! Selecione os que deseja adicionar.
+        </p>
+      </div>
+
+      <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+        {objectives.map((obj, index) => (
+          <div
+            key={index}
+            className={`bg-gray-900/50 border rounded-xl p-4 cursor-pointer transition-all ${
+              selected.has(index) ? 'border-purple-500/50 bg-purple-900/10' : 'border-gray-700/50'
+            }`}
+            onClick={() => toggleSelect(index)}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                selected.has(index) ? 'border-purple-500 bg-purple-500' : 'border-gray-500'
+              }`}>
+                {selected.has(index) && <Check className="w-3 h-3 text-white" />}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-white mb-1">{obj.name}</p>
+                <p className="text-xs text-gray-400">{obj.description}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+        <button
+          onClick={onBack}
+          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+        >
+          Voltar
+        </button>
+        <button
+          onClick={() => onApply(Array.from(selected))}
+          disabled={selected.size === 0}
+          className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Adicionar {selected.size} Objetivos
+        </button>
       </div>
     </div>
   )
@@ -3980,6 +4509,9 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
   // Estado para modal de IA Auto-Fill
   const [showAIModal, setShowAIModal] = useState(false)
+
+  // Estado para modal de IA Geração de Conteúdo
+  const [showAIGenerateModal, setShowAIGenerateModal] = useState<'objections' | 'personas' | 'objectives' | null>(null)
 
   // Check user role on mount
   useEffect(() => {
@@ -4058,6 +4590,8 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 setShowCompanyEvaluationModal={setShowCompanyEvaluationModal}
                 showAIModal={showAIModal}
                 setShowAIModal={setShowAIModal}
+                showAIGenerateModal={showAIGenerateModal}
+                setShowAIGenerateModal={setShowAIGenerateModal}
               />
             ) : (
               // Access denied - Not admin
