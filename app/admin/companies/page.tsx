@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -18,6 +18,8 @@ interface Company {
   training_plan?: PlanType
   selection_plan?: PlanType | null
   locked?: boolean
+  monthly_credits_used?: number
+  monthly_credits_reset_at?: string
   _count?: {
     employees: number
   }
@@ -197,6 +199,12 @@ export default function CompaniesAdmin() {
   const [selectedTrainingPlan, setSelectedTrainingPlan] = useState<PlanType>(PlanType.INDIVIDUAL)
   const [selectedSelectionPlan, setSelectedSelectionPlan] = useState<PlanType | null>(null)
   const [updatingPlan, setUpdatingPlan] = useState(false)
+
+  // Estados para adicionar créditos
+  const [showCreditsModal, setShowCreditsModal] = useState(false)
+  const [companyToAddCredits, setCompanyToAddCredits] = useState<Company | null>(null)
+  const [creditsToAdd, setCreditsToAdd] = useState('')
+  const [addingCredits, setAddingCredits] = useState(false)
 
   // Estados para visualizar roleplays
   const [showRoleplaysModal, setShowRoleplaysModal] = useState(false)
@@ -400,6 +408,49 @@ export default function CompaniesAdmin() {
       showToast('error', 'Erro ao atualizar planos', error.message)
     } finally {
       setUpdatingPlan(false)
+    }
+  }
+
+  // Funções para adicionar créditos
+  const handleAddCreditsClick = (company: Company) => {
+    setCompanyToAddCredits(company)
+    setCreditsToAdd('')
+    setShowCreditsModal(true)
+  }
+
+  const handleAddCredits = async () => {
+    if (!companyToAddCredits || !creditsToAdd) return
+
+    const credits = parseInt(creditsToAdd)
+    if (isNaN(credits) || credits <= 0) {
+      showToast('error', 'Valor inválido', 'Insira um número positivo de créditos')
+      return
+    }
+
+    setAddingCredits(true)
+    try {
+      const response = await fetch('/api/admin/companies/add-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: companyToAddCredits.id,
+          credits: credits
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      showToast('success', 'Créditos adicionados!', `+${credits} créditos para ${companyToAddCredits.name}`)
+      setShowCreditsModal(false)
+      setCompanyToAddCredits(null)
+      setCreditsToAdd('')
+      await loadCompanies()
+    } catch (error: any) {
+      console.error('Erro ao adicionar créditos:', error)
+      showToast('error', 'Erro ao adicionar créditos', error.message)
+    } finally {
+      setAddingCredits(false)
     }
   }
 
@@ -1016,6 +1067,13 @@ export default function CompaniesAdmin() {
                           </span>
                         </div>
                       )}
+                      {/* Créditos usados */}
+                      <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-yellow-600/20 to-amber-600/20 rounded-full">
+                        <Zap className="w-3 h-3 text-yellow-400" />
+                        <span className="text-xs font-medium text-yellow-300">
+                          {company.monthly_credits_used || 0} créditos usados
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1026,6 +1084,14 @@ export default function CompaniesAdmin() {
                       title="Editar plano"
                     >
                       <Package className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleAddCreditsClick(company)}
+                      className="p-2 text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
+                      title="Adicionar créditos"
+                    >
+                      <Zap className="w-4 h-4" />
                     </button>
 
                     <button
@@ -2300,6 +2366,114 @@ export default function CompaniesAdmin() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Adicionar Créditos */}
+        {showCreditsModal && companyToAddCredits && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-md w-full border border-yellow-500/30">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Zap className="w-6 h-6 text-yellow-400" />
+                    Adicionar Créditos
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Empresa: <span className="text-yellow-400 font-medium">{companyToAddCredits.name}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowCreditsModal(false)
+                    setCompanyToAddCredits(null)
+                    setCreditsToAdd('')
+                  }}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Créditos atuais */}
+              <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Créditos usados este mês:</span>
+                  <span className="text-xl font-bold text-yellow-400">
+                    {companyToAddCredits.monthly_credits_used || 0}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Ao adicionar créditos, o contador de créditos usados será reduzido.
+                </p>
+              </div>
+
+              {/* Input de créditos */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Quantidade de créditos a adicionar
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={creditsToAdd}
+                  onChange={(e) => setCreditsToAdd(e.target.value)}
+                  placeholder="Ex: 50, 100, 200..."
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50"
+                />
+              </div>
+
+              {/* Pacotes sugeridos */}
+              <div className="mb-6">
+                <p className="text-sm text-gray-400 mb-3">Pacotes rápidos:</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[10, 50, 100, 200, 500, 1000].map((amount) => (
+                    <button
+                      key={amount}
+                      onClick={() => setCreditsToAdd(amount.toString())}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        creditsToAdd === amount.toString()
+                          ? 'bg-yellow-600 text-white'
+                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      +{amount}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Botões */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCreditsModal(false)
+                    setCompanyToAddCredits(null)
+                    setCreditsToAdd('')
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleAddCredits}
+                  disabled={addingCredits || !creditsToAdd}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-yellow-600 to-amber-600 text-white rounded-xl hover:from-yellow-500 hover:to-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {addingCredits ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Adicionando...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      Adicionar Créditos
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
