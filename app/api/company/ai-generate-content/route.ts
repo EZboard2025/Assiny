@@ -43,18 +43,20 @@ O tipo de negócio será informado (B2B, B2C ou Ambos). Crie personas apropriada
 - B2B: Foque em cargos, empresas, contextos corporativos
 - B2C: Foque em perfis de consumidores, situações pessoais
 
-Para cada persona, forneça:
+Para cada persona, forneça TODOS os campos:
 - cargo: Cargo/Profissão da pessoa
 - tipo_empresa_faturamento: Tipo/tamanho da empresa ou situação financeira pessoal
 - contexto: Contexto atual do cliente (desafios, momento)
 - busca: O que a persona busca/precisa
 - dores: Dores e frustrações principais
+- conhecimento_previo: O que a persona já sabe sobre a empresa/produto (ex: "viu anúncio no LinkedIn", "foi indicado por colega", "não conhece a empresa ainda")
 
 REGRAS:
 - Gere entre 4 e 6 personas variadas
 - Inclua personas fáceis e difíceis de convencer
 - Seja específico e realista
 - Adapte ao segmento da empresa
+- PREENCHA TODOS OS CAMPOS para cada persona
 
 FORMATO DE RESPOSTA (JSON):
 {
@@ -65,7 +67,8 @@ FORMATO DE RESPOSTA (JSON):
       "tipo_empresa_faturamento": "Empresa de médio porte, faturamento R$5-20M/ano",
       "contexto": "Está sob pressão para aumentar leads qualificados com orçamento limitado",
       "busca": "Soluções que provem ROI rápido e sejam fáceis de implementar",
-      "dores": "Equipe enxuta, muitas ferramentas desconectadas, dificuldade em provar resultados"
+      "dores": "Equipe enxuta, muitas ferramentas desconectadas, dificuldade em provar resultados",
+      "conhecimento_previo": "Viu um case de sucesso no LinkedIn e pesquisou sobre a empresa"
     }
   ]
 }

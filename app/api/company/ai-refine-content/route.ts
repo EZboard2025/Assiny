@@ -32,12 +32,13 @@ Retorne APENAS o JSON válido.`,
 Você recebeu uma lista de personas previamente geradas e agora precisa REFINÁ-LAS com base no feedback do usuário.
 
 REGRAS:
-- Mantenha o formato original (tipo, cargo, tipo_empresa_faturamento, contexto, busca, dores)
+- Mantenha o formato original (tipo, cargo, tipo_empresa_faturamento, contexto, busca, dores, conhecimento_previo)
 - Aplique TODAS as alterações solicitadas pelo usuário
 - Se o usuário pedir para adicionar mais personas, adicione
 - Se pedir para remover ou modificar específicas, faça isso
 - Se pedir para mudar o perfil, nicho ou características, aplique
 - Mantenha entre 4 e 8 personas no total
+- SEMPRE inclua todos os campos para cada persona
 
 FORMATO DE RESPOSTA (JSON):
 {
@@ -48,7 +49,8 @@ FORMATO DE RESPOSTA (JSON):
       "tipo_empresa_faturamento": "Tipo de empresa ou situação",
       "contexto": "Contexto atual",
       "busca": "O que busca",
-      "dores": "Principais dores"
+      "dores": "Principais dores",
+      "conhecimento_previo": "O que já sabe sobre a empresa"
     }
   ]
 }

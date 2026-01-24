@@ -438,7 +438,7 @@ function ConfigurationInterface({
   const [aiGenerateLoading, setAIGenerateLoading] = useState(false)
   const [aiGenerateError, setAIGenerateError] = useState<string | null>(null)
   const [aiGeneratedObjections, setAIGeneratedObjections] = useState<Array<{name: string, rebuttals: string[]}> | null>(null)
-  const [aiGeneratedPersonas, setAIGeneratedPersonas] = useState<Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string}> | null>(null)
+  const [aiGeneratedPersonas, setAIGeneratedPersonas] = useState<Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string, conhecimento_previo?: string}> | null>(null)
   const [aiGeneratedObjectives, setAIGeneratedObjectives] = useState<Array<{name: string, description: string}> | null>(null)
   const [aiRefining, setAIRefining] = useState(false)
 
@@ -750,6 +750,8 @@ function ConfigurationInterface({
     setAIGenerateError(null)
 
     try {
+      console.log(`[AI Generate] Iniciando geração de ${contentType} para URL:`, aiGenerateUrl)
+
       const response = await fetch('/api/company/ai-generate-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -762,16 +764,22 @@ function ConfigurationInterface({
 
       const result = await response.json()
 
+      console.log(`[AI Generate] Resposta da API (${contentType}):`, JSON.stringify(result, null, 2))
+
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao gerar conteúdo')
       }
 
       // Armazenar dados gerados no estado apropriado
       if (contentType === 'objections' && result.data.objections) {
+        console.log('[AI Generate] Objeções recebidas:', result.data.objections.length)
         setAIGeneratedObjections(result.data.objections)
       } else if (contentType === 'personas' && result.data.personas) {
+        console.log('[AI Generate] Personas recebidas:', result.data.personas.length)
+        console.log('[AI Generate] Detalhes das personas:', JSON.stringify(result.data.personas, null, 2))
         setAIGeneratedPersonas(result.data.personas)
       } else if (contentType === 'objectives' && result.data.objectives) {
+        console.log('[AI Generate] Objetivos recebidos:', result.data.objectives.length)
         setAIGeneratedObjectives(result.data.objectives)
       }
 
@@ -791,6 +799,8 @@ function ConfigurationInterface({
     setAIRefining(true)
 
     try {
+      console.log(`[AI Refine] Iniciando refinamento de ${contentType} com feedback:`, feedback)
+
       // Pegar o conteúdo atual para refinar
       let currentContent
       if (contentType === 'objections') {
@@ -800,6 +810,8 @@ function ConfigurationInterface({
       } else {
         currentContent = { objectives: aiGeneratedObjectives }
       }
+
+      console.log(`[AI Refine] Conteúdo atual para refinar:`, JSON.stringify(currentContent, null, 2))
 
       const response = await fetch('/api/company/ai-refine-content', {
         method: 'POST',
@@ -813,16 +825,22 @@ function ConfigurationInterface({
 
       const result = await response.json()
 
+      console.log(`[AI Refine] Resposta da API (${contentType}):`, JSON.stringify(result, null, 2))
+
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao refinar conteúdo')
       }
 
       // Atualizar dados refinados no estado apropriado
       if (contentType === 'objections' && result.data.objections) {
+        console.log('[AI Refine] Objeções refinadas:', result.data.objections.length)
         setAIGeneratedObjections(result.data.objections)
       } else if (contentType === 'personas' && result.data.personas) {
+        console.log('[AI Refine] Personas refinadas:', result.data.personas.length)
+        console.log('[AI Refine] Detalhes das personas refinadas:', JSON.stringify(result.data.personas, null, 2))
         setAIGeneratedPersonas(result.data.personas)
       } else if (contentType === 'objectives' && result.data.objectives) {
+        console.log('[AI Refine] Objetivos refinados:', result.data.objectives.length)
         setAIGeneratedObjectives(result.data.objectives)
       }
 
@@ -830,6 +848,7 @@ function ConfigurationInterface({
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      console.error('[AI Refine] Erro:', errorMessage)
       showToast('error', 'Erro', errorMessage)
     } finally {
       setAIRefining(false)
@@ -840,10 +859,20 @@ function ConfigurationInterface({
   const handleApplyGeneratedObjections = async (selectedIndexes: number[]) => {
     if (!aiGeneratedObjections) return
 
+    console.log('[AI Objeções] Iniciando save de', selectedIndexes.length, 'objeções')
+    const results: (Objection | null)[] = []
+
     for (const index of selectedIndexes) {
       const obj = aiGeneratedObjections[index]
-      await addObjection(obj.name, obj.rebuttals)
+      console.log(`[AI Objeção ${index}] Dados:`, JSON.stringify(obj, null, 2))
+
+      const result = await addObjection(obj.name, obj.rebuttals)
+      console.log(`[AI Objeção ${index}] Resultado:`, result)
+      results.push(result)
     }
+
+    const successCount = results.filter(r => r !== null).length
+    console.log(`[AI Objeções] ${successCount}/${selectedIndexes.length} salvas com sucesso`)
 
     // Recarregar objeções
     const updatedObjections = await getObjections()
@@ -854,32 +883,89 @@ function ConfigurationInterface({
     setShowAIGenerateModal(null)
     setAIGenerateUrl('')
 
-    showToast('success', 'Objeções Adicionadas', `${selectedIndexes.length} objeções foram criadas`)
+    if (successCount === selectedIndexes.length) {
+      showToast('success', 'Objeções Adicionadas', `${successCount} objeções foram criadas`)
+    } else {
+      showToast('warning', 'Atenção', `${successCount} de ${selectedIndexes.length} objeções foram criadas`)
+    }
   }
 
-  // Aplicar personas geradas
+  // Helper para extrair valor de múltiplas possíveis chaves (a IA pode usar nomes diferentes)
+  const getFieldValue = (obj: Record<string, unknown>, ...keys: string[]): string => {
+    for (const key of keys) {
+      const value = obj[key]
+      if (value !== undefined && value !== null && value !== '') {
+        return String(value)
+      }
+    }
+    return ''
+  }
+
+  // Aplicar personas geradas (SEQUENCIAL para evitar race conditions com getCompanyId)
   const handleApplyGeneratedPersonas = async (selectedIndexes: number[]) => {
     if (!aiGeneratedPersonas) return
 
+    console.log('[AI Personas] Iniciando save de', selectedIndexes.length, 'personas')
+    console.log('[AI Personas] Dados completos:', JSON.stringify(aiGeneratedPersonas, null, 2))
+
+    const results: (Persona | null)[] = []
+
+    // Salvar sequencialmente para evitar race conditions com getCompanyId()
     for (const index of selectedIndexes) {
-      const p = aiGeneratedPersonas[index]
-      // Criar objeto persona com estrutura correta baseada no tipo
-      const personaData = p.tipo === 'B2B' ? {
+      const p = aiGeneratedPersonas[index] as Record<string, unknown>
+
+      console.log(`[AI Persona ${index}] Dados brutos da IA:`, JSON.stringify(p, null, 2))
+      console.log(`[AI Persona ${index}] Todas as chaves recebidas:`, Object.keys(p))
+
+      // Extrair valores com fallback para nomes alternativos de campos
+      const tipo = getFieldValue(p, 'tipo', 'type', 'business_type')
+      const cargo = getFieldValue(p, 'cargo', 'position', 'job_title', 'profession', 'profissao', 'titulo')
+      const tipoEmpresa = getFieldValue(p, 'tipo_empresa_faturamento', 'empresa', 'company_type', 'tipo_empresa', 'faturamento', 'company')
+      const contexto = getFieldValue(p, 'contexto', 'context', 'situacao', 'cenario')
+      const busca = getFieldValue(p, 'busca', 'what_seeks', 'company_goals', 'goals', 'objetivos', 'o_que_busca')
+      const dores = getFieldValue(p, 'dores', 'main_pains', 'business_challenges', 'challenges', 'desafios', 'problemas', 'pains')
+      const conhecimentoPrevio = getFieldValue(p, 'conhecimento_previo', 'prior_knowledge', 'conhecimento', 'o_que_sabe', 'background')
+
+      console.log(`[AI Persona ${index}] Campos extraídos:`, {
+        tipo, cargo, tipoEmpresa, contexto, busca, dores, conhecimentoPrevio
+      })
+
+      // Normalizar o tipo (case insensitive, trim whitespace)
+      const tipoNormalizado = tipo.toUpperCase().trim()
+      const isB2B = tipoNormalizado === 'B2B' || tipoNormalizado.includes('B2B')
+
+      console.log(`[AI Persona ${index}] Tipo: "${tipo}" -> Normalizado: "${tipoNormalizado}" -> isB2B: ${isB2B}`)
+
+      // Criar objeto persona com TODOS os campos preenchidos
+      const personaData = isB2B ? {
         business_type: 'B2B' as const,
-        job_title: p.cargo,
-        company_type: p.tipo_empresa_faturamento,
-        context: p.contexto,
-        company_goals: p.busca,
-        business_challenges: p.dores
+        job_title: cargo,
+        company_type: tipoEmpresa,
+        context: contexto,
+        company_goals: busca,
+        business_challenges: dores,
+        prior_knowledge: conhecimentoPrevio
       } : {
         business_type: 'B2C' as const,
-        profession: p.cargo,
-        context: p.contexto,
-        what_seeks: p.busca,
-        main_pains: p.dores
+        profession: cargo,
+        context: contexto,
+        what_seeks: busca,
+        main_pains: dores,
+        prior_knowledge: conhecimentoPrevio
       }
-      await addPersona(personaData)
+
+      console.log(`[AI Persona ${index}] Dados formatados para DB:`, JSON.stringify(personaData, null, 2))
+
+      const result = await addPersona(personaData)
+
+      console.log(`[AI Persona ${index}] Resultado do save:`, result ? JSON.stringify(result, null, 2) : 'NULL - FALHOU')
+
+      results.push(result)
     }
+
+    const successCount = results.filter(r => r !== null).length
+
+    console.log(`[AI Personas] RESULTADO FINAL: ${successCount}/${selectedIndexes.length} personas salvas com sucesso`)
 
     // Recarregar personas
     const updatedPersonas = await getPersonas()
@@ -890,7 +976,11 @@ function ConfigurationInterface({
     setShowAIGenerateModal(null)
     setAIGenerateUrl('')
 
-    showToast('success', 'Personas Adicionadas', `${selectedIndexes.length} personas foram criadas`)
+    if (successCount === selectedIndexes.length) {
+      showToast('success', 'Personas Adicionadas', `${successCount} personas foram criadas`)
+    } else {
+      showToast('warning', 'Atenção', `${successCount} de ${selectedIndexes.length} personas foram criadas`)
+    }
   }
 
   // Aplicar objetivos gerados
@@ -2758,6 +2848,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               setEditingPersonaId(persona.id!)
                               setNewPersona(persona)
                               setShowPersonaForm(true)
+                              // Definir o tipo correto da persona para mostrar o formulário correto
+                              setSelectedPersonaType(persona.business_type as 'B2B' | 'B2C')
                               // Carregar tags da persona
                               if (persona.id) {
                                 const tags = personaTags.get(persona.id) || []
@@ -4415,7 +4507,7 @@ function AIGeneratedPersonasPreview({
   onRefine,
   isRefining
 }: {
-  personas: Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string}>
+  personas: Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string, conhecimento_previo?: string}>
   onApply: (selectedIndexes: number[]) => void
   onBack: () => void
   onRefine: (feedback: string) => void
@@ -4471,7 +4563,10 @@ function AIGeneratedPersonasPreview({
                 <p className="text-xs text-gray-400 mb-1"><strong>Empresa:</strong> {persona.tipo_empresa_faturamento}</p>
                 <p className="text-xs text-gray-400 mb-1"><strong>Contexto:</strong> {persona.contexto}</p>
                 <p className="text-xs text-gray-400 mb-1"><strong>Busca:</strong> {persona.busca}</p>
-                <p className="text-xs text-gray-400"><strong>Dores:</strong> {persona.dores}</p>
+                <p className="text-xs text-gray-400 mb-1"><strong>Dores:</strong> {persona.dores}</p>
+                {persona.conhecimento_previo && (
+                  <p className="text-xs text-gray-400"><strong>Já sabe:</strong> {persona.conhecimento_previo}</p>
+                )}
               </div>
             </div>
           </div>
