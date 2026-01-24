@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -4387,41 +4387,37 @@ function AIGeneratedObjectionsPreview({
 
   return (
     <div className="space-y-4">
-      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
-        <p className="text-sm text-green-300 flex items-center gap-2">
-          <CheckCircle className="w-4 h-4" />
-          {objections.length} objeções geradas! Selecione as que deseja adicionar.
-        </p>
-      </div>
+      <p className="text-sm text-green-400 flex items-center gap-2">
+        <CheckCircle className="w-4 h-4" />
+        {objections.length} objeções geradas
+      </p>
 
-      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
         {objections.map((obj, index) => (
           <div
             key={index}
-            className={`bg-gray-900/50 border rounded-xl p-4 cursor-pointer transition-all ${
-              selected.has(index) ? 'border-purple-500/50 bg-purple-900/10' : 'border-gray-700/50'
+            className={`rounded-lg p-3 cursor-pointer transition-colors ${
+              selected.has(index)
+                ? 'bg-purple-500/10 ring-1 ring-purple-500/50'
+                : 'bg-gray-800/50 hover:bg-gray-800'
             }`}
             onClick={() => toggleSelect(index)}
           >
-            <div className="flex items-start gap-3">
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                selected.has(index) ? 'border-purple-500 bg-purple-500' : 'border-gray-500'
+            <div className="flex items-start gap-2.5">
+              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                selected.has(index)
+                  ? 'bg-purple-500'
+                  : 'border border-gray-600'
               }`}>
                 {selected.has(index) && <Check className="w-3 h-3 text-white" />}
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-white mb-3">"{obj.name}"</p>
-                <div className="space-y-2">
-                  <p className="text-xs text-green-400 font-medium uppercase tracking-wide">Como quebrar:</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white font-medium mb-2">"{obj.name}"</p>
+                <div className="space-y-1.5 text-xs">
                   {obj.rebuttals.map((rebuttal, ri) => (
-                    <div key={ri} className="flex items-start gap-2 bg-green-900/20 border border-green-500/20 rounded-lg p-3">
-                      <span className="flex-shrink-0 w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center text-xs text-green-400 font-bold">
-                        {ri + 1}
-                      </span>
-                      <p className="text-sm text-gray-300 leading-relaxed">
-                        {rebuttal}
-                      </p>
-                    </div>
+                    <p key={ri} className="text-gray-300 pl-2 border-l-2 border-green-500/40">
+                      {rebuttal}
+                    </p>
                   ))}
                 </div>
               </div>
@@ -4430,69 +4426,61 @@ function AIGeneratedObjectionsPreview({
         ))}
       </div>
 
-      {/* Seção de Refinamento */}
-      <div className="border-t border-purple-500/20 pt-4">
-        <button
-          onClick={() => setShowFeedback(!showFeedback)}
-          className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors mb-3"
-        >
-          <Edit2 className="w-4 h-4" />
-          {showFeedback ? 'Esconder opções de refinamento' : 'Quer alterar algo? Refine com IA'}
-        </button>
+      {/* Refinamento - Design chamativo */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-600/20 via-violet-600/20 to-purple-600/20 p-[1px]">
+        <div className="bg-gray-900 rounded-xl p-3">
+          <button
+            onClick={() => setShowFeedback(!showFeedback)}
+            className="w-full flex flex-col items-center justify-center gap-2"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-white">Refinar com IA</p>
+              <p className="text-[10px] text-gray-400">Ajuste as objeções geradas</p>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-purple-400 transition-transform ${showFeedback ? 'rotate-180' : ''}`} />
+          </button>
 
-        {showFeedback && (
-          <div className="space-y-3 bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
-            <p className="text-xs text-gray-400">
-              Descreva o que deseja alterar (ex: "adicione objeções sobre prazo de entrega", "torne as respostas mais diretas")
-            </p>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Ex: Quero objeções mais específicas para o setor de tecnologia..."
-              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
-              rows={2}
-              disabled={isRefining}
-            />
-            <button
-              onClick={() => {
-                if (feedback.trim()) {
-                  onRefine(feedback)
-                }
-              }}
-              disabled={!feedback.trim() || isRefining}
-              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
-            >
-              {isRefining ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Refinando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Refinar com IA
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          {showFeedback && (
+            <div className="mt-3 space-y-2">
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Ex: Adicione objeções sobre preço, torne as respostas mais diretas..."
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
+                rows={2}
+                disabled={isRefining}
+              />
+              <button
+                onClick={() => feedback.trim() && onRefine(feedback)}
+                disabled={!feedback.trim() || isRefining}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-lg text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+      <div className="flex gap-2 pt-3 border-t border-gray-800">
         <button
           onClick={onBack}
           disabled={isRefining}
-          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors disabled:opacity-50"
+          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
           disabled={selected.size === 0 || isRefining}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+          className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
-          <Plus className="w-5 h-5" />
-          Adicionar {selected.size} Objeções
+          <Plus className="w-4 h-4" />
+          Adicionar ({selected.size})
         </button>
       </div>
     </div>
@@ -4529,113 +4517,125 @@ function AIGeneratedPersonasPreview({
 
   return (
     <div className="space-y-4">
-      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
-        <p className="text-sm text-green-300 flex items-center gap-2">
-          <CheckCircle className="w-4 h-4" />
-          {personas.length} personas geradas! Selecione as que deseja adicionar.
-        </p>
-      </div>
+      <p className="text-sm text-green-400 flex items-center gap-2">
+        <CheckCircle className="w-4 h-4" />
+        {personas.length} personas geradas
+      </p>
 
-      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
         {personas.map((persona, index) => (
           <div
             key={index}
-            className={`bg-gray-900/50 border rounded-xl p-4 cursor-pointer transition-all ${
-              selected.has(index) ? 'border-purple-500/50 bg-purple-900/10' : 'border-gray-700/50'
+            className={`rounded-lg p-3 cursor-pointer transition-colors ${
+              selected.has(index)
+                ? 'bg-purple-500/10 ring-1 ring-purple-500/50'
+                : 'bg-gray-800/50 hover:bg-gray-800'
             }`}
             onClick={() => toggleSelect(index)}
           >
-            <div className="flex items-start gap-3">
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                selected.has(index) ? 'border-purple-500 bg-purple-500' : 'border-gray-500'
+            {/* Header */}
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                selected.has(index)
+                  ? 'bg-purple-500'
+                  : 'border border-gray-600'
               }`}>
                 {selected.has(index) && <Check className="w-3 h-3 text-white" />}
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    persona.tipo === 'B2B' ? 'bg-blue-500/20 text-blue-400' : 'bg-pink-500/20 text-pink-400'
-                  }`}>
-                    {persona.tipo}
-                  </span>
-                  <p className="font-medium text-white">{persona.cargo}</p>
-                </div>
-                <p className="text-xs text-gray-400 mb-1"><strong>Empresa:</strong> {persona.tipo_empresa_faturamento}</p>
-                <p className="text-xs text-gray-400 mb-1"><strong>Contexto:</strong> {persona.contexto}</p>
-                <p className="text-xs text-gray-400 mb-1"><strong>Busca:</strong> {persona.busca}</p>
-                <p className="text-xs text-gray-400 mb-1"><strong>Dores:</strong> {persona.dores}</p>
-                {persona.conhecimento_previo && (
-                  <p className="text-xs text-gray-400"><strong>Já sabe:</strong> {persona.conhecimento_previo}</p>
-                )}
-              </div>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                persona.tipo?.toUpperCase().includes('B2B')
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'bg-pink-500/20 text-pink-400'
+              }`}>
+                {persona.tipo}
+              </span>
+              <span className="font-medium text-white text-sm">{persona.cargo}</span>
+            </div>
+
+            {/* Campos com ícones */}
+            <div className="grid gap-2 text-xs ml-6">
+              <p className="flex items-start gap-1.5">
+                <Building2 className="w-3 h-3 text-blue-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-300">{persona.tipo_empresa_faturamento}</span>
+              </p>
+              <p className="flex items-start gap-1.5">
+                <FileText className="w-3 h-3 text-purple-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-300">{persona.contexto}</span>
+              </p>
+              <p className="flex items-start gap-1.5">
+                <Target className="w-3 h-3 text-green-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-300">{persona.busca}</span>
+              </p>
+              <p className="flex items-start gap-1.5">
+                <AlertCircle className="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-300">{persona.dores}</span>
+              </p>
+              {persona.conhecimento_previo && (
+                <p className="flex items-start gap-1.5">
+                  <Eye className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-300">{persona.conhecimento_previo}</span>
+                </p>
+              )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Seção de Refinamento */}
-      <div className="border-t border-purple-500/20 pt-4">
-        <button
-          onClick={() => setShowFeedback(!showFeedback)}
-          className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors mb-3"
-        >
-          <Edit2 className="w-4 h-4" />
-          {showFeedback ? 'Esconder opções de refinamento' : 'Quer alterar algo? Refine com IA'}
-        </button>
+      {/* Refinamento - Design chamativo */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-600/20 via-violet-600/20 to-purple-600/20 p-[1px]">
+        <div className="bg-gray-900 rounded-xl p-3">
+          <button
+            onClick={() => setShowFeedback(!showFeedback)}
+            className="w-full flex flex-col items-center justify-center gap-2"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-white">Refinar com IA</p>
+              <p className="text-[10px] text-gray-400">Ajuste as personas geradas</p>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-purple-400 transition-transform ${showFeedback ? 'rotate-180' : ''}`} />
+          </button>
 
-        {showFeedback && (
-          <div className="space-y-3 bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
-            <p className="text-xs text-gray-400">
-              Descreva o que deseja alterar (ex: "adicione mais personas B2C", "foque em pequenas empresas")
-            </p>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Ex: Quero personas mais focadas em startups de tecnologia..."
-              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
-              rows={2}
-              disabled={isRefining}
-            />
-            <button
-              onClick={() => {
-                if (feedback.trim()) {
-                  onRefine(feedback)
-                }
-              }}
-              disabled={!feedback.trim() || isRefining}
-              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
-            >
-              {isRefining ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Refinando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Refinar com IA
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          {showFeedback && (
+            <div className="mt-3 space-y-2">
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Ex: Adicione personas de startups, foque em empresas menores..."
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
+                rows={2}
+                disabled={isRefining}
+              />
+              <button
+                onClick={() => feedback.trim() && onRefine(feedback)}
+                disabled={!feedback.trim() || isRefining}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-lg text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+      <div className="flex gap-2 pt-3 border-t border-gray-800">
         <button
           onClick={onBack}
           disabled={isRefining}
-          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors disabled:opacity-50"
+          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
           disabled={selected.size === 0 || isRefining}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+          className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
-          <Plus className="w-5 h-5" />
-          Adicionar {selected.size} Personas
+          <Plus className="w-4 h-4" />
+          Adicionar ({selected.size})
         </button>
       </div>
     </div>
@@ -4672,100 +4672,94 @@ function AIGeneratedObjectivesPreview({
 
   return (
     <div className="space-y-4">
-      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
-        <p className="text-sm text-green-300 flex items-center gap-2">
-          <CheckCircle className="w-4 h-4" />
-          {objectives.length} objetivos gerados! Selecione os que deseja adicionar.
-        </p>
-      </div>
+      <p className="text-sm text-green-400 flex items-center gap-2">
+        <CheckCircle className="w-4 h-4" />
+        {objectives.length} objetivos gerados
+      </p>
 
-      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
         {objectives.map((obj, index) => (
           <div
             key={index}
-            className={`bg-gray-900/50 border rounded-xl p-4 cursor-pointer transition-all ${
-              selected.has(index) ? 'border-purple-500/50 bg-purple-900/10' : 'border-gray-700/50'
+            className={`rounded-lg p-3 cursor-pointer transition-colors ${
+              selected.has(index)
+                ? 'bg-purple-500/10 ring-1 ring-purple-500/50'
+                : 'bg-gray-800/50 hover:bg-gray-800'
             }`}
             onClick={() => toggleSelect(index)}
           >
-            <div className="flex items-start gap-3">
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                selected.has(index) ? 'border-purple-500 bg-purple-500' : 'border-gray-500'
+            <div className="flex items-start gap-2.5">
+              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                selected.has(index)
+                  ? 'bg-purple-500'
+                  : 'border border-gray-600'
               }`}>
                 {selected.has(index) && <Check className="w-3 h-3 text-white" />}
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-white mb-1">{obj.name}</p>
-                <p className="text-xs text-gray-400">{obj.description}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white font-medium">{obj.name}</p>
+                <p className="text-xs text-gray-300 mt-0.5">{obj.description}</p>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Seção de Refinamento */}
-      <div className="border-t border-purple-500/20 pt-4">
-        <button
-          onClick={() => setShowFeedback(!showFeedback)}
-          className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors mb-3"
-        >
-          <Edit2 className="w-4 h-4" />
-          {showFeedback ? 'Esconder opções de refinamento' : 'Quer alterar algo? Refine com IA'}
-        </button>
+      {/* Refinamento - Design chamativo */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-600/20 via-violet-600/20 to-purple-600/20 p-[1px]">
+        <div className="bg-gray-900 rounded-xl p-3">
+          <button
+            onClick={() => setShowFeedback(!showFeedback)}
+            className="w-full flex flex-col items-center justify-center gap-2"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-white">Refinar com IA</p>
+              <p className="text-[10px] text-gray-400">Ajuste os objetivos gerados</p>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-purple-400 transition-transform ${showFeedback ? 'rotate-180' : ''}`} />
+          </button>
 
-        {showFeedback && (
-          <div className="space-y-3 bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
-            <p className="text-xs text-gray-400">
-              Descreva o que deseja alterar (ex: "adicione objetivos de fechamento", "foque em técnicas de qualificação")
-            </p>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Ex: Quero objetivos mais focados em negociação de preço..."
-              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
-              rows={2}
-              disabled={isRefining}
-            />
-            <button
-              onClick={() => {
-                if (feedback.trim()) {
-                  onRefine(feedback)
-                }
-              }}
-              disabled={!feedback.trim() || isRefining}
-              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
-            >
-              {isRefining ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Refinando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Refinar com IA
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          {showFeedback && (
+            <div className="mt-3 space-y-2">
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Ex: Adicione objetivos de fechamento, foque em qualificação..."
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
+                rows={2}
+                disabled={isRefining}
+              />
+              <button
+                onClick={() => feedback.trim() && onRefine(feedback)}
+                disabled={!feedback.trim() || isRefining}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-lg text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+      <div className="flex gap-2 pt-3 border-t border-gray-800">
         <button
           onClick={onBack}
           disabled={isRefining}
-          className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors disabled:opacity-50"
+          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
           disabled={selected.size === 0 || isRefining}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+          className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
-          <Plus className="w-5 h-5" />
-          Adicionar {selected.size} Objetivos
+          <Plus className="w-4 h-4" />
+          Adicionar ({selected.size})
         </button>
       </div>
     </div>
