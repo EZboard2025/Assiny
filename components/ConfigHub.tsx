@@ -62,9 +62,6 @@ import {
 } from '@/lib/config'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import {
-  canCreatePersona,
-  canCreateObjection,
-  canAddRebuttal,
   getPlanUsageSummary,
   getCompanyTrainingPlan
 } from '@/lib/utils/planLimitsChecker'
@@ -328,9 +325,6 @@ function ConfigurationInterface({
 
   // Hook para verificar limites do plano
   const {
-    checkPersonaLimit,
-    checkObjectionLimit,
-    checkRebuttalLimit,
     trainingPlan,
     planUsage
   } = usePlanLimits()
@@ -506,25 +500,9 @@ function ConfigurationInterface({
         objectionsCount: objections.length
       })
 
-      // Verificar limite de personas
-      const personasUsed = planUsage.training?.personas?.used || personas.length || 0
-      const personasLimit = planUsage.training?.personas?.limit || 999
-      if (trainingPlan === 'pro' && personasUsed >= personasLimit) {
-        console.log('⚠️ Limite de personas atingido:', personasUsed, '/', personasLimit)
-        setPersonaLimitReached(true)
-      } else {
-        setPersonaLimitReached(false)
-      }
-
-      // Verificar limite de objeções
-      const objectionsUsed = planUsage.training?.objections?.used || objections.length || 0
-      const objectionsLimit = planUsage.training?.objections?.limit || 999
-      if (trainingPlan === 'pro' && objectionsUsed >= objectionsLimit) {
-        console.log('⚠️ Limite de objeções atingido:', objectionsUsed, '/', objectionsLimit)
-        setObjectionLimitReached(true)
-      } else {
-        setObjectionLimitReached(false)
-      }
+      // No sistema de créditos, personas e objeções são ilimitadas
+      setPersonaLimitReached(false)
+      setObjectionLimitReached(false)
     }
     checkLimits()
   }, [personas.length, objections.length, trainingPlan, planUsage])
@@ -1404,13 +1382,6 @@ function ConfigurationInterface({
         setEditingPersonaId(null)
         setSelectedPersonaTags([])
       } else {
-        // Verificar limite de personas antes de criar
-        const limitCheck = await checkPersonaLimit()
-        if (!limitCheck.allowed) {
-          showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de personas atingido para o plano')
-          return
-        }
-
         // Criar nova persona
         const result = await addPersona({ ...persona, business_type: personaType })
         if (result) {
@@ -1459,13 +1430,6 @@ function ConfigurationInterface({
         setEditingPersonaId(null)
         setSelectedPersonaTags([])
       } else {
-        // Verificar limite de personas antes de criar
-        const limitCheck = await checkPersonaLimit()
-        if (!limitCheck.allowed) {
-          showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de personas atingido para o plano')
-          return
-        }
-
         // Criar nova persona
         const result = await addPersona({ ...persona, business_type: personaType })
         if (result) {
@@ -1640,13 +1604,6 @@ function ConfigurationInterface({
 
   const handleAddObjection = async () => {
     if (newObjection.trim()) {
-      // Verificar limite de objeções antes de criar
-      const limitCheck = await checkObjectionLimit()
-      if (!limitCheck.allowed) {
-        showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de objeções atingido para o plano')
-        return
-      }
-
       const objection = await addObjection(newObjection.trim(), [])
       if (objection) {
         setObjections([...objections, objection])
@@ -1662,14 +1619,6 @@ function ConfigurationInterface({
 
     const objection = objections.find(o => o.id === objectionId)
     if (!objection) return
-
-    // Verificar limite de formas de quebrar antes de adicionar
-    const currentRebuttalCount = objection.rebuttals?.length || 0
-    const limitCheck = await checkRebuttalLimit(currentRebuttalCount)
-    if (!limitCheck.allowed) {
-      showToast('error', 'Limite atingido', limitCheck.reason || 'Limite de formas de quebrar atingido para o plano')
-      return
-    }
 
     const updatedRebuttals = [...(objection.rebuttals || []), newRebuttal.trim()]
     const success = await updateObjection(objectionId, objection.name, updatedRebuttals)
@@ -2513,14 +2462,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="flex items-center gap-3">
                   <h3 className="text-xl font-bold">Personas {businessType === 'Ambos' ? 'B2B e B2C' : businessType}</h3>
                   {/* Contador de Personas */}
-                  <div className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                    personaLimitReached
-                      ? 'bg-red-900/30 border border-red-500/40 text-red-400'
-                      : trainingPlan === 'pro'
-                      ? 'bg-yellow-900/30 border border-yellow-500/40 text-yellow-400'
-                      : 'bg-green-900/30 border border-green-500/40 text-green-400'
-                  }`}>
-                    {planUsage?.training?.personas?.used || personas.length || 0}/{planUsage?.training?.personas?.limit || '∞'} personas
+                  <div className="px-3 py-1 rounded-lg text-sm font-medium bg-green-900/30 border border-green-500/40 text-green-400">
+                    {personas.length} personas
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -3238,14 +3181,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="flex items-center gap-3">
                   <h3 className="text-xl font-bold">Principais Objeções</h3>
                   {/* Contador de Objeções */}
-                  <div className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                    objectionLimitReached
-                      ? 'bg-red-900/30 border border-red-500/40 text-red-400'
-                      : trainingPlan === 'pro'
-                      ? 'bg-yellow-900/30 border border-yellow-500/40 text-yellow-400'
-                      : 'bg-green-900/30 border border-green-500/40 text-green-400'
-                  }`}>
-                    {planUsage?.training?.objections?.used || objections.length || 0}/{planUsage?.training?.objections?.limit || '∞'} objeções
+                  <div className="px-3 py-1 rounded-lg text-sm font-medium bg-green-900/30 border border-green-500/40 text-green-400">
+                    {objections.length} objeções
                   </div>
                 </div>
                 <button
@@ -3393,14 +3330,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="text-sm font-medium text-gray-400">Formas de Quebrar:</h4>
                               {/* Contador de formas de quebrar */}
-                              <div className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                trainingPlan === 'pro' && objection.rebuttals?.length >= 3
-                                  ? 'bg-red-900/30 border border-red-500/40 text-red-400'
-                                  : trainingPlan === 'pro'
-                                  ? 'bg-yellow-900/30 border border-yellow-500/40 text-yellow-400'
-                                  : 'bg-green-900/30 border border-green-500/40 text-green-400'
-                              }`}>
-                                {objection.rebuttals?.length || 0}/{trainingPlan === 'pro' ? '3' : '∞'}
+                              <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-900/30 border border-green-500/40 text-green-400">
+                                {objection.rebuttals?.length || 0}
                               </div>
                             </div>
 
@@ -3478,60 +3409,27 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             )}
 
                             {/* Adicionar nova forma de quebra */}
-                            {/* Verificar limite de formas de quebrar */}
-                            {trainingPlan === 'pro' && objection.rebuttals?.length >= 3 ? (
-                              <div className="bg-yellow-900/20 border border-yellow-500/40 rounded-lg p-2 flex items-center gap-2">
-                                <Lock className="w-4 h-4 text-yellow-400" />
-                                <span className="text-xs text-yellow-300">
-                                  Limite de 3 formas de quebrar atingido - Plano PRO
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  value={editingObjectionId === objection.id ? newRebuttal : ''}
-                                  onFocus={() => setEditingObjectionId(objection.id)}
-                                  onChange={(e) => setNewRebuttal(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !(trainingPlan === 'pro' && objection.rebuttals?.length >= 3)) {
-                                      handleAddRebuttal(objection.id)
-                                    }
-                                  }}
-                                  disabled={trainingPlan === 'pro' && objection.rebuttals?.length >= 3}
-                                  className={`flex-1 px-3 py-2 bg-gray-800/50 border rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none ${
-                                    trainingPlan === 'pro' && objection.rebuttals?.length >= 3
-                                      ? 'border-gray-700 opacity-50 cursor-not-allowed'
-                                      : 'border-green-500/20 focus:border-green-500/40'
-                                  }`}
-                                  placeholder={
-                                    trainingPlan === 'pro' && objection.rebuttals?.length >= 3
-                                      ? "Limite de formas de quebrar atingido"
-                                      : "Ex: Apresentar cálculo de ROI detalhado mostrando retorno em 6 meses com base em cases reais do segmento"
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={editingObjectionId === objection.id ? newRebuttal : ''}
+                                onFocus={() => setEditingObjectionId(objection.id)}
+                                onChange={(e) => setNewRebuttal(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleAddRebuttal(objection.id)
                                   }
-                                />
-                                <button
-                                  onClick={() => handleAddRebuttal(objection.id)}
-                                  disabled={trainingPlan === 'pro' && objection.rebuttals?.length >= 3}
-                                  className={`px-4 py-2 rounded-lg font-medium transition-transform text-sm ${
-                                    trainingPlan === 'pro' && objection.rebuttals?.length >= 3
-                                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
-                                      : 'bg-gradient-to-r from-green-600 to-green-500 hover:scale-105'
-                                  }`}
-                                  title={
-                                    trainingPlan === 'pro' && objection.rebuttals?.length >= 3
-                                      ? 'Limite de 3 formas de quebrar atingido no plano PRO'
-                                      : ''
-                                  }
-                                >
-                                  {trainingPlan === 'pro' && objection.rebuttals?.length >= 3 ? (
-                                    <Lock className="w-4 h-4" />
-                                  ) : (
-                                    <Plus className="w-4 h-4" />
-                                  )}
-                                </button>
-                              </div>
-                            )}
+                                }}
+                                className="flex-1 px-3 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                                placeholder="Ex: Apresentar cálculo de ROI detalhado mostrando retorno em 6 meses com base em cases reais do segmento"
+                              />
+                              <button
+                                onClick={() => handleAddRebuttal(objection.id)}
+                                className="px-4 py-2 rounded-lg font-medium transition-transform text-sm bg-gradient-to-r from-green-600 to-green-500 hover:scale-105"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )}

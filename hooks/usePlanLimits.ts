@@ -1,16 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  canCreatePersona,
-  canCreateObjection,
-  canAddRebuttal,
   canCreateRoleplay,
+  canAddSeller,
   hasAccessToChatIA,
   hasAccessToPDI,
   hasAccessToFollowUp,
   getPlanUsageSummary,
   getCompanyTrainingPlan,
   getCompanySelectionPlan,
-  incrementRoleplayCount
+  incrementCreditsUsed,
+  getRemainingCredits
 } from '@/lib/utils/planLimitsChecker'
 import { PlanType } from '@/lib/types/plans'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
@@ -51,32 +50,27 @@ export function usePlanLimits() {
     }
   }
 
-  const checkPersonaLimit = useCallback(async () => {
-    if (!companyId) return { allowed: false, reason: 'Empresa não encontrada' }
-    return await canCreatePersona(companyId)
-  }, [companyId])
-
-  const checkObjectionLimit = useCallback(async () => {
-    if (!companyId) return { allowed: false, reason: 'Empresa não encontrada' }
-    return await canCreateObjection(companyId)
-  }, [companyId])
-
-  const checkRebuttalLimit = useCallback(async (currentRebuttals: number) => {
-    if (!trainingPlan) return { allowed: false, reason: 'Plano não encontrado' }
-    return canAddRebuttal(currentRebuttals, trainingPlan)
-  }, [trainingPlan])
-
   const checkRoleplayLimit = useCallback(async () => {
     if (!companyId) return { allowed: false, reason: 'Empresa não encontrada' }
     return await canCreateRoleplay(companyId)
   }, [companyId])
 
-  const incrementRoleplay = useCallback(async () => {
+  const checkSellerLimit = useCallback(async () => {
+    if (!companyId) return { allowed: false, reason: 'Empresa não encontrada' }
+    return await canAddSeller(companyId)
+  }, [companyId])
+
+  const incrementCredits = useCallback(async () => {
     if (!companyId) return
-    await incrementRoleplayCount(companyId)
+    await incrementCreditsUsed(companyId)
     // Recarregar dados de uso
     const usage = await getPlanUsageSummary(companyId)
     setPlanUsage(usage)
+  }, [companyId])
+
+  const getCredits = useCallback(async () => {
+    if (!companyId) return { remaining: null, limit: null, used: 0, resetDate: null }
+    return await getRemainingCredits(companyId)
   }, [companyId])
 
   const checkChatIAAccess = useCallback(async () => {
@@ -106,11 +100,11 @@ export function usePlanLimits() {
     selectionPlan,
     planUsage,
     loading,
-    checkPersonaLimit,
-    checkObjectionLimit,
-    checkRebuttalLimit,
     checkRoleplayLimit,
-    incrementRoleplay,
+    checkSellerLimit,
+    incrementCredits,
+    incrementRoleplay: incrementCredits, // Alias for backwards compatibility
+    getCredits,
     checkChatIAAccess,
     checkPDIAccess,
     checkFollowUpAccess,

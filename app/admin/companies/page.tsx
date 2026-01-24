@@ -194,7 +194,7 @@ export default function CompaniesAdmin() {
   // Estados para editar plano
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [companyToEditPlan, setCompanyToEditPlan] = useState<Company | null>(null)
-  const [selectedTrainingPlan, setSelectedTrainingPlan] = useState<PlanType>(PlanType.OG)
+  const [selectedTrainingPlan, setSelectedTrainingPlan] = useState<PlanType>(PlanType.INDIVIDUAL)
   const [selectedSelectionPlan, setSelectedSelectionPlan] = useState<PlanType | null>(null)
   const [updatingPlan, setUpdatingPlan] = useState(false)
 
@@ -363,7 +363,7 @@ export default function CompaniesAdmin() {
 
   const handleEditPlanClick = (company: Company) => {
     setCompanyToEditPlan(company)
-    setSelectedTrainingPlan(company.training_plan || PlanType.OG)
+    setSelectedTrainingPlan(company.training_plan || PlanType.INDIVIDUAL)
     setSelectedSelectionPlan(company.selection_plan || null)
     setShowPlanModal(true)
   }
@@ -1669,89 +1669,119 @@ export default function CompaniesAdmin() {
                     Planos de Treinamento
                   </h3>
                   <div className="space-y-2">
-                    {/* OG Plan */}
+                    {/* Individual Plan */}
                     <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedTrainingPlan === PlanType.OG
-                        ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 border-2 border-purple-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        value={PlanType.OG}
-                        checked={selectedTrainingPlan === PlanType.OG}
-                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.OG]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-purple-600/50 to-pink-600/50 text-emerald-300 rounded-full">
-                            Early Adopters
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2">Para nossos primeiros clientes - tudo ilimitado!</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-300 rounded">∞ Roleplays/semana</span>
-                          <span className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-300 rounded">∞ Personas</span>
-                          <span className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-300 rounded">∞ Objeções</span>
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">✓ Todos os recursos</span>
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* PRO Plan */}
-                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedTrainingPlan === PlanType.PRO
-                        ? 'bg-gradient-to-r from-blue-600/30 to-cyan-600/30 border-2 border-blue-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        value={PlanType.PRO}
-                        checked={selectedTrainingPlan === PlanType.PRO}
-                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PRO]}</span>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2">Para equipes em crescimento</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">4 Roleplays/semana</span>
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">3 Personas</span>
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">10 Objeções</span>
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">3 formas/objeção</span>
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* MAX Plan */}
-                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedTrainingPlan === PlanType.MAX
+                      selectedTrainingPlan === PlanType.INDIVIDUAL
                         ? 'bg-gradient-to-r from-green-600/30 to-emerald-600/30 border-2 border-green-500'
                         : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
                     }`}>
                       <input
                         type="radio"
-                        value={PlanType.MAX}
-                        checked={selectedTrainingPlan === PlanType.MAX}
+                        value={PlanType.INDIVIDUAL}
+                        checked={selectedTrainingPlan === PlanType.INDIVIDUAL}
                         onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
                         className="sr-only"
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.MAX]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-green-600/50 to-emerald-600/50 text-green-300 rounded-full">
-                            Premium
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.INDIVIDUAL]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-green-600/50 text-green-200 rounded-full">
+                            R$ 129/mês
                           </span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-2">Recursos ilimitados para grandes equipes</p>
+                        <p className="text-sm text-gray-400 mb-2">Para vendedores individuais</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ Roleplays/semana</span>
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ Personas</span>
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ Objeções</span>
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">∞ formas/objeção</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">20 simulações/mês</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">1 vendedor</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">✓ Todos os recursos</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Team Plan */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedTrainingPlan === PlanType.TEAM
+                        ? 'bg-gradient-to-r from-blue-600/30 to-cyan-600/30 border-2 border-blue-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        value={PlanType.TEAM}
+                        checked={selectedTrainingPlan === PlanType.TEAM}
+                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.TEAM]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-blue-600/50 text-blue-200 rounded-full">
+                            R$ 1.999/mês
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">Para equipes pequenas e médias</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">400 simulações/mês</span>
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">Até 20 vendedores</span>
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">+50 sim = R$250</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Business Plan */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedTrainingPlan === PlanType.BUSINESS
+                        ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 border-2 border-purple-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        value={PlanType.BUSINESS}
+                        checked={selectedTrainingPlan === PlanType.BUSINESS}
+                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.BUSINESS]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-purple-600/50 text-purple-200 rounded-full">
+                            R$ 4.999/mês
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">Para equipes grandes</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">1.000 simulações/mês</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">20-50 vendedores</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+50 sim = R$250</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+100 sim = R$450</span>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Enterprise Plan */}
+                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
+                      selectedTrainingPlan === PlanType.ENTERPRISE
+                        ? 'bg-gradient-to-r from-amber-600/30 to-orange-600/30 border-2 border-amber-500'
+                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                    }`}>
+                      <input
+                        type="radio"
+                        value={PlanType.ENTERPRISE}
+                        checked={selectedTrainingPlan === PlanType.ENTERPRISE}
+                        onChange={(e) => setSelectedTrainingPlan(e.target.value as PlanType)}
+                        className="sr-only"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.ENTERPRISE]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-amber-600/50 text-amber-200 rounded-full">
+                            Personalizado
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-2">Para grandes operações - preço negociável</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">Simulações ilimitadas</span>
+                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">+50 vendedores</span>
+                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">Suporte dedicado</span>
                         </div>
                       </div>
                     </label>

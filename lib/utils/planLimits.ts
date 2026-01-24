@@ -1,11 +1,11 @@
 import { supabase } from '@/lib/supabase'
-import { PlanType, PLAN_CONFIGS, hasFeature, checkLimit } from '@/lib/types/plans'
+import { PlanType, PLAN_CONFIGS } from '@/lib/types/plans'
 
 interface CompanyPlanData {
   id: string
-  plan: PlanType
-  weekly_roleplay_count: number
-  weekly_roleplay_reset_at: string
+  training_plan: PlanType
+  monthly_credits_used: number
+  monthly_credits_reset_at: string
   selection_candidates_used: number
   selection_plan_expires_at: string | null
 }
@@ -17,7 +17,7 @@ export async function getCompanyPlanData(companyId: string): Promise<CompanyPlan
   try {
     const { data, error } = await supabase
       .from('companies')
-      .select('id, plan, weekly_roleplay_count, weekly_roleplay_reset_at, selection_candidates_used, selection_plan_expires_at')
+      .select('id, training_plan, monthly_credits_used, monthly_credits_reset_at, selection_candidates_used, selection_plan_expires_at')
       .eq('id', companyId)
       .single()
 
@@ -26,23 +26,26 @@ export async function getCompanyPlanData(companyId: string): Promise<CompanyPlan
       return null
     }
 
-    // Verificar se precisa resetar o contador semanal
-    const lastReset = new Date(data.weekly_roleplay_reset_at)
+    // Verificar se precisa resetar o contador mensal
+    const lastReset = new Date(data.monthly_credits_reset_at)
     const now = new Date()
-    const daysSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24)
 
-    // Se passou mais de 7 dias, resetar contador
-    if (daysSinceReset >= 7) {
+    // Verifica se passou para um novo mês
+    const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
+                       now.getFullYear() !== lastReset.getFullYear()
+
+    // Se mudou o mês, resetar contador
+    if (isNewMonth) {
       await supabase
         .from('companies')
         .update({
-          weekly_roleplay_count: 0,
-          weekly_roleplay_reset_at: now.toISOString()
+          monthly_credits_used: 0,
+          monthly_credits_reset_at: now.toISOString()
         })
         .eq('id', companyId)
 
-      data.weekly_roleplay_count = 0
-      data.weekly_roleplay_reset_at = now.toISOString()
+      data.monthly_credits_used = 0
+      data.monthly_credits_reset_at = now.toISOString()
     }
 
     return data as CompanyPlanData
@@ -58,9 +61,9 @@ export async function getCompanyPlanData(companyId: string): Promise<CompanyPlan
 export async function canCreateRoleplay(companyId: string): Promise<{
   allowed: boolean
   reason?: string
-  limit?: number
+  limit?: number | null
   used?: number
-  remaining?: number
+  remaining?: number | null
 }> {
   const planData = await getCompanyPlanData(companyId)
 
@@ -68,7 +71,7 @@ export async function canCreateRoleplay(companyId: string): Promise<{
     return { allowed: false, reason: 'Erro ao verificar plano' }
   }
 
-  const config = PLAN_CONFIGS[planData.plan]
+  const config = PLAN_CONFIGS[planData.training_plan]
 
   // Se é plano de processo seletivo, não pode fazer roleplay de treinamento
   if (config.isSelectionPlan) {
@@ -80,73 +83,71 @@ export async function canCreateRoleplay(companyId: string): Promise<{
     return { allowed: false, reason: 'Seu plano não inclui simulações de roleplay' }
   }
 
-  // Verificar limite semanal
-  if (config.maxRoleplaysPerWeek === null) {
+  // Verificar limite mensal de créditos
+  if (config.monthlyCredits === null) {
     return { allowed: true } // Ilimitado
   }
 
-  const remaining = config.maxRoleplaysPerWeek - planData.weekly_roleplay_count
+  const remaining = config.monthlyCredits - planData.monthly_credits_used
 
   if (remaining <= 0) {
     return {
       allowed: false,
-      reason: `Limite semanal de ${config.maxRoleplaysPerWeek} simulações atingido`,
-      limit: config.maxRoleplaysPerWeek,
-      used: planData.weekly_roleplay_count,
+      reason: `Limite de ${config.monthlyCredits} simulações/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
+      limit: config.monthlyCredits,
+      used: planData.monthly_credits_used,
       remaining: 0
     }
   }
 
   return {
     allowed: true,
-    limit: config.maxRoleplaysPerWeek,
-    used: planData.weekly_roleplay_count,
+    limit: config.monthlyCredits,
+    used: planData.monthly_credits_used,
     remaining
   }
 }
 
 /**
- * Incrementa o contador de roleplays usados
+ * Incrementa o contador de créditos usados
  */
-export async function incrementRoleplayCount(companyId: string): Promise<boolean> {
+export async function incrementCreditsUsed(companyId: string): Promise<boolean> {
   try {
-    const { error } = await supabase.rpc('increment', {
-      table_name: 'companies',
-      column_name: 'weekly_roleplay_count',
-      row_id: companyId
-    })
+    const { data: current } = await supabase
+      .from('companies')
+      .select('monthly_credits_used')
+      .eq('id', companyId)
+      .single()
 
-    if (error) {
-      // Se a função RPC não existir, fazer update manual
-      const { data: current } = await supabase
+    if (current) {
+      await supabase
         .from('companies')
-        .select('weekly_roleplay_count')
+        .update({ monthly_credits_used: (current.monthly_credits_used || 0) + 1 })
         .eq('id', companyId)
-        .single()
-
-      if (current) {
-        await supabase
-          .from('companies')
-          .update({ weekly_roleplay_count: (current.weekly_roleplay_count || 0) + 1 })
-          .eq('id', companyId)
-      }
     }
 
     return true
   } catch (error) {
-    console.error('Erro ao incrementar contador de roleplay:', error)
+    console.error('Erro ao incrementar contador de créditos:', error)
     return false
   }
 }
 
 /**
- * Verifica se pode criar personas
+ * Alias para compatibilidade - incrementa contador de roleplay
  */
-export async function canCreatePersona(companyId: string, currentCount: number): Promise<{
+export async function incrementRoleplayCount(companyId: string): Promise<boolean> {
+  return incrementCreditsUsed(companyId)
+}
+
+/**
+ * Verifica se pode adicionar um novo vendedor
+ */
+export async function canAddSeller(companyId: string, currentCount: number): Promise<{
   allowed: boolean
   reason?: string
-  limit?: number
-  remaining?: number
+  limit?: number | null
+  remaining?: number | null
 }> {
   const planData = await getCompanyPlanData(companyId)
 
@@ -154,88 +155,28 @@ export async function canCreatePersona(companyId: string, currentCount: number):
     return { allowed: false, reason: 'Erro ao verificar plano' }
   }
 
-  const config = PLAN_CONFIGS[planData.plan]
+  const config = PLAN_CONFIGS[planData.training_plan]
 
-  if (!config.hasCustomPersonas) {
-    return { allowed: false, reason: 'Seu plano não permite criar personas personalizadas' }
-  }
-
-  if (config.maxPersonas === null) {
+  if (config.maxSellers === null) {
     return { allowed: true } // Ilimitado
   }
 
-  const remaining = config.maxPersonas - currentCount
+  const remaining = config.maxSellers - currentCount
 
   if (remaining <= 0) {
     return {
       allowed: false,
-      reason: `Limite de ${config.maxPersonas} personas atingido`,
-      limit: config.maxPersonas,
+      reason: `Limite de ${config.maxSellers} vendedor(es) atingido`,
+      limit: config.maxSellers,
       remaining: 0
     }
   }
 
   return {
     allowed: true,
-    limit: config.maxPersonas,
+    limit: config.maxSellers,
     remaining
   }
-}
-
-/**
- * Verifica se pode criar objeções
- */
-export async function canCreateObjection(companyId: string, currentCount: number): Promise<{
-  allowed: boolean
-  reason?: string
-  limit?: number
-  remaining?: number
-}> {
-  const planData = await getCompanyPlanData(companyId)
-
-  if (!planData) {
-    return { allowed: false, reason: 'Erro ao verificar plano' }
-  }
-
-  const config = PLAN_CONFIGS[planData.plan]
-
-  if (!config.hasCustomObjections) {
-    return { allowed: false, reason: 'Seu plano não permite criar objeções personalizadas' }
-  }
-
-  if (config.maxObjections === null) {
-    return { allowed: true } // Ilimitado
-  }
-
-  const remaining = config.maxObjections - currentCount
-
-  if (remaining <= 0) {
-    return {
-      allowed: false,
-      reason: `Limite de ${config.maxObjections} objeções atingido`,
-      limit: config.maxObjections,
-      remaining: 0
-    }
-  }
-
-  return {
-    allowed: true,
-    limit: config.maxObjections,
-    remaining
-  }
-}
-
-/**
- * Verifica quantas formas de quebrar objeção o plano permite
- */
-export async function getMaxRebuttals(companyId: string): Promise<number> {
-  const planData = await getCompanyPlanData(companyId)
-
-  if (!planData) {
-    return 3 // Default
-  }
-
-  return PLAN_CONFIGS[planData.plan].maxObjectionRebuttals
 }
 
 /**
@@ -248,7 +189,7 @@ export async function canUseChatIA(companyId: string): Promise<boolean> {
     return false
   }
 
-  return PLAN_CONFIGS[planData.plan].hasChatIA
+  return PLAN_CONFIGS[planData.training_plan].hasChatIA
 }
 
 /**
@@ -261,7 +202,7 @@ export async function canUseFollowUp(companyId: string): Promise<boolean> {
     return true // Por enquanto liberado para todos
   }
 
-  return PLAN_CONFIGS[planData.plan].hasFollowUp
+  return PLAN_CONFIGS[planData.training_plan].hasFollowUp
 }
 
 /**
@@ -274,7 +215,7 @@ export async function canGeneratePDI(companyId: string): Promise<boolean> {
     return false
   }
 
-  return PLAN_CONFIGS[planData.plan].hasPDI
+  return PLAN_CONFIGS[planData.training_plan].hasPDI
 }
 
 /**
@@ -287,7 +228,7 @@ export async function canAccessConfigHub(companyId: string): Promise<boolean> {
     return false
   }
 
-  return PLAN_CONFIGS[planData.plan].hasConfigHub
+  return PLAN_CONFIGS[planData.training_plan].hasConfigHub
 }
 
 /**
@@ -296,9 +237,9 @@ export async function canAccessConfigHub(companyId: string): Promise<boolean> {
 export async function canCreateSelectionCandidate(companyId: string): Promise<{
   allowed: boolean
   reason?: string
-  limit?: number
+  limit?: number | null
   used?: number
-  remaining?: number
+  remaining?: number | null
 }> {
   const planData = await getCompanyPlanData(companyId)
 
@@ -306,7 +247,7 @@ export async function canCreateSelectionCandidate(companyId: string): Promise<{
     return { allowed: false, reason: 'Erro ao verificar plano' }
   }
 
-  const config = PLAN_CONFIGS[planData.plan]
+  const config = PLAN_CONFIGS[planData.training_plan]
 
   // Verificar se é plano de processo seletivo
   if (!config.isSelectionPlan) {
@@ -370,5 +311,32 @@ export async function incrementSelectionCandidateCount(companyId: string): Promi
   } catch (error) {
     console.error('Erro ao incrementar contador de candidatos:', error)
     return false
+  }
+}
+
+/**
+ * Obter créditos restantes
+ */
+export async function getRemainingCredits(companyId: string): Promise<{
+  remaining: number | null
+  limit: number | null
+  used: number
+  resetDate: string | null
+}> {
+  const planData = await getCompanyPlanData(companyId)
+
+  if (!planData) {
+    return { remaining: null, limit: null, used: 0, resetDate: null }
+  }
+
+  const config = PLAN_CONFIGS[planData.training_plan]
+  const limit = config.monthlyCredits
+  const used = planData.monthly_credits_used || 0
+
+  return {
+    remaining: limit !== null ? Math.max(0, limit - used) : null,
+    limit,
+    used,
+    resetDate: planData.monthly_credits_reset_at
   }
 }

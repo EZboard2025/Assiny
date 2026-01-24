@@ -99,15 +99,15 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     loadData()
   }, [])
 
-  // Verificar limite de roleplays semanais
+  // Verificar limite de créditos mensais
   useEffect(() => {
     if (planUsage && trainingPlan) {
-      const used = planUsage.training?.roleplays?.used || 0
-      const limit = planUsage.training?.roleplays?.limit || 999
+      const used = planUsage.training?.credits?.used || 0
+      const limit = planUsage.training?.credits?.limit
 
-      if (trainingPlan === 'pro' && used >= limit) {
+      if (limit !== null && used >= limit) {
         setRoleplayLimitReached(true)
-        console.log('⚠️ Limite semanal de roleplays atingido:', used, '/', limit)
+        console.log('⚠️ Limite de créditos mensais atingido:', used, '/', limit)
       } else {
         setRoleplayLimitReached(false)
       }
@@ -1156,41 +1156,30 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
             <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30">
-              {/* Contador de Roleplays Semanais */}
+              {/* Contador de Créditos Mensais */}
               {planUsage && (
                 <div className="flex justify-center mb-6">
                   <div className={`px-4 py-2 rounded-xl flex items-center gap-3 ${
-                    trainingPlan === 'pro' && planUsage.training?.roleplays?.used >= planUsage.training?.roleplays?.limit
+                    planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
                       ? 'bg-red-900/30 border border-red-500/40'
-                      : trainingPlan === 'pro'
-                      ? 'bg-yellow-900/30 border border-yellow-500/40'
                       : 'bg-green-900/30 border border-green-500/40'
                   }`}>
                     <Zap className={`w-5 h-5 ${
-                      trainingPlan === 'pro' && planUsage.training?.roleplays?.used >= planUsage.training?.roleplays?.limit
+                      planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
                         ? 'text-red-400'
-                        : trainingPlan === 'pro'
-                        ? 'text-yellow-400'
                         : 'text-green-400'
                     }`} />
                     <div className="flex flex-col">
                       <span className={`text-sm font-medium ${
-                        trainingPlan === 'pro' && planUsage.training?.roleplays?.used >= planUsage.training?.roleplays?.limit
+                        planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
                           ? 'text-red-400'
-                          : trainingPlan === 'pro'
-                          ? 'text-yellow-400'
                           : 'text-green-400'
                       }`}>
-                        Simulações esta semana: {planUsage.training?.roleplays?.used || 0}/{planUsage.training?.roleplays?.limit === 999 ? '∞' : planUsage.training?.roleplays?.limit || 0}
+                        Créditos este mês: {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
                       </span>
-                      {trainingPlan === 'pro' && planUsage.training?.roleplays?.used === planUsage.training?.roleplays?.limit - 1 && (
+                      {planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used === planUsage.training?.credits?.limit - 1 && (
                         <span className="text-xs text-yellow-400 font-semibold animate-pulse">
-                          ⚠️ Última simulação disponível!
-                        </span>
-                      )}
-                      {trainingPlan === 'pro' && planUsage.training?.roleplays?.resetDate && (
-                        <span className="text-xs text-gray-400">
-                          Reseta em: {new Date(planUsage.training.roleplays.resetDate).toLocaleDateString('pt-BR', { weekday: 'long' })}
+                          ⚠️ Último crédito disponível!
                         </span>
                       )}
                     </div>

@@ -5,9 +5,9 @@ import { PlanType, PLAN_CONFIGS, isTrainingPlan, isSelectionPlan } from '@/lib/t
 export interface PlanCheckResult {
   allowed: boolean
   reason?: string
-  limit?: number
+  limit?: number | null
   currentUsage?: number
-  remaining?: number
+  remaining?: number | null
 }
 
 // Buscar o plano de treinamento da empresa
@@ -48,41 +48,44 @@ export async function getCompanySelectionPlan(companyId: string): Promise<PlanTy
   return data.selection_plan as PlanType | null
 }
 
-// Verificar se precisa resetar o contador semanal
-async function checkAndResetWeeklyCounter(companyId: string): Promise<void> {
+// Verificar se precisa resetar o contador mensal de créditos
+async function checkAndResetMonthlyCredits(companyId: string): Promise<void> {
   const { data: company } = await supabase
     .from('companies')
-    .select('weekly_roleplay_reset_at')
+    .select('monthly_credits_reset_at')
     .eq('id', companyId)
     .single()
 
   if (!company) return
 
-  const lastReset = new Date(company.weekly_roleplay_reset_at)
+  const lastReset = new Date(company.monthly_credits_reset_at)
   const now = new Date()
-  const daysSinceReset = Math.floor((now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24))
 
-  // Reset se passou mais de 7 dias
-  if (daysSinceReset >= 7) {
+  // Verifica se passou para um novo mês
+  const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
+                     now.getFullYear() !== lastReset.getFullYear()
+
+  // Reset se mudou o mês
+  if (isNewMonth) {
     await supabase
       .from('companies')
       .update({
-        weekly_roleplay_count: 0,
-        weekly_roleplay_reset_at: now.toISOString()
+        monthly_credits_used: 0,
+        monthly_credits_reset_at: now.toISOString()
       })
       .eq('id', companyId)
   }
 }
 
-// Verificar se pode criar um novo roleplay
+// Verificar se pode criar uma nova simulação (roleplay)
 export async function canCreateRoleplay(companyId: string, userId?: string): Promise<PlanCheckResult> {
   // Resetar contador se necessário
-  await checkAndResetWeeklyCounter(companyId)
+  await checkAndResetMonthlyCredits(companyId)
 
   // Buscar plano e contador atual
   const { data: company } = await supabase
     .from('companies')
-    .select('training_plan, weekly_roleplay_count')
+    .select('training_plan, monthly_credits_used')
     .eq('id', companyId)
     .single()
 
@@ -91,24 +94,24 @@ export async function canCreateRoleplay(companyId: string, userId?: string): Pro
   }
 
   const plan = company.training_plan as PlanType
-  const currentCount = company.weekly_roleplay_count || 0
+  const currentUsage = company.monthly_credits_used || 0
   const config = PLAN_CONFIGS[plan]
 
-  // Planos ilimitados (OG e MAX)
-  if (!config.maxRoleplaysPerWeek) {
+  // Planos ilimitados (Enterprise)
+  if (config.monthlyCredits === null) {
     return { allowed: true }
   }
 
-  // Verificar limite do plano PRO
-  const limit = config.maxRoleplaysPerWeek
-  const remaining = limit - currentCount
+  // Verificar limite de créditos mensais
+  const limit = config.monthlyCredits
+  const remaining = limit - currentUsage
 
   if (remaining <= 0) {
     return {
       allowed: false,
-      reason: `Limite semanal de ${limit} simulações atingido. Resets às segundas-feiras.`,
+      reason: `Limite de ${limit} simulações/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
       limit,
-      currentUsage: currentCount,
+      currentUsage,
       remaining: 0
     }
   }
@@ -116,52 +119,57 @@ export async function canCreateRoleplay(companyId: string, userId?: string): Pro
   return {
     allowed: true,
     limit,
-    currentUsage: currentCount,
+    currentUsage,
     remaining
   }
 }
 
-// Incrementar contador de roleplay
-export async function incrementRoleplayCount(companyId: string): Promise<void> {
+// Incrementar contador de créditos usados
+export async function incrementCreditsUsed(companyId: string): Promise<void> {
   const { data: company } = await supabase
     .from('companies')
-    .select('weekly_roleplay_count')
+    .select('monthly_credits_used')
     .eq('id', companyId)
     .single()
 
-  const currentCount = company?.weekly_roleplay_count || 0
+  const currentUsage = company?.monthly_credits_used || 0
 
   await supabase
     .from('companies')
-    .update({ weekly_roleplay_count: currentCount + 1 })
+    .update({ monthly_credits_used: currentUsage + 1 })
     .eq('id', companyId)
 }
 
-// Verificar se pode criar uma nova persona
-export async function canCreatePersona(companyId: string): Promise<PlanCheckResult> {
+// Alias para compatibilidade - incrementar contador de roleplay
+export async function incrementRoleplayCount(companyId: string): Promise<void> {
+  return incrementCreditsUsed(companyId)
+}
+
+// Verificar se pode adicionar um novo vendedor
+export async function canAddSeller(companyId: string): Promise<PlanCheckResult> {
   const plan = await getCompanyTrainingPlan(companyId)
   if (!plan) return { allowed: false, reason: 'Plano não encontrado' }
 
   const config = PLAN_CONFIGS[plan]
 
   // Planos ilimitados
-  if (!config.maxPersonas) {
+  if (config.maxSellers === null) {
     return { allowed: true }
   }
 
-  // Contar personas atuais
+  // Contar vendedores atuais
   const { count } = await supabase
-    .from('personas')
+    .from('employees')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', companyId)
 
   const currentCount = count || 0
-  const limit = config.maxPersonas
+  const limit = config.maxSellers
 
   if (currentCount >= limit) {
     return {
       allowed: false,
-      reason: `Limite de ${limit} personas atingido para o plano ${plan.toUpperCase()}.`,
+      reason: `Limite de ${limit} vendedor(es) atingido para o plano ${plan.toUpperCase()}.`,
       limit,
       currentUsage: currentCount,
       remaining: 0
@@ -173,68 +181,6 @@ export async function canCreatePersona(companyId: string): Promise<PlanCheckResu
     limit,
     currentUsage: currentCount,
     remaining: limit - currentCount
-  }
-}
-
-// Verificar se pode criar uma nova objeção
-export async function canCreateObjection(companyId: string): Promise<PlanCheckResult> {
-  const plan = await getCompanyTrainingPlan(companyId)
-  if (!plan) return { allowed: false, reason: 'Plano não encontrado' }
-
-  const config = PLAN_CONFIGS[plan]
-
-  // Planos ilimitados
-  if (!config.maxObjections) {
-    return { allowed: true }
-  }
-
-  // Contar objeções atuais
-  const { count } = await supabase
-    .from('objections')
-    .select('*', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-
-  const currentCount = count || 0
-  const limit = config.maxObjections
-
-  if (currentCount >= limit) {
-    return {
-      allowed: false,
-      reason: `Limite de ${limit} objeções atingido para o plano ${plan.toUpperCase()}.`,
-      limit,
-      currentUsage: currentCount,
-      remaining: 0
-    }
-  }
-
-  return {
-    allowed: true,
-    limit,
-    currentUsage: currentCount,
-    remaining: limit - currentCount
-  }
-}
-
-// Verificar limite de rebuttals por objeção
-export function canAddRebuttal(currentRebuttals: number, plan: PlanType): PlanCheckResult {
-  const config = PLAN_CONFIGS[plan]
-  const limit = config.maxObjectionRebuttals
-
-  if (currentRebuttals >= limit) {
-    return {
-      allowed: false,
-      reason: `Limite de ${limit} formas de quebrar objeção atingido para o plano ${plan.toUpperCase()}.`,
-      limit,
-      currentUsage: currentRebuttals,
-      remaining: 0
-    }
-  }
-
-  return {
-    allowed: true,
-    limit,
-    currentUsage: currentRebuttals,
-    remaining: limit - currentRebuttals
   }
 }
 
@@ -351,17 +297,12 @@ export async function getPlanUsageSummary(companyId: string) {
 
   const { data: company } = await supabase
     .from('companies')
-    .select('weekly_roleplay_count, selection_candidates_count, weekly_roleplay_reset_at, selection_plan_expires_at')
+    .select('monthly_credits_used, selection_candidates_count, monthly_credits_reset_at, selection_plan_expires_at')
     .eq('id', companyId)
     .single()
 
-  const { count: personasCount } = await supabase
-    .from('personas')
-    .select('*', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-
-  const { count: objectionsCount } = await supabase
-    .from('objections')
+  const { count: sellersCount } = await supabase
+    .from('employees')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', companyId)
 
@@ -371,24 +312,21 @@ export async function getPlanUsageSummary(companyId: string) {
   return {
     training: {
       plan: trainingPlan,
-      roleplays: {
-        used: company?.weekly_roleplay_count || 0,
-        limit: trainingConfig.maxRoleplaysPerWeek,
-        resetDate: company?.weekly_roleplay_reset_at
+      credits: {
+        used: company?.monthly_credits_used || 0,
+        limit: trainingConfig.monthlyCredits,
+        resetDate: company?.monthly_credits_reset_at
       },
-      personas: {
-        used: personasCount || 0,
-        limit: trainingConfig.maxPersonas
-      },
-      objections: {
-        used: objectionsCount || 0,
-        limit: trainingConfig.maxObjections
+      sellers: {
+        count: sellersCount || 0,
+        limit: trainingConfig.maxSellers
       },
       features: {
         chatIA: trainingConfig.hasChatIA,
         pdi: trainingConfig.hasPDI,
         followUp: trainingConfig.hasFollowUp
-      }
+      },
+      extraCreditsPackages: trainingConfig.extraCreditsPackages
     },
     selection: selectionPlan ? {
       plan: selectionPlan,
@@ -398,5 +336,37 @@ export async function getPlanUsageSummary(companyId: string) {
         expiresAt: company?.selection_plan_expires_at
       }
     } : null
+  }
+}
+
+// Obter créditos restantes
+export async function getRemainingCredits(companyId: string): Promise<{
+  remaining: number | null
+  limit: number | null
+  used: number
+  resetDate: string | null
+}> {
+  await checkAndResetMonthlyCredits(companyId)
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('training_plan, monthly_credits_used, monthly_credits_reset_at')
+    .eq('id', companyId)
+    .single()
+
+  if (!company) {
+    return { remaining: null, limit: null, used: 0, resetDate: null }
+  }
+
+  const plan = company.training_plan as PlanType
+  const config = PLAN_CONFIGS[plan]
+  const used = company.monthly_credits_used || 0
+  const limit = config.monthlyCredits
+
+  return {
+    remaining: limit !== null ? Math.max(0, limit - used) : null,
+    limit,
+    used,
+    resetDate: company.monthly_credits_reset_at
   }
 }
