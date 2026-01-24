@@ -70,6 +70,7 @@ import {
 } from '@/lib/utils/planLimitsChecker'
 import { PlanType } from '@/lib/types/plans'
 import { useToast } from '@/components/Toast'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 interface ConfigHubProps {
   onClose: () => void
@@ -378,6 +379,19 @@ function ConfigurationInterface({
   // Estados para controle de limites
   const [personaLimitReached, setPersonaLimitReached] = useState(false)
   const [objectionLimitReached, setObjectionLimitReached] = useState(false)
+
+  // Estado para modal de confirmação de exclusão
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean
+    type: 'tag' | 'employee' | 'persona' | 'objection' | 'objective' | 'stage' | null
+    id: string | null
+    name: string
+  }>({
+    isOpen: false,
+    type: null,
+    id: null,
+    name: ''
+  })
 
   // Paleta de cores para tags
   const tagColorPalette = [
@@ -1106,9 +1120,16 @@ function ConfigurationInterface({
     }
   }
 
-  const handleDeleteTag = async (tagId: string) => {
-    if (!confirm('Tem certeza que deseja deletar esta etiqueta?')) return
+  const handleDeleteTag = async (tagId: string, tagName?: string) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'tag',
+      id: tagId,
+      name: tagName || 'esta etiqueta'
+    })
+  }
 
+  const executeDeleteTag = async (tagId: string) => {
     try {
       const success = await deleteTag(tagId)
       if (success) {
@@ -1122,7 +1143,7 @@ function ConfigurationInterface({
       }
     } catch (error) {
       console.error('Erro ao deletar tag:', error)
-      alert('Erro ao deletar etiqueta')
+      showToast('error', 'Erro', 'Erro ao deletar etiqueta')
     }
   }
 
@@ -1218,8 +1239,16 @@ function ConfigurationInterface({
     }
   }
 
-  const handleDeleteEmployee = async (id: string, email: string) => {
-    if (!confirm('Tem certeza que deseja excluir este funcionário?')) return
+  const handleDeleteEmployee = async (id: string, email: string, name?: string) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'employee',
+      id: `${id}|${email}`,
+      name: name || email
+    })
+  }
+
+  const executeDeleteEmployee = async (id: string, email: string) => {
     const success = await deleteEmployee(id, email)
     if (success) {
       setEmployees(employees.filter(e => e.id !== id))
@@ -1453,8 +1482,16 @@ function ConfigurationInterface({
     }
   }
 
-  const handleDeletePersona = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta persona?')) return
+  const handleDeletePersona = async (id: string, name?: string) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'persona',
+      id,
+      name: name || 'esta persona'
+    })
+  }
+
+  const executeDeletePersona = async (id: string) => {
     const success = await deletePersona(id)
     if (success) {
       setPersonas(personas.filter(p => p.id !== id))
@@ -1704,8 +1741,16 @@ function ConfigurationInterface({
     }
   }
 
-  const handleRemoveObjection = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta objeção?')) return
+  const handleRemoveObjection = async (id: string, name?: string) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'objection',
+      id,
+      name: name || 'esta objeção'
+    })
+  }
+
+  const executeDeleteObjection = async (id: string) => {
     const success = await deleteObjection(id)
     if (success) {
       setObjections(objections.filter(o => o.id !== id))
@@ -1908,9 +1953,16 @@ function ConfigurationInterface({
     }
   }
 
-  const handleDeleteObjective = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este objetivo?')) return
+  const handleDeleteObjective = async (id: string, name?: string) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'objective',
+      id,
+      name: name || 'este objetivo'
+    })
+  }
 
+  const executeDeleteObjective = async (id: string) => {
     const success = await deleteRoleplayObjective(id)
     if (success) {
       setObjectives(objectives.filter(o => o.id !== id))
@@ -1974,9 +2026,16 @@ function ConfigurationInterface({
     }
   }
 
-  const handleDeleteFunnelStage = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta fase?')) return
+  const handleDeleteFunnelStage = async (id: string, name?: string) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'stage',
+      id,
+      name: name || 'esta fase'
+    })
+  }
 
+  const executeDeleteFunnelStage = async (id: string) => {
     const success = await deleteFunnelStage(id)
     if (success) {
       setFunnelStages(funnelStages.filter(s => s.id !== id))
@@ -1998,6 +2057,36 @@ function ConfigurationInterface({
     setEditStageName('')
     setEditStageDescription('')
     setEditStageObjective('')
+  }
+
+  // Handler para confirmar exclusão no modal
+  const handleConfirmDelete = async () => {
+    const { type, id } = deleteConfirmModal
+    if (!id) return
+
+    switch (type) {
+      case 'tag':
+        await executeDeleteTag(id)
+        break
+      case 'employee':
+        const [empId, email] = id.split('|')
+        await executeDeleteEmployee(empId, email)
+        break
+      case 'persona':
+        await executeDeletePersona(id)
+        break
+      case 'objection':
+        await executeDeleteObjection(id)
+        break
+      case 'objective':
+        await executeDeleteObjective(id)
+        break
+      case 'stage':
+        await executeDeleteFunnelStage(id)
+        break
+    }
+
+    setDeleteConfirmModal({ isOpen: false, type: null, id: null, name: '' })
   }
 
   const handleDragEndFunnelStages = async (event: DragEndEvent) => {
@@ -4352,6 +4441,24 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           </div>,
           document.body
         )}
+
+        {/* Modal de Confirmação de Exclusão */}
+        <ConfirmModal
+          isOpen={deleteConfirmModal.isOpen}
+          onClose={() => setDeleteConfirmModal({ isOpen: false, type: null, id: null, name: '' })}
+          onConfirm={handleConfirmDelete}
+          title="Confirmar Exclusão"
+          message={
+            <span>
+              Tem certeza que deseja excluir <strong className="text-white">{deleteConfirmModal.name}</strong>?
+              <br />
+              <span className="text-gray-400 text-sm">Esta ação não pode ser desfeita.</span>
+            </span>
+          }
+          confirmText="Excluir"
+          cancelText="Cancelar"
+          confirmButtonClass="bg-red-600 hover:bg-red-700"
+        />
       </div>
     </div>
   )
