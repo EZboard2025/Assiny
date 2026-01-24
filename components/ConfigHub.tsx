@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
@@ -4127,9 +4128,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           </div>
         )}
 
-        {/* Modal de Geração de Conteúdo com IA - Tela Cheia */}
-        {showAIGenerateModal && (
-          <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center p-4">
+        {/* Modal de Geração de Conteúdo com IA - Tela Cheia (Portal) */}
+        {showAIGenerateModal && typeof document !== 'undefined' && createPortal(
+          <div className="fixed inset-0 bg-black z-[9999] flex items-center justify-center p-4">
             <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden">
               {/* Gradient background */}
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/10 rounded-3xl blur-xl"></div>
@@ -4256,7 +4257,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>
@@ -4316,12 +4318,18 @@ function AIGeneratedObjectionsPreview({
                 {selected.has(index) && <Check className="w-3 h-3 text-white" />}
               </div>
               <div className="flex-1">
-                <p className="font-medium text-white mb-2">"{obj.name}"</p>
-                <div className="space-y-1">
+                <p className="font-medium text-white mb-3">"{obj.name}"</p>
+                <div className="space-y-2">
+                  <p className="text-xs text-green-400 font-medium uppercase tracking-wide">Como quebrar:</p>
                   {obj.rebuttals.map((rebuttal, ri) => (
-                    <p key={ri} className="text-xs text-gray-400 pl-3 border-l border-green-500/30">
-                      {rebuttal}
-                    </p>
+                    <div key={ri} className="flex items-start gap-2 bg-green-900/20 border border-green-500/20 rounded-lg p-3">
+                      <span className="flex-shrink-0 w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center text-xs text-green-400 font-bold">
+                        {ri + 1}
+                      </span>
+                      <p className="text-sm text-gray-300 leading-relaxed">
+                        {rebuttal}
+                      </p>
+                    </div>
                   ))}
                 </div>
               </div>
