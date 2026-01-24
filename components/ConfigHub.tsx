@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -298,7 +298,9 @@ function ConfigurationInterface({
   qualityEvaluation,
   setQualityEvaluation,
   showCompanyEvaluationModal,
-  setShowCompanyEvaluationModal
+  setShowCompanyEvaluationModal,
+  showAIModal,
+  setShowAIModal
 }: {
   personaEvaluation: any
   setPersonaEvaluation: (val: any) => void
@@ -312,6 +314,8 @@ function ConfigurationInterface({
   setQualityEvaluation: (val: any) => void
   showCompanyEvaluationModal: boolean
   setShowCompanyEvaluationModal: (val: boolean) => void
+  showAIModal: boolean
+  setShowAIModal: (val: boolean) => void
 }) {
   const { currentCompany } = useCompany()
   const { showToast } = useToast()
@@ -415,6 +419,13 @@ function ConfigurationInterface({
   const [companyDataId, setCompanyDataId] = useState<string | null>(null)
   const [savingCompanyData, setSavingCompanyData] = useState(false)
   const [companyDataEdited, setCompanyDataEdited] = useState(false)
+
+  // Estados para IA Auto-Fill (showAIModal vem como prop)
+  const [aiUrl, setAIUrl] = useState('')
+  const [aiLoading, setAILoading] = useState(false)
+  const [aiPreviewData, setAIPreviewData] = useState<typeof companyData | null>(null)
+  const [aiConfidence, setAIConfidence] = useState<Record<string, number>>({})
+  const [aiError, setAIError] = useState<string | null>(null)
 
   // Estados para Fases do Funil
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
@@ -646,6 +657,71 @@ function ConfigurationInterface({
     } finally {
       setSavingCompanyData(false)
     }
+  }
+
+  // Extrair dados do site da empresa com IA
+  const handleAIExtract = async () => {
+    if (!aiUrl.trim()) {
+      showToast('warning', 'URL Vazia', 'Digite a URL do site da empresa')
+      return
+    }
+
+    setAILoading(true)
+    setAIError(null)
+
+    try {
+      const response = await fetch('/api/company/ai-extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: aiUrl })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao extrair dados')
+      }
+
+      if (result.warning) {
+        showToast('warning', 'Atenção', result.warning)
+      }
+
+      setAIPreviewData(result.data)
+      setAIConfidence(result.confidence || {})
+      showToast('success', 'Dados Extraídos', 'Revise os dados antes de aplicar')
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      setAIError(errorMessage)
+      showToast('error', 'Erro', 'Não foi possível extrair dados do site')
+    } finally {
+      setAILoading(false)
+    }
+  }
+
+  // Aplicar dados extraídos pela IA no formulário
+  const handleApplyAIData = () => {
+    if (!aiPreviewData) return
+
+    setCompanyData({
+      nome: aiPreviewData.nome || companyData.nome,
+      descricao: aiPreviewData.descricao || companyData.descricao,
+      produtos_servicos: aiPreviewData.produtos_servicos || companyData.produtos_servicos,
+      funcao_produtos: aiPreviewData.funcao_produtos || companyData.funcao_produtos,
+      diferenciais: aiPreviewData.diferenciais || companyData.diferenciais,
+      concorrentes: aiPreviewData.concorrentes || companyData.concorrentes,
+      dados_metricas: aiPreviewData.dados_metricas || companyData.dados_metricas,
+      erros_comuns: aiPreviewData.erros_comuns || companyData.erros_comuns,
+      percepcao_desejada: aiPreviewData.percepcao_desejada || companyData.percepcao_desejada,
+      dores_resolvidas: aiPreviewData.dores_resolvidas || companyData.dores_resolvidas
+    })
+
+    setCompanyDataEdited(true)
+    setShowAIModal(false)
+    setAIPreviewData(null)
+    setAIUrl('')
+
+    showToast('success', 'Dados Aplicados', 'Revise e salve os dados')
   }
 
   const loadData = async () => {
@@ -3321,7 +3397,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
               {/* Formulário de Dados da Empresa */}
               <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">
-                <h4 className="text-lg font-semibold mb-6">Informações da Empresa</h4>
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className="text-lg font-semibold">Informações da Empresa</h4>
+                  <button
+                    onClick={() => setShowAIModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Preencher com IA
+                  </button>
+                </div>
                 <div className="space-y-6">
                   {/* Nome da Empresa */}
                   <div>
@@ -3668,6 +3753,166 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             </div>
           </div>
         )}
+
+        {/* Modal de IA Auto-Fill */}
+        {showAIModal && (
+          <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
+            <div className="animate-slide-in">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-purple-500/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Preencher com IA</h3>
+                    <p className="text-xs text-gray-400">Extraia dados automaticamente do site</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowAIModal(false)
+                    setAIPreviewData(null)
+                    setAIError(null)
+                    setAIUrl('')
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Input de URL */}
+              {!aiPreviewData && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      URL do Site da Empresa
+                    </label>
+                    <input
+                      type="url"
+                      value={aiUrl}
+                      onChange={(e) => setAIUrl(e.target.value)}
+                      placeholder="https://www.empresa.com.br"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      disabled={aiLoading}
+                    />
+                  </div>
+
+                  {aiError && (
+                    <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3">
+                      <p className="text-sm text-red-300">{aiError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleAIExtract}
+                    disabled={aiLoading || !aiUrl.trim()}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {aiLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Extraindo dados...
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-5 h-5" />
+                        Extrair Dados do Site
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-xs text-gray-500 text-center">
+                    A IA irá analisar o site e extrair informações relevantes. Você poderá revisar antes de aplicar.
+                  </p>
+                </div>
+              )}
+
+              {/* Preview dos Dados */}
+              {aiPreviewData && (
+                <div className="space-y-4">
+                  <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3 mb-4">
+                    <p className="text-sm text-green-300 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Dados extraídos! Revise antes de aplicar.
+                    </p>
+                  </div>
+
+                  {/* Campos com Preview */}
+                  <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
+                    {Object.entries(aiPreviewData)
+                      .filter(([key]) => !key.startsWith('_'))
+                      .map(([campo, valor]) => {
+                        const fieldLabels: Record<string, string> = {
+                          nome: 'Nome',
+                          descricao: 'Descrição',
+                          produtos_servicos: 'Produtos/Serviços',
+                          funcao_produtos: 'Função dos Produtos',
+                          diferenciais: 'Diferenciais',
+                          concorrentes: 'Concorrentes',
+                          dados_metricas: 'Dados/Métricas',
+                          erros_comuns: 'Erros Comuns',
+                          percepcao_desejada: 'Percepção Desejada',
+                          dores_resolvidas: 'Dores Resolvidas'
+                        }
+                        const confidence = aiConfidence[campo]
+
+                        return (
+                          <div key={campo} className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs text-gray-400 uppercase tracking-wider">
+                                {fieldLabels[campo] || campo}
+                              </label>
+                              {confidence !== undefined && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  confidence >= 0.8 ? 'bg-green-500/20 text-green-400' :
+                                  confidence >= 0.5 ? 'bg-yellow-500/20 text-yellow-400' :
+                                  'bg-red-500/20 text-red-400'
+                                }`}>
+                                  {Math.round(confidence * 100)}%
+                                </span>
+                              )}
+                            </div>
+                            <textarea
+                              value={valor as string}
+                              onChange={(e) => setAIPreviewData({
+                                ...aiPreviewData,
+                                [campo]: e.target.value
+                              })}
+                              rows={2}
+                              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
+                              placeholder={!valor ? '(não encontrado)' : undefined}
+                            />
+                          </div>
+                        )
+                      })}
+                  </div>
+
+                  {/* Botões de Ação */}
+                  <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+                    <button
+                      onClick={() => {
+                        setAIPreviewData(null)
+                        setAIError(null)
+                      }}
+                      className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={handleApplyAIData}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      Aplicar Dados
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -3733,6 +3978,9 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
   } | null>(null)
   const [showCompanyEvaluationModal, setShowCompanyEvaluationModal] = useState(false)
 
+  // Estado para modal de IA Auto-Fill
+  const [showAIModal, setShowAIModal] = useState(false)
+
   // Check user role on mount
   useEffect(() => {
     checkUserRole()
@@ -3765,7 +4013,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className={`relative max-w-5xl w-full max-h-[90vh] overflow-hidden transition-transform duration-300 ${
-        showPersonaEvaluationModal || showCompanyEvaluationModal ? 'sm:-translate-x-[250px]' :
+        showPersonaEvaluationModal || showCompanyEvaluationModal || showAIModal ? 'sm:-translate-x-[250px]' :
         showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
       }`}>
         <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
@@ -3808,6 +4056,8 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 setQualityEvaluation={setQualityEvaluation}
                 showCompanyEvaluationModal={showCompanyEvaluationModal}
                 setShowCompanyEvaluationModal={setShowCompanyEvaluationModal}
+                showAIModal={showAIModal}
+                setShowAIModal={setShowAIModal}
               />
             ) : (
               // Access denied - Not admin
