@@ -4540,7 +4540,6 @@ function AIGeneratedObjectionsPreview({
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(objections.map((_, i) => i)))
   const [feedback, setFeedback] = useState('')
-  const [showFeedback, setShowFeedback] = useState(false)
 
   const toggleSelect = (index: number) => {
     const newSelected = new Set(selected)
@@ -4593,43 +4592,42 @@ function AIGeneratedObjectionsPreview({
         ))}
       </div>
 
-      {/* Refinamento - Design chamativo */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-600/20 via-violet-600/20 to-purple-600/20 p-[1px]">
-        <div className="bg-gray-900 rounded-xl p-3">
-          <button
-            onClick={() => setShowFeedback(!showFeedback)}
-            className="w-full flex flex-col items-center justify-center gap-2"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+      {/* Refinamento - Sempre visível e intuitivo */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-fuchsia-500/20 p-[1px] animate-gradient-x bg-[length:200%_200%]">
+        <div className="bg-gray-900/95 rounded-xl p-4">
+          {/* Header com indicador visual */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 via-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
             </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-white">Refinar com IA</p>
-              <p className="text-[10px] text-gray-400">Ajuste as objeções geradas</p>
+            <div>
+              <p className="text-sm font-semibold text-white">Refinar com IA</p>
+              <p className="text-[11px] text-gray-400">Descreva ajustes para melhorar as objeções</p>
             </div>
-            <ChevronDown className={`w-5 h-5 text-purple-400 transition-transform ${showFeedback ? 'rotate-180' : ''}`} />
-          </button>
+          </div>
 
-          {showFeedback && (
-            <div className="mt-3 space-y-2">
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Ex: Adicione objeções sobre preço, torne as respostas mais diretas..."
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
-                rows={2}
-                disabled={isRefining}
-              />
-              <button
-                onClick={() => feedback.trim() && onRefine(feedback)}
-                disabled={!feedback.trim() || isRefining}
-                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-lg text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
-              </button>
-            </div>
-          )}
+          {/* Textarea sempre visível */}
+          <textarea
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="✨ Digite suas observações aqui...&#10;Ex: Adicione objeções sobre preço, torne as respostas mais diretas, foque em concorrência..."
+            className="w-full px-3 py-2.5 bg-gray-800/80 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-sm resize-none transition-all"
+            rows={3}
+            disabled={isRefining}
+          />
+
+          {/* Botão de refinar */}
+          <button
+            onClick={() => feedback.trim() && onRefine(feedback)}
+            disabled={!feedback.trim() || isRefining}
+            className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-500 rounded-lg text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+          >
+            {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+          </button>
         </div>
       </div>
 
@@ -4670,7 +4668,6 @@ function AIGeneratedPersonasPreview({
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(personas.map((_, i) => i)))
   const [feedback, setFeedback] = useState('')
-  const [showFeedback, setShowFeedback] = useState(false)
 
   const toggleSelect = (index: number) => {
     const newSelected = new Set(selected)
@@ -4748,43 +4745,42 @@ function AIGeneratedPersonasPreview({
         ))}
       </div>
 
-      {/* Refinamento - Design chamativo */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-600/20 via-violet-600/20 to-purple-600/20 p-[1px]">
-        <div className="bg-gray-900 rounded-xl p-3">
-          <button
-            onClick={() => setShowFeedback(!showFeedback)}
-            className="w-full flex flex-col items-center justify-center gap-2"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+      {/* Refinamento - Sempre visível e intuitivo */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-fuchsia-500/20 p-[1px] animate-gradient-x bg-[length:200%_200%]">
+        <div className="bg-gray-900/95 rounded-xl p-4">
+          {/* Header com indicador visual */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 via-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
             </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-white">Refinar com IA</p>
-              <p className="text-[10px] text-gray-400">Ajuste as personas geradas</p>
+            <div>
+              <p className="text-sm font-semibold text-white">Refinar com IA</p>
+              <p className="text-[11px] text-gray-400">Descreva ajustes para melhorar as personas</p>
             </div>
-            <ChevronDown className={`w-5 h-5 text-purple-400 transition-transform ${showFeedback ? 'rotate-180' : ''}`} />
-          </button>
+          </div>
 
-          {showFeedback && (
-            <div className="mt-3 space-y-2">
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Ex: Adicione personas de startups, foque em empresas menores..."
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
-                rows={2}
-                disabled={isRefining}
-              />
-              <button
-                onClick={() => feedback.trim() && onRefine(feedback)}
-                disabled={!feedback.trim() || isRefining}
-                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-lg text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
-              </button>
-            </div>
-          )}
+          {/* Textarea sempre visível */}
+          <textarea
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="✨ Digite suas observações aqui...&#10;Ex: Adicione personas de startups, foque em empresas menores, inclua mais B2C..."
+            className="w-full px-3 py-2.5 bg-gray-800/80 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-sm resize-none transition-all"
+            rows={3}
+            disabled={isRefining}
+          />
+
+          {/* Botão de refinar */}
+          <button
+            onClick={() => feedback.trim() && onRefine(feedback)}
+            disabled={!feedback.trim() || isRefining}
+            className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-500 rounded-lg text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+          >
+            {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+          </button>
         </div>
       </div>
 
@@ -4825,7 +4821,6 @@ function AIGeneratedObjectivesPreview({
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(objectives.map((_, i) => i)))
   const [feedback, setFeedback] = useState('')
-  const [showFeedback, setShowFeedback] = useState(false)
 
   const toggleSelect = (index: number) => {
     const newSelected = new Set(selected)
@@ -4872,43 +4867,42 @@ function AIGeneratedObjectivesPreview({
         ))}
       </div>
 
-      {/* Refinamento - Design chamativo */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-600/20 via-violet-600/20 to-purple-600/20 p-[1px]">
-        <div className="bg-gray-900 rounded-xl p-3">
-          <button
-            onClick={() => setShowFeedback(!showFeedback)}
-            className="w-full flex flex-col items-center justify-center gap-2"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+      {/* Refinamento - Sempre visível e intuitivo */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-fuchsia-500/20 p-[1px] animate-gradient-x bg-[length:200%_200%]">
+        <div className="bg-gray-900/95 rounded-xl p-4">
+          {/* Header com indicador visual */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 via-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
             </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-white">Refinar com IA</p>
-              <p className="text-[10px] text-gray-400">Ajuste os objetivos gerados</p>
+            <div>
+              <p className="text-sm font-semibold text-white">Refinar com IA</p>
+              <p className="text-[11px] text-gray-400">Descreva ajustes para melhorar os objetivos</p>
             </div>
-            <ChevronDown className={`w-5 h-5 text-purple-400 transition-transform ${showFeedback ? 'rotate-180' : ''}`} />
-          </button>
+          </div>
 
-          {showFeedback && (
-            <div className="mt-3 space-y-2">
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Ex: Adicione objetivos de fechamento, foque em qualificação..."
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm resize-none"
-                rows={2}
-                disabled={isRefining}
-              />
-              <button
-                onClick={() => feedback.trim() && onRefine(feedback)}
-                disabled={!feedback.trim() || isRefining}
-                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-lg text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
-              </button>
-            </div>
-          )}
+          {/* Textarea sempre visível */}
+          <textarea
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="✨ Digite suas observações aqui...&#10;Ex: Adicione objetivos de fechamento, foque em qualificação, inclua negociação..."
+            className="w-full px-3 py-2.5 bg-gray-800/80 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-sm resize-none transition-all"
+            rows={3}
+            disabled={isRefining}
+          />
+
+          {/* Botão de refinar */}
+          <button
+            onClick={() => feedback.trim() && onRefine(feedback)}
+            disabled={!feedback.trim() || isRefining}
+            className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-500 rounded-lg text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+          >
+            {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+          </button>
         </div>
       </div>
 
