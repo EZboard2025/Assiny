@@ -5029,31 +5029,30 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className={`relative max-w-5xl w-full max-h-[90vh] overflow-hidden transition-transform duration-300 ${
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-12 px-4 pb-4">
+      <div className={`relative max-w-5xl w-full max-h-[calc(100vh-80px)] flex flex-col transition-transform duration-300 ${
         showPersonaEvaluationModal || showCompanyEvaluationModal || showAIModal ? 'sm:-translate-x-[250px]' :
         showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
       }`}>
-        <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-        <div className="relative bg-gray-900/70 backdrop-blur-xl rounded-3xl border border-green-500/30 overflow-hidden">
+        <div className="bg-gray-900 rounded-2xl border border-gray-800 shadow-2xl flex flex-col max-h-full overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-green-500/20">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-600/20 rounded-xl flex items-center justify-center">
-                <Settings className="w-6 h-6 text-green-400" />
+              <div className="w-9 h-9 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <Settings className="w-5 h-5 text-green-400" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Hub de Configuração</h2>
+              <h2 className="text-xl font-bold text-white">Hub de Configuração</h2>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors text-2xl"
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+          <div className="p-6 overflow-y-auto flex-1 min-h-0">
             {loading ? (
               // Loading state
               <div className="flex items-center justify-center py-12">
@@ -5096,7 +5095,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
           </div>
         </div>
       </div>
-    </div>
+      </div>
 
     {/* Modal de Avaliação de Persona - Side Panel (fora do ConfigHub) */}
     {showPersonaEvaluationModal && personaEvaluation && (
