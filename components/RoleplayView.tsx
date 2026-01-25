@@ -1549,97 +1549,105 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
         {/* Configuration Modal */}
         {showConfig && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-20 pb-8 px-4 overflow-y-auto">
-            <div className="relative max-w-6xl w-full">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/95 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30 max-h-[calc(100vh-120px)] overflow-y-auto">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold">Configuração da Sessão</h2>
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto">
+            <div className="min-h-screen py-8 px-4 sm:px-6">
+              <div className="max-w-5xl mx-auto">
+                {/* Header */}
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-white mb-1">Configuração da Sessão</h1>
+                    <p className="text-gray-400 text-sm">Configure os parâmetros do seu roleplay</p>
+                  </div>
                   <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       setShowConfig(false);
                     }}
-                    className="text-gray-400 hover:text-white transition-colors text-2xl z-50 cursor-pointer"
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
                     type="button"
                   >
-                    ×
+                    <X className="w-6 h-6" />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Coluna Esquerda */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Coluna Esquerda - Cliente */}
                   <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Perfil do Cliente</h3>
+
                     {/* Idade do Cliente */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Idade do Cliente: <span className="text-green-400 text-lg font-bold">{age} anos</span>
-                      </label>
+                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium text-gray-300">Idade do Cliente</label>
+                        <span className="text-lg font-bold text-green-400">{age} anos</span>
+                      </div>
                       <input
                         type="range"
                         min="18"
                         max="60"
                         value={age}
                         onChange={(e) => setAge(Number(e.target.value))}
-                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-purple"
+                        className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-green-500"
                       />
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <div className="flex justify-between text-xs text-gray-500 mt-2">
                         <span>18</span>
                         <span>60</span>
                       </div>
 
-                      {/* Caixa de Comportamento por Faixa Etária */}
-                      <div className="mt-3 bg-gradient-to-br from-blue-900/20 to-green-900/20 border border-blue-500/30 rounded-xl p-3">
+                      {/* Info da faixa etária */}
+                      <div className="mt-4 bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                         {age >= 18 && age <= 24 && (
                           <div>
-                            <p className="text-sm font-semibold text-blue-400 mb-2">18 a 24 anos</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Informal e moderno</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Preciso ver o retorno disso", "Quanto isso impacta no CPA?"</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Aceita novidades • Referências digitais • Trends</p>
+                            <p className="text-sm font-medium text-blue-400 mb-2">18 a 24 anos</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Tom:</span> Informal e moderno</p>
+                              <p><span className="text-gray-300">Comportamento:</span> Aceita novidades • Referências digitais</p>
+                            </div>
                           </div>
                         )}
                         {age >= 25 && age <= 34 && (
                           <div>
-                            <p className="text-sm font-semibold text-green-400 mb-2">25 a 34 anos</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Pragmático e orientado a resultados</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Preciso ver o retorno disso", "Quanto isso impacta no CPA?"</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em ROI • Aceita risco calculado • Profissional</p>
+                            <p className="text-sm font-medium text-green-400 mb-2">25 a 34 anos</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Tom:</span> Pragmático e orientado a resultados</p>
+                              <p><span className="text-gray-300">Comportamento:</span> Foco em ROI • Aceita risco calculado</p>
+                            </div>
                           </div>
                         )}
                         {age >= 35 && age <= 44 && (
                           <div>
-                            <p className="text-sm font-semibold text-yellow-400 mb-2">35 a 44 anos</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Preciso garantir que isso não quebra nada"</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Valoriza compliance • Cauteloso • Validação prática</p>
+                            <p className="text-sm font-medium text-yellow-400 mb-2">35 a 44 anos</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
+                              <p><span className="text-gray-300">Comportamento:</span> Valoriza compliance • Cauteloso</p>
+                            </div>
                           </div>
                         )}
                         {age >= 45 && age <= 60 && (
                           <div>
-                            <p className="text-sm font-semibold text-orange-400 mb-2">45 a 60 anos</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Tom:</span> Conservador e formal</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Vocabulário:</span> "Não posso me dar ao luxo de instabilidade"</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Comportamento:</span> Foco em segurança • Avesso a riscos • Suporte dedicado</p>
+                            <p className="text-sm font-medium text-orange-400 mb-2">45 a 60 anos</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Tom:</span> Conservador e formal</p>
+                              <p><span className="text-gray-300">Comportamento:</span> Foco em segurança • Avesso a riscos</p>
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
 
                     {/* Temperamento */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Temperamento
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                      <label className="text-sm font-medium text-gray-300 mb-3 block">Temperamento</label>
+                      <div className="flex flex-wrap gap-2">
                         {temperaments.map((temp) => (
                           <button
                             key={temp}
                             onClick={() => setTemperament(temp)}
-                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                               temperament === temp
-                                ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                                : 'bg-gray-800/50 text-gray-400 border border-green-500/20 hover:border-green-500/40'
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                                : 'bg-gray-800/50 text-gray-400 border border-gray-700 hover:border-gray-600 hover:text-gray-300'
                             }`}
                           >
                             {temp}
@@ -1647,269 +1655,194 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         ))}
                       </div>
 
-                      {/* Caixa de Descrição do Temperamento */}
-                      <div className="mt-3 bg-gradient-to-br from-green-900/20 to-pink-900/20 border border-green-500/30 rounded-xl p-3">
+                      {/* Info do temperamento */}
+                      <div className="mt-4 bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                         {temperament === 'Analítico' && (
                           <div>
-                            <p className="text-sm font-semibold text-green-400 mb-2">Analítico</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Tom formal e lógico • Faz perguntas técnicas • Desconfia de argumentos subjetivos</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Formal, racional, calmo e preciso</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Dados concretos, estatísticas, provas de eficácia, garantias</p>
+                            <p className="text-sm font-medium text-green-400 mb-2">Analítico</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Estilo:</span> Formal, racional, calmo e preciso</p>
+                              <p><span className="text-gray-300">Gatilhos:</span> Dados concretos, estatísticas, provas de eficácia</p>
+                            </div>
                           </div>
                         )}
                         {temperament === 'Empático' && (
                           <div>
-                            <p className="text-sm font-semibold text-pink-400 mb-2">Empático</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Demonstra empatia genuína • Compartilha experiências pessoais • Pergunta sobre impacto humano</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Afável, próximo, gentil e emocional</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Histórias reais, propósito, apoio humano, relacionamento</p>
+                            <p className="text-sm font-medium text-pink-400 mb-2">Empático</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Estilo:</span> Afável, próximo, gentil e emocional</p>
+                              <p><span className="text-gray-300">Gatilhos:</span> Histórias reais, propósito, apoio humano</p>
+                            </div>
                           </div>
                         )}
                         {temperament === 'Determinado' && (
                           <div>
-                            <p className="text-sm font-semibold text-red-400 mb-2">Determinado</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Postura firme e objetiva • Corta rodeios • Perguntas estratégicas • Demonstra impaciência</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Soluções rápidas, eficiência, autoridade, resultado imediato</p>
+                            <p className="text-sm font-medium text-red-400 mb-2">Determinado</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
+                              <p><span className="text-gray-300">Gatilhos:</span> Soluções rápidas, eficiência, resultado imediato</p>
+                            </div>
                           </div>
                         )}
                         {temperament === 'Indeciso' && (
                           <div>
-                            <p className="text-sm font-semibold text-yellow-400 mb-2">Indeciso</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Demonstra insegurança e dúvida • Faz perguntas repetidas • Expressa medo • Busca garantias</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Hesitante, cauteloso e questionador</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Depoimentos, garantias, segurança, prova social</p>
+                            <p className="text-sm font-medium text-yellow-400 mb-2">Indeciso</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Estilo:</span> Hesitante, cauteloso e questionador</p>
+                              <p><span className="text-gray-300">Gatilhos:</span> Depoimentos, garantias, segurança, prova social</p>
+                            </div>
                           </div>
                         )}
                         {temperament === 'Sociável' && (
                           <div>
-                            <p className="text-sm font-semibold text-cyan-400 mb-2">Sociável</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Comportamento:</span> Animado e espontâneo • Usa humor leve • Faz comentários fora do tema • Mostra tédio se vendedor for frio</p>
-                            <p className="text-xs text-gray-300 mb-1"><span className="font-semibold">Estilo:</span> Leve, animado, entusiasmado e informal</p>
-                            <p className="text-xs text-gray-300"><span className="font-semibold">Gatilhos:</span> Amizade, humor, interesse genuíno, energia positiva</p>
+                            <p className="text-sm font-medium text-cyan-400 mb-2">Sociável</p>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <p><span className="text-gray-300">Estilo:</span> Leve, animado, entusiasmado e informal</p>
+                              <p><span className="text-gray-300">Gatilhos:</span> Amizade, humor, interesse genuíno, energia positiva</p>
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Coluna Direita */}
+                  {/* Coluna Direita - Cenário */}
                   <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Cenário do Roleplay</h3>
+
                     {/* Persona */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Persona
-                      </label>
+                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                      <label className="text-sm font-medium text-gray-300 mb-3 block">Persona</label>
                       {(businessType === 'Ambos' ? personas : personas.filter(p => p.business_type === businessType)).length === 0 ? (
-                        <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
+                        <div className="text-gray-500 text-sm py-4 text-center">
                           Nenhuma persona {businessType} cadastrada.
                         </div>
                       ) : (
-                        <div
-                          className="space-y-3 overflow-y-auto pr-2"
-                          style={{ maxHeight: '300px', overflowY: 'auto' }}
-                        >
+                        <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
                           {(() => {
                             const { sortedGroups, noTagPersonas } = getGroupedPersonas()
-
                             return (
                               <>
-                                {/* Personas agrupadas por tag */}
                                 {sortedGroups.map(({ tag, personas: groupPersonas }) => (
                                   <div key={tag.id} className="space-y-2">
-                                    {/* Separador de tag */}
-                                    <div className="flex items-center gap-2 px-2 py-1">
-                                      <div
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ backgroundColor: tag.color }}
-                                      />
-                                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                        {tag.name}
-                                      </span>
-                                      <div className="flex-1 h-px bg-gray-700/50" />
+                                    <div className="flex items-center gap-2 py-1">
+                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{tag.name}</span>
                                     </div>
-
-                                    {/* Personas do grupo */}
                                     {groupPersonas.map((persona) => (
-                              <div
-                                key={persona.id}
-                                className={`bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
-                                  selectedPersona === persona.id
-                                    ? 'border-green-500 shadow-lg shadow-green-500/20'
-                                    : 'border-green-500/30 hover:border-green-500/50'
-                                }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div
-                                    onClick={() => setSelectedPersona(persona.id!)}
-                                    className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0 cursor-pointer"
-                                  >
-                                    <UserCircle2 className="w-6 h-6 text-white" />
-                                  </div>
-                                  <div className="flex-1 min-w-0" onClick={() => setSelectedPersona(persona.id!)}>
-                                    <h4 className="font-semibold text-white text-sm cursor-pointer">
-                                      {persona.business_type === 'B2B'
-                                        ? (persona as PersonaB2B).job_title
-                                        : (persona as PersonaB2C).profession}
-                                    </h4>
-                                    {/* Tags da persona */}
-                                    {personaTags.get(persona.id!) && personaTags.get(persona.id!)!.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-1.5">
-                                        {personaTags.get(persona.id!)!.map((tag) => (
-                                          <span
-                                            key={tag.id}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-white"
-                                            style={{ backgroundColor: tag.color }}
+                                      <div
+                                        key={persona.id}
+                                        onClick={() => setSelectedPersona(persona.id!)}
+                                        className={`cursor-pointer rounded-lg p-3 border transition-all ${
+                                          selectedPersona === persona.id
+                                            ? 'bg-green-500/10 border-green-500/50'
+                                            : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                            selectedPersona === persona.id ? 'bg-green-500/20' : 'bg-gray-800'
+                                          }`}>
+                                            <UserCircle2 className={`w-5 h-5 ${selectedPersona === persona.id ? 'text-green-400' : 'text-gray-500'}`} />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-white truncate">
+                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).job_title : (persona as PersonaB2C).profession}
+                                            </p>
+                                            {personaTags.get(persona.id!) && personaTags.get(persona.id!)!.length > 0 && (
+                                              <div className="flex flex-wrap gap-1 mt-1">
+                                                {personaTags.get(persona.id!)!.map((t) => (
+                                                  <span key={t.id} className="text-[10px] px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
+                                                ))}
+                                              </div>
+                                            )}
+                                            <p className="text-xs text-gray-500 mt-1 truncate">
+                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).company_type : (persona as PersonaB2C).what_seeks}
+                                            </p>
+                                          </div>
+                                          {selectedPersona === persona.id && <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />}
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!) }}
+                                            className="p-1 text-gray-500 hover:text-gray-300"
                                           >
-                                            {tag.name}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {expandedPersonaId === persona.id ? (
-                                      <div className="text-xs text-gray-400 mt-2 space-y-1">
-                                        {persona.business_type === 'B2B' ? (
-                                          <>
-                                            <p><span className="text-green-400 font-medium">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
-                                            <p><span className="text-green-400 font-medium">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
-                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2B).company_goals}</p>
-                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2B).prior_knowledge}</p>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
-                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
-                                            <p><span className="text-green-400 font-medium">Conhecimento:</span> {(persona as PersonaB2C).prior_knowledge}</p>
-                                          </>
+                                            {expandedPersonaId === persona.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                          </button>
+                                        </div>
+                                        {expandedPersonaId === persona.id && (
+                                          <div className="mt-3 pt-3 border-t border-gray-700 space-y-1 text-xs text-gray-400">
+                                            {persona.business_type === 'B2B' ? (
+                                              <>
+                                                <p><span className="text-gray-300">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
+                                                <p><span className="text-gray-300">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
+                                                <p><span className="text-gray-300">Busca:</span> {(persona as PersonaB2B).company_goals}</p>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <p><span className="text-gray-300">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
+                                                <p><span className="text-gray-300">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
+                                              </>
+                                            )}
+                                          </div>
                                         )}
                                       </div>
-                                    ) : (
-                                      <p className="text-xs text-gray-400 mt-1 line-clamp-1 cursor-pointer">
-                                        {persona.business_type === 'B2B'
-                                          ? (persona as PersonaB2B).company_type
-                                          : (persona as PersonaB2C).what_seeks}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                    {selectedPersona === persona.id && (
-                                      <CheckCircle className="w-5 h-5 text-green-500" />
-                                    )}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!)
-                                      }}
-                                      className="text-green-400 hover:text-green-300 transition-colors p-1"
-                                    >
-                                      {expandedPersonaId === persona.id ? (
-                                        <ChevronUp className="w-4 h-4" />
-                                      ) : (
-                                        <ChevronDown className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
                                     ))}
                                   </div>
                                 ))}
-
-                                {/* Personas sem tag */}
                                 {noTagPersonas.length > 0 && (
                                   <div className="space-y-2">
-                                    {/* Separador "Sem Etiqueta" */}
                                     {sortedGroups.length > 0 && (
-                                      <div className="flex items-center gap-2 px-2 py-1">
-                                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Sem Etiqueta
-                                        </span>
-                                        <div className="flex-1 h-px bg-gray-700/50" />
+                                      <div className="flex items-center gap-2 py-1">
+                                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Sem Etiqueta</span>
                                       </div>
                                     )}
-
-                                    {/* Personas sem tag */}
                                     {noTagPersonas.map((persona) => (
-                              <div
-                                key={persona.id}
-                                className={`bg-gradient-to-br from-gray-900/80 to-gray-900/40 border rounded-xl p-3 transition-all ${
-                                  selectedPersona === persona.id
-                                    ? 'border-green-500 shadow-lg shadow-green-500/20'
-                                    : 'border-green-500/30 hover:border-green-500/50'
-                                }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div
-                                    onClick={() => setSelectedPersona(persona.id!)}
-                                    className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0 cursor-pointer"
-                                  >
-                                    <UserCircle2 className="w-6 h-6 text-white" />
-                                  </div>
-                                  <div className="flex-1 min-w-0" onClick={() => setSelectedPersona(persona.id!)}>
-                                    <h4 className="font-semibold text-white text-sm cursor-pointer">
-                                      {persona.business_type === 'B2B'
-                                        ? (persona as PersonaB2B).job_title
-                                        : (persona as PersonaB2C).profession}
-                                    </h4>
-                                    {/* Tags da persona */}
-                                    {personaTags.get(persona.id!) && personaTags.get(persona.id!)!.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-1.5">
-                                        {personaTags.get(persona.id!)!.map((tag) => (
-                                          <span
-                                            key={tag.id}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-white"
-                                            style={{ backgroundColor: tag.color }}
+                                      <div
+                                        key={persona.id}
+                                        onClick={() => setSelectedPersona(persona.id!)}
+                                        className={`cursor-pointer rounded-lg p-3 border transition-all ${
+                                          selectedPersona === persona.id
+                                            ? 'bg-green-500/10 border-green-500/50'
+                                            : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                            selectedPersona === persona.id ? 'bg-green-500/20' : 'bg-gray-800'
+                                          }`}>
+                                            <UserCircle2 className={`w-5 h-5 ${selectedPersona === persona.id ? 'text-green-400' : 'text-gray-500'}`} />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-white truncate">
+                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).job_title : (persona as PersonaB2C).profession}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1 truncate">
+                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).company_type : (persona as PersonaB2C).what_seeks}
+                                            </p>
+                                          </div>
+                                          {selectedPersona === persona.id && <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />}
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!) }}
+                                            className="p-1 text-gray-500 hover:text-gray-300"
                                           >
-                                            {tag.name}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {expandedPersonaId === persona.id ? (
-                                      <div className="text-xs text-gray-400 mt-2 space-y-1">
-                                        {persona.business_type === 'B2B' ? (
-                                          <>
-                                            <p><span className="text-green-400 font-medium">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
-                                            <p><span className="text-green-400 font-medium">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
-                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2B).company_goals}</p>
-                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2B).prior_knowledge}</p>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <p><span className="text-green-400 font-medium">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
-                                            <p><span className="text-green-400 font-medium">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
-                                            <p><span className="text-green-400 font-medium">Conhecimento:</span> {(persona as PersonaB2C).prior_knowledge}</p>
-                                          </>
+                                            {expandedPersonaId === persona.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                          </button>
+                                        </div>
+                                        {expandedPersonaId === persona.id && (
+                                          <div className="mt-3 pt-3 border-t border-gray-700 space-y-1 text-xs text-gray-400">
+                                            {persona.business_type === 'B2B' ? (
+                                              <>
+                                                <p><span className="text-gray-300">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
+                                                <p><span className="text-gray-300">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <p><span className="text-gray-300">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
+                                                <p><span className="text-gray-300">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
+                                              </>
+                                            )}
+                                          </div>
                                         )}
                                       </div>
-                                    ) : (
-                                      <p className="text-xs text-gray-400 mt-1 line-clamp-1 cursor-pointer">
-                                        {persona.business_type === 'B2B'
-                                          ? (persona as PersonaB2B).company_type
-                                          : (persona as PersonaB2C).what_seeks}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                    {selectedPersona === persona.id && (
-                                      <CheckCircle className="w-5 h-5 text-green-500" />
-                                    )}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!)
-                                      }}
-                                      className="text-green-400 hover:text-green-300 transition-colors p-1"
-                                    >
-                                      {expandedPersonaId === persona.id ? (
-                                        <ChevronUp className="w-4 h-4" />
-                                      ) : (
-                                        <ChevronDown className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
                                     ))}
                                   </div>
                                 )}
@@ -1921,35 +1854,31 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </div>
 
                     {/* Objeções */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Objeções <span className="text-green-400 text-xs font-semibold">({selectedObjections.length} selecionadas)</span>
-                      </label>
+                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium text-gray-300">Objeções</label>
+                        <span className="text-xs text-green-400 font-medium">{selectedObjections.length} selecionadas</span>
+                      </div>
                       {objections.length === 0 ? (
-                        <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
-                          Nenhuma objeção cadastrada.
-                        </div>
+                        <div className="text-gray-500 text-sm py-4 text-center">Nenhuma objeção cadastrada.</div>
                       ) : (
-                        <div
-                          className="space-y-2 pr-2 overflow-y-auto"
-                          style={{ maxHeight: '250px', overflowY: 'auto' }}
-                        >
+                        <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
                           {objections.map((objection) => (
                             <div
                               key={objection.id}
-                              className={`group border rounded-xl px-4 py-2.5 transition-all duration-200 ${
+                              className={`group rounded-lg p-3 border transition-all ${
                                 selectedObjections.includes(objection.id)
-                                  ? 'bg-gradient-to-r from-green-900/40 to-green-800/20 border-green-500 shadow-md shadow-green-500/10'
-                                  : 'bg-gray-800/40 border-green-500/20 hover:border-green-500/40 hover:bg-gray-800/60'
+                                  ? 'bg-green-500/10 border-green-500/50'
+                                  : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
                               }`}
                             >
                               <div className="flex items-start gap-3">
                                 <div
                                   onClick={() => toggleObjection(objection.id)}
-                                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 mt-0.5 cursor-pointer ${
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all mt-0.5 ${
                                     selectedObjections.includes(objection.id)
                                       ? 'bg-green-500 border-green-500'
-                                      : 'border-green-500/40 group-hover:border-green-500/60'
+                                      : 'border-gray-600 group-hover:border-gray-500'
                                   }`}
                                 >
                                   {selectedObjections.includes(objection.id) && (
@@ -1959,15 +1888,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleObjection(objection.id)}>
-                                  <span className={`text-sm transition-colors duration-200 ${
-                                    expandedObjectionId === objection.id ? '' : 'truncate block'
-                                  } ${
-                                    selectedObjections.includes(objection.id)
-                                      ? 'text-white font-medium'
-                                      : 'text-gray-300 group-hover:text-gray-200'
+                                  <span className={`text-sm ${expandedObjectionId === objection.id ? '' : 'truncate block'} ${
+                                    selectedObjections.includes(objection.id) ? 'text-white font-medium' : 'text-gray-300'
                                   }`}>{objection.name}</span>
                                   {expandedObjectionId === objection.id && objection.rebuttals && objection.rebuttals.length > 0 && (
-                                    <div className="mt-2 pl-2 border-l-2 border-green-500/30 space-y-1">
+                                    <div className="mt-2 pt-2 border-t border-gray-700 space-y-1">
                                       <p className="text-xs text-green-400 font-medium">Rebatidas:</p>
                                       {objection.rebuttals.map((rebuttal, idx) => (
                                         <p key={idx} className="text-xs text-gray-400">• {rebuttal}</p>
@@ -1976,17 +1901,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                   )}
                                 </div>
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setExpandedObjectionId(expandedObjectionId === objection.id ? null : objection.id)
-                                  }}
-                                  className="text-green-400 hover:text-green-300 transition-colors p-1 flex-shrink-0"
+                                  onClick={(e) => { e.stopPropagation(); setExpandedObjectionId(expandedObjectionId === objection.id ? null : objection.id) }}
+                                  className="p-1 text-gray-500 hover:text-gray-300 flex-shrink-0"
                                 >
-                                  {expandedObjectionId === objection.id ? (
-                                    <ChevronUp className="w-4 h-4" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4" />
-                                  )}
+                                  {expandedObjectionId === objection.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                 </button>
                               </div>
                             </div>
@@ -1995,53 +1913,41 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       )}
                     </div>
 
-                    {/* Objetivos */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {/* Objetivo */}
+                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                      <label className="text-sm font-medium text-gray-300 mb-3 block">
                         Objetivo do Roleplay <span className="text-red-400">*</span>
                       </label>
                       {objectives.length === 0 ? (
-                        <div className="bg-gray-800/50 border border-green-500/20 rounded-xl p-3 text-gray-400 text-sm">
-                          Nenhum objetivo cadastrado.
-                        </div>
+                        <div className="text-gray-500 text-sm py-4 text-center">Nenhum objetivo cadastrado.</div>
                       ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {objectives.map((objective) => (
                             <div
                               key={objective.id}
                               onClick={() => setSelectedObjective(objective.id)}
-                              className={`group cursor-pointer border rounded-xl p-4 transition-all duration-200 ${
+                              className={`cursor-pointer rounded-lg p-3 border transition-all ${
                                 selectedObjective === objective.id
-                                  ? 'bg-gradient-to-r from-green-900/40 to-green-800/20 border-green-500 shadow-md shadow-green-500/10'
-                                  : 'bg-gray-800/40 border-green-500/20 hover:border-green-500/40 hover:bg-gray-800/60'
+                                  ? 'bg-green-500/10 border-green-500/50'
+                                  : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
                               }`}
                             >
-                              <div className="flex items-start gap-3">
-                                <div
-                                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 mt-0.5 ${
-                                    selectedObjective === objective.id
-                                      ? 'bg-green-500 border-green-500'
-                                      : 'border-green-500/40 group-hover:border-green-500/60'
-                                  }`}
-                                >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                  selectedObjective === objective.id ? 'bg-green-500 border-green-500' : 'border-gray-600'
+                                }`}>
                                   {selectedObjective === objective.id && (
                                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
                                   )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className={`font-medium transition-colors duration-200 ${
-                                    selectedObjective === objective.id
-                                      ? 'text-white'
-                                      : 'text-gray-300 group-hover:text-gray-200'
-                                  }`}>
+                                <div className="flex-1">
+                                  <p className={`text-sm font-medium ${selectedObjective === objective.id ? 'text-white' : 'text-gray-300'}`}>
                                     {objective.name}
                                   </p>
                                   {objective.description && (
-                                    <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
-                                      {objective.description}
-                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">{objective.description}</p>
                                   )}
                                 </div>
                               </div>
@@ -2055,30 +1961,15 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Aviso de configuração incompleta */}
                 {(!selectedPersona || selectedObjections.length === 0 || !selectedObjective) && (
-                  <div className="mt-4 bg-yellow-900/20 border border-yellow-500/40 rounded-xl p-4">
+                  <div className="mt-6 bg-yellow-500/10 rounded-xl border border-yellow-500/30 p-4">
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-yellow-300 mb-2">Configure os itens obrigatórios para iniciar:</p>
-                        <ul className="space-y-1 text-xs text-yellow-200">
-                          {!selectedPersona && (
-                            <li className="flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span>
-                              Selecione uma <strong>Persona</strong>
-                            </li>
-                          )}
-                          {selectedObjections.length === 0 && (
-                            <li className="flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span>
-                              Selecione pelo menos uma <strong>Objeção</strong>
-                            </li>
-                          )}
-                          {!selectedObjective && (
-                            <li className="flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></span>
-                              Selecione um <strong>Objetivo</strong>
-                            </li>
-                          )}
+                        <p className="text-sm font-medium text-yellow-400 mb-2">Configure os itens obrigatórios:</p>
+                        <ul className="space-y-1 text-xs text-yellow-300/80">
+                          {!selectedPersona && <li>• Selecione uma Persona</li>}
+                          {selectedObjections.length === 0 && <li>• Selecione pelo menos uma Objeção</li>}
+                          {!selectedObjective && <li>• Selecione um Objetivo</li>}
                         </ul>
                       </div>
                     </div>
@@ -2086,15 +1977,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-4 mt-5">
+                <div className="flex gap-3 mt-6">
                   <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowConfig(false);
-                    }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowConfig(false); }}
                     type="button"
-                    className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-base font-semibold hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl font-medium hover:bg-gray-800 transition-colors text-gray-300 text-sm"
                   >
                     Cancelar
                   </button>
@@ -2102,10 +1989,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     onClick={handleStartSimulation}
                     type="button"
                     disabled={!selectedPersona || selectedObjections.length === 0 || !selectedObjective}
-                    className={`flex-1 px-6 py-3 rounded-xl text-base font-semibold transition-all ${
+                    className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all text-sm ${
                       !selectedPersona || selectedObjections.length === 0 || !selectedObjective
-                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-green-600 to-green-500 hover:scale-105 glow-green cursor-pointer'
+                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-500 text-white'
                     }`}
                   >
                     Iniciar Roleplay
