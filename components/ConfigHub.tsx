@@ -2264,16 +2264,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
   return (
     <div className="space-y-6">
-      {/* Tabs - Redesenhadas */}
-      <div className="flex gap-2 pb-4 overflow-x-auto">
+      {/* Tabs - Estilo HistoricoView */}
+      <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 overflow-x-auto">
         {/* Funcionários - Apenas para planos Team, Business e Enterprise */}
         {trainingPlan !== PlanType.INDIVIDUAL && (
           <button
             onClick={() => setActiveTab('employees')}
-            className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'employees'
-                ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-                : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
+                ? 'bg-green-500/20 text-green-400'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -2282,10 +2282,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         )}
         <button
           onClick={() => setActiveTab('personas')}
-          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'personas'
-              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
+              ? 'bg-green-500/20 text-green-400'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
           <UserCircle2 className="w-4 h-4" />
@@ -2293,10 +2293,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         </button>
         <button
           onClick={() => setActiveTab('objections')}
-          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'objections'
-              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
+              ? 'bg-green-500/20 text-green-400'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
           <Target className="w-4 h-4" />
@@ -2304,10 +2304,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         </button>
         <button
           onClick={() => setActiveTab('objectives')}
-          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'objectives'
-              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
+              ? 'bg-green-500/20 text-green-400'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
           <CheckCircle className="w-4 h-4" />
@@ -2315,10 +2315,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         </button>
         <button
           onClick={() => setActiveTab('files')}
-          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'files'
-              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
+              ? 'bg-green-500/20 text-green-400'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
           <Building2 className="w-4 h-4" />
@@ -2326,10 +2326,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         </button>
         <button
           onClick={() => setActiveTab('funnel')}
-          className={`group px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap border-2 ${
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'funnel'
-              ? 'bg-gradient-to-r from-green-600 to-green-500 text-white border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-              : 'bg-transparent text-gray-400 hover:text-gray-200 border-green-500/30 hover:border-green-500/50'
+              ? 'bg-green-500/20 text-green-400'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
           }`}
         >
           <Target className="w-4 h-4" />
@@ -2342,40 +2342,42 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Funcionários Tab - Apenas para planos Team, Business e Enterprise */}
         {activeTab === 'employees' && trainingPlan !== PlanType.INDIVIDUAL && (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-xl font-bold mb-4">Gerenciar Funcionários</h3>
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Gerenciar Funcionários</h3>
+              </div>
 
               {/* Lista de funcionários */}
               {employees.length > 0 && (
-                <div className="mb-6 overflow-x-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-left border-b border-green-500/20">
-                        <th className="pb-3 text-sm font-medium text-gray-400">Nome</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400">Email</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400">Cargo/Role</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400">Ações</th>
+                      <tr className="text-left border-b border-gray-800">
+                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo/Role</th>
+                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {employees.map((emp) => (
-                        <tr key={emp.id} className="border-b border-green-500/10">
-                          <td className="py-3 text-sm text-gray-300">{emp.name}</td>
-                          <td className="py-3 text-sm text-gray-300">{emp.email}</td>
-                          <td className="py-3">
+                        <tr key={emp.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                          <td className="px-4 py-3 text-sm text-white">{emp.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-400">{emp.email}</td>
+                          <td className="px-4 py-3">
                             <select
                               value={emp.role || 'Vendedor'}
                               onChange={(e) => handleRoleChange(emp.id, e.target.value)}
-                              className="px-3 py-1.5 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/40"
+                              className="px-3 py-1.5 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/50"
                             >
                               <option value="Admin">Admin</option>
                               <option value="Vendedor">Vendedor</option>
                             </select>
                           </td>
-                          <td className="py-3">
+                          <td className="px-4 py-3">
                             <button
                               onClick={() => handleDeleteEmployee(emp.id, emp.email)}
-                              className="text-red-400 hover:text-red-300 transition-colors"
+                              className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -2388,46 +2390,46 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               )}
 
               {/* Adicionar novo funcionário */}
+              <div className="p-4 border-t border-gray-800">
               {!addingEmployee ? (
                 <button
                   onClick={() => setAddingEmployee(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center gap-2"
+                  className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg font-medium hover:bg-green-500/30 transition-colors flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Adicionar Funcionário
                 </button>
               ) : (
-                <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6">
-                  <h4 className="text-lg font-semibold mb-4">Novo Funcionário</h4>
-                  <div className="space-y-4">
+                <div className="bg-gray-800/50 rounded-lg p-4 space-y-4">
+                  <h4 className="text-sm font-medium text-white mb-4">Novo Funcionário</h4>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Nome</label>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Nome</label>
                       <input
                         type="text"
                         value={newEmployeeName}
                         onChange={(e) => setNewEmployeeName(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                        className="w-full px-4 py-2.5 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                         placeholder="João Silva"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Email</label>
                       <input
                         type="email"
                         value={newEmployeeEmail}
                         onChange={(e) => setNewEmployeeEmail(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                        className="w-full px-4 py-2.5 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                         placeholder="joao@empresa.com"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Senha</label>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Senha</label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
                           value={newEmployeePassword}
                           onChange={(e) => setNewEmployeePassword(e.target.value)}
-                          className="w-full px-4 py-3 pr-12 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          className="w-full px-4 py-2.5 pr-12 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                           placeholder="••••••••"
                         />
                         <button
@@ -2461,8 +2463,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       </button>
                     </div>
                   </div>
-                </div>
               )}
+              </div>
             </div>
           </div>
         )}
@@ -2471,81 +2473,84 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Personas Tab */}
         {activeTab === 'personas' && (
           <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-xl font-bold">Personas {businessType === 'Ambos' ? 'B2B e B2C' : businessType}</h3>
-                  {/* Contador de Personas */}
-                  <div className="px-3 py-1 rounded-lg text-sm font-medium bg-green-900/30 border border-green-500/40 text-green-400">
-                    {personas.length} personas
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Personas {businessType === 'Ambos' ? 'B2B e B2C' : businessType}</h3>
+                    {/* Contador de Personas */}
+                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                      {personas.length}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {/* Botão Gerar com IA */}
-                  <button
-                    onClick={() => setShowAIGenerateModal('personas')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Gerar com IA
-                  </button>
-                  {/* Filtro por Tipo B2B/B2C */}
-                  <select
-                    value={filterBusinessType}
-                    onChange={(e) => setFilterBusinessType(e.target.value as '' | 'B2B' | 'B2C')}
-                    className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:outline-none focus:border-green-500/40"
-                  >
-                    <option value="">B2B e B2C</option>
-                    <option value="B2B">Apenas B2B</option>
-                    <option value="B2C">Apenas B2C</option>
-                  </select>
-                  {/* Filtro por Tag */}
-                  {tags.length > 0 && (
-                    <select
-                      value={filterTag}
-                      onChange={(e) => setFilterTag(e.target.value)}
-                      className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:outline-none focus:border-green-500/40"
+                  <div className="flex items-center gap-2">
+                    {/* Botão Gerar com IA */}
+                    <button
+                      onClick={() => setShowAIGenerateModal('personas')}
+                      className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
                     >
-                      <option value="">Todas as etiquetas</option>
-                      {tags.map((tag) => (
-                        <option key={tag.id} value={tag.id}>
-                          {tag.name}
-                        </option>
-                      ))}
+                      <Sparkles className="w-4 h-4 animate-pulse" />
+                      Gerar com IA
+                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                    </button>
+                    {/* Filtro por Tipo B2B/B2C */}
+                    <select
+                      value={filterBusinessType}
+                      onChange={(e) => setFilterBusinessType(e.target.value as '' | 'B2B' | 'B2C')}
+                      className="px-3 py-1.5 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/50"
+                    >
+                      <option value="">B2B e B2C</option>
+                      <option value="B2B">Apenas B2B</option>
+                      <option value="B2C">Apenas B2C</option>
                     </select>
-                  )}
-                  <button
-                    onClick={() => {
-                      if (!personaLimitReached) {
-                        setShowPersonaForm(true)
-                        setNewPersona({})
-                        setEditingPersonaId(null)
-                        setSelectedPersonaTags([])
-                      }
-                    }}
-                    disabled={personaLimitReached}
-                    className={`px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
-                      personaLimitReached
-                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-green-600 to-green-500 hover:scale-105'
-                    }`}
-                    title={personaLimitReached ? `Limite de ${planUsage?.training?.personas?.used || 0} personas atingido no plano PRO` : ''}
-                  >
-                    {personaLimitReached ? (
-                      <Lock className="w-4 h-4" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
+                    {/* Filtro por Tag */}
+                    {tags.length > 0 && (
+                      <select
+                        value={filterTag}
+                        onChange={(e) => setFilterTag(e.target.value)}
+                        className="px-3 py-1.5 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/50"
+                      >
+                        <option value="">Todas as etiquetas</option>
+                        {tags.map((tag) => (
+                          <option key={tag.id} value={tag.id}>
+                            {tag.name}
+                          </option>
+                        ))}
+                      </select>
                     )}
-                    {personaLimitReached
-                      ? `Limite Atingido (${planUsage?.training?.personas?.used || 0}/${planUsage?.training?.personas?.limit || 3})`
-                      : `Nova Persona ${businessType}`
-                    }
-                  </button>
+                    <button
+                      onClick={() => {
+                        if (!personaLimitReached) {
+                          setShowPersonaForm(true)
+                          setNewPersona({})
+                          setEditingPersonaId(null)
+                          setSelectedPersonaTags([])
+                        }
+                      }}
+                      disabled={personaLimitReached}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                        personaLimitReached
+                          ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
+                          : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                      }`}
+                      title={personaLimitReached ? `Limite de ${planUsage?.training?.personas?.used || 0} personas atingido no plano PRO` : ''}
+                    >
+                      {personaLimitReached ? (
+                        <Lock className="w-4 h-4" />
+                      ) : (
+                        <Plus className="w-4 h-4" />
+                      )}
+                      {personaLimitReached
+                        ? `Limite (${planUsage?.training?.personas?.used || 0}/${planUsage?.training?.personas?.limit || 3})`
+                        : `Nova Persona`
+                      }
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Aviso de Qualidade */}
-              <div className="mb-4 bg-red-900/20 border border-red-500/40 rounded-xl p-4">
+              <div className="mx-4 mt-4 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                   <div>
@@ -2557,16 +2562,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
 
               {/* Seção de Gerenciar Etiquetas */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <TagIcon className="w-5 h-5 text-green-400" />
+              <div className="p-4 border-t border-gray-800">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                    <TagIcon className="w-4 h-4" />
                     Etiquetas
                   </h4>
                   {!showTagForm && (
                     <button
                       onClick={() => setShowTagForm(true)}
-                      className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-gray-800/70 transition-colors flex items-center gap-2"
+                      className="px-3 py-1.5 bg-gray-800/80 border border-gray-600 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 hover:border-gray-500 transition-all flex items-center gap-2"
                     >
                       <Plus className="w-3 h-3" />
                       Nova Etiqueta
@@ -2576,38 +2581,64 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                 {/* Formulário para adicionar nova etiqueta */}
                 {showTagForm && (
-                  <div className="mb-4 bg-gray-900/50 border border-green-500/20 rounded-xl p-4 space-y-3">
-                    <input
-                      type="text"
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      placeholder="Nome da etiqueta"
-                      className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
-                    />
+                  <div className="mb-4 bg-gray-800/50 border border-gray-600 rounded-xl p-4 space-y-4 shadow-lg">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">Nome da etiqueta</label>
+                      <input
+                        type="text"
+                        value={newTagName}
+                        onChange={(e) => setNewTagName(e.target.value)}
+                        placeholder="Ex: Leads Quentes, Franquias..."
+                        className="w-full px-4 py-2.5 bg-gray-900/70 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                      />
+                    </div>
 
                     <div>
-                      <p className="text-xs text-gray-400 mb-2">Escolha uma cor:</p>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">Escolha uma cor</label>
                       <div className="grid grid-cols-6 gap-2">
                         {tagColorPalette.map((color) => (
                           <button
                             key={color}
                             type="button"
                             onClick={() => setNewTagColor(color)}
-                            className={`w-10 h-10 rounded-lg transition-all ${
+                            className={`w-9 h-9 rounded-lg transition-all duration-200 ${
                               newTagColor === color
-                                ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-110'
-                                : 'hover:scale-105'
+                                ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-800 scale-110 shadow-lg'
+                                : 'hover:scale-105 opacity-80 hover:opacity-100'
                             }`}
-                            style={{ backgroundColor: color }}
+                            style={{
+                              backgroundColor: color,
+                              boxShadow: newTagColor === color ? `0 4px 12px ${color}60` : 'none'
+                            }}
                           />
                         ))}
                       </div>
+                      {/* Preview da etiqueta */}
+                      {newTagName && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Preview:</span>
+                          <span
+                            className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white shadow-md"
+                            style={{
+                              background: `linear-gradient(135deg, ${newTagColor} 0%, ${newTagColor}dd 100%)`,
+                              boxShadow: `0 2px 8px ${newTagColor}40`
+                            }}
+                          >
+                            {newTagName}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex gap-2 pt-1">
                       <button
                         onClick={handleCreateTag}
-                        className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-sm font-medium hover:scale-105 transition-transform"
+                        disabled={!newTagName.trim()}
+                        className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                          newTagName.trim()
+                            ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02]'
+                            : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
                         Criar Etiqueta
                       </button>
@@ -2617,7 +2648,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           setNewTagName('')
                           setNewTagColor('#6B46C1')
                         }}
-                        className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-gray-800/70 transition-colors"
+                        className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors"
                       >
                         Cancelar
                       </button>
@@ -2627,56 +2658,83 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                 {/* Lista de etiquetas existentes */}
                 {tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-3 p-3 bg-gray-800/30 rounded-xl border border-gray-700/50">
                     {tags.map((tag) => (
                       <div
                         key={tag.id}
-                        className="group relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white transition-all hover:ring-2 hover:ring-offset-2 hover:ring-offset-gray-900"
+                        className="group relative inline-flex items-center justify-center px-5 py-2 rounded-lg text-sm font-semibold text-white text-center shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl min-w-[80px]"
                         style={{
-                          backgroundColor: tag.color,
+                          background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}dd 100%)`,
+                          boxShadow: `0 4px 14px ${tag.color}40`,
                           ...(editingTagId === tag.id && { ringColor: tag.color })
                         }}
                       >
                         {editingTagId === tag.id ? (
-                          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => {
+                          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => {
                             setEditingTagId(null)
                             setEditingTagName('')
                             setEditingTagColor('')
                           }}>
-                            <div className="bg-gray-900 border border-green-500/30 rounded-xl p-5 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
-                              <h4 className="text-lg font-semibold text-white">Editar Etiqueta</h4>
-
-                              <input
-                                type="text"
-                                value={editingTagName}
-                                onChange={(e) => setEditingTagName(e.target.value)}
-                                className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm text-white placeholder-white/60 focus:outline-none focus:border-green-500/40"
-                                autoFocus
-                              />
+                            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-96 space-y-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-500/20 rounded-lg">
+                                  <TagIcon className="w-5 h-5 text-purple-400" />
+                                </div>
+                                <h4 className="text-lg font-bold text-white">Editar Etiqueta</h4>
+                              </div>
 
                               <div>
-                                <p className="text-xs text-gray-400 mb-2">Escolha uma cor:</p>
+                                <label className="block text-xs font-medium text-gray-400 mb-2">Nome</label>
+                                <input
+                                  type="text"
+                                  value={editingTagName}
+                                  onChange={(e) => setEditingTagName(e.target.value)}
+                                  className="w-full px-4 py-2.5 bg-gray-800/70 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                                  autoFocus
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-400 mb-2">Cor</label>
                                 <div className="grid grid-cols-6 gap-2">
                                   {tagColorPalette.map((color) => (
                                     <button
                                       key={color}
                                       type="button"
                                       onClick={() => setEditingTagColor(color)}
-                                      className={`w-10 h-10 rounded-lg transition-all ${
+                                      className={`w-10 h-10 rounded-lg transition-all duration-200 ${
                                         editingTagColor === color
-                                          ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-110'
-                                          : 'hover:scale-105'
+                                          ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-900 scale-110'
+                                          : 'hover:scale-105 opacity-80 hover:opacity-100'
                                       }`}
-                                      style={{ backgroundColor: color }}
+                                      style={{
+                                        backgroundColor: color,
+                                        boxShadow: editingTagColor === color ? `0 4px 12px ${color}60` : 'none'
+                                      }}
                                     />
                                   ))}
                                 </div>
+                                {/* Preview */}
+                                {editingTagName && (
+                                  <div className="mt-3 flex items-center gap-2">
+                                    <span className="text-xs text-gray-500">Preview:</span>
+                                    <span
+                                      className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white shadow-md"
+                                      style={{
+                                        background: `linear-gradient(135deg, ${editingTagColor} 0%, ${editingTagColor}dd 100%)`,
+                                        boxShadow: `0 2px 8px ${editingTagColor}40`
+                                      }}
+                                    >
+                                      {editingTagName}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
 
-                              <div className="flex gap-3">
+                              <div className="flex gap-3 pt-2">
                                 <button
                                   onClick={() => handleUpdateTag(tag.id)}
-                                  className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-lg text-sm font-medium hover:scale-105 transition-transform"
+                                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 rounded-lg text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] transition-all"
                                 >
                                   Salvar
                                 </button>
@@ -2686,7 +2744,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     setEditingTagName('')
                                     setEditingTagColor('')
                                   }}
-                                  className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-sm font-medium hover:bg-gray-800/70 transition-colors"
+                                  className="px-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-all"
                                 >
                                   Cancelar
                                 </button>
@@ -2695,23 +2753,23 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           </div>
                         ) : (
                           <>
-                            <span>{tag.name}</span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="drop-shadow-sm text-center w-full">{tag.name}</span>
+                            <div className="absolute -top-1 -right-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
                               <button
                                 onClick={() => {
                                   setEditingTagId(tag.id)
                                   setEditingTagName(tag.name)
                                   setEditingTagColor(tag.color)
                                 }}
-                                className="text-white/80 hover:text-white"
+                                className="p-1 rounded-full bg-gray-900 text-white/90 hover:bg-gray-800 hover:text-white transition-colors shadow-md"
                               >
-                                <Edit2 className="w-3 h-3" />
+                                <Edit2 className="w-2.5 h-2.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteTag(tag.id)}
-                                className="text-white/80 hover:text-white"
+                                className="p-1 rounded-full bg-gray-900 text-white/90 hover:bg-red-500 hover:text-white transition-colors shadow-md"
                               >
-                                <X className="w-3 h-3" />
+                                <X className="w-2.5 h-2.5" />
                               </button>
                             </div>
                           </>
@@ -2722,7 +2780,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 )}
 
                 {tags.length === 0 && !showTagForm && (
-                  <p className="text-gray-400 text-sm">Nenhuma etiqueta criada ainda. Crie etiquetas para organizar suas personas.</p>
+                  <div className="flex flex-col items-center justify-center py-6 px-4 bg-gray-800/30 rounded-xl border border-dashed border-gray-700">
+                    <TagIcon className="w-8 h-8 text-gray-600 mb-2" />
+                    <p className="text-gray-400 text-sm text-center">Nenhuma etiqueta criada ainda.</p>
+                    <p className="text-gray-500 text-xs text-center mt-1">Crie etiquetas para organizar suas personas.</p>
+                  </div>
                 )}
               </div>
 
@@ -2748,7 +2810,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                 return true
               }).length > 0 && (
-                <div className="mb-4 space-y-4">
+                <div className="p-4 space-y-3">
                   {personas.filter(p => {
                     // Filtrar pelo dropdown B2B/B2C
                     if (filterBusinessType && p.business_type !== filterBusinessType) return false
@@ -2774,11 +2836,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     return (
                     <div
                       key={persona.id}
-                      className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-green-500/30 rounded-xl overflow-hidden hover:border-green-500/50 transition-all shadow-lg"
+                      className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden hover:border-gray-600 transition-colors"
                     >
                       {/* Header clicável */}
                       <div
-                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-green-500/5 transition-colors"
+                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-800/30 transition-colors"
                         onClick={() => {
                           const newExpanded = new Set(expandedPersonas)
                           if (isExpanded) {
@@ -2790,11 +2852,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
-                            <UserCircle2 className="w-5 h-5 text-white" />
+                          <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                            <UserCircle2 className="w-4 h-4 text-green-400" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="text-base font-bold text-white truncate">
+                            <h4 className="text-sm font-medium text-white truncate">
                               {persona.business_type === 'B2B'
                                 ? (persona as PersonaB2B).job_title
                                 : (persona as PersonaB2C).profession}
@@ -2803,69 +2865,78 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           </div>
                           {/* Tags compactas no header */}
                           {persona.id && personaTags.get(persona.id) && personaTags.get(persona.id)!.length > 0 && (
-                            <div className="flex gap-1 mr-2">
+                            <div className="flex gap-1.5 mr-2">
                               {personaTags.get(persona.id)?.slice(0, 2).map(tagId => {
                                 const tag = tags.find(t => t.id === tagId)
                                 if (!tag) return null
                                 return (
                                   <span
                                     key={tag.id}
-                                    className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                                    style={{ backgroundColor: tag.color }}
+                                    className="px-2.5 py-1 rounded-md text-[10px] font-semibold text-white shadow-sm"
+                                    style={{
+                                      background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}cc 100%)`,
+                                      boxShadow: `0 2px 6px ${tag.color}30`
+                                    }}
                                   >
                                     {tag.name}
                                   </span>
                                 )
                               })}
                               {personaTags.get(persona.id)!.length > 2 && (
-                                <span className="text-xs text-gray-500">+{personaTags.get(persona.id)!.length - 2}</span>
+                                <span className="px-2 py-1 rounded-md text-[10px] font-medium bg-gray-700 text-gray-400">
+                                  +{personaTags.get(persona.id)!.length - 2}
+                                </span>
                               )}
                             </div>
                           )}
                           {/* Score compacto */}
                           {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
-                            <div className="flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-500/40 rounded-lg mr-2">
-                              <span className="text-sm font-bold text-green-400">{persona.evaluation_score.toFixed(1)}</span>
+                            <div className={`px-2 py-0.5 rounded text-xs font-bold ${
+                              persona.evaluation_score >= 7 ? 'bg-green-500/20 text-green-400' :
+                              persona.evaluation_score >= 4 ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {persona.evaluation_score.toFixed(1)}
                             </div>
                           )}
-                          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                         </div>
                       </div>
 
                       {/* Conteúdo expandido */}
                       {isExpanded && (
-                        <div className="px-5 pb-5 pt-2 border-t border-green-500/20">
+                        <div className="px-4 pb-4 pt-2 border-t border-gray-700">
                           {/* Detalhes da persona */}
                           <div className="space-y-3">
                             {/* Conteúdo B2B */}
                             {persona.business_type === 'B2B' && (
                               <div className="space-y-2">
                                 {(persona as PersonaB2B).company_type && (
-                                  <p className="text-sm text-gray-300 leading-relaxed">
-                                    <span className="font-bold text-green-400">Tipo de Empresa:</span>{' '}
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="font-medium text-gray-300">Tipo de Empresa:</span>{' '}
                                     {(persona as PersonaB2B).company_type}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).company_goals && (
-                                  <p className="text-sm text-gray-300 leading-relaxed">
-                                    <span className="font-bold text-green-400">Busca:</span>{' '}
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="font-medium text-gray-300">Busca:</span>{' '}
                                     {(persona as PersonaB2B).company_goals}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).business_challenges && (
-                                  <p className="text-sm text-gray-300 leading-relaxed">
-                                    <span className="font-bold text-green-400">Desafios:</span>{' '}
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="font-medium text-gray-300">Desafios:</span>{' '}
                                     {(persona as PersonaB2B).business_challenges}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).prior_knowledge && (
-                                  <p className="text-sm text-gray-300 leading-relaxed">
-                                    <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="font-medium text-gray-300">Conhecimento prévio:</span>{' '}
                                     {(persona as PersonaB2B).prior_knowledge}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).context && (
-                                  <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
+                                  <p className="text-xs text-gray-500 italic mt-2 pt-2 border-t border-gray-700">
                                     {(persona as PersonaB2B).context}
                                   </p>
                                 )}
@@ -2876,25 +2947,25 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             {persona.business_type === 'B2C' && (
                               <div className="space-y-2">
                                 {(persona as PersonaB2C).what_seeks && (
-                                  <p className="text-sm text-gray-300 leading-relaxed">
-                                    <span className="font-bold text-green-400">Busca:</span>{' '}
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="font-medium text-gray-300">Busca:</span>{' '}
                                     {(persona as PersonaB2C).what_seeks}
                                   </p>
                                 )}
                                 {(persona as PersonaB2C).main_pains && (
-                                  <p className="text-sm text-gray-300 leading-relaxed">
-                                    <span className="font-bold text-green-400">Dores:</span>{' '}
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="font-medium text-gray-300">Dores:</span>{' '}
                                     {(persona as PersonaB2C).main_pains}
                                   </p>
                                 )}
                                 {(persona as PersonaB2C).prior_knowledge && (
-                                  <p className="text-sm text-gray-300 leading-relaxed">
-                                    <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    <span className="font-medium text-gray-300">Conhecimento prévio:</span>{' '}
                                     {(persona as PersonaB2C).prior_knowledge}
                                   </p>
                                 )}
                                 {(persona as PersonaB2C).context && (
-                                  <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
+                                  <p className="text-xs text-gray-500 italic mt-2 pt-2 border-t border-gray-700">
                                     {(persona as PersonaB2C).context}
                                   </p>
                                 )}
@@ -2903,31 +2974,45 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                             {/* Tags da Persona (todas) */}
                             {persona.id && personaTags.get(persona.id) && personaTags.get(persona.id)!.length > 0 && (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {personaTags.get(persona.id)?.map(tagId => {
-                                  const tag = tags.find(t => t.id === tagId)
-                                  if (!tag) return null
-                                  return (
-                                    <span
-                                      key={tag.id}
-                                      className="px-3 py-1 rounded-full text-xs font-medium text-white"
-                                      style={{ backgroundColor: tag.color }}
-                                    >
-                                      {tag.name}
-                                    </span>
-                                  )
-                                })}
+                              <div className="mt-3 pt-3 border-t border-gray-700/50">
+                                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2">Etiquetas</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {personaTags.get(persona.id)?.map(tagId => {
+                                    const tag = tags.find(t => t.id === tagId)
+                                    if (!tag) return null
+                                    return (
+                                      <span
+                                        key={tag.id}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-md transition-transform hover:scale-105"
+                                        style={{
+                                          background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}dd 100%)`,
+                                          boxShadow: `0 3px 10px ${tag.color}40`
+                                        }}
+                                      >
+                                        {tag.name}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
                               </div>
                             )}
                           </div>
 
                           {/* Botões de ação */}
-                          <div className="flex gap-2 flex-shrink-0 items-center mt-4 pt-4 border-t border-green-500/20">
+                          <div className="flex gap-2 flex-shrink-0 items-center mt-3 pt-3 border-t border-gray-700">
                             {/* Score da avaliação */}
                             {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
-                              <div className="flex items-center gap-1.5 px-3 py-2 bg-green-900/30 border border-green-500/40 rounded-lg">
-                                <span className="text-xs text-green-300 font-medium">Nota:</span>
-                                <span className="text-lg font-bold text-green-400">{persona.evaluation_score.toFixed(1)}</span>
+                              <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${
+                                persona.evaluation_score >= 7 ? 'bg-green-500/20' :
+                                persona.evaluation_score >= 4 ? 'bg-yellow-500/20' :
+                                'bg-red-500/20'
+                              }`}>
+                                <span className="text-xs text-gray-400">Nota:</span>
+                                <span className={`text-sm font-bold ${
+                                  persona.evaluation_score >= 7 ? 'text-green-400' :
+                                  persona.evaluation_score >= 4 ? 'text-yellow-400' :
+                                  'text-red-400'
+                                }`}>{persona.evaluation_score.toFixed(1)}</span>
                               </div>
                             )}
 
@@ -2937,11 +3022,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                 handleEvaluatePersona(persona)
                               }}
                               disabled={evaluatingPersona || (persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!))}
-                              className={`px-4 py-2 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 ${
-                                editedPersonaIds.has(persona.id!)
-                                  ? 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
-                                  : 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
-                              }`}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                               title={
                                 persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!)
                                   ? 'Edite a persona para poder reavaliá-la'
@@ -2950,12 +3031,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   : 'Avaliar persona'
                               }
                             >
-                              {evaluatingPersona && <Loader2 className="w-4 h-4 animate-spin" />}
+                              {evaluatingPersona && <Loader2 className="w-3 h-3 animate-spin" />}
                               {evaluatingPersona
-                                ? 'AVALIANDO...'
+                                ? 'Avaliando...'
                                 : editedPersonaIds.has(persona.id!)
-                                ? 'REAVALIAR PERSONA'
-                                : 'AVALIAR PERSONA'}
+                                ? 'Reavaliar'
+                                : 'Avaliar'}
                             </button>
                             <button
                               onClick={(e) => {
@@ -2969,20 +3050,20 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   setSelectedPersonaTags(tags)
                                 }
                               }}
-                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 p-2 rounded-lg transition-all"
+                              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
                               title="Editar persona"
                             >
-                              <Settings className="w-5 h-5" />
+                              <Settings className="w-4 h-4" />
                             </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleDeletePersona(persona.id!)
                               }}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg transition-all"
+                              className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                               title="Deletar persona"
                             >
-                              <Trash2 className="w-5 h-5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -2995,20 +3076,21 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
               {/* Formulário de Nova/Editar Persona */}
               {showPersonaForm && (
-                <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 space-y-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-bold">
-                      {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType === 'Ambos' ? selectedPersonaType : businessType}
-                    </h4>
-                    <button
-                      onClick={() => {
-                        setShowPersonaForm(false)
-                        setNewPersona({})
-                        setEditingPersonaId(null)
-                        setSelectedPersonaTags([])
-                      }}
-                      className="text-gray-400 hover:text-gray-300"
-                    >
+                <div className="p-4 border-t border-gray-800">
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-white">
+                        {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType === 'Ambos' ? selectedPersonaType : businessType}
+                      </h4>
+                      <button
+                        onClick={() => {
+                          setShowPersonaForm(false)
+                          setNewPersona({})
+                          setEditingPersonaId(null)
+                          setSelectedPersonaTags([])
+                        }}
+                        className="p-1 text-gray-500 hover:text-white rounded transition-colors"
+                      >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
@@ -3255,6 +3337,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </button>
                   </div>
                 </div>
+              </div>
               )}
             </div>
           </div>
@@ -3263,56 +3346,57 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Objeções Tab */}
         {activeTab === 'objections' && (
           <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-xl font-bold">Principais Objeções</h3>
-                  {/* Contador de Objeções */}
-                  <div className="px-3 py-1 rounded-lg text-sm font-medium bg-green-900/30 border border-green-500/40 text-green-400">
-                    {objections.length} objeções
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Principais Objeções</h3>
+                    {/* Contador de Objeções */}
+                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                      {objections.length}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setShowAIGenerateModal('objections')}
+                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
+                  >
+                    <Sparkles className="w-4 h-4 animate-pulse" />
+                    Gerar com IA
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowAIGenerateModal('objections')}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Gerar com IA
-                </button>
+                <p className="text-gray-500 mt-2 text-xs">
+                  Registre objeções comuns e adicione múltiplas formas de quebrá-las para cada uma.
+                </p>
               </div>
-              <p className="text-gray-400 mb-6 text-sm">
-                Registre objeções comuns e adicione múltiplas formas de quebrá-las para cada uma.
-              </p>
 
               {/* Aviso de Qualidade */}
-              <div className="mb-4 bg-red-900/20 border border-red-500/40 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-red-300 leading-relaxed">
-                      <span className="font-bold">Atenção:</span> Objeções com pontuação abaixo de 7.0 podem comprometer a qualidade e a eficácia do treinamento de vendas.
-                    </p>
-                  </div>
+              <div className="mx-4 mt-4 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-300 leading-relaxed">
+                    <span className="font-medium">Atenção:</span> Objeções com pontuação abaixo de 7.0 podem comprometer a qualidade do treinamento.
+                  </p>
                 </div>
               </div>
 
               {/* Lista de objeções */}
               {objections.length > 0 && (
-                <div className="mb-4 space-y-3">
+                <div className="p-4 space-y-2">
                   {objections.map((objection) => (
                     <div
                       key={objection.id}
-                      className="bg-gray-900/50 border border-green-500/20 rounded-xl overflow-hidden"
+                      className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden"
                     >
                       {/* Header da objeção */}
-                      <div className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-3 flex-1">
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <div className="flex items-center gap-2 flex-1">
                           <button
                             onClick={() => toggleObjectionExpanded(objection.id)}
-                            className="text-green-400 hover:text-green-300 transition-colors"
+                            className="text-gray-500 hover:text-white transition-colors"
                           >
                             <svg
-                              className={`w-5 h-5 transform transition-transform ${expandedObjections.has(objection.id) ? 'rotate-90' : ''}`}
+                              className={`w-4 h-4 transform transition-transform ${expandedObjections.has(objection.id) ? 'rotate-90' : ''}`}
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -3335,7 +3419,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                       setTempObjectionName('')
                                     }
                                   }}
-                                  className="flex-1 px-2 py-1 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500"
+                                  className="flex-1 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-green-500/50"
                                   autoFocus
                                 />
                                 <button
@@ -3349,25 +3433,25 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     setEditingObjectionName(null)
                                     setTempObjectionName('')
                                   }}
-                                  className="text-gray-400 hover:text-gray-300 transition-colors"
+                                  className="text-gray-500 hover:text-white transition-colors"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
                               </>
                             ) : (
                               <>
-                                <span className="text-gray-300 font-medium">{objection.name}</span>
+                                <span className="text-sm text-white">{objection.name}</span>
                                 <button
                                   onClick={() => {
                                     setEditingObjectionName(objection.id)
                                     setTempObjectionName(objection.name)
                                   }}
-                                  className="text-green-400 hover:text-green-300 transition-colors"
+                                  className="text-gray-500 hover:text-white transition-colors"
                                 >
                                   <Edit2 className="w-3 h-3" />
                                 </button>
-                                <span className="text-gray-500 text-sm">
-                                  ({objection.rebuttals?.length || 0} {objection.rebuttals?.length === 1 ? 'forma de quebra' : 'formas de quebra'})
+                                <span className="text-xs text-gray-500">
+                                  ({objection.rebuttals?.length || 0})
                                 </span>
                               </>
                             )}
@@ -3376,10 +3460,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <div className="flex items-center gap-2">
                           {/* Score Badge */}
                           {objection.evaluation_score !== null && objection.evaluation_score !== undefined && (
-                            <div className={`px-2 py-1 rounded text-xs font-bold ${
-                              objection.evaluation_score >= 7 ? 'bg-green-600/20 text-green-400' :
-                              objection.evaluation_score >= 4 ? 'bg-yellow-600/20 text-yellow-400' :
-                              'bg-red-600/20 text-red-400'
+                            <div className={`px-2 py-0.5 rounded text-xs font-bold ${
+                              objection.evaluation_score >= 7 ? 'bg-green-500/20 text-green-400' :
+                              objection.evaluation_score >= 4 ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-red-500/20 text-red-400'
                             }`}>
                               {objection.evaluation_score.toFixed(1)}
                             </div>
@@ -3388,7 +3472,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           <button
                             onClick={() => handleEvaluateObjection(objection)}
                             disabled={evaluatingObjection || (objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id))}
-                            className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-lg text-xs font-medium text-green-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title={
                               objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id)
                                 ? 'Edite a objeção para poder reavaliar'
@@ -3398,12 +3482,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             {evaluatingObjection ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
                             ) : (
-                              objection.evaluation_score !== null && objection.evaluation_score !== undefined ? 'REAVALIAR' : 'AVALIAR'
+                              objection.evaluation_score !== null && objection.evaluation_score !== undefined ? 'Reavaliar' : 'Avaliar'
                             )}
                           </button>
                           <button
                             onClick={() => handleRemoveObjection(objection.id)}
-                            className="text-red-400 hover:text-red-300 transition-colors"
+                            className="p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -3412,12 +3496,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                       {/* Conteúdo expandido */}
                       {expandedObjections.has(objection.id) && (
-                        <div className="border-t border-green-500/20 px-4 py-3 space-y-3 bg-gray-800/30">
+                        <div className="border-t border-gray-700 px-3 py-3 space-y-3 bg-gray-900/30">
                           <div>
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="text-sm font-medium text-gray-400">Formas de Quebrar:</h4>
+                              <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Formas de Quebrar</h4>
                               {/* Contador de formas de quebrar */}
-                              <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-900/30 border border-green-500/40 text-green-400">
+                              <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
                                 {objection.rebuttals?.length || 0}
                               </div>
                             </div>
@@ -3432,9 +3516,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   return (
                                   <div
                                     key={index}
-                                    className="flex items-start gap-2 bg-gray-900/50 border border-green-500/10 rounded-lg px-3 py-2"
+                                    className="flex items-start gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2"
                                   >
-                                    <span className="text-green-400 font-bold text-sm mt-0.5">{index + 1}.</span>
+                                    <span className="text-gray-500 font-medium text-xs mt-0.5">{index + 1}.</span>
                                     {editingRebuttalId?.objectionId === objection.id && editingRebuttalId?.index === index ? (
                                       <>
                                         <input
@@ -3449,7 +3533,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                               setTempRebuttalText('')
                                             }
                                           }}
-                                          className="flex-1 px-2 py-1 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500"
+                                          className="flex-1 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded text-white text-xs focus:outline-none focus:border-green-500/50"
                                           autoFocus
                                         />
                                         <button
@@ -3463,28 +3547,28 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                             setEditingRebuttalId(null)
                                             setTempRebuttalText('')
                                           }}
-                                          className="text-gray-400 hover:text-gray-300 transition-colors"
+                                          className="text-gray-500 hover:text-white transition-colors"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>
                                       </>
                                     ) : (
                                       <>
-                                        <span className="text-gray-300 text-sm flex-1">{rebuttalText}</span>
+                                        <span className="text-gray-400 text-xs flex-1">{rebuttalText}</span>
                                         <button
                                           onClick={() => {
                                             setEditingRebuttalId({ objectionId: objection.id, index })
                                             setTempRebuttalText(rebuttalText)
                                           }}
-                                          className="text-green-400 hover:text-green-300 transition-colors"
+                                          className="text-gray-500 hover:text-white transition-colors"
                                         >
                                           <Edit2 className="w-3 h-3" />
                                         </button>
                                         <button
                                           onClick={() => handleRemoveRebuttal(objection.id, index)}
-                                          className="text-red-400 hover:text-red-300 transition-colors"
+                                          className="text-gray-500 hover:text-red-400 transition-colors"
                                         >
-                                          <X className="w-4 h-4" />
+                                          <X className="w-3 h-3" />
                                         </button>
                                       </>
                                     )}
@@ -3492,7 +3576,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                 )})}
                               </div>
                             ) : (
-                              <p className="text-gray-500 text-sm mb-3 italic">Nenhuma forma de quebra registrada ainda.</p>
+                              <p className="text-gray-500 text-xs mb-3 italic">Nenhuma forma de quebra registrada ainda.</p>
                             )}
 
                             {/* Adicionar nova forma de quebra */}
@@ -3507,12 +3591,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     handleAddRebuttal(objection.id)
                                   }
                                 }}
-                                className="flex-1 px-3 py-2 bg-gray-800/50 border border-green-500/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-green-500/40"
-                                placeholder="Ex: Apresentar cálculo de ROI detalhado mostrando retorno em 6 meses com base em cases reais do segmento"
+                                className="flex-1 px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-xs placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                                placeholder="Ex: Apresentar cálculo de ROI detalhado..."
                               />
                               <button
                                 onClick={() => handleAddRebuttal(objection.id)}
-                                className="px-4 py-2 rounded-lg font-medium transition-transform text-sm bg-gradient-to-r from-green-600 to-green-500 hover:scale-105"
+                                className="px-3 py-2 rounded-lg text-sm bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
                               >
                                 <Plus className="w-4 h-4" />
                               </button>
@@ -3526,13 +3610,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               )}
 
               {/* Adicionar nova objeção */}
-              <div className="space-y-2">
+              <div className="p-4 border-t border-gray-800 space-y-2">
                 {/* Indicador de limite */}
                 {objectionLimitReached && (
-                  <div className="bg-yellow-900/20 border border-yellow-500/40 rounded-xl p-3 flex items-center gap-2">
+                  <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-2 flex items-center gap-2">
                     <Lock className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm text-yellow-300">
-                      Limite de objeções atingido ({planUsage?.training?.objections?.used || 0}/{planUsage?.training?.objections?.limit || 10}) - Plano PRO
+                    <span className="text-xs text-yellow-300">
+                      Limite atingido ({planUsage?.training?.objections?.used || 0}/{planUsage?.training?.objections?.limit || 10})
                     </span>
                   </div>
                 )}
@@ -3544,31 +3628,31 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     onChange={(e) => setNewObjection(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && !objectionLimitReached && handleAddObjection()}
                     disabled={objectionLimitReached}
-                    className={`flex-1 px-4 py-3 bg-gray-800/50 border rounded-xl text-white placeholder-gray-500 focus:outline-none ${
+                    className={`flex-1 px-3 py-2 bg-gray-900/50 border rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none ${
                       objectionLimitReached
                         ? 'border-gray-700 opacity-50 cursor-not-allowed'
-                        : 'border-green-500/20 focus:border-green-500/40'
+                        : 'border-gray-700 focus:border-green-500/50'
                     }`}
                     placeholder={
                       objectionLimitReached
-                        ? "Limite de objeções atingido no plano PRO"
-                        : "Ex: Cliente diz que o preço está acima do orçamento disponível e questiona se terá ROI rápido o suficiente para justificar"
+                        ? "Limite atingido"
+                        : "Nova objeção..."
                     }
                   />
                   <button
                     onClick={handleAddObjection}
                     disabled={objectionLimitReached}
-                    className={`px-6 py-3 rounded-xl font-medium transition-all ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       objectionLimitReached
                         ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-green-600 to-green-500 hover:scale-105'
+                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                     }`}
-                    title={objectionLimitReached ? `Limite de ${planUsage?.training?.objections?.used || 0} objeções atingido no plano PRO` : ''}
+                    title={objectionLimitReached ? `Limite atingido` : ''}
                   >
                     {objectionLimitReached ? (
-                      <Lock className="w-5 h-5" />
+                      <Lock className="w-4 h-4" />
                     ) : (
-                      <Plus className="w-5 h-5" />
+                      <Plus className="w-4 h-4" />
                     )}
                   </button>
                 </div>
@@ -3580,49 +3664,43 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Objetivos de Roleplay Tab */}
         {activeTab === 'objectives' && (
           <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold">Objetivos de Roleplay</h3>
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Objetivos de Roleplay</h3>
                 <button
                   onClick={() => setShowAIGenerateModal('objectives')}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
+                  className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 animate-pulse" />
                   Gerar com IA
+                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
                 </button>
               </div>
-              <p className="text-gray-400 mb-6 text-sm">
-                Defina os objetivos que os vendedores devem alcançar durante os roleplays (ex: marcar reunião, fechar venda, identificar necessidades).
-              </p>
 
               {/* Formulário de novo objetivo */}
-              <div className="mb-6 bg-gray-900/50 border border-green-500/20 rounded-xl p-4">
-                <h4 className="text-sm font-bold text-green-400 mb-3">Adicionar Novo Objetivo</h4>
+              <div className="p-4 border-b border-gray-800">
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Adicionar Novo Objetivo</h4>
                 <div className="space-y-3">
-                  <div>
-                    <input
-                      type="text"
-                      value={newObjectiveName}
-                      onChange={(e) => setNewObjectiveName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddObjective()}
-                      placeholder="Nome do objetivo (ex: Marcar próxima reunião)"
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <textarea
-                      value={newObjectiveDescription}
-                      onChange={(e) => setNewObjectiveDescription(e.target.value)}
-                      placeholder="Descrição do objetivo"
-                      rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors resize-none"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={newObjectiveName}
+                    onChange={(e) => setNewObjectiveName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddObjective()}
+                    placeholder="Nome do objetivo (ex: Marcar próxima reunião)"
+                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                  />
+                  <textarea
+                    value={newObjectiveDescription}
+                    onChange={(e) => setNewObjectiveDescription(e.target.value)}
+                    placeholder="Descrição do objetivo (opcional)"
+                    rows={2}
+                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                  />
                   <button
                     onClick={handleAddObjective}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-medium transition-all shadow-lg shadow-green-500/20"
+                    className="w-full px-3 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
                   >
-                    <Plus className="w-4 h-4 inline mr-2" />
+                    <Plus className="w-4 h-4" />
                     Adicionar Objetivo
                   </button>
                 </div>
@@ -3630,15 +3708,15 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
               {/* Lista de objetivos */}
               {objectives.length > 0 ? (
-                <div className="space-y-3">
+                <div className="p-4 space-y-2">
                   {objectives.map((objective) => (
                     <div
                       key={objective.id}
-                      className="bg-gray-900/50 border border-green-500/20 rounded-xl p-4"
+                      className="bg-gray-800/50 border border-gray-700 rounded-lg p-3"
                     >
                       {editingObjectiveId === objective.id ? (
                         // Modo de edição
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           <input
                             type="text"
                             value={editingObjectiveName}
@@ -3647,55 +3725,54 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               if (e.key === 'Enter') handleUpdateObjective(objective.id)
                               if (e.key === 'Escape') cancelEditingObjective()
                             }}
-                            className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500"
+                            className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded text-sm text-white focus:outline-none focus:border-green-500/50"
                             autoFocus
                           />
                           <textarea
                             value={editingObjectiveDescription}
                             onChange={(e) => setEditingObjectiveDescription(e.target.value)}
                             rows={2}
-                            className="w-full px-3 py-2 bg-gray-800/50 border border-green-500/30 rounded text-white text-sm focus:outline-none focus:border-green-500 resize-none"
+                            className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded text-sm text-white focus:outline-none focus:border-green-500/50 resize-none"
                           />
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleUpdateObjective(objective.id)}
-                              className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-medium transition-colors"
+                              className="flex-1 px-3 py-1.5 bg-green-500/20 text-green-400 rounded text-sm font-medium hover:bg-green-500/30 transition-colors"
                             >
-                              <Check className="w-4 h-4 inline mr-1" />
+                              <Check className="w-3 h-3 inline mr-1" />
                               Salvar
                             </button>
                             <button
                               onClick={cancelEditingObjective}
-                              className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors"
+                              className="flex-1 px-3 py-1.5 bg-gray-700 text-gray-300 rounded text-sm font-medium hover:bg-gray-600 transition-colors"
                             >
-                              <X className="w-4 h-4 inline mr-1" />
                               Cancelar
                             </button>
                           </div>
                         </div>
                       ) : (
                         // Modo de visualização
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2">
                               <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-                              <h4 className="text-white font-medium">{objective.name}</h4>
+                              <h4 className="text-sm text-white font-medium">{objective.name}</h4>
                             </div>
                             {objective.description && (
-                              <p className="text-gray-400 text-sm ml-6">{objective.description}</p>
+                              <p className="text-xs text-gray-500 ml-6 mt-1">{objective.description}</p>
                             )}
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1">
                             <button
                               onClick={() => startEditingObjective(objective)}
-                              className="p-2 text-gray-400 hover:text-green-400 transition-colors"
+                              className="p-1.5 text-gray-500 hover:text-white hover:bg-gray-700 rounded transition-colors"
                               title="Editar"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteObjective(objective.id)}
-                              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                              className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
                               title="Excluir"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -3707,10 +3784,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12 bg-gray-900/30 rounded-xl border border-green-500/10">
-                  <CheckCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-500">Nenhum objetivo cadastrado ainda.</p>
-                  <p className="text-gray-600 text-sm mt-1">Adicione objetivos acima para começar.</p>
+                <div className="p-8 text-center">
+                  <CheckCircle className="w-10 h-10 text-gray-700 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">Nenhum objetivo cadastrado ainda.</p>
                 </div>
               )}
             </div>
@@ -3720,78 +3796,69 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Dados da Empresa Tab */}
         {activeTab === 'files' && (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-xl font-bold mb-4">Dados da Empresa</h3>
-              <p className="text-gray-400 mb-6">
-                Preencha as informações sobre sua empresa para melhorar o treinamento da IA.
-              </p>
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Dados da Empresa</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Preencha as informações para melhorar o treinamento da IA.
+                </p>
+              </div>
 
               {/* Tipo de Empresa */}
-              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">
-                <h4 className="text-lg font-semibold mb-4">Tipo de Empresa</h4>
-                <p className="text-sm text-gray-400 mb-4">
-                  Selecione o modelo de negócio da sua empresa
-                </p>
-                <div className="grid grid-cols-3 gap-3">
+              <div className="p-4 border-b border-gray-800">
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Tipo de Empresa</h4>
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => handleSetBusinessType('B2C')}
-                    className={`px-6 py-4 rounded-xl font-medium transition-all ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       businessType === 'B2C'
-                        ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                        : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-gray-800/50 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'
                     }`}
                   >
-                    <div>
-                      <div className="font-semibold">B2C</div>
-                      <div className="text-xs mt-1 opacity-80">Business to Consumer</div>
-                    </div>
+                    B2C
                   </button>
                   <button
                     onClick={() => handleSetBusinessType('B2B')}
-                    className={`px-6 py-4 rounded-xl font-medium transition-all ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       businessType === 'B2B'
-                        ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                        : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-gray-800/50 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'
                     }`}
                   >
-                    <div>
-                      <div className="font-semibold">B2B</div>
-                      <div className="text-xs mt-1 opacity-80">Business to Business</div>
-                    </div>
+                    B2B
                   </button>
                   <button
                     onClick={() => handleSetBusinessType('Ambos')}
-                    className={`px-6 py-4 rounded-xl font-medium transition-all ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       businessType === 'Ambos'
-                        ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                        : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-gray-800/50 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'
                     }`}
                   >
-                    <div>
-                      <div className="font-semibold">Ambos</div>
-                      <div className="text-xs mt-1 opacity-80">B2B e B2C</div>
-                    </div>
+                    Ambos
                   </button>
                 </div>
               </div>
 
               {/* Formulário de Dados da Empresa */}
-              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="text-lg font-semibold">Informações da Empresa</h4>
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Informações da Empresa</h4>
                   <button
                     onClick={() => setShowAIModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-sm hover:scale-105 transition-transform"
+                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
                   >
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4 animate-pulse" />
                     Preencher com IA
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
                   </button>
                 </div>
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Nome da Empresa */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Qual é o nome da empresa?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Nome da empresa
                     </label>
                     <input
                       type="text"
@@ -3801,14 +3868,14 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyDataEdited(true)
                       }}
                       placeholder="Ex: Tech Solutions LTDA"
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                     />
                   </div>
 
                   {/* Descrição */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Em uma frase simples e objetiva, como você descreveria o que a empresa faz?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Descrição
                     </label>
                     <textarea
                       value={companyData.descricao}
@@ -3816,16 +3883,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, descricao: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: Desenvolvemos software de gestão para pequenas e médias empresas"
+                      placeholder="O que a empresa faz em uma frase"
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Produtos/Serviços */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Quais são os produtos ou serviços principais da empresa?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Produtos/Serviços
                     </label>
                     <textarea
                       value={companyData.produtos_servicos}
@@ -3833,16 +3900,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, produtos_servicos: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: Sistema ERP, CRM para vendas, Plataforma de automação de marketing"
-                      rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      placeholder="Ex: Sistema ERP, CRM para vendas"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Função dos Produtos */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      O que cada produto faz na prática (função real e verificável)?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Função dos produtos
                     </label>
                     <textarea
                       value={companyData.funcao_produtos}
@@ -3850,16 +3917,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, funcao_produtos: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: ERP - controla estoque em tempo real e gera relatórios financeiros automáticos"
-                      rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      placeholder="O que cada produto faz na prática"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Diferenciais */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Quais são os diferenciais reais da empresa em relação aos concorrentes?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Diferenciais
                     </label>
                     <textarea
                       value={companyData.diferenciais}
@@ -3867,16 +3934,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, diferenciais: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: Suporte técnico 24/7, implementação em 48h, integração nativa com 200+ apps"
-                      rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      placeholder="Diferenciais em relação aos concorrentes"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Concorrentes */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Quais empresas são consideradas concorrentes diretas?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Concorrentes
                     </label>
                     <textarea
                       value={companyData.concorrentes}
@@ -3884,16 +3951,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, concorrentes: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: TOTVS, Omie, Bling, SAP Business One"
+                      placeholder="Ex: TOTVS, Omie, Bling"
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Dados e Métricas */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Quais dados, resultados ou números podem ser citados com segurança (ex: quantidade de clientes, crescimento, métricas reais)?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Dados e métricas
                     </label>
                     <textarea
                       value={companyData.dados_metricas}
@@ -3901,16 +3968,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, dados_metricas: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: 5.000+ clientes ativos, 98% de satisfação (NPS 85), crescimento de 40% em 2024"
-                      rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      placeholder="Números que podem ser citados com segurança"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Erros Comuns */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Quais informações ou pontos o vendedor costuma confundir, exagerar ou citar de forma incorreta sobre a empresa ou produto?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Erros comuns
                     </label>
                     <textarea
                       value={companyData.erros_comuns}
@@ -3918,16 +3985,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, erros_comuns: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: Vendedores dizem 'integração instantânea' mas leva 24-48h, falam 'ilimitado' mas há limite de 10GB"
-                      rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      placeholder="Informações que vendedores costumam confundir"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Percepção Desejada */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Como a empresa deseja ser percebida pelos clientes (ex: acessível, premium, inovadora, consultiva, simples, tradicional etc.)?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Percepção desejada
                     </label>
                     <textarea
                       value={companyData.percepcao_desejada}
@@ -3935,16 +4002,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, percepcao_desejada: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: Inovadora e acessível, com foco em simplificar tecnologia para PMEs"
+                      placeholder="Como a empresa deseja ser percebida pelos clientes"
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Dores que Resolve */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Quais dores a empresa resolve para seus clientes?
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Dores que resolve
                     </label>
                     <textarea
                       value={companyData.dores_resolvidas}
@@ -3952,30 +4019,30 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, dores_resolvidas: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Ex: Falta de controle financeiro, processos manuais demorados, dificuldade em escalar o negócio, perda de vendas por falta de organização"
-                      rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      placeholder="Quais dores a empresa resolve para seus clientes"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Botões Salvar/Avaliar/Ver */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex flex-wrap gap-2 pt-2">
                     {/* Botão Salvar/Atualizar - só aparece se não há ID (primeira vez) OU se houve edição */}
                     {(!companyDataId || companyDataEdited) && (
                       <button
                         onClick={handleSaveCompanyData}
                         disabled={savingCompanyData}
-                        className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {savingCompanyData ? (
                           <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" />
                             {companyDataId ? 'Atualizando...' : 'Salvando...'}
                           </>
                         ) : (
                           <>
-                            <CheckCircle className="w-5 h-5" />
-                            {companyDataId ? 'Atualizar Dados' : 'Salvar Dados'}
+                            <CheckCircle className="w-4 h-4" />
+                            {companyDataId ? 'Atualizar' : 'Salvar'}
                           </>
                         )}
                       </button>
@@ -3984,7 +4051,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <button
                       onClick={handleEvaluateQuality}
                       disabled={evaluatingQuality || (qualityEvaluation && !companyDataEdited)}
-                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       title={
                         qualityEvaluation && !companyDataEdited
                           ? 'Edite os dados para poder reavaliar'
@@ -3993,13 +4060,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     >
                       {evaluatingQuality ? (
                         <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           Avaliando...
                         </>
                       ) : (
                         <>
-                          <AlertCircle className="w-5 h-5" />
-                          {qualityEvaluation ? 'Reavaliar Dados' : 'Avaliar Dados'}
+                          <AlertCircle className="w-4 h-4" />
+                          {qualityEvaluation ? 'Reavaliar' : 'Avaliar'}
                         </>
                       )}
                     </button>
@@ -4007,9 +4074,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     {qualityEvaluation && (
                       <button
                         onClick={() => setShowCompanyEvaluationModal(true)}
-                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center justify-center gap-2"
+                        className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-500/30 transition-colors flex items-center gap-2"
                       >
-                        <CheckCircle className="w-5 h-5" />
+                        <CheckCircle className="w-4 h-4" />
                         Ver Avaliação
                       </button>
                     )}
@@ -4023,77 +4090,85 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Fases do Funil Tab */}
         {activeTab === 'funnel' && (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-xl font-bold mb-4">Fases do Funil de Vendas</h3>
-              <p className="text-gray-400 mb-6">
-                Configure as fases do seu processo de vendas. Essas fases serão usadas para categorizar e analisar follow-ups.
-              </p>
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Fases do Funil de Vendas</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Configure as fases do seu processo de vendas.
+                </p>
+              </div>
 
               {/* Formulário para adicionar nova fase */}
-              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6 mb-6">
-                <h4 className="text-lg font-semibold mb-4">Adicionar Nova Fase</h4>
-                <div className="space-y-4">
+              <div className="p-4 border-b border-gray-800">
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Adicionar Nova Fase</h4>
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
                       Nome da Fase *
                     </label>
                     <input
                       type="text"
                       value={newStageName}
                       onChange={(e) => setNewStageName(e.target.value)}
-                      placeholder="Ex: Primeiro Contato, Qualificação, Proposta..."
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      placeholder="Ex: Primeiro Contato, Qualificação..."
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
                       Descrição
                     </label>
                     <textarea
                       value={newStageDescription}
                       onChange={(e) => setNewStageDescription(e.target.value)}
-                      placeholder="Descreva o que caracteriza essa fase do funil..."
+                      placeholder="O que caracteriza essa fase do funil..."
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Objetivo (Como passar para próxima fase)
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                      Objetivo
                     </label>
                     <textarea
                       value={newStageObjective}
                       onChange={(e) => setNewStageObjective(e.target.value)}
-                      placeholder="Ex: Conseguir que o lead responda e demonstre interesse inicial"
+                      placeholder="Como passar para próxima fase"
                       rows={2}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
                   <button
                     onClick={handleAddFunnelStage}
-                    className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white font-medium rounded-xl hover:from-green-500 hover:to-green-400 transition-all flex items-center justify-center gap-2"
+                    className="w-full px-3 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Adicionar Fase
                   </button>
                 </div>
               </div>
 
               {/* Lista de fases */}
-              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-6">
-                <h4 className="text-lg font-semibold mb-4">Fases Cadastradas</h4>
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Fases Cadastradas</h4>
+                  {funnelStages.length > 0 && (
+                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                      {funnelStages.length}
+                    </div>
+                  )}
+                </div>
 
                 {funnelStages.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>Nenhuma fase cadastrada ainda.</p>
-                    <p className="text-sm mt-2">Adicione as fases do seu funil de vendas acima.</p>
+                  <div className="text-center py-8 text-gray-500">
+                    <Target className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma fase cadastrada.</p>
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm text-gray-400 mb-4 flex items-center gap-2">
-                      <GripVertical className="w-4 h-4" />
-                      Arraste os cards para reordenar as fases do funil
+                    <p className="text-xs text-gray-500 mb-3 flex items-center gap-2">
+                      <GripVertical className="w-3 h-3" />
+                      Arraste para reordenar
                     </p>
                     <DndContext
                       sensors={sensors}
