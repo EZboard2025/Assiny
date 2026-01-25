@@ -403,29 +403,29 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
       const selectedObjectiveData = objectives.find(o => o.id === selectedObjective)
 
-      // Enviar todos os dados da persona para o agente
+      // Enviar todos os dados da persona para o agente (usando nomes do banco de dados)
       let personaData: any = {}
       if (selectedPersonaData) {
+        // O banco usa nomes em português: cargo, tipo_empresa_faturamento, contexto, busca, dores
+        const p = selectedPersonaData as any
         if (selectedPersonaData.business_type === 'B2B') {
-          const persona = selectedPersonaData as PersonaB2B
           personaData = {
             business_type: 'B2B',
-            job_title: persona.job_title,
-            company_type: persona.company_type,
-            context: persona.context,
-            company_goals: persona.company_goals,
-            business_challenges: persona.business_challenges,
-            prior_knowledge: persona.prior_knowledge
+            cargo: p.cargo || p.job_title,
+            tipo_empresa_faturamento: p.tipo_empresa_faturamento || p.company_type,
+            contexto: p.contexto || p.context,
+            busca: p.busca || p.company_goals,
+            dores: p.dores || p.business_challenges,
+            prior_knowledge: p.prior_knowledge
           }
         } else {
-          const persona = selectedPersonaData as PersonaB2C
           personaData = {
             business_type: 'B2C',
-            profession: persona.profession,
-            context: persona.context,
-            what_seeks: persona.what_seeks,
-            main_pains: persona.main_pains,
-            prior_knowledge: persona.prior_knowledge
+            profissao: p.profissao || p.profession,
+            contexto: p.contexto || p.context,
+            busca: p.busca || p.what_seeks,
+            dores: p.dores || p.main_pains,
+            prior_knowledge: p.prior_knowledge
           }
         }
       }
@@ -469,19 +469,19 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       if (personaData.business_type === 'B2B') {
         personaInfo = `
 PERFIL DO CLIENTE B2B:
-- Cargo: ${personaData.job_title || 'Não especificado'}
-- Empresa: ${personaData.company_type || 'Não especificado'}
-- Contexto: ${personaData.context || 'Não especificado'}
-- O que busca para a empresa: ${personaData.company_goals || 'Não especificado'}
-- Principais desafios do negócio: ${personaData.business_challenges || 'Não especificado'}
+- Cargo: ${personaData.cargo || 'Não especificado'}
+- Empresa: ${personaData.tipo_empresa_faturamento || 'Não especificado'}
+- Contexto: ${personaData.contexto || 'Não especificado'}
+- O que busca para a empresa: ${personaData.busca || 'Não especificado'}
+- Principais desafios do negócio: ${personaData.dores || 'Não especificado'}
 - O que já sabe sobre sua empresa: ${personaData.prior_knowledge || 'Não sabe nada ainda'}`
       } else if (personaData.business_type === 'B2C') {
         personaInfo = `
 PERFIL DO CLIENTE B2C:
-- Profissão: ${personaData.profession || 'Não especificado'}
-- Contexto: ${personaData.context || 'Não especificado'}
-- O que busca/valoriza: ${personaData.what_seeks || 'Não especificado'}
-- Principais dores/problemas: ${personaData.main_pains || 'Não especificado'}
+- Profissão: ${personaData.profissao || 'Não especificado'}
+- Contexto: ${personaData.contexto || 'Não especificado'}
+- O que busca/valoriza: ${personaData.busca || 'Não especificado'}
+- Principais dores/problemas: ${personaData.dores || 'Não especificado'}
 - O que já sabe sobre sua empresa: ${personaData.prior_knowledge || 'Não sabe nada ainda'}`
       }
 
@@ -499,8 +499,8 @@ ${selectedObjectiveData?.description ? `Descrição: ${selectedObjectiveData.des
 
 Interprete este personagem de forma realista e consistente com todas as características acima. Inicie a conversa como cliente.`
 
-      // Criar nova sessão com N8N
-      const response = await fetch('/api/roleplay/chat', {
+      // Criar nova sessão com API direta (chat-v2)
+      const response = await fetch('/api/roleplay/chat-v2', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -544,10 +544,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       // Criar descrição resumida para o banco (campo segment)
       let segmentDescription = 'Não especificado'
       if (personaData.business_type === 'B2B') {
-        segmentDescription = personaData.job_title
-        if (personaData.company_type) segmentDescription += ` de ${personaData.company_type}`
+        segmentDescription = personaData.cargo || 'Não especificado'
+        if (personaData.tipo_empresa_faturamento) segmentDescription += ` de ${personaData.tipo_empresa_faturamento}`
       } else if (personaData.business_type === 'B2C') {
-        segmentDescription = personaData.profession
+        segmentDescription = personaData.profissao || 'Não especificado'
       }
 
       // Criar sessão no Supabase (usando sessionId do N8N como thread_id)
@@ -833,7 +833,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         temperament: savedTemperament,
         selectedPersona,
         sessionIdN8N,
-        personaData: selectedPersonaData?.job_title || selectedPersonaData?.profile_type,
+        personaData: (selectedPersonaData as any)?.cargo || (selectedPersonaData as any)?.profissao || selectedPersonaData?.profile_type,
         selectedObjections,
         objectionsWithRebuttals
       })
@@ -861,7 +861,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       }
       console.log('📤 Enviando com clientName:', currentClientName)
 
-      // Enviar para API (N8N)
+      // Enviar para API direta (chat-v2)
       const payload = {
         sessionId: sessionIdN8N,
         message: userMessage,
@@ -872,12 +872,15 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         age: savedAge,
         temperament: savedTemperament,
         persona: selectedPersonaData,
-        objections: objectionsWithRebuttals
+        objections: objectionsWithRebuttals,
+        objective: roleplayConfig?.objective, // Enviar objetivo do roleplay
+        // NOVO: Enviar histórico de mensagens para manter contexto
+        chatHistory: messages
       }
 
       console.log('📦 PAYLOAD COMPLETO sendo enviado:', JSON.stringify(payload, null, 2))
 
-      const response = await fetch('/api/roleplay/chat', {
+      const response = await fetch('/api/roleplay/chat-v2', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -885,11 +888,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         body: JSON.stringify(payload),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error('Erro ao enviar mensagem')
+        // Tratamento de erros específicos da API v2
+        if (data.code === 'CONTEXT_TOO_LONG') {
+          throw new Error('A conversa ficou muito longa. Por favor, finalize esta sessão e inicie uma nova.')
+        } else if (data.code === 'RATE_LIMIT') {
+          throw new Error('Muitas requisições. Aguarde alguns segundos e tente novamente.')
+        } else {
+          throw new Error(data.error || 'Erro ao enviar mensagem')
+        }
       }
 
-      const data = await response.json()
       console.log('✅ Resposta do cliente recebida:', data.message)
 
       // Adicionar resposta do cliente
@@ -916,9 +927,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       // Converter resposta em áudio e tocar
       await textToSpeech(data.message, isFinalizationMessage)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao enviar mensagem:', error)
-      alert('Erro ao enviar mensagem. Tente novamente.')
+      alert(error.message || 'Erro ao enviar mensagem. Tente novamente.')
     } finally {
       setIsLoading(false)
     }
@@ -1749,7 +1760,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                           </div>
                                           <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-white truncate">
-                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).job_title : (persona as PersonaB2C).profession}
+                                              {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
                                             </p>
                                             {personaTags.get(persona.id!) && personaTags.get(persona.id!)!.length > 0 && (
                                               <div className="flex flex-wrap gap-1 mt-1">
@@ -1759,7 +1770,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                               </div>
                                             )}
                                             <p className="text-xs text-gray-500 mt-1 truncate">
-                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).company_type : (persona as PersonaB2C).what_seeks}
+                                              {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
                                             </p>
                                           </div>
                                           {selectedPersona === persona.id && <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />}
@@ -1774,14 +1785,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                           <div className="mt-3 pt-3 border-t border-gray-700 space-y-1 text-xs text-gray-400">
                                             {persona.business_type === 'B2B' ? (
                                               <>
-                                                <p><span className="text-gray-300">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
-                                                <p><span className="text-gray-300">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
-                                                <p><span className="text-gray-300">Busca:</span> {(persona as PersonaB2B).company_goals}</p>
+                                                <p><span className="text-gray-300">Empresa:</span> {(persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type}</p>
+                                                <p><span className="text-gray-300">Contexto:</span> {(persona as any).contexto || (persona as any).dores || (persona as PersonaB2B).business_challenges}</p>
+                                                <p><span className="text-gray-300">Busca:</span> {(persona as any).busca || (persona as PersonaB2B).company_goals}</p>
                                               </>
                                             ) : (
                                               <>
-                                                <p><span className="text-gray-300">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
-                                                <p><span className="text-gray-300">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
+                                                <p><span className="text-gray-300">Busca:</span> {(persona as any).busca || (persona as PersonaB2C).what_seeks}</p>
+                                                <p><span className="text-gray-300">Dores:</span> {(persona as any).dores || (persona as PersonaB2C).main_pains}</p>
                                               </>
                                             )}
                                           </div>
@@ -1815,10 +1826,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                           </div>
                                           <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-white truncate">
-                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).job_title : (persona as PersonaB2C).profession}
+                                              {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
                                             </p>
                                             <p className="text-xs text-gray-500 mt-1 truncate">
-                                              {persona.business_type === 'B2B' ? (persona as PersonaB2B).company_type : (persona as PersonaB2C).what_seeks}
+                                              {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
                                             </p>
                                           </div>
                                           {selectedPersona === persona.id && <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />}
@@ -1833,13 +1844,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                           <div className="mt-3 pt-3 border-t border-gray-700 space-y-1 text-xs text-gray-400">
                                             {persona.business_type === 'B2B' ? (
                                               <>
-                                                <p><span className="text-gray-300">Empresa:</span> {(persona as PersonaB2B).company_type}</p>
-                                                <p><span className="text-gray-300">Contexto:</span> {(persona as PersonaB2B).business_challenges}</p>
+                                                <p><span className="text-gray-300">Empresa:</span> {(persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type}</p>
+                                                <p><span className="text-gray-300">Contexto:</span> {(persona as any).contexto || (persona as any).dores || (persona as PersonaB2B).business_challenges}</p>
                                               </>
                                             ) : (
                                               <>
-                                                <p><span className="text-gray-300">Busca:</span> {(persona as PersonaB2C).what_seeks}</p>
-                                                <p><span className="text-gray-300">Dores:</span> {(persona as PersonaB2C).main_pains}</p>
+                                                <p><span className="text-gray-300">Busca:</span> {(persona as any).busca || (persona as PersonaB2C).what_seeks}</p>
+                                                <p><span className="text-gray-300">Dores:</span> {(persona as any).dores || (persona as PersonaB2C).main_pains}</p>
                                               </>
                                             )}
                                           </div>

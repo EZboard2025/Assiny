@@ -370,6 +370,8 @@ function ConfigurationInterface({
   const [selectedPersonaTags, setSelectedPersonaTags] = useState<string[]>([])
   const [personaTags, setPersonaTags] = useState<Map<string, string[]>>(new Map())
   const [filterTag, setFilterTag] = useState<string>('')
+  const [filterBusinessType, setFilterBusinessType] = useState<'' | 'B2B' | 'B2C'>('')
+  const [expandedPersonas, setExpandedPersonas] = useState<Set<string>>(new Set())
   const [showTagForm, setShowTagForm] = useState(false)
 
   // Estados para controle de limites
@@ -2487,6 +2489,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <Sparkles className="w-4 h-4" />
                     Gerar com IA
                   </button>
+                  {/* Filtro por Tipo B2B/B2C */}
+                  <select
+                    value={filterBusinessType}
+                    onChange={(e) => setFilterBusinessType(e.target.value as '' | 'B2B' | 'B2C')}
+                    className="px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:outline-none focus:border-green-500/40"
+                  >
+                    <option value="">B2B e B2C</option>
+                    <option value="B2B">Apenas B2B</option>
+                    <option value="B2C">Apenas B2C</option>
+                  </select>
                   {/* Filtro por Tag */}
                   {tags.length > 0 && (
                     <select
@@ -2716,13 +2728,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
               {/* Lista de personas */}
               {!showPersonaForm && personas.filter(p => {
-                // Filtrar por tipo de negócio
-                if (businessType === 'Ambos') {
-                  // Se "Ambos" está selecionado, mostrar tanto B2B quanto B2C
-                  if (p.business_type !== 'B2B' && p.business_type !== 'B2C') return false
-                } else {
-                  // Caso contrário, filtrar pelo tipo específico
-                  if (p.business_type !== businessType) return false
+                // Filtrar pelo dropdown B2B/B2C
+                if (filterBusinessType && p.business_type !== filterBusinessType) return false
+
+                // Filtrar por tipo de negócio da empresa (se não tiver filtro específico)
+                if (!filterBusinessType) {
+                  if (businessType === 'Ambos') {
+                    if (p.business_type !== 'B2B' && p.business_type !== 'B2C') return false
+                  } else {
+                    if (p.business_type !== businessType) return false
+                  }
                 }
 
                 // Filtrar por tag se selecionada
@@ -2735,13 +2750,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               }).length > 0 && (
                 <div className="mb-4 space-y-4">
                   {personas.filter(p => {
-                    // Filtrar por tipo de negócio
-                    if (businessType === 'Ambos') {
-                      // Se "Ambos" está selecionado, mostrar tanto B2B quanto B2C
-                      if (p.business_type !== 'B2B' && p.business_type !== 'B2C') return false
-                    } else {
-                      // Caso contrário, filtrar pelo tipo específico
-                      if (p.business_type !== businessType) return false
+                    // Filtrar pelo dropdown B2B/B2C
+                    if (filterBusinessType && p.business_type !== filterBusinessType) return false
+
+                    // Filtrar por tipo de negócio da empresa (se não tiver filtro específico)
+                    if (!filterBusinessType) {
+                      if (businessType === 'Ambos') {
+                        if (p.business_type !== 'B2B' && p.business_type !== 'B2C') return false
+                      } else {
+                        if (p.business_type !== businessType) return false
+                      }
                     }
 
                     // Filtrar por tag se selecionada
@@ -2751,171 +2769,227 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     }
 
                     return true
-                  }).map((persona) => (
+                  }).map((persona) => {
+                    const isExpanded = expandedPersonas.has(persona.id!)
+                    return (
                     <div
                       key={persona.id}
-                      className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-green-500/30 rounded-xl p-5 hover:border-green-500/50 transition-all shadow-lg"
+                      className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-green-500/30 rounded-xl overflow-hidden hover:border-green-500/50 transition-all shadow-lg"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-3">
-                          {/* Título */}
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
-                              <UserCircle2 className="w-7 h-7 text-white" />
-                            </div>
-                            <h4 className="text-lg font-bold text-white">
+                      {/* Header clicável */}
+                      <div
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-green-500/5 transition-colors"
+                        onClick={() => {
+                          const newExpanded = new Set(expandedPersonas)
+                          if (isExpanded) {
+                            newExpanded.delete(persona.id!)
+                          } else {
+                            newExpanded.add(persona.id!)
+                          }
+                          setExpandedPersonas(newExpanded)
+                        }}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-green-400 flex items-center justify-center flex-shrink-0">
+                            <UserCircle2 className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-base font-bold text-white truncate">
                               {persona.business_type === 'B2B'
                                 ? (persona as PersonaB2B).job_title
                                 : (persona as PersonaB2C).profession}
                             </h4>
+                            <span className="text-xs text-gray-500">{persona.business_type}</span>
                           </div>
-
-                          {/* Conteúdo B2B */}
-                          {persona.business_type === 'B2B' && (
-                            <div className="space-y-2 pl-15">
-                              {(persona as PersonaB2B).company_type && (
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-green-400">Tipo de Empresa:</span>{' '}
-                                  {(persona as PersonaB2B).company_type}
-                                </p>
-                              )}
-                              {(persona as PersonaB2B).company_goals && (
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-green-400">Busca:</span>{' '}
-                                  {(persona as PersonaB2B).company_goals}
-                                </p>
-                              )}
-                              {(persona as PersonaB2B).business_challenges && (
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-green-400">Desafios:</span>{' '}
-                                  {(persona as PersonaB2B).business_challenges}
-                                </p>
-                              )}
-                              {(persona as PersonaB2B).prior_knowledge && (
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
-                                  {(persona as PersonaB2B).prior_knowledge}
-                                </p>
-                              )}
-                              {(persona as PersonaB2B).context && (
-                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
-                                  {(persona as PersonaB2B).context}
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Conteúdo B2C */}
-                          {persona.business_type === 'B2C' && (
-                            <div className="space-y-2 pl-15">
-                              {(persona as PersonaB2C).what_seeks && (
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-green-400">Busca:</span>{' '}
-                                  {(persona as PersonaB2C).what_seeks}
-                                </p>
-                              )}
-                              {(persona as PersonaB2C).main_pains && (
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-green-400">Dores:</span>{' '}
-                                  {(persona as PersonaB2C).main_pains}
-                                </p>
-                              )}
-                              {(persona as PersonaB2C).prior_knowledge && (
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
-                                  {(persona as PersonaB2C).prior_knowledge}
-                                </p>
-                              )}
-                              {(persona as PersonaB2C).context && (
-                                <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
-                                  {(persona as PersonaB2C).context}
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Tags da Persona */}
+                          {/* Tags compactas no header */}
                           {persona.id && personaTags.get(persona.id) && personaTags.get(persona.id)!.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {personaTags.get(persona.id)?.map(tagId => {
+                            <div className="flex gap-1 mr-2">
+                              {personaTags.get(persona.id)?.slice(0, 2).map(tagId => {
                                 const tag = tags.find(t => t.id === tagId)
                                 if (!tag) return null
                                 return (
                                   <span
                                     key={tag.id}
-                                    className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                                    className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
                                     style={{ backgroundColor: tag.color }}
                                   >
                                     {tag.name}
                                   </span>
                                 )
                               })}
+                              {personaTags.get(persona.id)!.length > 2 && (
+                                <span className="text-xs text-gray-500">+{personaTags.get(persona.id)!.length - 2}</span>
+                              )}
                             </div>
                           )}
-                        </div>
-
-                        {/* Botões de ação */}
-                        <div className="flex gap-2 flex-shrink-0 items-center">
-                          {/* Score da avaliação */}
+                          {/* Score compacto */}
                           {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
-                            <div className="flex items-center gap-1.5 px-3 py-2 bg-green-900/30 border border-green-500/40 rounded-lg">
-                              <span className="text-xs text-green-300 font-medium">Nota:</span>
-                              <span className="text-lg font-bold text-green-400">{persona.evaluation_score.toFixed(1)}</span>
+                            <div className="flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-500/40 rounded-lg mr-2">
+                              <span className="text-sm font-bold text-green-400">{persona.evaluation_score.toFixed(1)}</span>
                             </div>
                           )}
-
-                          <button
-                            onClick={() => handleEvaluatePersona(persona)}
-                            disabled={evaluatingPersona || (persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!))}
-                            className={`px-4 py-2 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 ${
-                              editedPersonaIds.has(persona.id!)
-                                ? 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
-                                : 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
-                            }`}
-                            title={
-                              persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!)
-                                ? 'Edite a persona para poder reavaliá-la'
-                                : editedPersonaIds.has(persona.id!)
-                                ? 'Reavaliar persona após edição'
-                                : 'Avaliar persona'
-                            }
-                          >
-                            {evaluatingPersona && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {evaluatingPersona
-                              ? 'AVALIANDO...'
-                              : editedPersonaIds.has(persona.id!)
-                              ? 'REAVALIAR PERSONA'
-                              : 'AVALIAR PERSONA'}
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setEditingPersonaId(persona.id!)
-                              setNewPersona(persona)
-                              setShowPersonaForm(true)
-                              // Definir o tipo correto da persona para mostrar o formulário correto
-                              setSelectedPersonaType(persona.business_type as 'B2B' | 'B2C')
-                              // Carregar tags da persona
-                              if (persona.id) {
-                                const tags = personaTags.get(persona.id) || []
-                                setSelectedPersonaTags(tags)
-                              }
-                            }}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 p-2 rounded-lg transition-all"
-                            title="Editar persona"
-                          >
-                            <Settings className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePersona(persona.id!)}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg transition-all"
-                            title="Deletar persona"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
+                          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                         </div>
                       </div>
+
+                      {/* Conteúdo expandido */}
+                      {isExpanded && (
+                        <div className="px-5 pb-5 pt-2 border-t border-green-500/20">
+                          {/* Detalhes da persona */}
+                          <div className="space-y-3">
+                            {/* Conteúdo B2B */}
+                            {persona.business_type === 'B2B' && (
+                              <div className="space-y-2">
+                                {(persona as PersonaB2B).company_type && (
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-green-400">Tipo de Empresa:</span>{' '}
+                                    {(persona as PersonaB2B).company_type}
+                                  </p>
+                                )}
+                                {(persona as PersonaB2B).company_goals && (
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-green-400">Busca:</span>{' '}
+                                    {(persona as PersonaB2B).company_goals}
+                                  </p>
+                                )}
+                                {(persona as PersonaB2B).business_challenges && (
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-green-400">Desafios:</span>{' '}
+                                    {(persona as PersonaB2B).business_challenges}
+                                  </p>
+                                )}
+                                {(persona as PersonaB2B).prior_knowledge && (
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
+                                    {(persona as PersonaB2B).prior_knowledge}
+                                  </p>
+                                )}
+                                {(persona as PersonaB2B).context && (
+                                  <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
+                                    {(persona as PersonaB2B).context}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Conteúdo B2C */}
+                            {persona.business_type === 'B2C' && (
+                              <div className="space-y-2">
+                                {(persona as PersonaB2C).what_seeks && (
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-green-400">Busca:</span>{' '}
+                                    {(persona as PersonaB2C).what_seeks}
+                                  </p>
+                                )}
+                                {(persona as PersonaB2C).main_pains && (
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-green-400">Dores:</span>{' '}
+                                    {(persona as PersonaB2C).main_pains}
+                                  </p>
+                                )}
+                                {(persona as PersonaB2C).prior_knowledge && (
+                                  <p className="text-sm text-gray-300 leading-relaxed">
+                                    <span className="font-bold text-green-400">Conhecimento prévio:</span>{' '}
+                                    {(persona as PersonaB2C).prior_knowledge}
+                                  </p>
+                                )}
+                                {(persona as PersonaB2C).context && (
+                                  <p className="text-sm text-gray-400 italic mt-2 pt-2 border-t border-green-500/20">
+                                    {(persona as PersonaB2C).context}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Tags da Persona (todas) */}
+                            {persona.id && personaTags.get(persona.id) && personaTags.get(persona.id)!.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {personaTags.get(persona.id)?.map(tagId => {
+                                  const tag = tags.find(t => t.id === tagId)
+                                  if (!tag) return null
+                                  return (
+                                    <span
+                                      key={tag.id}
+                                      className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                                      style={{ backgroundColor: tag.color }}
+                                    >
+                                      {tag.name}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Botões de ação */}
+                          <div className="flex gap-2 flex-shrink-0 items-center mt-4 pt-4 border-t border-green-500/20">
+                            {/* Score da avaliação */}
+                            {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
+                              <div className="flex items-center gap-1.5 px-3 py-2 bg-green-900/30 border border-green-500/40 rounded-lg">
+                                <span className="text-xs text-green-300 font-medium">Nota:</span>
+                                <span className="text-lg font-bold text-green-400">{persona.evaluation_score.toFixed(1)}</span>
+                              </div>
+                            )}
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEvaluatePersona(persona)
+                              }}
+                              disabled={evaluatingPersona || (persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!))}
+                              className={`px-4 py-2 rounded-lg font-medium text-white hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 ${
+                                editedPersonaIds.has(persona.id!)
+                                  ? 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
+                                  : 'bg-gradient-to-r from-green-500 to-green-400 shadow-green-500/30'
+                              }`}
+                              title={
+                                persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!)
+                                  ? 'Edite a persona para poder reavaliá-la'
+                                  : editedPersonaIds.has(persona.id!)
+                                  ? 'Reavaliar persona após edição'
+                                  : 'Avaliar persona'
+                              }
+                            >
+                              {evaluatingPersona && <Loader2 className="w-4 h-4 animate-spin" />}
+                              {evaluatingPersona
+                                ? 'AVALIANDO...'
+                                : editedPersonaIds.has(persona.id!)
+                                ? 'REAVALIAR PERSONA'
+                                : 'AVALIAR PERSONA'}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingPersonaId(persona.id!)
+                                setNewPersona(persona)
+                                setShowPersonaForm(true)
+                                setSelectedPersonaType(persona.business_type as 'B2B' | 'B2C')
+                                if (persona.id) {
+                                  const tags = personaTags.get(persona.id) || []
+                                  setSelectedPersonaTags(tags)
+                                }
+                              }}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 p-2 rounded-lg transition-all"
+                              title="Editar persona"
+                            >
+                              <Settings className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeletePersona(persona.id!)
+                              }}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded-lg transition-all"
+                              title="Deletar persona"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  )
+                  })}
                 </div>
               )}
 
@@ -2976,7 +3050,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </div>
                   )}
 
-                  {(businessType === 'B2B' || (businessType === 'Ambos' && selectedPersonaType === 'B2B')) ? (
+                  {/* Ao editar, sempre usa selectedPersonaType. Ao criar nova, considera o businessType da empresa */}
+                  {(editingPersonaId ? selectedPersonaType === 'B2B' : (businessType === 'B2B' || (businessType === 'Ambos' && selectedPersonaType === 'B2B'))) ? (
                     <>
                       {/* Formulário B2B */}
                       <div>
