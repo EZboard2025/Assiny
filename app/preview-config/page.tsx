@@ -44,23 +44,25 @@ export default function PreviewConfigPage() {
   const untaggedPersonas = mockPersonas.filter(p => p.tags.length === 0)
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto">
-      <div className="min-h-screen py-8 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white mb-1">Configuração da Sessão</h1>
-              <p className="text-gray-400 text-sm">Configure os parâmetros do seu roleplay (Preview)</p>
-            </div>
-            <a
-              href="/"
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </a>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-start justify-center pt-24 px-6 pb-6">
+      {/* Container principal */}
+      <div className="w-full max-w-5xl max-h-[calc(100vh-120px)] bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
+          <div>
+            <h1 className="text-xl font-bold text-white">Configuração da Sessão</h1>
+            <p className="text-gray-500 text-sm">Configure os parâmetros do seu roleplay</p>
           </div>
+          <a
+            href="/"
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </a>
+        </div>
 
+        {/* Content - scrollable */}
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Coluna Esquerda - Cliente */}
             <div className="space-y-4">
@@ -395,38 +397,35 @@ export default function PreviewConfigPage() {
 
           {/* Aviso de configuração incompleta */}
           {selectedObjections.length === 0 && (
-            <div className="mt-6 bg-yellow-500/10 rounded-xl border border-yellow-500/30 p-4">
+            <div className="mt-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30 p-3">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-yellow-400 mb-2">Configure os itens obrigatórios:</p>
-                  <ul className="space-y-1 text-xs text-yellow-300/80">
-                    <li>• Selecione pelo menos uma Objeção</li>
-                  </ul>
+                  <p className="text-sm font-medium text-yellow-400">Selecione pelo menos uma Objeção</p>
                 </div>
               </div>
             </div>
           )}
+        </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 mt-6">
-            <a
-              href="/"
-              className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl font-medium hover:bg-gray-800 transition-colors text-gray-300 text-sm text-center"
-            >
-              Voltar
-            </a>
-            <button
-              disabled={selectedObjections.length === 0}
-              className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all text-sm ${
-                selectedObjections.length === 0
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-500 text-white'
-              }`}
-            >
-              Iniciar Roleplay
-            </button>
-          </div>
+        {/* Footer com botões */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-800 bg-gray-900/50 flex-shrink-0">
+          <a
+            href="/"
+            className="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg font-medium hover:bg-gray-700 transition-colors text-gray-300 text-sm text-center"
+          >
+            Cancelar
+          </a>
+          <button
+            disabled={selectedObjections.length === 0}
+            className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all text-sm ${
+              selectedObjections.length === 0
+                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-500 text-white'
+            }`}
+          >
+            Iniciar Roleplay
+          </button>
         </div>
       </div>
     </div>
