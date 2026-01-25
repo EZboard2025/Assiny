@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
@@ -150,6 +150,124 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     if (objectivesData.length > 0) {
       setSelectedObjective(objectivesData[0].id)
     }
+  }
+
+  // Helper functions for evaluation modal (matching HistoricoView design)
+  const getScoreColor = (score: number) => {
+    if (score >= 8) return 'text-green-400'
+    if (score >= 6) return 'text-yellow-400'
+    return 'text-red-400'
+  }
+
+  const getScoreBg = (score: number) => {
+    if (score >= 8) return 'bg-green-500/20 border-green-500/30'
+    if (score >= 6) return 'bg-yellow-500/20 border-yellow-500/30'
+    return 'bg-red-500/20 border-red-500/30'
+  }
+
+  const getPerformanceLabel = (level: string) => {
+    const labels: Record<string, string> = {
+      'legendary': 'Lendário',
+      'excellent': 'Excelente',
+      'very_good': 'Muito Bom',
+      'good': 'Bom',
+      'needs_improvement': 'Precisa Melhorar',
+      'poor': 'Em Desenvolvimento'
+    }
+    return labels[level] || level
+  }
+
+  const translateIndicator = (key: string) => {
+    const translations: Record<string, string> = {
+      // Indicadores SPIN - Situação (S)
+      'adaptability_score': 'Adaptabilidade',
+      'open_questions_score': 'Perguntas Abertas',
+      'scenario_mapping_score': 'Mapeamento de Cenário',
+      'depth_score': 'Profundidade',
+      'relevance_score': 'Relevância',
+      'context_score': 'Contexto',
+      'discovery_score': 'Descoberta',
+      'exploration_score': 'Exploração',
+      'investigation_score': 'Investigação',
+      // Indicadores SPIN - Problema (P)
+      'problem_identification_score': 'Identificação de Problemas',
+      'empathy_score': 'Empatia',
+      'consequences_exploration_score': 'Exploração de Consequências',
+      'impact_understanding_score': 'Compreensão de Impacto',
+      'pain_identification_score': 'Identificação de Dores',
+      'challenge_discovery_score': 'Descoberta de Desafios',
+      // Indicadores SPIN - Implicação (I)
+      'emotional_impact_score': 'Impacto Emocional',
+      'logical_flow_score': 'Fluxo Lógico',
+      'quantification_score': 'Quantificação',
+      'future_projection_score': 'Projeção Futura',
+      'business_impact_score': 'Impacto no Negócio',
+      'consequence_development_score': 'Desenvolvimento de Consequências',
+      'amplification_score': 'Amplificação',
+      'concrete_risks': 'Riscos Concretos',
+      'inaction_consequences': 'Consequências da Inação',
+      'urgency_amplification': 'Amplificação de Urgência',
+      'non_aggressive_urgency': 'Urgência Não Agressiva',
+      // Indicadores SPIN - Necessidade (N)
+      'value_articulation_score': 'Articulação de Valor',
+      'solution_fit_score': 'Adequação da Solução',
+      'commitment_score': 'Comprometimento',
+      'benefit_clarity_score': 'Clareza de Benefícios',
+      'roi_demonstration_score': 'Demonstração de ROI',
+      'outcome_score': 'Resultado',
+      'value_proposition_score': 'Proposta de Valor',
+      'credibility': 'Credibilidade',
+      'personalization': 'Personalização',
+      'benefits_clarity': 'Clareza de Benefícios',
+      'solution_clarity': 'Clareza da Solução',
+      'cta_effectiveness': 'Eficácia do CTA',
+      // Indicadores gerais de vendas
+      'timing_score': 'Timing',
+      'impact_score': 'Impacto',
+      'clarity_score': 'Clareza',
+      'connection_score': 'Conexão',
+      'rapport_score': 'Rapport',
+      'listening_score': 'Escuta Ativa',
+      'active_listening_score': 'Escuta Ativa',
+      'questioning_score': 'Questionamento',
+      'probing_score': 'Investigação',
+      'urgency_score': 'Urgência',
+      'engagement_score': 'Engajamento',
+      'trust_score': 'Confiança',
+      'persuasion_score': 'Persuasão',
+      'negotiation_score': 'Negociação',
+      'presentation_score': 'Apresentação',
+      'communication_score': 'Comunicação',
+      'flexibility_score': 'Flexibilidade',
+      'confidence_score': 'Confiança',
+      // Indicadores sem sufixo _score
+      'timing': 'Timing',
+      'impact': 'Impacto',
+      'clarity': 'Clareza',
+      'connection': 'Conexão',
+      'rapport': 'Rapport',
+      'listening': 'Escuta Ativa',
+      'engagement': 'Engajamento',
+      'trust': 'Confiança',
+      'depth': 'Profundidade',
+      'relevance': 'Relevância',
+      'context': 'Contexto',
+      'discovery': 'Descoberta',
+      'exploration': 'Exploração',
+      'empathy': 'Empatia',
+      'adaptability': 'Adaptabilidade',
+      'outcome': 'Resultado',
+      'commitment': 'Comprometimento',
+      'quantification': 'Quantificação',
+      'amplification': 'Amplificação',
+    }
+    const normalized = key.toLowerCase().replace(/\s+/g, '_')
+    if (translations[normalized]) return translations[normalized]
+    if (translations[key]) return translations[key]
+    const withoutScore = normalized.replace(/_score$/, '')
+    if (translations[withoutScore]) return translations[withoutScore]
+    const cleaned = key.replace(/_score$/i, '').replace(/\s+score$/i, '').replace(/_/g, ' ').trim()
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
   }
 
   const temperaments = ['Analítico', 'Empático', 'Determinado', 'Indeciso', 'Sociável']
@@ -2011,316 +2129,353 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           </div>
         )}
 
-        {/* Modal de Avaliação - Novo Design */}
+        {/* Modal de Avaliação - Design matching HistoricoView */}
         {showEvaluationSummary && evaluation && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-y-auto flex items-start justify-center pt-20 pb-20">
-            <div className="relative w-full max-w-7xl mx-auto px-4">
-              {/* Close Button */}
-              <button
-                onClick={() => setShowEvaluationSummary(false)}
-                className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-
-              {/* Header com Tabs */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-3">
-                <h2 className="text-xl font-bold text-center text-white mb-3">DESEMPENHO DO VENDEDOR</h2>
-                <div className="flex justify-center gap-2">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] overflow-y-auto">
+            <div className="min-h-screen py-8 px-4 sm:px-6">
+              <div className="max-w-5xl mx-auto">
+                {/* Header */}
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-white mb-1">Resultado da Sessão</h1>
+                    <p className="text-gray-400 text-sm">Análise detalhada do seu desempenho</p>
+                  </div>
                   <button
-                    onClick={() => setActiveEvaluationTab('conversation')}
-                    className={`px-5 py-2 text-sm rounded-lg transition-colors ${
-                      activeEvaluationTab === 'conversation'
-                        ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
-                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-                    }`}>
-                    Conversa
-                  </button>
-                  <button
-                    onClick={() => setActiveEvaluationTab('evaluation')}
-                    className={`px-5 py-2 text-sm rounded-lg transition-colors ${
-                      activeEvaluationTab === 'evaluation'
-                        ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
-                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-                    }`}>
-                    Avaliação
-                  </button>
-                  <button
-                    onClick={() => setActiveEvaluationTab('feedback')}
-                    className={`px-5 py-2 text-sm rounded-lg transition-colors ${
-                      activeEvaluationTab === 'feedback'
-                        ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
-                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-                    }`}>
-                    Feedback
+                    onClick={() => setShowEvaluationSummary(false)}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6" />
                   </button>
                 </div>
-              </div>
 
-              {/* Main Content */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-3">
-                {/* Aba Conversa */}
-                {activeEvaluationTab === 'conversation' && (
-                  <div className="space-y-2">
-                    <h3 className="text-base font-bold text-white mb-2">Transcrição da Conversa</h3>
-                    <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20 max-h-[300px] overflow-y-auto">
-                      <div className="space-y-3">
-                        {messages.map((msg, index) => (
-                          <div key={index} className={`flex ${msg.role === 'seller' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] p-3 rounded-xl ${
-                              msg.role === 'seller'
-                                ? 'bg-green-600/20 border border-green-500/30'
-                                : 'bg-gray-700/50 border border-gray-600/30'
-                            }`}>
-                              <div className="text-xs text-gray-400 mb-1">
-                                {msg.role === 'seller' ? '👤 Vendedor (você)' : '🤖 Cliente (IA)'}
-                              </div>
-                              <div className="text-sm text-white">
-                                {msg.text}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                {/* Score Principal */}
+                {(() => {
+                  const overallScore = evaluation.overall_score !== undefined
+                    ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
+                    : null
+                  return (
+                    <div className={`rounded-xl border p-6 text-center mb-6 ${getScoreBg(overallScore || 0)}`}>
+                      <div className={`text-5xl font-bold mb-2 ${getScoreColor(overallScore || 0)}`}>
+                        {overallScore?.toFixed(1) || 'N/A'}
+                      </div>
+                      <div className="text-gray-400 text-sm">
+                        {evaluation.performance_level && getPerformanceLabel(evaluation.performance_level)}
                       </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
 
-                {/* Aba Avaliação */}
+                {/* Tabs de navegação */}
+                <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 mb-6">
+                  {['resumo', 'spin', 'transcricao'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveEvaluationTab(tab === 'resumo' ? 'evaluation' : tab === 'spin' ? 'feedback' : 'conversation')}
+                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                        (tab === 'resumo' && activeEvaluationTab === 'evaluation') ||
+                        (tab === 'spin' && activeEvaluationTab === 'feedback') ||
+                        (tab === 'transcricao' && activeEvaluationTab === 'conversation')
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                      }`}
+                    >
+                      {tab === 'resumo' && 'Resumo'}
+                      {tab === 'spin' && 'Análise SPIN'}
+                      {tab === 'transcricao' && 'Transcrição'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Conteúdo das tabs */}
+                {/* Tab Resumo (evaluation) */}
                 {activeEvaluationTab === 'evaluation' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-
-                  {/* Left Side - SPIN Radar Chart */}
-                  <div className="space-y-2">
-                    <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20">
-                      <h3 className="text-sm font-bold text-white mb-2 text-center">Métricas de Competências SPIN</h3>
-
-                      {/* Radar Chart Visual - Diamond Shape */}
-                      <div className="relative w-full aspect-square max-w-[200px] mx-auto mb-2">
-                        <svg viewBox="0 0 240 240" className="w-full h-full">
-                          {/* Background diamonds (losangos) - 10 níveis */}
-                          {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((level) => {
-                            const size = level * 8; // Cada nível representa 8 pixels
-                            return (
-                              <polygon
-                                key={level}
-                                points={`120,${120-size} ${120+size},120 120,${120+size} ${120-size},120`}
-                                fill="none"
-                                stroke={level % 2 === 0 ? "rgba(139, 92, 246, 0.15)" : "rgba(139, 92, 246, 0.08)"}
-                                strokeWidth="1"
-                              />
-                            );
-                          })}
-
-                          {/* Diagonal lines connecting opposite vertices (forming X inside diamond) */}
-                          <line x1="120" y1="40" x2="120" y2="200" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="0.5" />
-                          <line x1="40" y1="120" x2="200" y2="120" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="0.5" />
-
-                          {/* Data polygon */}
-                          {evaluation.spin_evaluation && (() => {
-                            const S = evaluation.spin_evaluation.S?.final_score || 0
-                            const P = evaluation.spin_evaluation.P?.final_score || 0
-                            const I = evaluation.spin_evaluation.I?.final_score || 0
-                            const N = evaluation.spin_evaluation.N?.final_score || 0
-
-                            // Calculate positions for diamond (4 vertices)
-                            const sY = 120 - (S * 8)  // Top (S)
-                            const pX = 120 + (P * 8)  // Right (P)
-                            const iY = 120 + (I * 8)  // Bottom (I)
-                            const nX = 120 - (N * 8)  // Left (N)
-
-                            return (
-                              <>
-                                <polygon
-                                  points={`120,${sY} ${pX},120 120,${iY} ${nX},120`}
-                                  fill="rgba(168, 85, 247, 0.3)"
-                                  stroke="rgb(168, 85, 247)"
-                                  strokeWidth="2"
-                                />
-                                {/* Data points */}
-                                <circle cx="120" cy={sY} r="5" fill="rgb(168, 85, 247)" />
-                                <circle cx={pX} cy="120" r="5" fill="rgb(168, 85, 247)" />
-                                <circle cx="120" cy={iY} r="5" fill="rgb(168, 85, 247)" />
-                                <circle cx={nX} cy="120" r="5" fill="rgb(168, 85, 247)" />
-                              </>
-                            )
-                          })()}
-
-                          {/* Labels */}
-                          <text x="120" y="32" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">S</text>
-                          <text x="208" y="125" textAnchor="start" fill="white" fontSize="14" fontWeight="bold">P</text>
-                          <text x="120" y="215" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">I</text>
-                          <text x="32" y="125" textAnchor="end" fill="white" fontSize="14" fontWeight="bold">N</text>
-                        </svg>
-                      </div>
-
-                      {/* SPIN Scores */}
-                      <div className="grid grid-cols-4 gap-2 mb-3">
-                        {evaluation.spin_evaluation && (
-                          <>
-                            <div className="text-center">
-                              <div className="text-xs text-gray-400 mb-1">S</div>
-                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.S?.final_score?.toFixed(1) || '0'}</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-xs text-gray-400 mb-1">P</div>
-                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.P?.final_score?.toFixed(1) || '0'}</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-xs text-gray-400 mb-1">I</div>
-                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.I?.final_score?.toFixed(1) || '0'}</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-xs text-gray-400 mb-1">N</div>
-                              <div className="text-base font-bold text-white">{evaluation.spin_evaluation.N?.final_score?.toFixed(1) || '0'}</div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Detalhamento SPIN */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
-                          <span className="text-xs text-gray-300">Situação</span>
-                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.S?.final_score || 0}/10</span>
-                        </div>
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
-                          <span className="text-xs text-gray-300">Problema</span>
-                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.P?.final_score || 0}/10</span>
-                        </div>
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
-                          <span className="text-xs text-gray-300">Implicação</span>
-                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.I?.final_score || 0}/10</span>
-                        </div>
-                        <div className="flex justify-between items-center bg-gray-900/50 rounded-lg px-3 py-1.5">
-                          <span className="text-xs text-gray-300">Necessidade</span>
-                          <span className="text-xs font-semibold text-white">{evaluation.spin_evaluation?.N?.final_score || 0}/10</span>
-                        </div>
-                      </div>
-
-                      {/* Média Geral */}
-                      <div className="mt-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl px-3 py-2 text-center">
-                        <div className="text-xs text-purple-100 mb-1">Média Geral</div>
-                        <div className="text-lg font-bold text-white">
-                          {evaluation.spin_evaluation ? (
-                            ((evaluation.spin_evaluation.S?.final_score || 0) +
-                             (evaluation.spin_evaluation.P?.final_score || 0) +
-                             (evaluation.spin_evaluation.I?.final_score || 0) +
-                             (evaluation.spin_evaluation.N?.final_score || 0)) / 4
-                          ).toFixed(1) : '0'}/10
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Side - Performance Metrics */}
-                  <div className="space-y-2">
-                    {/* Overall Score */}
-                    <div className="bg-gradient-to-br from-green-600/20 to-green-400/10 border border-green-500/30 rounded-xl p-3">
-                      <h3 className="text-center text-xs text-gray-400 mb-1">Performance Geral</h3>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-white">
-                          {evaluation.performance_level === 'legendary' && 'Lendário'}
-                          {evaluation.performance_level === 'excellent' && 'Excelente'}
-                          {evaluation.performance_level === 'very_good' && 'Muito Bom'}
-                          {evaluation.performance_level === 'good' && 'Bom'}
-                          {evaluation.performance_level === 'needs_improvement' && 'Precisa Melhorar'}
-                          {evaluation.performance_level === 'poor' && 'Insuficiente'}
-                          {!evaluation.performance_level && 'N/A'}
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-                )}
-
-                {/* Aba Feedback */}
-                {activeEvaluationTab === 'feedback' && (
-                  <div className="space-y-2">
-                    <h3 className="text-base font-bold text-white mb-2">Feedback Detalhado</h3>
-
-                    {/* Pontos Fortes */}
-                    {evaluation?.top_strengths && evaluation.top_strengths.length > 0 && (
-                      <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 rounded-xl p-3 border border-green-500/30">
-                        <h4 className="text-sm font-bold text-green-400 mb-2 flex items-center gap-2">
-                          <CheckCircle className="w-5 h-5" />
-                          Seus Pontos Fortes
+                  <div className="space-y-4">
+                    {/* Resumo executivo */}
+                    {evaluation.executive_summary && (
+                      <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                        <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+                          Resumo Executivo
                         </h4>
-                        <ul className="space-y-2">
-                          {evaluation.top_strengths.map((strength: string, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-green-400 mt-1">•</span>
-                              <span className="text-sm text-gray-200">{strength}</span>
-                            </li>
-                          ))}
-                        </ul>
+                        <p className="text-gray-300 text-sm leading-relaxed">
+                          {evaluation.executive_summary}
+                        </p>
                       </div>
                     )}
 
-                    {/* Gaps Críticos */}
-                    {evaluation?.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                      <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 rounded-xl p-3 border border-red-500/30">
-                        <h4 className="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
-                          <AlertCircle className="w-5 h-5" />
-                          Áreas para Desenvolvimento
-                        </h4>
-                        <ul className="space-y-2">
-                          {evaluation.critical_gaps.map((gap: string, index: number) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-red-400 mt-1">•</span>
-                              <span className="text-sm text-gray-200">{gap}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {/* Grid de insights */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Pontos fortes */}
+                      {evaluation.top_strengths?.length > 0 && (
+                        <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                          <h4 className="flex items-center gap-2 text-sm font-medium text-green-400 mb-3">
+                            <TrendingUp className="w-4 h-4" />
+                            Pontos Fortes
+                          </h4>
+                          <ul className="space-y-2">
+                            {evaluation.top_strengths.map((strength: string, i: number) => (
+                              <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                <span className="text-green-400 mt-0.5">•</span>
+                                {strength}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
-                    {/* Melhorias Prioritárias */}
-                    {evaluation?.priority_improvements && evaluation.priority_improvements.length > 0 && (
-                      <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 rounded-xl p-3 border border-purple-500/30">
-                        <h4 className="text-sm font-bold text-purple-400 mb-2 flex items-center gap-2">
-                          <Zap className="w-5 h-5" />
-                          Melhorias Prioritárias
+                      {/* Gaps críticos */}
+                      {evaluation.critical_gaps?.length > 0 && (
+                        <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                          <h4 className="flex items-center gap-2 text-sm font-medium text-red-400 mb-3">
+                            <AlertTriangle className="w-4 h-4" />
+                            Pontos a Melhorar
+                          </h4>
+                          <ul className="space-y-2">
+                            {evaluation.critical_gaps.map((gap: string, i: number) => (
+                              <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                <span className="text-red-400 mt-0.5">•</span>
+                                {gap}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prioridades de melhoria */}
+                    {evaluation.priority_improvements?.length > 0 && (
+                      <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-yellow-400 mb-3">
+                          <Lightbulb className="w-4 h-4" />
+                          Prioridades de Melhoria
                         </h4>
                         <div className="space-y-3">
-                          {evaluation.priority_improvements.map((improvement: any, index: number) => (
-                            <div key={index} className="bg-gray-800/40 rounded-lg p-3">
-                              <div className="flex justify-between items-start mb-2">
-                                <span className="text-sm font-semibold text-purple-300">{improvement.area}</span>
-                                <span className={`text-xs px-2 py-1 rounded ${
-                                  improvement.priority === 'high'
-                                    ? 'bg-red-500/20 text-red-300'
-                                    : improvement.priority === 'medium'
-                                    ? 'bg-yellow-500/20 text-yellow-300'
-                                    : 'bg-green-500/20 text-green-300'
+                          {evaluation.priority_improvements.map((imp: any, i: number) => (
+                            <div key={i} className="bg-gray-800/50 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs px-2 py-0.5 rounded ${
+                                  imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                  imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                  'bg-yellow-500/20 text-yellow-400'
                                 }`}>
-                                  {improvement.priority === 'high' ? 'Alta' : improvement.priority === 'medium' ? 'Média' : 'Baixa'} Prioridade
+                                  {imp.priority === 'critical' ? 'Crítico' :
+                                   imp.priority === 'high' ? 'Alta' : 'Média'}
                                 </span>
+                                <span className="text-sm font-medium text-white">{imp.area}</span>
                               </div>
-                              <p className="text-xs text-gray-400 mb-2">Gap: {improvement.current_gap}</p>
-                              <p className="text-sm text-gray-200">{improvement.action_plan}</p>
+                              <p className="text-xs text-gray-400">{imp.action_plan}</p>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
 
-                    {/* Resumo Executivo */}
-                    {evaluation?.executive_summary && (
-                      <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20">
-                        <h4 className="text-sm font-bold text-white mb-2">Resumo Executivo</h4>
-                        <p className="text-xs text-gray-200 leading-relaxed">{evaluation.executive_summary}</p>
+                {/* Tab Análise SPIN (feedback) */}
+                {activeEvaluationTab === 'feedback' && evaluation.spin_evaluation && (
+                  <div className="space-y-4">
+                    {/* Grid de scores SPIN */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { key: 'S', label: 'Situação', color: 'text-blue-400' },
+                        { key: 'P', label: 'Problema', color: 'text-purple-400' },
+                        { key: 'I', label: 'Implicação', color: 'text-orange-400' },
+                        { key: 'N', label: 'Necessidade', color: 'text-green-400' }
+                      ].map(({ key, label, color }) => {
+                        const score = evaluation.spin_evaluation[key]?.final_score || 0
+                        return (
+                          <div key={key} className="bg-gray-900/50 rounded-xl border border-gray-800 p-4 text-center">
+                            <div className={`text-3xl font-bold mb-1 ${color}`}>
+                              {score.toFixed(1)}
+                            </div>
+                            <div className="text-xs text-gray-500 uppercase tracking-wider">
+                              {label}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Média SPIN */}
+                    <div className="bg-green-500/10 rounded-xl border border-green-500/20 p-4 text-center">
+                      <div className="text-2xl font-bold text-green-400 mb-1">
+                        {(
+                          ((evaluation.spin_evaluation.S?.final_score || 0) +
+                          (evaluation.spin_evaluation.P?.final_score || 0) +
+                          (evaluation.spin_evaluation.I?.final_score || 0) +
+                          (evaluation.spin_evaluation.N?.final_score || 0)) / 4
+                        ).toFixed(1)}
                       </div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider">
+                        Média Geral SPIN
+                      </div>
+                    </div>
+
+                    {/* Detalhes de cada pilar */}
+                    {['S', 'P', 'I', 'N'].map((letter) => {
+                      const data = evaluation.spin_evaluation[letter]
+                      if (!data) return null
+
+                      const labels: Record<string, string> = {
+                        'S': 'Situação',
+                        'P': 'Problema',
+                        'I': 'Implicação',
+                        'N': 'Necessidade'
+                      }
+
+                      return (
+                        <details key={letter} className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
+                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-sm font-bold text-green-400">
+                                {letter}
+                              </span>
+                              <span className="font-medium text-white">{labels[letter]}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold text-white">
+                                {data.final_score?.toFixed(1)}
+                              </span>
+                              <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
+                            </div>
+                          </summary>
+                          <div className="p-4 pt-0 space-y-3">
+                            {/* Feedback */}
+                            {data.technical_feedback && (
+                              <p className="text-sm text-gray-300 leading-relaxed">
+                                {data.technical_feedback}
+                              </p>
+                            )}
+
+                            {/* Indicadores */}
+                            {data.indicators && Object.keys(data.indicators).length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(data.indicators).map(([key, value]: [string, any]) => {
+                                  const score = typeof value === 'number' ? value : 0
+                                  const getIndicatorStyle = (s: number) => {
+                                    if (s >= 8) return 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-300'
+                                    if (s >= 6) return 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30 text-yellow-300'
+                                    return 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-500/30 text-red-300'
+                                  }
+                                  const getIndicatorScoreStyle = (s: number) => {
+                                    if (s >= 8) return 'text-green-400 font-semibold'
+                                    if (s >= 6) return 'text-yellow-400 font-semibold'
+                                    return 'text-red-400 font-semibold'
+                                  }
+                                  return (
+                                    <span
+                                      key={key}
+                                      className={`text-xs px-3 py-1.5 rounded-lg border backdrop-blur-sm transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
+                                    >
+                                      {translateIndicator(key)}: <span className={getIndicatorScoreStyle(score)}>{value}/10</span>
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            {/* Oportunidades perdidas */}
+                            {data.missed_opportunities?.length > 0 && (
+                              <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
+                                <p className="text-xs font-medium text-orange-400 mb-2">Oportunidades Perdidas</p>
+                                <ul className="space-y-1">
+                                  {data.missed_opportunities.map((opp: string, i: number) => (
+                                    <li key={i} className="text-xs text-orange-300">• {opp}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      )
+                    })}
+
+                    {/* Análise de objeções */}
+                    {evaluation.objections_analysis?.length > 0 && (
+                      <details className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
+                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center">
+                              <Target className="w-4 h-4 text-green-400" />
+                            </span>
+                            <span className="font-medium text-white">Análise de Objeções</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-gray-400">
+                              {evaluation.objections_analysis.length} objeções
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
+                          </div>
+                        </summary>
+                        <div className="p-4 pt-0 space-y-3">
+                          {evaluation.objections_analysis.map((obj: any, idx: number) => (
+                            <div key={idx} className="bg-gray-800/50 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs px-2 py-0.5 bg-gray-700 rounded text-gray-300">
+                                  {obj.objection_type}
+                                </span>
+                                <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
+                                  {obj.score}/10
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-300 italic mb-2">
+                                "{obj.objection_text}"
+                              </p>
+                              {obj.detailed_analysis && (
+                                <p className="text-xs text-gray-400">{obj.detailed_analysis}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     )}
+                  </div>
+                )}
+
+                {/* Tab Transcrição (conversation) */}
+                {activeEvaluationTab === 'conversation' && (
+                  <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                    <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">
+                      {messages.length} mensagens
+                    </h4>
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                      {messages.map((msg, index) => (
+                        <div
+                          key={index}
+                          className={`flex gap-3 ${msg.role === 'seller' ? 'flex-row-reverse' : ''}`}
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            msg.role === 'client'
+                              ? 'bg-gray-800'
+                              : 'bg-green-500/20'
+                          }`}>
+                            <User className={`w-4 h-4 ${
+                              msg.role === 'client' ? 'text-gray-400' : 'text-green-400'
+                            }`} />
+                          </div>
+                          <div className={`flex-1 max-w-[80%] ${msg.role === 'seller' ? 'text-right' : ''}`}>
+                            <div className="text-xs text-gray-500 mb-1">
+                              {msg.role === 'client' ? 'Cliente' : 'Você'}
+                            </div>
+                            <div className={`inline-block p-3 rounded-xl text-sm ${
+                              msg.role === 'client'
+                                ? 'bg-gray-800 text-gray-300 rounded-tl-none'
+                                : 'bg-green-500/20 text-green-100 rounded-tr-none'
+                            }`}>
+                              {msg.text}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mt-4">
+                <div className="flex gap-3 mt-6">
                   <button
                     onClick={() => setShowEvaluationSummary(false)}
-                    className="flex-1 px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors text-white text-sm"
+                    className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl font-medium hover:bg-gray-800 transition-colors text-gray-300 text-sm"
                   >
                     Fechar
                   </button>
@@ -2333,7 +2488,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         window.location.href = '/?view=historico';
                       }
                     }}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform text-white shadow-lg shadow-green-500/30 text-sm"
+                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-500 rounded-xl font-medium transition-colors text-white text-sm"
                   >
                     Ver Análise Completa no Histórico
                   </button>
