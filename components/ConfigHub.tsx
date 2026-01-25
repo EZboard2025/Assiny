@@ -2265,7 +2265,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
   return (
     <div className="space-y-6">
       {/* Tabs - Estilo HistoricoView */}
-      <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 overflow-x-auto">
+      <div className="inline-flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 overflow-x-auto">
         {/* Funcionários - Apenas para planos Team, Business e Enterprise */}
         {trainingPlan !== PlanType.INDIVIDUAL && (
           <button
