@@ -449,10 +449,13 @@ function ConfigurationInterface({
   const [aiGenerateUrl, setAIGenerateUrl] = useState('')
   const [aiGenerateLoading, setAIGenerateLoading] = useState(false)
   const [aiGenerateError, setAIGenerateError] = useState<string | null>(null)
+  const [aiGenerateCustomization, setAIGenerateCustomization] = useState('')
+  const [showCustomization, setShowCustomization] = useState(false)
   const [aiGeneratedObjections, setAIGeneratedObjections] = useState<Array<{name: string, rebuttals: string[]}> | null>(null)
   const [aiGeneratedPersonas, setAIGeneratedPersonas] = useState<Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string, conhecimento_previo?: string}> | null>(null)
   const [aiGeneratedObjectives, setAIGeneratedObjectives] = useState<Array<{name: string, description: string}> | null>(null)
   const [aiRefining, setAIRefining] = useState(false)
+  const [aiApplying, setAIApplying] = useState(false)
 
   // Estados para Fases do Funil
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
@@ -754,6 +757,7 @@ function ConfigurationInterface({
 
     try {
       console.log(`[AI Generate] Iniciando geração de ${contentType} para URL:`, aiGenerateUrl)
+      console.log(`[AI Generate] Customização:`, aiGenerateCustomization.trim() || '(nenhuma - geração aleatória)')
 
       const response = await fetch('/api/company/ai-generate-content', {
         method: 'POST',
@@ -761,7 +765,8 @@ function ConfigurationInterface({
         body: JSON.stringify({
           url: aiGenerateUrl,
           contentType,
-          businessType: businessType
+          businessType: businessType,
+          customization: aiGenerateCustomization.trim() || undefined
         })
       })
 
@@ -860,8 +865,9 @@ function ConfigurationInterface({
 
   // Aplicar objeções geradas
   const handleApplyGeneratedObjections = async (selectedIndexes: number[]) => {
-    if (!aiGeneratedObjections) return
+    if (!aiGeneratedObjections || aiApplying) return
 
+    setAIApplying(true)
     console.log('[AI Objeções] Iniciando save de', selectedIndexes.length, 'objeções')
     const results: (Objection | null)[] = []
 
@@ -885,6 +891,9 @@ function ConfigurationInterface({
     setAIGeneratedObjections(null)
     setShowAIGenerateModal(null)
     setAIGenerateUrl('')
+    setAIGenerateCustomization('')
+    setShowCustomization(false)
+    setAIApplying(false)
 
     if (successCount === selectedIndexes.length) {
       showToast('success', 'Objeções Adicionadas', `${successCount} objeções foram criadas`)
@@ -906,8 +915,9 @@ function ConfigurationInterface({
 
   // Aplicar personas geradas (SEQUENCIAL para evitar race conditions com getCompanyId)
   const handleApplyGeneratedPersonas = async (selectedIndexes: number[]) => {
-    if (!aiGeneratedPersonas) return
+    if (!aiGeneratedPersonas || aiApplying) return
 
+    setAIApplying(true)
     console.log('[AI Personas] Iniciando save de', selectedIndexes.length, 'personas')
     console.log('[AI Personas] Dados completos:', JSON.stringify(aiGeneratedPersonas, null, 2))
 
@@ -978,6 +988,9 @@ function ConfigurationInterface({
     setAIGeneratedPersonas(null)
     setShowAIGenerateModal(null)
     setAIGenerateUrl('')
+    setAIGenerateCustomization('')
+    setShowCustomization(false)
+    setAIApplying(false)
 
     if (successCount === selectedIndexes.length) {
       showToast('success', 'Personas Adicionadas', `${successCount} personas foram criadas`)
@@ -988,7 +1001,9 @@ function ConfigurationInterface({
 
   // Aplicar objetivos gerados
   const handleApplyGeneratedObjectives = async (selectedIndexes: number[]) => {
-    if (!aiGeneratedObjectives) return
+    if (!aiGeneratedObjectives || aiApplying) return
+
+    setAIApplying(true)
 
     for (const index of selectedIndexes) {
       const obj = aiGeneratedObjectives[index]
@@ -1003,6 +1018,9 @@ function ConfigurationInterface({
     setAIGeneratedObjectives(null)
     setShowAIGenerateModal(null)
     setAIGenerateUrl('')
+    setAIGenerateCustomization('')
+    setShowCustomization(false)
+    setAIApplying(false)
 
     showToast('success', 'Objetivos Adicionados', `${selectedIndexes.length} objetivos foram criados`)
   }
@@ -4398,6 +4416,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       setAIGeneratedObjectives(null)
                       setAIGenerateError(null)
                       setAIGenerateUrl('')
+                      setAIGenerateCustomization('')
+                      setShowCustomization(false)
                     }}
                     className="w-10 h-10 bg-gray-800/50 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
                   >
@@ -4422,6 +4442,54 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-lg"
                           disabled={aiGenerateLoading}
                         />
+                      </div>
+
+                      {/* Personalização da Geração */}
+                      <div>
+                        {!showCustomization ? (
+                          <button
+                            onClick={() => setShowCustomization(true)}
+                            disabled={aiGenerateLoading}
+                            className="w-full px-4 py-3 border border-dashed border-purple-500/40 rounded-xl text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/60 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            Personalizar Geração
+                          </button>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="block text-sm font-medium text-gray-300">
+                                Personalizar Geração
+                              </label>
+                              <button
+                                onClick={() => {
+                                  setShowCustomization(false)
+                                  setAIGenerateCustomization('')
+                                }}
+                                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                            <textarea
+                              value={aiGenerateCustomization}
+                              onChange={(e) => setAIGenerateCustomization(e.target.value)}
+                              placeholder={
+                                showAIGenerateModal === 'personas'
+                                  ? 'Ex: "Foco em personas do setor imobiliário", "Apenas personas B2B de tecnologia"...'
+                                  : showAIGenerateModal === 'objections'
+                                  ? 'Ex: "Objeções relacionadas a tempo e urgência", "Foco em objeções de preço"...'
+                                  : 'Ex: "Objetivos focados em cold calling", "Foco em negociação"...'
+                              }
+                              rows={2}
+                              className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 resize-none"
+                              disabled={aiGenerateLoading}
+                              autoFocus
+                            />
+                          </div>
+                        )}
                       </div>
 
                       {aiGenerateError && (
@@ -4449,7 +4517,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       </button>
 
                       <p className="text-sm text-gray-500 text-center">
-                        A IA irá analisar o site e gerar {showAIGenerateModal === 'objections' ? 'objeções com formas de quebrá-las' : showAIGenerateModal === 'personas' ? 'personas de clientes' : 'objetivos de roleplay'}.
+                        {aiGenerateCustomization.trim()
+                          ? `A IA irá gerar ${showAIGenerateModal === 'objections' ? 'objeções' : showAIGenerateModal === 'personas' ? 'personas' : 'objetivos'} seguindo suas preferências.`
+                          : `A IA irá analisar o site e gerar ${showAIGenerateModal === 'objections' ? 'objeções com formas de quebrá-las' : showAIGenerateModal === 'personas' ? 'personas de clientes' : 'objetivos de roleplay'} aleatoriamente.`
+                        }
                       </p>
                     </div>
                   )}
@@ -4465,6 +4536,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       onRefine={(feedback) => handleAIRefineContent('objections', feedback)}
                       isRefining={aiRefining}
+                      isApplying={aiApplying}
                     />
                   )}
 
@@ -4479,6 +4551,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       onRefine={(feedback) => handleAIRefineContent('personas', feedback)}
                       isRefining={aiRefining}
+                      isApplying={aiApplying}
                     />
                   )}
 
@@ -4491,6 +4564,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setAIGeneratedObjectives(null)
                         setAIGenerateError(null)
                       }}
+                      isApplying={aiApplying}
                       onRefine={(feedback) => handleAIRefineContent('objectives', feedback)}
                       isRefining={aiRefining}
                     />
@@ -4530,13 +4604,15 @@ function AIGeneratedObjectionsPreview({
   onApply,
   onBack,
   onRefine,
-  isRefining
+  isRefining,
+  isApplying
 }: {
   objections: Array<{name: string, rebuttals: string[]}>
   onApply: (selectedIndexes: number[]) => void
   onBack: () => void
   onRefine: (feedback: string) => void
   isRefining: boolean
+  isApplying: boolean
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(objections.map((_, i) => i)))
   const [feedback, setFeedback] = useState('')
@@ -4634,18 +4710,27 @@ function AIGeneratedObjectionsPreview({
       <div className="flex gap-2 pt-3 border-t border-gray-800">
         <button
           onClick={onBack}
-          disabled={isRefining}
+          disabled={isRefining || isApplying}
           className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
-          disabled={selected.size === 0 || isRefining}
+          disabled={selected.size === 0 || isRefining || isApplying}
           className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
-          <Plus className="w-4 h-4" />
-          Adicionar ({selected.size})
+          {isApplying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4" />
+              Adicionar ({selected.size})
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -4658,13 +4743,15 @@ function AIGeneratedPersonasPreview({
   onApply,
   onBack,
   onRefine,
-  isRefining
+  isRefining,
+  isApplying
 }: {
   personas: Array<{tipo: string, cargo: string, tipo_empresa_faturamento: string, contexto: string, busca: string, dores: string, conhecimento_previo?: string}>
   onApply: (selectedIndexes: number[]) => void
   onBack: () => void
   onRefine: (feedback: string) => void
   isRefining: boolean
+  isApplying: boolean
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(personas.map((_, i) => i)))
   const [feedback, setFeedback] = useState('')
@@ -4787,18 +4874,27 @@ function AIGeneratedPersonasPreview({
       <div className="flex gap-2 pt-3 border-t border-gray-800">
         <button
           onClick={onBack}
-          disabled={isRefining}
+          disabled={isRefining || isApplying}
           className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
-          disabled={selected.size === 0 || isRefining}
+          disabled={selected.size === 0 || isRefining || isApplying}
           className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
-          <Plus className="w-4 h-4" />
-          Adicionar ({selected.size})
+          {isApplying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4" />
+              Adicionar ({selected.size})
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -4811,13 +4907,15 @@ function AIGeneratedObjectivesPreview({
   onApply,
   onBack,
   onRefine,
-  isRefining
+  isRefining,
+  isApplying
 }: {
   objectives: Array<{name: string, description: string}>
   onApply: (selectedIndexes: number[]) => void
   onBack: () => void
   onRefine: (feedback: string) => void
   isRefining: boolean
+  isApplying: boolean
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(objectives.map((_, i) => i)))
   const [feedback, setFeedback] = useState('')
@@ -4909,18 +5007,27 @@ function AIGeneratedObjectivesPreview({
       <div className="flex gap-2 pt-3 border-t border-gray-800">
         <button
           onClick={onBack}
-          disabled={isRefining}
+          disabled={isRefining || isApplying}
           className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
-          disabled={selected.size === 0 || isRefining}
+          disabled={selected.size === 0 || isRefining || isApplying}
           className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
-          <Plus className="w-4 h-4" />
-          Adicionar ({selected.size})
+          {isApplying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4" />
+              Adicionar ({selected.size})
+            </>
+          )}
         </button>
       </div>
     </div>

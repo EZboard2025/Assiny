@@ -8,6 +8,8 @@ const SYSTEM_PROMPTS = {
 
 Sua tarefa é analisar o site de uma empresa e gerar objeções DETALHADAS e REALISTAS que clientes potenciais teriam, junto com MÚLTIPLAS formas profissionais de quebrá-las.
 
+IMPORTANTE: Se o usuário fornecer preferências específicas (ex: "objeções sobre tempo", "foco em preço", etc.), você DEVE gerar conteúdo que siga EXATAMENTE essas preferências. As preferências do usuário têm PRIORIDADE MÁXIMA.
+
 Para cada objeção, forneça:
 - name: A objeção completa e contextualizada (não genérica). Inclua o MOTIVO por trás da objeção.
   RUIM: "Está caro"
@@ -51,6 +53,8 @@ Retorne APENAS o JSON válido.`,
 
 Sua tarefa é analisar o site de uma empresa e criar personas de clientes ideais para roleplay de vendas.
 
+IMPORTANTE: Se o usuário fornecer preferências específicas (ex: "setor imobiliário", "personas de tecnologia", etc.), você DEVE gerar personas que sigam EXATAMENTE essas preferências. As preferências do usuário têm PRIORIDADE MÁXIMA.
+
 O tipo de negócio será informado (B2B, B2C ou Ambos). Crie personas apropriadas:
 - B2B: Foque em cargos, empresas, contextos corporativos
 - B2C: Foque em perfis de consumidores, situações pessoais
@@ -90,6 +94,8 @@ Retorne APENAS o JSON válido.`,
   objectives: `Você é um especialista em treinamento de vendas e desenvolvimento de equipes comerciais.
 
 Sua tarefa é analisar o site de uma empresa e criar objetivos de roleplay de vendas específicos para treinar a equipe.
+
+IMPORTANTE: Se o usuário fornecer preferências específicas (ex: "foco em cold calling", "objetivos de negociação", etc.), você DEVE gerar objetivos que sigam EXATAMENTE essas preferências. As preferências do usuário têm PRIORIDADE MÁXIMA.
 
 Para cada objetivo, forneça:
 - name: Nome curto do objetivo
@@ -151,7 +157,7 @@ function isValidUrl(url: string): boolean {
 
 export async function POST(req: Request) {
   try {
-    const { url, contentType, businessType } = await req.json()
+    const { url, contentType, businessType, customization } = await req.json()
 
     // Validar parâmetros
     if (!url || typeof url !== 'string') {
@@ -252,6 +258,15 @@ ${pageContent.mainContent}
 
     if (contentType === 'personas' && businessType) {
       userPrompt += `\n\nTIPO DE NEGÓCIO: ${businessType}\nGere personas apropriadas para esse modelo de negócio.`
+    }
+
+    // Adicionar personalização do usuário se fornecida
+    if (customization && typeof customization === 'string' && customization.trim()) {
+      console.log(`📝 Customização recebida: "${customization.trim()}"`)
+      userPrompt += `\n\n⚠️ INSTRUÇÃO IMPORTANTE - PREFERÊNCIAS ESPECÍFICAS DO USUÁRIO:
+"${customization.trim()}"
+
+VOCÊ DEVE OBRIGATORIAMENTE seguir essas preferências ao gerar o conteúdo. Esta é a prioridade máxima.`
     }
 
     try {
