@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, TrendingUp, Award, Target, ArrowLeft, Loader2, MessageSquare, Activity, TrendingDown, Eye, X, FileText, ChevronRight, Sparkles, BarChart3, AlertTriangle, Calendar, CheckCircle, Zap } from 'lucide-react'
+import { Users, TrendingUp, Award, Target, ArrowLeft, Loader2, MessageSquare, Activity, TrendingDown, Eye, X, FileText, ChevronRight, Sparkles, BarChart3, AlertTriangle, Calendar, CheckCircle, Zap, Search } from 'lucide-react'
 
 interface SessionTimeline {
   session_id: string
@@ -72,6 +72,7 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
   const [selectedSellerForPDI, setSelectedSellerForPDI] = useState<{userId: string, userName: string} | null>(null)
   const [pdiData, setPdiData] = useState<any>(null)
   const [pdiLoading, setPdiLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     if (viewMode === 'roleplay') {
@@ -289,6 +290,12 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
     return { text: 'Precisa Melhorar', color: 'bg-red-600' }
   }
 
+  // Filtrar vendedores pela pesquisa
+  const filteredSellers = sellers.filter(seller =>
+    seller.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    seller.user_email.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   // Calcular estatísticas gerais
   const totalSellers = sellers.length
   const avgGeneralPerformance = sellers.length > 0
@@ -449,9 +456,38 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
         {/* Lista de Vendedores */}
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl rounded-2xl border border-green-500/20 overflow-hidden">
           <div className="p-6 border-b border-green-500/20">
-            <h2 className="text-xl font-bold text-white">
-              {viewMode === 'roleplay' ? 'Performance Individual - Roleplay' : 'Performance Individual - Follow-up'}
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h2 className="text-xl font-bold text-white">
+                {viewMode === 'roleplay' ? 'Performance Individual - Roleplay' : 'Performance Individual - Follow-up'}
+              </h2>
+
+              {/* Barra de Pesquisa */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar vendedor..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-gray-900/80 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500/30 transition-all text-sm"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Contador de resultados */}
+            {searchTerm && (
+              <p className="text-sm text-gray-400 mt-3">
+                {filteredSellers.length} {filteredSellers.length === 1 ? 'resultado encontrado' : 'resultados encontrados'}
+              </p>
+            )}
           </div>
 
           {sellers.length === 0 ? (
@@ -459,9 +495,20 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
               <Target className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400">Nenhum vendedor com dados de performance ainda</p>
             </div>
+          ) : filteredSellers.length === 0 ? (
+            <div className="p-12 text-center">
+              <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">Nenhum vendedor encontrado para "{searchTerm}"</p>
+              <button
+                onClick={() => setSearchTerm('')}
+                className="mt-4 text-green-400 hover:text-green-300 text-sm font-medium transition-colors"
+              >
+                Limpar pesquisa
+              </button>
+            </div>
           ) : (
             <div className="divide-y divide-green-500/10">
-              {sellers.map((seller) => {
+              {filteredSellers.map((seller) => {
                 const score = viewMode === 'roleplay' ? seller.overall_average : seller.followup_data?.average_score || 0
                 const badge = getPerformanceBadge(score)
 
