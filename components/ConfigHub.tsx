@@ -5023,7 +5023,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-12 px-4 pb-4">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-start justify-center pt-12 px-4 pb-4">
       <div className={`relative max-w-5xl w-full max-h-[calc(100vh-80px)] flex flex-col transition-transform duration-300 ${
         showPersonaEvaluationModal || showCompanyEvaluationModal || showAIModal ? 'sm:-translate-x-[250px]' :
         showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''

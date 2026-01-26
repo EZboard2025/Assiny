@@ -16,6 +16,8 @@ import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Setting
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
+import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
+import ConfigurationRequired from './ConfigurationRequired'
 
 // Lazy load RoleplayLinksView to prevent it from executing on public pages
 const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), {
@@ -51,6 +53,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     checkPDIAccess,
     checkFollowUpAccess
   } = usePlanLimits()
+
+  // Hook para verificar configuração da empresa
+  const {
+    isLoading: configLoading,
+    isConfigured,
+    missingItems,
+    details: configDetails,
+    refetch: refetchConfig
+  } = useCompanyConfig()
 
   // Estados para controlar acesso às features
   const [hasChatIA, setHasChatIA] = useState(true)
@@ -604,12 +615,66 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Config Hub Modal */}
       {showConfigHub && (
-        <ConfigHub onClose={() => setShowConfigHub(false)} />
+        <ConfigHub onClose={() => {
+          setShowConfigHub(false)
+          // Refetch config status após fechar o ConfigHub
+          refetchConfig()
+        }} />
       )}
 
       {/* Sales Dashboard Modal */}
       {showSalesDashboard && (
         <SalesDashboard onClose={() => setShowSalesDashboard(false)} />
+      )}
+
+      {/* Configuration Required Overlay - Bloqueia features até configurar */}
+      {!configLoading && !isConfigured && userRole !== null && currentView !== 'followup' && currentView !== 'followup-history' && (
+        userRole?.toLowerCase() === 'admin' ? (
+          <ConfigurationRequired
+            isLoading={configLoading}
+            missingItems={missingItems}
+            details={configDetails}
+            onOpenConfig={() => {
+              setShowConfigHub(true)
+            }}
+          />
+        ) : (
+          // Versão para vendedores (não podem configurar)
+          <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-0">
+              <div className="stars"></div>
+              <div className="stars2"></div>
+              <div className="stars3"></div>
+            </div>
+            <div className="relative z-10 max-w-lg w-full">
+              <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl border border-yellow-500/30 shadow-2xl p-8 text-center">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-yellow-500/30 to-orange-500/20 border border-yellow-500/40 flex items-center justify-center">
+                  <Lock className="w-10 h-10 text-yellow-400" />
+                </div>
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  Configuração Pendente
+                </h1>
+                <p className="text-gray-400 mb-6">
+                  O administrador precisa configurar a empresa antes que você possa usar as funcionalidades de treinamento.
+                </p>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
+                  <p className="text-sm text-yellow-400 font-medium mb-2">Itens pendentes:</p>
+                  <ul className="space-y-1">
+                    {missingItems.map((item, idx) => (
+                      <li key={idx} className="text-sm text-yellow-400/80 flex items-center justify-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Entre em contato com seu gestor para liberar o acesso.
+                </p>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {/* Modal de Plano de Processo Seletivo */}
