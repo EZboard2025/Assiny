@@ -3,56 +3,107 @@ import puppeteer from 'puppeteer'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
-const SYSTEM_PROMPT = `Você é um especialista em análise de empresas para treinamento de vendas B2B/B2C.
+const SYSTEM_PROMPT = `Você é um extrator de dados de empresas com ZERO TOLERÂNCIA para alucinação ou invenção de informações.
 
-Sua tarefa é extrair informações estruturadas de uma página web de empresa para preencher um formulário de treinamento de IA de roleplay de vendas.
+⚠️ REGRA ABSOLUTA - NUNCA ALUCINAR:
+- Você deve APENAS extrair informações que estão EXPLICITAMENTE presentes no texto fornecido
+- Se uma informação NÃO está claramente escrita no conteúdo, retorne "" (string vazia)
+- NUNCA invente, suponha, deduza ou "complete" informações que não existem
+- É MELHOR deixar um campo vazio do que colocar informação inventada ou genérica
+- Texto genérico como "soluções inovadoras" ou "atendimento de qualidade" NÃO conta como informação real
 
 CAMPOS A EXTRAIR (retorne JSON):
-1. nome - Nome da empresa (apenas o nome, sem slogans ou descrições)
-2. descricao - Descrição objetiva do que a empresa faz (1-2 frases curtas)
-3. produtos_servicos - Lista dos principais produtos ou serviços oferecidos
-4. funcao_produtos - O que cada produto/serviço faz na prática para o cliente
-5. diferenciais - Diferenciais competitivos reais da empresa
-6. concorrentes - Concorrentes diretos (se mencionados ou implícitos no texto)
-7. dados_metricas - Números, métricas, dados verificáveis (ex: "5000+ clientes", "NPS 85")
-8. erros_comuns - Deixe sempre como "" (string vazia) - este é um dado interno que não pode ser extraído
-9. percepcao_desejada - Como a empresa deseja ser percebida pelo mercado (tom, posicionamento)
-10. dores_resolvidas - Problemas/dores que a empresa resolve para seus clientes
 
-REGRAS IMPORTANTES:
-- Se não encontrar informação para um campo, retorne "" (string vazia)
-- NÃO invente dados ou suposições
-- Seja factual e objetivo
-- Mantenha textos concisos mas informativos
-- Para cada campo, inclua também um nível de confiança de 0 a 1
+1. nome
+   - Apenas o nome da empresa (sem slogans)
+   - Extrair EXATAMENTE como aparece no site
+   - Se não encontrar o nome exato, deixe ""
 
-FORMATO DE RESPOSTA (JSON):
+2. descricao
+   - O que a empresa FAZ de forma objetiva
+   - Use APENAS informações do texto, não resuma com suas próprias palavras genéricas
+   - Se o site só tem frases de marketing vagas, deixe ""
+
+3. produtos_servicos
+   - Liste APENAS produtos/serviços com NOMES ESPECÍFICOS mencionados no site
+   - Formato: "• Produto1 - descrição breve | • Produto2 - descrição breve"
+   - Se não há produtos/serviços nomeados explicitamente, deixe ""
+   - NÃO use termos genéricos como "consultoria", "soluções" sem especificação
+
+4. funcao_produtos
+   - O que cada produto/serviço FAZ NA PRÁTICA para o cliente
+   - Extrair funcionalidades ESPECÍFICAS mencionadas no site
+   - Exemplo bom: "O sistema X automatiza emissão de NF, controla estoque em tempo real, gera relatórios de vendas"
+   - Exemplo ruim (NÃO USE): "ajuda empresas a crescer", "melhora a produtividade"
+   - Se o site só tem frases genéricas, deixe ""
+
+5. diferenciais
+   - Diferenciais que são ESPECÍFICOS e VERIFICÁVEIS
+   - Exemplo bom: "Única empresa com certificação ISO 9001 no setor", "Suporte 24h com SLA de 2h"
+   - Exemplo ruim (NÃO USE): "qualidade", "inovação", "confiança", "excelência"
+   - Se só há diferenciais genéricos no site, deixe ""
+
+6. concorrentes
+   - APENAS se a empresa MENCIONAR concorrentes PELO NOME no site
+   - Formato: "Nome1, Nome2, Nome3"
+   - NÃO invente concorrentes baseado no setor
+   - Se não há menção explícita a concorrentes, OBRIGATORIAMENTE deixe ""
+   - Este campo geralmente fica vazio - isso é esperado e correto
+
+7. dados_metricas (Provas Sociais)
+   - Elementos de prova social EXPLICITAMENTE presentes no site
+   - Inclui: métricas com números, depoimentos de clientes, cases de sucesso, prêmios, certificações, logos de clientes conhecidos, selos de qualidade
+   - Exemplos: "500+ clientes ativos", "NPS 85", "Certificação ISO 9001", "Case: Empresa X aumentou vendas em 40%", "Ganhador do Prêmio Y 2024", "Clientes: Magazine Luiza, Ambev, Natura"
+   - DEVE haver informação REAL no site - não invente prêmios ou clientes
+   - Se não há provas sociais explícitas, deixe ""
+
+8. erros_comuns
+   - SEMPRE deixe como "" - este campo é preenchido manualmente
+
+9. percepcao_desejada
+   - Como a empresa se POSICIONA no mercado
+   - Extrair apenas se houver declaração clara de posicionamento
+   - Exemplo: "Líder em tecnologia para pequenas empresas", "Referência em sustentabilidade"
+   - Se só há frases de marketing vagas, deixe ""
+
+10. dores_resolvidas
+    - Problemas ESPECÍFICOS que a empresa diz resolver
+    - Deve estar explícito no texto que isso é um problema que eles resolvem
+    - Exemplo bom: "Elimina retrabalho manual em processos de RH", "Reduz tempo de atendimento de 2h para 15min"
+    - Exemplo ruim (NÃO USE): "ajuda com desafios do dia a dia", "resolve problemas de gestão"
+    - Se não há dores específicas mencionadas, deixe ""
+
+🚨 LEMBRE-SE:
+- Campos vazios são PREFERÍVEIS a informações inventadas ou genéricas
+- Confidence baixa (< 0.5) = provavelmente deve ser ""
+- Se você está "deduzindo" ou "supondo", a resposta correta é ""
+- O usuário pode completar manualmente - não "ajude" inventando dados
+
+FORMATO DE RESPOSTA (JSON válido, sem markdown):
 {
-  "nome": "string",
-  "descricao": "string",
-  "produtos_servicos": "string",
-  "funcao_produtos": "string",
-  "diferenciais": "string",
-  "concorrentes": "string",
-  "dados_metricas": "string",
+  "nome": "",
+  "descricao": "",
+  "produtos_servicos": "",
+  "funcao_produtos": "",
+  "diferenciais": "",
+  "concorrentes": "",
+  "dados_metricas": "",
   "erros_comuns": "",
-  "percepcao_desejada": "string",
-  "dores_resolvidas": "string",
+  "percepcao_desejada": "",
+  "dores_resolvidas": "",
   "_confidence": {
-    "nome": 0.95,
-    "descricao": 0.85,
-    "produtos_servicos": 0.80,
-    "funcao_produtos": 0.70,
-    "diferenciais": 0.65,
-    "concorrentes": 0.50,
-    "dados_metricas": 0.60,
+    "nome": 0,
+    "descricao": 0,
+    "produtos_servicos": 0,
+    "funcao_produtos": 0,
+    "diferenciais": 0,
+    "concorrentes": 0,
+    "dados_metricas": 0,
     "erros_comuns": 0,
-    "percepcao_desejada": 0.55,
-    "dores_resolvidas": 0.70
+    "percepcao_desejada": 0,
+    "dores_resolvidas": 0
   }
-}
-
-Retorne APENAS o JSON válido, sem markdown ou texto adicional.`
+}`
 
 // Normaliza URL adicionando https:// se não tiver protocolo
 function normalizeUrl(url: string): string {
@@ -243,7 +294,15 @@ export async function POST(req: Request) {
     // 4. Processar com OpenAI
     console.log('🤖 Enviando para GPT-4...')
 
-    const userPrompt = `Analise o conteúdo abaixo de um site de empresa e extraia as informações solicitadas:
+    const userPrompt = `TAREFA: Extrair APENAS informações EXPLÍCITAS do conteúdo abaixo.
+
+⚠️ ALERTA ANTI-ALUCINAÇÃO:
+- Se a informação NÃO ESTÁ ESCRITA no texto, o campo deve ser ""
+- Não invente concorrentes, métricas, ou funcionalidades
+- Não use frases genéricas como "soluções inovadoras" ou "atendimento de qualidade"
+- É melhor deixar VAZIO do que inventar
+
+===== CONTEÚDO DO SITE =====
 
 TÍTULO DA PÁGINA:
 ${pageContent.title}
@@ -260,9 +319,11 @@ ${pageContent.h2s.join('\n')}
 CONTEÚDO PRINCIPAL:
 ${pageContent.mainContent}
 
----
+===== FIM DO CONTEÚDO =====
 
-Extraia as informações e retorne o JSON conforme instruído.`
+Agora extraia APENAS o que está EXPLICITAMENTE escrito acima.
+Campos sem informação explícita = ""
+Retorne o JSON conforme instruído.`
 
     try {
       const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -277,8 +338,8 @@ Extraia as informações e retorne o JSON conforme instruído.`
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userPrompt }
           ],
-          temperature: 0.3,
-          max_tokens: 2000,
+          temperature: 0.1,
+          max_tokens: 2500,
           response_format: { type: 'json_object' }
         })
       })

@@ -669,12 +669,12 @@ function ConfigurationInterface({
           console.error('⚠️ Erro ao gerar embeddings (não bloqueante):', error)
         })
 
-      alert('✅ Dados salvos com sucesso! Embeddings estão sendo gerados em segundo plano.')
+      showToast('success', 'Dados Salvos', 'Embeddings estão sendo gerados em segundo plano.')
       setCompanyDataEdited(false) // Resetar flag de edição após salvar
 
     } catch (error) {
       console.error('💥 Erro ao salvar dados:', error)
-      alert('❌ Erro ao salvar dados da empresa')
+      showToast('error', 'Erro', 'Não foi possível salvar dados da empresa')
     } finally {
       setSavingCompanyData(false)
     }
@@ -3978,7 +3978,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   {/* Dados e Métricas */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                      Dados e métricas
+                      Provas Sociais
                     </label>
                     <textarea
                       value={companyData.dados_metricas}
@@ -3986,7 +3986,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyData({ ...companyData, dados_metricas: e.target.value })
                         setCompanyDataEdited(true)
                       }}
-                      placeholder="Números que podem ser citados com segurança"
+                      placeholder="Depoimentos, cases, prêmios, certificações, clientes conhecidos, métricas..."
                       rows={2}
                       className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
@@ -4227,33 +4227,40 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           </div>
         )}
 
-        {/* Modal de IA Auto-Fill */}
-        {showAIModal && (
-          <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[100] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
-            <div className="animate-slide-in">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-purple-500/30">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-purple-400" />
+        {/* Modal de IA Auto-Fill - Tela Cheia (Portal) */}
+        {showAIModal && typeof document !== 'undefined' && createPortal(
+          <div className="fixed inset-0 bg-black z-[9999] flex items-center justify-center p-4">
+            <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden">
+              {/* Gradient background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/10 rounded-3xl blur-xl"></div>
+
+              <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-purple-500/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Preencher com IA</h3>
+                      <p className="text-sm text-gray-400">Extraia dados automaticamente do site</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Preencher com IA</h3>
-                    <p className="text-xs text-gray-400">Extraia dados automaticamente do site</p>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setShowAIModal(false)
+                      setAIPreviewData(null)
+                      setAIError(null)
+                      setAIUrl('')
+                    }}
+                    className="w-10 h-10 bg-gray-800/50 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowAIModal(false)
-                    setAIPreviewData(null)
-                    setAIError(null)
-                    setAIUrl('')
-                  }}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+
+                {/* Content */}
+                <div className="p-6 max-h-[calc(90vh-100px)] overflow-y-auto">
 
               {/* Input de URL */}
               {!aiPreviewData && (
@@ -4324,37 +4331,25 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           funcao_produtos: 'Função dos Produtos',
                           diferenciais: 'Diferenciais',
                           concorrentes: 'Concorrentes',
-                          dados_metricas: 'Dados/Métricas',
+                          dados_metricas: 'Provas Sociais',
                           erros_comuns: 'Erros Comuns',
                           percepcao_desejada: 'Percepção Desejada',
                           dores_resolvidas: 'Dores Resolvidas'
                         }
-                        const confidence = aiConfidence[campo]
 
                         return (
                           <div key={campo} className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-3">
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="text-xs text-gray-400 uppercase tracking-wider">
-                                {fieldLabels[campo] || campo}
-                              </label>
-                              {confidence !== undefined && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                  confidence >= 0.8 ? 'bg-green-500/20 text-green-400' :
-                                  confidence >= 0.5 ? 'bg-yellow-500/20 text-yellow-400' :
-                                  'bg-red-500/20 text-red-400'
-                                }`}>
-                                  {Math.round(confidence * 100)}%
-                                </span>
-                              )}
-                            </div>
+                            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
+                              {fieldLabels[campo] || campo}
+                            </label>
                             <textarea
                               value={valor as string}
                               onChange={(e) => setAIPreviewData({
                                 ...aiPreviewData,
                                 [campo]: e.target.value
                               })}
-                              rows={2}
-                              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
+                              rows={3}
+                              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500 resize-y"
                               placeholder={!valor ? '(não encontrado)' : undefined}
                             />
                           </div>
@@ -4383,8 +4378,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                 </div>
               )}
+                </div>
+              </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Modal de Geração de Conteúdo com IA - Tela Cheia (Portal) */}
