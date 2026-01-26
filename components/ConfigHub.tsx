@@ -4211,7 +4211,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
         {/* Modal de IA Auto-Fill */}
         {showAIModal && (
-          <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
+          <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[100] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-purple-500/30">
             <div className="animate-slide-in">
               {/* Header */}
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-purple-500/30">
@@ -5093,7 +5093,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
     {/* Modal de Avaliação de Persona - Side Panel (fora do ConfigHub) */}
     {showPersonaEvaluationModal && personaEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4">
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[100] p-4">
         <style jsx>{`
           @keyframes slide-in {
             from {
@@ -5346,7 +5346,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
     {/* Modal de Avaliação de Objeção - Side Panel (fora do ConfigHub) */}
     {showObjectionEvaluationModal && objectionEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[420px] z-[70] p-3 bg-gradient-to-br from-green-950/90 via-gray-900/95 to-gray-900/95">
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[420px] z-[100] p-3 bg-gradient-to-br from-green-950/90 via-gray-900/95 to-gray-900/95">
         <div className="h-full bg-gradient-to-b from-green-900/20 to-gray-900/50 border border-green-500/30 rounded-lg shadow-2xl overflow-y-auto animate-slide-in">
           <div className="sticky top-0 bg-gradient-to-b from-green-900/80 to-gray-900/80 backdrop-blur-sm border-b border-green-500/30 p-3 flex items-center justify-between z-10">
             <h3 className="font-bold text-white text-sm">Avaliação da Objeção</h3>
@@ -5409,7 +5409,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
     {/* Painel Lateral de Avaliação de Dados da Empresa */}
     {showCompanyEvaluationModal && qualityEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[70] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-green-500/30">
+      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[100] p-4 overflow-y-auto bg-black/95 backdrop-blur-xl border-l border-green-500/30">
         <div className="animate-slide-in">
           {/* Header */}
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-green-500/30">
