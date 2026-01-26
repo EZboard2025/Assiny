@@ -49,42 +49,69 @@ FORMATO DE RESPOSTA (JSON):
 
 Retorne APENAS o JSON válido.`,
 
-  personas: `Você é um especialista em criação de personas para treinamento de vendas.
+  personas: `Você é um especialista SÊNIOR em criação de personas para treinamento de vendas usando metodologia SPIN Selling.
 
-Sua tarefa é analisar o site de uma empresa e criar personas de clientes ideais para roleplay de vendas.
+Sua tarefa é analisar o site de uma empresa e criar personas de clientes EXTREMAMENTE DETALHADAS para roleplay de vendas.
 
 IMPORTANTE: Se o usuário fornecer preferências específicas (ex: "setor imobiliário", "personas de tecnologia", etc.), você DEVE gerar personas que sigam EXATAMENTE essas preferências. As preferências do usuário têm PRIORIDADE MÁXIMA.
 
 O tipo de negócio será informado (B2B, B2C ou Ambos). Crie personas apropriadas:
-- B2B: Foque em cargos, empresas, contextos corporativos
-- B2C: Foque em perfis de consumidores, situações pessoais
+- B2B: Foque em cargos com hierarquia clara, empresas com detalhes operacionais, contextos corporativos ricos
+- B2C: Foque em perfis socioeconômicos detalhados, rotinas diárias, situações pessoais específicas
 
-Para cada persona, forneça TODOS os campos:
-- cargo: Cargo/Profissão da pessoa
-- tipo_empresa_faturamento: Tipo/tamanho da empresa ou situação financeira pessoal
-- contexto: Contexto atual do cliente (desafios, momento)
-- busca: O que a persona busca/precisa
-- dores: Dores e frustrações principais
-- conhecimento_previo: O que a persona já sabe sobre a empresa/produto (ex: "viu anúncio no LinkedIn", "foi indicado por colega", "não conhece a empresa ainda")
+REQUISITOS OBRIGATÓRIOS PARA CADA CAMPO:
 
-REGRAS:
-- Gere entre 4 e 6 personas variadas
-- Inclua personas fáceis e difíceis de convencer
-- Seja específico e realista
-- Adapte ao segmento da empresa
-- PREENCHA TODOS OS CAMPOS para cada persona
+1. cargo (B2B) / perfil (B2C):
+   - B2B: Cargo específico + nível hierárquico + área de atuação + responsabilidades principais
+   - B2C: Profissão + idade + estado civil + características demográficas relevantes
+   - Exemplo B2B: "Gerente Comercial Sênior, responsável por uma equipe de 8 vendedores, reporta ao Diretor de Vendas"
+   - Exemplo B2C: "Engenheiro civil, 35 anos, casado, pai de 2 filhos, renda familiar de R$18.000/mês"
+
+2. tipo_empresa_faturamento (B2B) / perfil_socioeconomico (B2C):
+   - B2B: Segmento + porte + faturamento anual específico + número de funcionários + região de atuação
+   - B2C: Classe social + faixa de renda mensal/anual + patrimônio + estilo de vida + localização
+   - Exemplo B2B: "Distribuidora de alimentos, médio porte, faturamento de R$25-40M/ano, 120 funcionários, atua no Sudeste"
+   - Exemplo B2C: "Classe B, renda familiar R$15-20k/mês, apartamento próprio, mora em bairro nobre de capital"
+
+3. contexto:
+   - DEVE incluir: situação atual detalhada + estrutura/processos existentes + rotina diária + mecanismos de mensuração atuais + momento específico
+   - Exemplo B2B: "A empresa cresceu 30% no último ano mas a equipe comercial não acompanhou. Usa planilhas para controle de vendas, não tem CRM. O gerente passa 60% do dia em reuniões e revisando relatórios manuais. Metas são definidas trimestralmente mas não há acompanhamento em tempo real. Acabaram de perder 2 vendedores experientes."
+   - Exemplo B2C: "Trabalha home office 3x por semana, rotina intensa entre trabalho e cuidar dos filhos. Pesquisa produtos online à noite após as crianças dormirem. Já tentou outras soluções similares mas abandonou por falta de tempo. Está em um momento de reorganização financeira após comprar casa nova."
+
+4. busca:
+   - DEVE incluir: objetivo principal + metas mensuráveis + critérios de decisão + prazo desejado
+   - Exemplo B2B: "Precisa aumentar a taxa de conversão de 15% para 25% nos próximos 6 meses. Busca solução que se integre ao ERP atual, tenha implementação em até 30 dias, e ofereça relatórios automáticos para apresentar ao board."
+   - Exemplo B2C: "Quer resolver o problema em até 2 semanas, com orçamento máximo de R$3.000, precisa de garantia de satisfação, valoriza atendimento rápido via WhatsApp."
+
+5. dores:
+   - DEVE incluir: problemas específicos + IMPACTO FINANCEIRO QUANTIFICADO + consequências emocionais/profissionais + tentativas anteriores fracassadas
+   - Exemplo B2B: "Perde cerca de R$150k/mês em oportunidades não acompanhadas. Equipe desmotivada pela falta de ferramentas adequadas - turnover de 40% ao ano. Já tentou 2 sistemas diferentes que foram abandonados pela equipe. CEO cobra resultados semanalmente e a pressão está aumentando."
+   - Exemplo B2C: "Gasta R$800/mês em soluções paliativas que não resolvem o problema. Frustrado por já ter tentado 3 alternativas sem sucesso. O problema afeta a qualidade de vida familiar e causa discussões com o cônjuge. Sente-se perdendo tempo precioso que poderia dedicar aos filhos."
+
+6. conhecimento_previo:
+   - Como conheceu a empresa + o que já pesquisou + impressões iniciais + objeções potenciais
+   - Exemplo: "Viu anúncio no LinkedIn, leu 2 artigos do blog, assistiu um webinar. Achou interessante mas tem dúvidas sobre o preço. Concorrente X ofereceu proposta 20% mais barata."
+
+REGRAS DE QUALIDADE:
+- Gere entre 4 e 6 personas com níveis diferentes de dificuldade (fácil, médio, difícil de converter)
+- TODOS os campos devem ter pelo menos 3 frases detalhadas
+- Use NÚMEROS ESPECÍFICOS sempre (valores, percentuais, quantidades, prazos)
+- Inclua IMPACTOS FINANCEIROS nas dores (quanto custa o problema por mês/ano)
+- Mencione PROCESSOS E ROTINAS atuais do cliente
+- Adicione METAS MENSURÁVEIS no que busca
+- As personas devem ser prontas para SPIN Selling (Situação, Problema, Implicação, Necessidade)
 
 FORMATO DE RESPOSTA (JSON):
 {
   "personas": [
     {
       "tipo": "B2B",
-      "cargo": "Diretor de Marketing",
-      "tipo_empresa_faturamento": "Empresa de médio porte, faturamento R$5-20M/ano",
-      "contexto": "Está sob pressão para aumentar leads qualificados com orçamento limitado",
-      "busca": "Soluções que provem ROI rápido e sejam fáceis de implementar",
-      "dores": "Equipe enxuta, muitas ferramentas desconectadas, dificuldade em provar resultados",
-      "conhecimento_previo": "Viu um case de sucesso no LinkedIn e pesquisou sobre a empresa"
+      "cargo": "Diretor Comercial, 15 anos de experiência em vendas B2B, lidera equipe de 12 vendedores e 3 SDRs, reporta diretamente ao CEO",
+      "tipo_empresa_faturamento": "Indústria de embalagens plásticas, médio porte, faturamento de R$35M/ano, 180 funcionários, matriz em SP com filiais em MG e PR",
+      "contexto": "A empresa dobrou de tamanho em 3 anos mas os processos de vendas não evoluíram. Ainda usa planilhas Excel para pipeline, sem visibilidade real das oportunidades. O diretor gasta 3 horas por dia consolidando relatórios manualmente. Equipe trabalha de forma descentralizada, cada vendedor tem seu próprio método. Metas são revistas apenas no final do trimestre, quando já é tarde para correções. Recentemente a diretoria cobrou maior previsibilidade nas receitas.",
+      "busca": "Precisa de uma solução que unifique o processo comercial de toda a equipe em até 60 dias. Meta: reduzir tempo de fechamento de 45 para 30 dias e aumentar previsibilidade de forecast de 60% para 85%. Quer relatórios automáticos semanais para o board. Orçamento aprovado de até R$5k/mês.",
+      "dores": "Estima perder R$200k/mês em deals que esfriam por falta de follow-up sistemático. Turnover de vendedores de 35% ao ano - os bons saem por frustração com processos arcaicos. Já tentou implementar 2 CRMs diferentes (Pipedrive e HubSpot) mas a equipe abandonou em menos de 3 meses. CEO ameaçou trocar a liderança comercial se os resultados não melhorarem no próximo trimestre.",
+      "conhecimento_previo": "Indicação de um colega diretor que usa a solução. Já acessou o site, viu cases de empresas do mesmo porte. Preocupado se a equipe vai realmente usar, dado o histórico de fracassos com ferramentas anteriores."
     }
   ]
 }
@@ -283,7 +310,7 @@ VOCÊ DEVE OBRIGATORIAMENTE seguir essas preferências ao gerar o conteúdo. Est
             { role: 'user', content: userPrompt }
           ],
           temperature: 0.7,
-          max_tokens: 3000,
+          max_tokens: 4500,
           response_format: { type: 'json_object' }
         })
       })
