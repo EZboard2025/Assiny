@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, AlertTriangle, CheckCircle, Building2, Users, MessageSquareWarning, ArrowRight, Loader2 } from 'lucide-react'
+import { Settings, AlertTriangle, CheckCircle, Building2, Users, MessageSquareWarning, ArrowRight, Loader2, LogOut } from 'lucide-react'
 
 interface ConfigurationRequiredProps {
   isLoading: boolean
@@ -11,13 +11,15 @@ interface ConfigurationRequiredProps {
     hasObjections: boolean
   }
   onOpenConfig: () => void
+  onLogout?: () => void
 }
 
 export default function ConfigurationRequired({
   isLoading,
   missingItems,
   details,
-  onOpenConfig
+  onOpenConfig,
+  onLogout
 }: ConfigurationRequiredProps) {
   if (isLoading) {
     return (
@@ -68,7 +70,20 @@ export default function ConfigurationRequired({
 
       <div className="relative z-10 max-w-lg w-full">
         {/* Card principal */}
-        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl border border-green-500/30 shadow-2xl shadow-green-500/10 overflow-hidden">
+        <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl border border-green-500/30 shadow-2xl shadow-green-500/10 overflow-hidden">
+          {/* Botão de logout */}
+          {onLogout && (
+            <div className="absolute top-4 right-4 z-20">
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-red-400 bg-gray-800/80 hover:bg-gray-800 rounded-lg transition-colors border border-gray-700/50 hover:border-red-500/30"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
+            </div>
+          )}
+
           {/* Header com ícone */}
           <div className="relative p-8 pb-6 text-center">
             {/* Glow effect */}

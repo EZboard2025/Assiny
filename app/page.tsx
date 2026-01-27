@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react'
 import LoginPage from '@/components/LoginPage'
 import Dashboard from '@/components/Dashboard'
+import { Loader2 } from 'lucide-react'
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -49,7 +51,12 @@ export default function Home() {
 
   const handleLogin = () => {
     console.log('Login clicked')
-    setIsLoggedIn(true)
+    setIsLoggingIn(true)
+    // Pequeno delay para transição suave
+    setTimeout(() => {
+      setIsLoggedIn(true)
+      setIsLoggingIn(false)
+    }, 800)
   }
 
   const handleLogout = async () => {
@@ -64,6 +71,22 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white">Carregando...</div>
+      </div>
+    )
+  }
+
+  // Tela de carregamento após login
+  if (isLoggingIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative mb-6">
+            <div className="w-16 h-16 rounded-full border-4 border-green-500/20 border-t-green-500 animate-spin mx-auto" />
+            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-500/10 blur-xl mx-auto" />
+          </div>
+          <p className="text-gray-400 text-lg font-medium">Entrando...</p>
+          <p className="text-gray-600 text-sm mt-1">Preparando seu ambiente</p>
+        </div>
       </div>
     )
   }

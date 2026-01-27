@@ -42,6 +42,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
+  const [userDataLoading, setUserDataLoading] = useState(true)
   const chatRef = useRef<ChatInterfaceHandle>(null)
 
   // Hook para verificar limites do plano
@@ -137,6 +138,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       }
     } catch (error) {
       console.error('Error checking user role:', error)
+    } finally {
+      setUserDataLoading(false)
     }
   }
 
@@ -538,6 +541,21 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     )
   }
 
+  // Tela de carregamento enquanto dados do usuário são carregados
+  if (userDataLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative mb-6">
+            <div className="w-16 h-16 rounded-full border-4 border-green-500/20 border-t-green-500 animate-spin mx-auto" />
+            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-500/10 blur-xl mx-auto" />
+          </div>
+          <p className="text-gray-400 text-lg font-medium">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
       {/* Animated background particles */}
@@ -636,6 +654,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             details={configDetails}
             onOpenConfig={() => {
               setShowConfigHub(true)
+            }}
+            onLogout={async () => {
+              const { supabase } = await import('@/lib/supabase')
+              await supabase.auth.signOut()
+              window.location.href = '/'
             }}
           />
         ) : (
