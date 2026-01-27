@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, Link2, Clock, UserPlus } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -338,6 +338,19 @@ function ConfigurationInterface({
   const [newEmployeePassword, setNewEmployeePassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [addingEmployee, setAddingEmployee] = useState(false)
+
+  // Estados para Convites
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [generatingInvite, setGeneratingInvite] = useState(false)
+  const [pendingRegistrations, setPendingRegistrations] = useState<{
+    id: string
+    name: string
+    email: string
+    created_at: string
+  }[]>([])
+  const [loadingPending, setLoadingPending] = useState(false)
+  const [processingRegistration, setProcessingRegistration] = useState<string | null>(null)
+
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
   const [personas, setPersonas] = useState<Persona[]>([])
   const [showPersonaForm, setShowPersonaForm] = useState(false)
@@ -520,6 +533,13 @@ function ConfigurationInterface({
       setActiveTab('personas')
     }
   }, [trainingPlan, activeTab])
+
+  // Carregar pendentes quando aba de funcionários for ativada
+  useEffect(() => {
+    if (activeTab === 'employees' && currentCompany?.id) {
+      loadPendingRegistrations()
+    }
+  }, [activeTab, currentCompany?.id])
 
   // Carregar dados da empresa
   const loadCompanyData = async () => {
@@ -1301,6 +1321,168 @@ function ConfigurationInterface({
     } catch (error) {
       console.error('Erro ao atualizar role:', error)
       alert('Erro ao atualizar role')
+    }
+  }
+
+  // Funções para gerenciar convites
+  const generateInviteLink = async () => {
+    if (!currentCompany?.id) return
+    setGeneratingInvite(true)
+
+    try {
+      // Get auth token
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        showToast('error', 'Erro', 'Você precisa estar autenticado')
+        setGeneratingInvite(false)
+        return
+      }
+
+      const response = await fetch('/api/invite/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ companyId: currentCompany.id })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        const baseUrl = window.location.origin
+        setInviteLink(`${baseUrl}/cadastro?invite=${data.token}`)
+        showToast('success', 'Link Gerado', data.isExisting ? 'Link de convite existente recuperado' : 'Novo link de convite criado')
+      } else {
+        showToast('error', 'Erro', data.error || 'Erro ao gerar link')
+      }
+    } catch (error) {
+      console.error('Erro ao gerar link:', error)
+      showToast('error', 'Erro', 'Erro ao gerar link de convite')
+    } finally {
+      setGeneratingInvite(false)
+    }
+  }
+
+  const loadPendingRegistrations = async () => {
+    if (!currentCompany?.id) return
+    setLoadingPending(true)
+
+    try {
+      // Get auth token
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setLoadingPending(false)
+        return
+      }
+
+      const response = await fetch(`/api/invite/pending?companyId=${currentCompany.id}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setPendingRegistrations(data.pendingRegistrations)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar pendentes:', error)
+    } finally {
+      setLoadingPending(false)
+    }
+  }
+
+  const handleApproveRegistration = async (registrationId: string) => {
+    if (!currentCompany?.id) return
+    setProcessingRegistration(registrationId)
+
+    try {
+      // Get auth token
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        showToast('error', 'Erro', 'Você precisa estar autenticado')
+        setProcessingRegistration(null)
+        return
+      }
+
+      const response = await fetch('/api/invite/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ registrationId, companyId: currentCompany.id })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showToast('success', 'Aprovado', 'Cadastro aprovado com sucesso!')
+        setPendingRegistrations(prev => prev.filter(r => r.id !== registrationId))
+        // Recarregar lista de funcionários
+        loadData()
+      } else {
+        showToast('error', 'Erro', data.error || 'Erro ao aprovar cadastro')
+      }
+    } catch (error) {
+      console.error('Erro ao aprovar:', error)
+      showToast('error', 'Erro', 'Erro ao aprovar cadastro')
+    } finally {
+      setProcessingRegistration(null)
+    }
+  }
+
+  const handleRejectRegistration = async (registrationId: string) => {
+    if (!currentCompany?.id) return
+    setProcessingRegistration(registrationId)
+
+    try {
+      // Get auth token
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        showToast('error', 'Erro', 'Você precisa estar autenticado')
+        setProcessingRegistration(null)
+        return
+      }
+
+      const response = await fetch('/api/invite/reject', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ registrationId, companyId: currentCompany.id })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showToast('warning', 'Recusado', 'Cadastro recusado')
+        setPendingRegistrations(prev => prev.filter(r => r.id !== registrationId))
+      } else {
+        showToast('error', 'Erro', data.error || 'Erro ao recusar cadastro')
+      }
+    } catch (error) {
+      console.error('Erro ao recusar:', error)
+      showToast('error', 'Erro', 'Erro ao recusar cadastro')
+    } finally {
+      setProcessingRegistration(null)
+    }
+  }
+
+  const copyInviteLink = async () => {
+    if (inviteLink) {
+      await navigator.clipboard.writeText(inviteLink)
+      showToast('success', 'Copiado', 'Link copiado para a área de transferência')
     }
   }
 
@@ -2296,6 +2478,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           >
             <Users className="w-4 h-4" />
             <span>Funcionários</span>
+            {pendingRegistrations.length > 0 && (
+              <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                {pendingRegistrations.length}
+              </span>
+            )}
           </button>
         )}
         <button
@@ -2482,6 +2669,129 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </div>
                   </div>
               )}
+              </div>
+            </div>
+
+            {/* Link de Convite Fixo */}
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Link de Convite</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Compartilhe este link para funcionários criarem suas contas
+                </p>
+              </div>
+
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={typeof window !== 'undefined' && currentCompany?.subdomain ? `${window.location.origin}/cadastro/${currentCompany.subdomain}` : ''}
+                    readOnly
+                    className="flex-1 px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-300 font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      if (currentCompany?.subdomain) {
+                        navigator.clipboard.writeText(`${window.location.origin}/cadastro/${currentCompany.subdomain}`)
+                        showToast('success', 'Copiado', 'Link copiado para a área de transferência')
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center gap-2"
+                  >
+                    <Link2 className="w-4 h-4" />
+                    Copiar
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Envie este link para os funcionários. Eles poderão criar uma conta e você receberá a solicitação para aprovar.
+                </p>
+              </div>
+            </div>
+
+            {/* Solicitações Pendentes */}
+            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Solicitações Pendentes</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Aprove ou recuse cadastros de funcionários
+                    </p>
+                  </div>
+                  {pendingRegistrations.length > 0 && (
+                    <span className="bg-orange-500/20 text-orange-400 text-xs px-2 py-1 rounded-lg font-medium">
+                      {pendingRegistrations.length} pendente{pendingRegistrations.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4">
+                {loadingPending ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 text-green-400 animate-spin" />
+                  </div>
+                ) : pendingRegistrations.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma solicitação pendente</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingRegistrations.map((registration) => (
+                      <div
+                        key={registration.id}
+                        className="flex items-center justify-between p-3 bg-gray-800/30 rounded-xl border border-gray-700/50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
+                            <UserPlus className="w-5 h-5 text-orange-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">{registration.name}</p>
+                            <p className="text-xs text-gray-400">{registration.email}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {new Date(registration.created_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleRejectRegistration(registration.id)}
+                            disabled={processingRegistration === registration.id}
+                            className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                          >
+                            {processingRegistration === registration.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              'Recusar'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleApproveRegistration(registration.id)}
+                            disabled={processingRegistration === registration.id}
+                            className="px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {processingRegistration === registration.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <>
+                                <Check className="w-3 h-3" />
+                                Aprovar
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
