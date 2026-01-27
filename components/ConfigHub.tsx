@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, Link2, Clock, UserPlus } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, Link2, Clock, UserPlus, RefreshCw } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -350,6 +350,8 @@ function ConfigurationInterface({
   }[]>([])
   const [loadingPending, setLoadingPending] = useState(false)
   const [processingRegistration, setProcessingRegistration] = useState<string | null>(null)
+  const [userCompanySubdomain, setUserCompanySubdomain] = useState<string | null>(null)
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
 
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
   const [personas, setPersonas] = useState<Persona[]>([])
@@ -487,6 +489,44 @@ function ConfigurationInterface({
     loadTags()
   }, [])
 
+  // Carregar subdomínio da empresa do usuário logado (para o link de convite)
+  useEffect(() => {
+    const loadUserCompanySubdomain = async () => {
+      try {
+        const { supabase } = await import('@/lib/supabase')
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+          // Buscar company_id do funcionário
+          const { data: employee } = await supabase
+            .from('employees')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single()
+
+          if (employee?.company_id) {
+            setUserCompanyId(employee.company_id)
+
+            // Buscar subdomain da empresa
+            const { data: company } = await supabase
+              .from('companies')
+              .select('subdomain')
+              .eq('id', employee.company_id)
+              .single()
+
+            if (company?.subdomain) {
+              setUserCompanySubdomain(company.subdomain)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar subdomínio da empresa:', error)
+      }
+    }
+
+    loadUserCompanySubdomain()
+  }, [])
+
   // Recarregar tags das personas quando as personas mudarem
   useEffect(() => {
     const loadPersonaTags = async () => {
@@ -536,10 +576,10 @@ function ConfigurationInterface({
 
   // Carregar pendentes quando aba de funcionários for ativada
   useEffect(() => {
-    if (activeTab === 'employees' && currentCompany?.id) {
+    if (activeTab === 'employees' && userCompanyId) {
       loadPendingRegistrations()
     }
-  }, [activeTab, currentCompany?.id])
+  }, [activeTab, userCompanyId])
 
   // Carregar dados da empresa
   const loadCompanyData = async () => {
@@ -1367,7 +1407,7 @@ function ConfigurationInterface({
   }
 
   const loadPendingRegistrations = async () => {
-    if (!currentCompany?.id) return
+    if (!userCompanyId) return
     setLoadingPending(true)
 
     try {
@@ -1380,7 +1420,7 @@ function ConfigurationInterface({
         return
       }
 
-      const response = await fetch(`/api/invite/pending?companyId=${currentCompany.id}`, {
+      const response = await fetch(`/api/invite/pending?companyId=${userCompanyId}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -1398,7 +1438,7 @@ function ConfigurationInterface({
   }
 
   const handleApproveRegistration = async (registrationId: string) => {
-    if (!currentCompany?.id) return
+    if (!userCompanyId) return
     setProcessingRegistration(registrationId)
 
     try {
@@ -1418,7 +1458,7 @@ function ConfigurationInterface({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ registrationId, companyId: currentCompany.id })
+        body: JSON.stringify({ registrationId, companyId: userCompanyId })
       })
 
       const data = await response.json()
@@ -1440,7 +1480,7 @@ function ConfigurationInterface({
   }
 
   const handleRejectRegistration = async (registrationId: string) => {
-    if (!currentCompany?.id) return
+    if (!userCompanyId) return
     setProcessingRegistration(registrationId)
 
     try {
@@ -1460,7 +1500,7 @@ function ConfigurationInterface({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ registrationId, companyId: currentCompany.id })
+        body: JSON.stringify({ registrationId, companyId: userCompanyId })
       })
 
       const data = await response.json()
@@ -2685,18 +2725,19 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    value={typeof window !== 'undefined' && currentCompany?.subdomain ? `${window.location.origin}/cadastro/${currentCompany.subdomain}` : ''}
+                    value={typeof window !== 'undefined' && userCompanySubdomain ? `${window.location.origin}/cadastro/${userCompanySubdomain}` : 'Carregando...'}
                     readOnly
                     className="flex-1 px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-300 font-mono"
                   />
                   <button
                     onClick={() => {
-                      if (currentCompany?.subdomain) {
-                        navigator.clipboard.writeText(`${window.location.origin}/cadastro/${currentCompany.subdomain}`)
+                      if (userCompanySubdomain) {
+                        navigator.clipboard.writeText(`${window.location.origin}/cadastro/${userCompanySubdomain}`)
                         showToast('success', 'Copiado', 'Link copiado para a área de transferência')
                       }
                     }}
-                    className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center gap-2"
+                    disabled={!userCompanySubdomain}
+                    className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Link2 className="w-4 h-4" />
                     Copiar
@@ -2718,11 +2759,21 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       Aprove ou recuse cadastros de funcionários
                     </p>
                   </div>
-                  {pendingRegistrations.length > 0 && (
-                    <span className="bg-orange-500/20 text-orange-400 text-xs px-2 py-1 rounded-lg font-medium">
-                      {pendingRegistrations.length} pendente{pendingRegistrations.length > 1 ? 's' : ''}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {pendingRegistrations.length > 0 && (
+                      <span className="bg-orange-500/20 text-orange-400 text-xs px-2 py-1 rounded-lg font-medium">
+                        {pendingRegistrations.length} pendente{pendingRegistrations.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    <button
+                      onClick={loadPendingRegistrations}
+                      disabled={loadingPending}
+                      className="p-2 text-gray-400 hover:text-green-400 bg-gray-800/50 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+                      title="Atualizar"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loadingPending ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
