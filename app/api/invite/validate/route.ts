@@ -9,20 +9,20 @@ const supabaseAdmin = createClient(
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const subdomain = searchParams.get('subdomain')
+    const companyId = searchParams.get('companyId')
 
-    if (!subdomain) {
+    if (!companyId) {
       return NextResponse.json(
-        { valid: false, error: 'Subdomínio é obrigatório' },
+        { valid: false, error: 'ID da empresa é obrigatório' },
         { status: 400 }
       )
     }
 
-    // Find company by subdomain
+    // Find company by ID
     const { data: company, error } = await supabaseAdmin
       .from('companies')
       .select('id, name, subdomain')
-      .eq('subdomain', subdomain.toLowerCase())
+      .eq('id', companyId)
       .single()
 
     if (error || !company) {

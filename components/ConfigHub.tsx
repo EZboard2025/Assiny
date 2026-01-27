@@ -517,15 +517,28 @@ function ConfigurationInterface({
             if (company?.subdomain) {
               setUserCompanySubdomain(company.subdomain)
             }
+          } else if (currentCompany?.id && currentCompany?.subdomain) {
+            // Fallback: usar empresa do subdomínio atual
+            setUserCompanyId(currentCompany.id)
+            setUserCompanySubdomain(currentCompany.subdomain)
           }
+        } else if (currentCompany?.id && currentCompany?.subdomain) {
+          // Se não há usuário logado, usar empresa do subdomínio
+          setUserCompanyId(currentCompany.id)
+          setUserCompanySubdomain(currentCompany.subdomain)
         }
       } catch (error) {
         console.error('Erro ao carregar subdomínio da empresa:', error)
+        // Em caso de erro, usar empresa do subdomínio como fallback
+        if (currentCompany?.id && currentCompany?.subdomain) {
+          setUserCompanyId(currentCompany.id)
+          setUserCompanySubdomain(currentCompany.subdomain)
+        }
       }
     }
 
     loadUserCompanySubdomain()
-  }, [])
+  }, [currentCompany])
 
   // Recarregar tags das personas quando as personas mudarem
   useEffect(() => {
@@ -2725,18 +2738,18 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    value={typeof window !== 'undefined' && userCompanySubdomain ? `${window.location.origin}/cadastro/${userCompanySubdomain}` : 'Carregando...'}
+                    value={typeof window !== 'undefined' && userCompanyId ? `${window.location.origin}/cadastro/${userCompanyId}` : 'Carregando...'}
                     readOnly
                     className="flex-1 px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-300 font-mono"
                   />
                   <button
                     onClick={() => {
-                      if (userCompanySubdomain) {
-                        navigator.clipboard.writeText(`${window.location.origin}/cadastro/${userCompanySubdomain}`)
+                      if (userCompanyId) {
+                        navigator.clipboard.writeText(`${window.location.origin}/cadastro/${userCompanyId}`)
                         showToast('success', 'Copiado', 'Link copiado para a área de transferência')
                       }
                     }}
-                    disabled={!userCompanySubdomain}
+                    disabled={!userCompanyId}
                     className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Link2 className="w-4 h-4" />

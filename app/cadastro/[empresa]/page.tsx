@@ -39,7 +39,7 @@ export default function CadastroEmpresaPage() {
       }
 
       try {
-        const response = await fetch(`/api/invite/validate?subdomain=${empresa}`)
+        const response = await fetch(`/api/invite/validate?companyId=${empresa}`)
         const data = await response.json()
 
         if (data.valid) {
