@@ -12,7 +12,8 @@ import PDIView from './PDIView'
 import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
 import FollowUpHistoryView from './FollowUpHistoryView'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock, FileSearch, History } from 'lucide-react'
+import MeetAnalysisView from './MeetAnalysisView'
+import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock, FileSearch, History, Video } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -37,7 +38,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -214,6 +215,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'followup-history') {
       return <FollowUpHistoryView />
+    }
+
+    if (currentView === 'meet-analysis') {
+      return <MeetAnalysisView />
     }
 
     // Home view
@@ -439,7 +444,55 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
           </div>
 
-          {/* Setor 3: Gestão - Only for Admin and Gestor */}
+          {/* Setor 3: Análise de Reuniões */}
+          <div className="mb-16">
+            <div className="mb-8 flex items-center gap-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
+                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  Análise de Reuniões
+                </span>
+              </h2>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
+            {/* Análise de Google Meet Card */}
+            <button
+              onClick={() => handleViewChange('meet-analysis')}
+              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              style={{ animationDelay: '400ms' }}
+            >
+              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
+                <div className="absolute top-4 right-4">
+                  <span className="px-2.5 py-1 bg-yellow-500/20 text-yellow-400 text-[10px] font-semibold rounded-full border border-yellow-500/30">
+                    Beta
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
+                    <Video className="w-6 h-6 text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Análise de Google Meet</h3>
+                    <span className="text-xs text-green-400/70">Transcrição em tempo real</span>
+                  </div>
+                </div>
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  Cole o link da reunião e nosso bot transcreve a conversa automaticamente.
+                </p>
+                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
+                  <span>Analisar reunião</span>
+                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+            </div>
+          </div>
+
+          {/* Setor 4: Gestão - Only for Admin and Gestor */}
           {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
           <div className="mb-16">
             <div className="mb-8 flex items-center gap-4">
