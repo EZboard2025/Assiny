@@ -132,7 +132,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   // Scroll-based page navigation
   const accumulatedScroll = useRef(0)
-  const scrollThreshold = 150 // Accumulated scroll needed to trigger page change
+  const scrollThreshold = 500 // Accumulated scroll needed to trigger page change (increased for less sensitivity)
 
   useEffect(() => {
     const getPageSequence = (): Array<typeof currentView> => {
