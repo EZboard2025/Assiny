@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
@@ -41,7 +41,6 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       }
     </style>
   `;
-  const [showConfig, setShowConfig] = useState(false)
   const [isSimulating, setIsSimulating] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [roleplayLimitReached, setRoleplayLimitReached] = useState(false)
@@ -52,6 +51,12 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  // Estados e refs para interface de videochamada
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isCameraOn, setIsCameraOn] = useState(true)
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
+  const [showChatSidebar, setShowChatSidebar] = useState(false)
 
   // Configurações do roleplay
   const [age, setAge] = useState(30)
@@ -93,6 +98,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback'>('evaluation') // Aba ativa no modal de avaliação
   const [clientName, setClientName] = useState<string>('Cliente') // Nome do cliente virtual
   const [roleplayConfig, setRoleplayConfig] = useState<any>(null) // Armazena toda a configuração do roleplay
+  const [dataLoading, setDataLoading] = useState(true) // Loading state para dados iniciais
 
   useEffect(() => {
     setMounted(true)
@@ -115,40 +121,89 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }, [planUsage, trainingPlan])
 
   const loadData = async () => {
-    const [businessTypeData, personasData, objectionsData, objectivesData, tagsData] = await Promise.all([
-      getCompanyType(),
-      getPersonas(),
-      getObjections(),
-      getRoleplayObjectives(),
-      getTags(),
-    ])
-    setBusinessType(businessTypeData)
-    setPersonas(personasData)
-    setObjections(objectionsData)
-    setObjectives(objectivesData)
-    setTags(tagsData)
+    setDataLoading(true)
+    try {
+      const [businessTypeData, personasData, objectionsData, objectivesData, tagsData] = await Promise.all([
+        getCompanyType(),
+        getPersonas(),
+        getObjections(),
+        getRoleplayObjectives(),
+        getTags(),
+      ])
+      setBusinessType(businessTypeData)
+      setPersonas(personasData)
+      setObjections(objectionsData)
+      setObjectives(objectivesData)
+      setTags(tagsData)
 
-    // Carregar tags de cada persona
-    const newPersonaTags = new Map<string, Tag[]>()
-    for (const persona of personasData) {
-      if (persona.id) {
-        const personaTagsData = await getPersonaTags(persona.id)
-        newPersonaTags.set(persona.id, personaTagsData)
+      // Carregar tags de cada persona em paralelo (otimizado)
+      const personaTagsPromises = personasData
+        .filter(persona => persona.id)
+        .map(async (persona) => {
+          const personaTagsData = await getPersonaTags(persona.id!)
+          return { id: persona.id!, tags: personaTagsData }
+        })
+
+      const personaTagsResults = await Promise.all(personaTagsPromises)
+      const newPersonaTags = new Map<string, Tag[]>()
+      personaTagsResults.forEach(({ id, tags }) => {
+        newPersonaTags.set(id, tags)
+      })
+      setPersonaTags(newPersonaTags)
+
+      // Filtrar personas pelo tipo de empresa e selecionar a primeira
+      const filteredPersonas = businessTypeData === 'Ambos'
+        ? personasData
+        : personasData.filter(p => p.business_type === businessTypeData)
+      if (filteredPersonas.length > 0) {
+        setSelectedPersona(filteredPersonas[0].id!)
       }
-    }
-    setPersonaTags(newPersonaTags)
 
-    // Filtrar personas pelo tipo de empresa e selecionar a primeira
-    const filteredPersonas = businessTypeData === 'Ambos'
-      ? personasData
-      : personasData.filter(p => p.business_type === businessTypeData)
-    if (filteredPersonas.length > 0) {
-      setSelectedPersona(filteredPersonas[0].id!)
+      // Selecionar primeiro objetivo se existir
+      if (objectivesData.length > 0) {
+        setSelectedObjective(objectivesData[0].id)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+    } finally {
+      setDataLoading(false)
     }
+  }
 
-    // Selecionar primeiro objetivo se existir
-    if (objectivesData.length > 0) {
-      setSelectedObjective(objectivesData[0].id)
+  // Funções para gerenciar webcam na interface de videochamada
+  const startWebcam = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false // Áudio é gerenciado separadamente pelo MediaRecorder
+      })
+      setWebcamStream(mediaStream)
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream
+      }
+      setIsCameraOn(true)
+    } catch (err) {
+      console.error('Erro ao acessar câmera:', err)
+      setIsCameraOn(false)
+    }
+  }
+
+  const stopWebcam = () => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop())
+      setWebcamStream(null)
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsCameraOn(false)
+  }
+
+  const toggleCamera = async () => {
+    if (isCameraOn) {
+      stopWebcam()
+    } else {
+      await startWebcam()
     }
   }
 
@@ -373,9 +428,11 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       return
     }
 
-    setShowConfig(false)
     setIsSimulating(true)
     setIsLoading(true)
+
+    // Iniciar webcam para interface de videochamada
+    startWebcam()
 
     try {
       // Buscar userId e companyId
@@ -599,6 +656,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
   const handleEndSession = async () => {
     console.log('🛑 Encerrando simulação...')
+
+    // Parar webcam
+    stopWebcam()
 
     // Parar gravação se estiver ativa
     if (mediaRecorderRef.current) {
@@ -1268,79 +1328,615 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
-      <div className="min-h-screen py-20 px-6 relative z-10">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className={`text-center mb-12 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          <h1 className="text-5xl md:text-6xl font-bold mb-4">
-            Treinamento de Roleplay
-          </h1>
-          <p className="text-xl text-gray-400">
-            Pratique suas habilidades de vendas com nosso cliente virtual inteligente.
-          </p>
-        </div>
 
-        {/* Session Info Card */}
-        <div className={`max-w-2xl mx-auto mb-8 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-            <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-8 border border-green-500/30">
-              {/* Contador de Créditos Mensais */}
-              {planUsage && (
-                <div className="flex justify-center mb-6">
-                  <div className={`px-4 py-2 rounded-xl flex items-center gap-3 ${
-                    planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                      ? 'bg-red-900/30 border border-red-500/40'
-                      : 'bg-green-900/30 border border-green-500/40'
-                  }`}>
-                    <Zap className={`w-5 h-5 ${
-                      planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                        ? 'text-red-400'
-                        : 'text-green-400'
-                    }`} />
-                    <div className="flex flex-col">
-                      <span className={`text-sm font-medium ${
-                        planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                          ? 'text-red-400'
-                          : 'text-green-400'
+      {/* Interface de Videochamada - Exibida durante a sessão ativa */}
+      {isSimulating && (
+        <div className="fixed inset-0 bg-[#1a1a1a] z-50 flex flex-col">
+          {/* Header minimalista */}
+          <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800">
+            <span className="text-white/60 text-sm">Roleplay em andamento</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowChatSidebar(!showChatSidebar)}
+                className={`p-2 rounded-lg transition-colors ${showChatSidebar ? 'bg-green-600/20 text-green-400' : 'hover:bg-gray-800 text-white/70'}`}
+                title="Mostrar/Ocultar Chat"
+              >
+                <MessageCircle size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 flex overflow-hidden">
+            {/* Área dos vídeos */}
+            <div className={`flex-1 flex items-center justify-center gap-4 p-6 transition-all ${showChatSidebar ? 'pr-0' : ''}`}>
+              {/* Ícone do Cliente Virtual */}
+              <div className="flex-1 max-w-[600px] aspect-video bg-gray-800 rounded-xl flex items-center justify-center relative overflow-hidden">
+                <img
+                  src="/icone-call.png"
+                  alt="Cliente Virtual"
+                  className="w-full h-full object-cover"
+                />
+                {isPlayingAudio && (
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2 text-green-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
+                    <Volume2 size={16} className="animate-pulse" />
+                    <span>Falando...</span>
+                  </div>
+                )}
+                {isLoading && !isPlayingAudio && (
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2 text-gray-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processando...</span>
+                  </div>
+                )}
+                <div className="absolute top-4 left-4 text-white/40 text-xs font-medium">Cliente Virtual</div>
+              </div>
+
+              {/* Webcam usuário */}
+              <div className="flex-1 max-w-[600px] aspect-video bg-gray-900 rounded-xl overflow-hidden relative">
+                {isCameraOn ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                    <UserCircle2 className="w-24 h-24 text-gray-600" />
+                  </div>
+                )}
+                {isRecording && (
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2 text-red-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    <span>Gravando...</span>
+                  </div>
+                )}
+                <div className="absolute top-4 left-4 text-white/40 text-xs font-medium">Você</div>
+              </div>
+            </div>
+
+            {/* Chat Sidebar */}
+            {showChatSidebar && (
+              <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col flex-shrink-0">
+                <div className="p-4 border-b border-gray-800 flex items-center gap-2">
+                  <MessageCircle size={18} className="text-green-400" />
+                  <h3 className="text-white font-medium">Chat da Simulação</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                  {messages.length === 0 ? (
+                    <p className="text-gray-500 text-sm text-center py-8">Aguardando início da conversa...</p>
+                  ) : (
+                    messages.map((msg, i) => (
+                      <div key={i} className={`p-3 rounded-lg text-sm ${
+                        msg.role === 'seller'
+                          ? 'bg-green-600/20 text-green-100 ml-4'
+                          : 'bg-gray-800 text-gray-100 mr-4'
                       }`}>
-                        Créditos este mês: {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
-                      </span>
-                      {planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used === planUsage.training?.credits?.limit - 1 && (
-                        <span className="text-xs text-yellow-400 font-semibold animate-pulse">
-                          ⚠️ Último crédito disponível!
+                        <span className="text-xs opacity-60 block mb-1">
+                          {msg.role === 'seller' ? 'Você' : 'Cliente'}
                         </span>
+                        {msg.text}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Controles */}
+          <div className="flex justify-center items-center gap-4 p-6 bg-[#1a1a1a] border-t border-gray-800">
+            {/* Botão Câmera */}
+            <button
+              onClick={toggleCamera}
+              className={`p-4 rounded-full transition-colors ${
+                isCameraOn
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+              }`}
+              title={isCameraOn ? 'Desligar câmera' : 'Ligar câmera'}
+            >
+              {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
+            </button>
+
+            {/* Botão Microfone */}
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isPlayingAudio || isLoading || showFinalizingMessage}
+              className={`p-4 rounded-full transition-colors ${
+                isRecording
+                  ? 'bg-green-500 text-white hover:bg-green-600'
+                  : 'bg-gray-700 hover:bg-gray-600 text-white'
+              } ${(isPlayingAudio || isLoading || showFinalizingMessage) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
+            >
+              {isRecording ? <Mic size={24} /> : <MicOff size={24} />}
+            </button>
+
+            {/* Botão Encerrar */}
+            <button
+              onClick={handleEndSession}
+              className="p-4 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+              title="Encerrar chamada"
+            >
+              <PhoneOff size={24} />
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      {/* Tela de Configuração - Layout integrado com fundo branco */}
+      <div className={`min-h-screen relative z-10 py-8 px-6 ${isSimulating ? 'hidden' : ''}`}>
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className={`mb-6 text-center ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+            <h1 className="text-3xl font-bold text-gray-900">Simulação de Vendas</h1>
+            <p className="text-gray-500 mt-1">
+              Pratique suas habilidades de vendas com nosso cliente virtual inteligente.
+            </p>
+          </div>
+
+          {/* Contador de Créditos Mensais */}
+          {planUsage && (
+            <div className="flex justify-center mb-6">
+              <div className={`px-4 py-2 rounded-xl flex items-center gap-3 ${
+                planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
+                  ? 'bg-red-100 border border-red-300'
+                  : 'bg-green-100 border border-green-300'
+              }`}>
+                <Zap className={`w-5 h-5 ${
+                  planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
+                    ? 'text-red-500'
+                    : 'text-green-500'
+                }`} />
+                <div className="flex flex-col">
+                  <span className={`text-sm font-medium ${
+                    planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
+                      ? 'text-red-600'
+                      : 'text-green-600'
+                  }`}>
+                    Créditos este mês: {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
+                  </span>
+                  {planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used === planUsage.training?.credits?.limit - 1 && (
+                    <span className="text-xs text-yellow-600 font-semibold animate-pulse">
+                      ⚠️ Último crédito disponível!
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Layout: Ícone de chamada na esquerda + Painel de config na direita */}
+          <div className="flex flex-col lg:flex-row gap-0">
+            {/* Esquerda - Ícone de Chamada (Botão de Iniciar) */}
+            <div className="hidden lg:flex lg:w-56 flex-shrink-0 items-start justify-center pt-20">
+              <div className="flex flex-col items-center">
+                <button
+                  onClick={handleStartSimulation}
+                  disabled={roleplayLimitReached || dataLoading}
+                  className={`w-44 h-44 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${
+                    roleplayLimitReached || dataLoading
+                      ? 'bg-gray-400 cursor-not-allowed opacity-60'
+                      : 'bg-green-600 hover:bg-green-500 hover:scale-105 hover:shadow-green-500/40 hover:shadow-2xl cursor-pointer'
+                  }`}
+                >
+                  <Phone className={`w-20 h-20 transition-colors duration-300 ${
+                    roleplayLimitReached || dataLoading ? 'text-gray-200' : 'text-white'
+                  }`} />
+                </button>
+                <p className={`text-sm mt-4 text-center font-medium ${
+                  roleplayLimitReached ? 'text-red-500' : dataLoading ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  {dataLoading ? 'Carregando...' : roleplayLimitReached ? 'Limite atingido' : 'Clique para iniciar'}
+                </p>
+              </div>
+            </div>
+
+            {/* Direita - Painel de Configuração (Branco) */}
+            <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              {/* Loading Skeleton */}
+              {dataLoading ? (
+                <div className="relative">
+                  {/* Animação de 3 bolinhas aparecendo uma de cada vez */}
+                  <div className="absolute inset-0 flex items-center justify-center z-10">
+                    <style dangerouslySetInnerHTML={{ __html: `
+                      @keyframes dotSequence {
+                        0%, 100% { opacity: 0; transform: scale(0.5); }
+                        20%, 80% { opacity: 1; transform: scale(1); }
+                      }
+                      .seq-dot-1 { animation: dotSequence 1.8s ease-in-out infinite; }
+                      .seq-dot-2 { animation: dotSequence 1.8s ease-in-out infinite; animation-delay: 0.3s; }
+                      .seq-dot-3 { animation: dotSequence 1.8s ease-in-out infinite; animation-delay: 0.6s; }
+                    `}} />
+                    <div className="flex gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full seq-dot-1" />
+                      <div className="w-3 h-3 bg-green-500 rounded-full seq-dot-2" />
+                      <div className="w-3 h-3 bg-green-500 rounded-full seq-dot-3" />
+                    </div>
+                  </div>
+                  {/* Skeleton de fundo */}
+                  <div className="animate-pulse opacity-50">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Coluna 1 - Skeleton */}
+                      <div className="space-y-4">
+                        <div className="h-4 bg-gray-200 rounded w-32" />
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                          <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
+                          <div className="h-2 bg-gray-200 rounded w-full mb-4" />
+                          <div className="h-16 bg-gray-200 rounded" />
+                        </div>
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                          <div className="h-4 bg-gray-200 rounded w-28 mb-3" />
+                          <div className="flex gap-2">
+                            {[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-gray-200 rounded w-20" />)}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Coluna 2 - Skeleton */}
+                      <div className="space-y-4">
+                        <div className="h-4 bg-gray-200 rounded w-40" />
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                          <div className="h-4 bg-gray-200 rounded w-20 mb-3" />
+                          <div className="space-y-2">
+                            {[1,2,3,4,5,6].map(i => <div key={i} className="h-12 bg-gray-200 rounded" />)}
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                          <div className="h-4 bg-gray-200 rounded w-20 mb-3" />
+                          <div className="space-y-2">
+                            {[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-gray-200 rounded" />)}
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                          <div className="h-4 bg-gray-200 rounded w-32 mb-3" />
+                          <div className="h-10 bg-gray-200 rounded" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="h-14 bg-gray-200 rounded-xl mt-4" />
+                  </div>
+                </div>
+              ) : (
+              <>
+              {/* Grid de 2 colunas internas */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Coluna 1 - Perfil do Cliente */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Perfil do Cliente</h3>
+
+                  {/* Idade do Cliente */}
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium text-gray-700">Idade do Cliente</label>
+                      <span className="text-lg font-bold text-green-600">{age} anos</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="18"
+                      max="60"
+                      value={age}
+                      onChange={(e) => setAge(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
+                    />
+                    <div className="flex justify-between text-xs text-gray-400 mt-2">
+                      <span>18</span>
+                      <span>60</span>
+                    </div>
+
+                    {/* Info da faixa etária */}
+                    <div className="mt-3 bg-white rounded-lg p-2 border border-gray-200">
+                      {age >= 18 && age <= 24 && (
+                        <div>
+                          <p className="text-xs font-medium text-blue-600 mb-1">18 a 24 anos</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Informal e moderno</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Aceita novidades</p>
+                        </div>
+                      )}
+                      {age >= 25 && age <= 34 && (
+                        <div>
+                          <p className="text-xs font-medium text-green-600 mb-1">25 a 34 anos</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Pragmático e orientado a resultados</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Foco em ROI • Aceita risco calculado</p>
+                        </div>
+                      )}
+                      {age >= 35 && age <= 44 && (
+                        <div>
+                          <p className="text-xs font-medium text-yellow-600 mb-1">35 a 44 anos</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Valoriza compliance • Cauteloso</p>
+                        </div>
+                      )}
+                      {age >= 45 && age <= 60 && (
+                        <div>
+                          <p className="text-xs font-medium text-orange-600 mb-1">45 a 60 anos</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Conservador e formal</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Foco em segurança • Avesso a riscos</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Temperamento */}
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                    <label className="text-sm font-medium text-gray-700 mb-3 block">Temperamento</label>
+                    <div className="flex flex-wrap gap-2">
+                      {temperaments.map((temp) => (
+                        <button
+                          key={temp}
+                          onClick={() => setTemperament(temp)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            temperament === temp
+                              ? 'bg-green-500 text-white border border-green-500'
+                              : 'bg-white text-gray-600 border border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {temp}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Info do temperamento */}
+                    <div className="mt-3 bg-white rounded-lg p-2 border border-gray-200">
+                      {temperament === 'Analítico' && (
+                        <div>
+                          <p className="text-xs font-medium text-green-600 mb-1">Analítico</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Formal, racional, calmo e preciso</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Dados concretos, estatísticas</p>
+                        </div>
+                      )}
+                      {temperament === 'Empático' && (
+                        <div>
+                          <p className="text-xs font-medium text-pink-600 mb-1">Empático</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Afável, próximo, gentil e emocional</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Histórias reais, propósito</p>
+                        </div>
+                      )}
+                      {temperament === 'Determinado' && (
+                        <div>
+                          <p className="text-xs font-medium text-red-600 mb-1">Determinado</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Soluções rápidas, eficiência</p>
+                        </div>
+                      )}
+                      {temperament === 'Indeciso' && (
+                        <div>
+                          <p className="text-xs font-medium text-yellow-600 mb-1">Indeciso</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Hesitante, cauteloso e questionador</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Depoimentos, garantias, segurança</p>
+                        </div>
+                      )}
+                      {temperament === 'Sociável' && (
+                        <div>
+                          <p className="text-xs font-medium text-cyan-600 mb-1">Sociável</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Leve, animado, entusiasmado e informal</p>
+                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Amizade, humor, energia positiva</p>
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
-              )}
 
-              <div className="flex justify-center gap-4 mb-6">
-                {!isSimulating && (
-                  <button
-                    onClick={() => setShowConfig(true)}
-                    disabled={roleplayLimitReached}
-                    className={`px-8 py-4 rounded-2xl font-semibold text-lg flex items-center gap-3 transition-transform ${
-                      roleplayLimitReached
-                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-green-600 to-green-500 hover:scale-105 glow-green'
-                    }`}
-                  >
-                    {roleplayLimitReached ? (
-                      <Lock className="w-5 h-5" />
+                {/* Coluna 2 - Cenário do Roleplay */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Cenário do Roleplay</h3>
+
+                  {/* Persona */}
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                    <span className="text-sm font-medium text-gray-700 mb-3 block">Persona</span>
+                    {dataLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
+                      </div>
+                    ) : (businessType === 'Ambos' ? personas : personas.filter(p => p.business_type === businessType)).length === 0 ? (
+                      <div className="text-gray-500 text-sm py-4 text-center">
+                        Nenhuma persona {businessType} cadastrada.
+                      </div>
                     ) : (
-                      <Play className="w-5 h-5" />
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                        {(() => {
+                          const { sortedGroups, noTagPersonas } = getGroupedPersonas()
+                          return (
+                            <>
+                              {sortedGroups.map(({ tag, personas: groupPersonas }) => (
+                                <div key={tag.id} className="space-y-2">
+                                  <div className="flex items-center gap-2 py-1">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">{tag.name}</span>
+                                  </div>
+                                  {groupPersonas.map((persona) => (
+                                    <div
+                                      key={persona.id}
+                                      onClick={() => setSelectedPersona(persona.id!)}
+                                      className={`cursor-pointer rounded-lg p-2 border transition-all ${
+                                        selectedPersona === persona.id
+                                          ? 'bg-green-50 border-green-500'
+                                          : 'bg-white border-gray-200 hover:border-gray-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                          selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                        }`}>
+                                          <UserCircle2 className={`w-4 h-4 ${selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-medium text-gray-900 truncate">
+                                            {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
+                                          </p>
+                                          <p className="text-[10px] text-gray-500 truncate">
+                                            {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
+                                          </p>
+                                        </div>
+                                        {selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                              {noTagPersonas.length > 0 && (
+                                <div className="space-y-2">
+                                  {sortedGroups.length > 0 && (
+                                    <div className="flex items-center gap-2 py-1">
+                                      <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Sem Etiqueta</span>
+                                    </div>
+                                  )}
+                                  {noTagPersonas.map((persona) => (
+                                    <div
+                                      key={persona.id}
+                                      onClick={() => setSelectedPersona(persona.id!)}
+                                      className={`cursor-pointer rounded-lg p-2 border transition-all ${
+                                        selectedPersona === persona.id
+                                          ? 'bg-green-50 border-green-500'
+                                          : 'bg-white border-gray-200 hover:border-gray-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                          selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                        }`}>
+                                          <UserCircle2 className={`w-4 h-4 ${selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-medium text-gray-900 truncate">
+                                            {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
+                                          </p>
+                                          <p className="text-[10px] text-gray-500 truncate">
+                                            {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
+                                          </p>
+                                        </div>
+                                        {selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </div>
                     )}
-                    {roleplayLimitReached ? 'Limite Semanal Atingido' : 'Iniciar Simulação'}
-                  </button>
-                )}
+                  </div>
+
+                  {/* Objeções */}
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-gray-700">Objeções</span>
+                      {!dataLoading && <span className="text-xs text-green-600 font-medium">{selectedObjections.length} selecionadas</span>}
+                    </div>
+                    {dataLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
+                      </div>
+                    ) : objections.length === 0 ? (
+                      <div className="text-gray-500 text-sm py-4 text-center">Nenhuma objeção cadastrada.</div>
+                    ) : (
+                      <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                        {objections.map((objection) => (
+                          <label
+                            key={objection.id}
+                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
+                              selectedObjections.includes(objection.id)
+                                ? 'bg-green-50 border border-green-500'
+                                : 'bg-white border border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div
+                              onClick={(e) => { e.preventDefault(); toggleObjection(objection.id) }}
+                              className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all ${
+                                selectedObjections.includes(objection.id)
+                                  ? 'bg-green-500 border-green-500'
+                                  : 'border-gray-300'
+                              }`}
+                            >
+                              {selectedObjections.includes(objection.id) && (
+                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-700 truncate">{objection.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Objetivo do Roleplay */}
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                    <span className="text-sm font-medium text-gray-700 mb-3 block">
+                      Objetivo do Roleplay <span className="text-red-500">*</span>
+                    </span>
+                    {dataLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
+                      </div>
+                    ) : objectives.length === 0 ? (
+                      <div className="text-gray-500 text-sm py-4 text-center">Nenhum objetivo cadastrado.</div>
+                    ) : (
+                      <select
+                        value={selectedObjective}
+                        onChange={(e) => setSelectedObjective(e.target.value)}
+                        className="w-full bg-green-600 text-white p-2.5 rounded-lg text-sm font-medium cursor-pointer hover:bg-green-500 transition-colors"
+                      >
+                        {objectives.map((objective) => (
+                          <option key={objective.id} value={objective.id}>
+                            {objective.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
               </div>
 
+              {/* Aviso de configuração incompleta */}
+              {!dataLoading && (!selectedPersona || selectedObjections.length === 0 || !selectedObjective) && (
+                <div className="mt-4 bg-yellow-50 rounded-lg border border-yellow-200 p-3">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-700">
+                      {!selectedPersona && !selectedObjective && selectedObjections.length === 0
+                        ? 'Selecione Persona, Objeção e Objetivo'
+                        : !selectedPersona
+                        ? 'Selecione uma Persona'
+                        : selectedObjections.length === 0
+                        ? 'Selecione pelo menos uma Objeção'
+                        : 'Selecione um Objetivo'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Botão Iniciar Chamada - Apenas Mobile */}
+              <button
+                onClick={handleStartSimulation}
+                disabled={dataLoading || roleplayLimitReached || !selectedPersona || selectedObjections.length === 0 || !selectedObjective}
+                className={`lg:hidden w-full mt-4 py-4 rounded-xl flex items-center justify-center gap-3 font-semibold text-lg transition-all ${
+                  dataLoading || roleplayLimitReached || !selectedPersona || selectedObjections.length === 0 || !selectedObjective
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-500 text-white hover:scale-[1.02]'
+                }`}
+              >
+                {roleplayLimitReached ? (
+                  <>
+                    <Lock className="w-6 h-6" />
+                    Limite Atingido
+                  </>
+                ) : (
+                  <>
+                    <Phone className="w-6 h-6" />
+                    Iniciar Chamada
+                  </>
+                )}
+              </button>
+
               {/* Data e Hora Atual */}
-              <div className="flex items-center justify-center gap-2 text-gray-300 pt-4 border-t border-green-500/20">
-                <Calendar className="w-5 h-5 text-green-400" />
-                <span className="text-sm">
+              <div className="flex items-center justify-center gap-2 text-gray-400 pt-4 mt-4 border-t border-gray-200">
+                <Calendar className="w-4 h-4 text-green-500" />
+                <span className="text-sm text-gray-500">
                   {new Date().toLocaleDateString('pt-BR', {
                     day: '2-digit',
                     month: '2-digit',
@@ -1353,671 +1949,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   })}
                 </span>
               </div>
+              </>
+              )}
             </div>
           </div>
         </div>
-
-        {/* Main Chat Section - Centralizado */}
-        <div className="flex justify-center max-w-3xl mx-auto">
-          {/* Chat da Simulação */}
-          <div className={`w-full ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-green-500/20">
-                  <MessageCircle className="w-5 h-5 text-green-400" />
-                  <h3 className="text-xl font-bold">Chat da Simulação</h3>
-                </div>
-
-                <div className="space-y-4 mb-4 h-96 overflow-y-auto pr-2">
-                  {/* Real messages from OpenAI Assistant */}
-                  {messages.map((msg, index) => (
-                    <div
-                      key={index}
-                      className={`flex gap-3 ${msg.role === 'seller' ? 'justify-end' : ''} animate-slide-up`}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      {msg.role === 'client' && (
-                        <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                          <User className="w-4 h-4 text-green-400" />
-                        </div>
-                      )}
-                      <div className={`flex-1 ${msg.role === 'seller' ? 'flex flex-col items-end' : ''}`}>
-                        <div className="text-xs text-gray-400 mb-1">
-                          {msg.role === 'client' ? 'Cliente virtual (IA)' : 'Vendedor (você)'}
-                        </div>
-                        <div
-                          className={`${
-                            msg.role === 'client'
-                              ? 'bg-gray-800/50 rounded-2xl rounded-tl-none'
-                              : `${
-                                  msg.text === lastUserMessage && lastUserMessage !== ''
-                                    ? 'bg-gradient-to-r from-green-600/30 to-green-500/30 border border-green-500/40'
-                                    : 'bg-green-600/20'
-                                } rounded-2xl rounded-tr-none max-w-md`
-                          } p-4 text-sm text-gray-300 transition-all duration-300`}
-                        >
-                          {msg.text}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Loading indicator */}
-                  {isLoading && (
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                        <User className="w-4 h-4 text-green-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-400 mb-1">Cliente virtual (IA)</div>
-                        <div className="bg-gray-800/50 rounded-2xl rounded-tl-none p-4 text-sm text-gray-300">
-                          <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Audio playing indicator */}
-                  {isPlayingAudio && (
-                    <div className="flex items-center justify-center py-2">
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 rounded-full">
-                        <Volume2 className="w-4 h-4 text-green-400 animate-pulse" />
-                        <span className="text-xs text-green-400">Cliente falando...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recording indicator */}
-                  {isRecording && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-center">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-red-600/20 rounded-full animate-pulse">
-                          <Mic className="w-4 h-4 text-red-400" />
-                          <span className="text-xs text-red-400">🎤 Gravando...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Status da transcrição - sempre visível quando tem conteúdo */}
-                  {currentTranscription && (
-                    <div className="mx-4 animate-slide-up">
-                      <div className={`p-4 rounded-xl border transition-all duration-300 ${
-                        currentTranscription.includes('✅')
-                          ? 'bg-green-900/20 border-green-500/30 shadow-lg shadow-green-500/10'
-                          : currentTranscription.includes('📤')
-                          ? 'bg-blue-900/20 border-blue-500/30 shadow-lg shadow-blue-500/10'
-                          : currentTranscription.includes('❌')
-                          ? 'bg-red-900/20 border-red-500/30 shadow-lg shadow-red-500/10'
-                          : 'bg-gray-800/50 border-green-500/20'
-                      }`}>
-                        <p className="text-sm text-center font-medium">
-                          {currentTranscription}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mensagem de Finalização Automática */}
-                  {showFinalizingMessage && (
-                    <div className="mx-4 animate-slide-up">
-                      <div className="p-4 rounded-xl border bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-yellow-500/40 shadow-lg shadow-yellow-500/20">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="w-5 h-5 text-yellow-400 animate-pulse" />
-                            <p className="text-sm font-semibold text-yellow-400">
-                              Roleplay Finalizado pela IA
-                            </p>
-                          </div>
-                          <p className="text-xs text-gray-300 text-center">
-                            Finalizando automaticamente...
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Empty state when no simulation */}
-                  {!isSimulating && messages.length === 0 && (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-gray-500 text-sm">Clique em "Iniciar Simulação" para começar</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-center gap-2 pt-4 border-t border-green-500/20">
-                  {/* Botões de controle de gravação */}
-                  {isSimulating && (
-                    <div className="flex items-center gap-3">
-                      {isPlayingAudio && (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 rounded-full">
-                          <Volume2 className="w-4 h-4 text-green-400 animate-pulse" />
-                          <span className="text-sm text-green-400">Aguarde o cliente terminar...</span>
-                        </div>
-                      )}
-
-                      {isLoading && !isRecording && !isPlayingAudio && (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-600/20 rounded-full">
-                          <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                          </div>
-                          <span className="text-sm text-gray-400">Processando...</span>
-                        </div>
-                      )}
-
-                      {/* Container flex para botões lado a lado */}
-                      <div className="flex items-center gap-4">
-                        {/* Botão de Iniciar Gravação / Finalizar Fala */}
-                        {!isPlayingAudio && !isRecording && !isLoading && (
-                          <button
-                            onClick={startRecording}
-                            disabled={showFinalizingMessage}
-                            className={`p-4 border rounded-full transition-all ${
-                              showFinalizingMessage
-                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
-                                : 'bg-green-600/20 border-green-500/30 hover:bg-green-600/30'
-                            }`}
-                            title={showFinalizingMessage ? "Finalizando sessão..." : "Clique para começar a falar"}
-                          >
-                            <Mic className={`w-6 h-6 ${showFinalizingMessage ? 'text-gray-500' : 'text-green-400'}`} />
-                          </button>
-                        )}
-
-                        {isRecording && (
-                          <button
-                            onClick={stopRecording}
-                            disabled={showFinalizingMessage}
-                            className={`px-6 py-3 border rounded-xl transition-all flex items-center gap-2 ${
-                              showFinalizingMessage
-                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
-                                : 'bg-red-600/20 border-red-500/30 hover:bg-red-600/30'
-                            }`}
-                            title={showFinalizingMessage ? "Finalizando sessão..." : "Clique para finalizar e enviar"}
-                          >
-                            <MicOff className={`w-5 h-5 ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`} />
-                            <span className={`text-sm font-medium ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`}>Finalizar Fala</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {!isSimulating && (
-                    <p className="text-gray-500 text-sm">Clique em "Iniciar Simulação" para começar a conversa por voz</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Configuration Modal */}
-        {showConfig && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-start justify-center pt-24 px-6 pb-6">
-            {/* Container principal */}
-            <div className="w-full max-w-5xl max-h-[calc(100vh-120px)] bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden flex flex-col shadow-2xl">
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
-                <div>
-                  <h1 className="text-xl font-bold text-white">Configuração da Sessão</h1>
-                  <p className="text-gray-500 text-sm">Configure os parâmetros do seu roleplay</p>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowConfig(false);
-                  }}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                  type="button"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Content - scrollable */}
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Coluna Esquerda - Cliente */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Perfil do Cliente</h3>
-
-                    {/* Idade do Cliente */}
-                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <label className="text-sm font-medium text-gray-300">Idade do Cliente</label>
-                        <span className="text-lg font-bold text-green-400">{age} anos</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="18"
-                        max="60"
-                        value={age}
-                        onChange={(e) => setAge(Number(e.target.value))}
-                        className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-green-500"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500 mt-2">
-                        <span>18</span>
-                        <span>60</span>
-                      </div>
-
-                      {/* Info da faixa etária */}
-                      <div className="mt-4 bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-                        {age >= 18 && age <= 24 && (
-                          <div>
-                            <p className="text-sm font-medium text-blue-400 mb-2">18 a 24 anos</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Tom:</span> Informal e moderno</p>
-                              <p><span className="text-gray-300">Comportamento:</span> Aceita novidades • Referências digitais</p>
-                            </div>
-                          </div>
-                        )}
-                        {age >= 25 && age <= 34 && (
-                          <div>
-                            <p className="text-sm font-medium text-green-400 mb-2">25 a 34 anos</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Tom:</span> Pragmático e orientado a resultados</p>
-                              <p><span className="text-gray-300">Comportamento:</span> Foco em ROI • Aceita risco calculado</p>
-                            </div>
-                          </div>
-                        )}
-                        {age >= 35 && age <= 44 && (
-                          <div>
-                            <p className="text-sm font-medium text-yellow-400 mb-2">35 a 44 anos</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
-                              <p><span className="text-gray-300">Comportamento:</span> Valoriza compliance • Cauteloso</p>
-                            </div>
-                          </div>
-                        )}
-                        {age >= 45 && age <= 60 && (
-                          <div>
-                            <p className="text-sm font-medium text-orange-400 mb-2">45 a 60 anos</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Tom:</span> Conservador e formal</p>
-                              <p><span className="text-gray-300">Comportamento:</span> Foco em segurança • Avesso a riscos</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Temperamento */}
-                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                      <label className="text-sm font-medium text-gray-300 mb-3 block">Temperamento</label>
-                      <div className="flex flex-wrap gap-2">
-                        {temperaments.map((temp) => (
-                          <button
-                            key={temp}
-                            onClick={() => setTemperament(temp)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                              temperament === temp
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                                : 'bg-gray-800/50 text-gray-400 border border-gray-700 hover:border-gray-600 hover:text-gray-300'
-                            }`}
-                          >
-                            {temp}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Info do temperamento */}
-                      <div className="mt-4 bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-                        {temperament === 'Analítico' && (
-                          <div>
-                            <p className="text-sm font-medium text-green-400 mb-2">Analítico</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Estilo:</span> Formal, racional, calmo e preciso</p>
-                              <p><span className="text-gray-300">Gatilhos:</span> Dados concretos, estatísticas, provas de eficácia</p>
-                            </div>
-                          </div>
-                        )}
-                        {temperament === 'Empático' && (
-                          <div>
-                            <p className="text-sm font-medium text-pink-400 mb-2">Empático</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Estilo:</span> Afável, próximo, gentil e emocional</p>
-                              <p><span className="text-gray-300">Gatilhos:</span> Histórias reais, propósito, apoio humano</p>
-                            </div>
-                          </div>
-                        )}
-                        {temperament === 'Determinado' && (
-                          <div>
-                            <p className="text-sm font-medium text-red-400 mb-2">Determinado</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
-                              <p><span className="text-gray-300">Gatilhos:</span> Soluções rápidas, eficiência, resultado imediato</p>
-                            </div>
-                          </div>
-                        )}
-                        {temperament === 'Indeciso' && (
-                          <div>
-                            <p className="text-sm font-medium text-yellow-400 mb-2">Indeciso</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Estilo:</span> Hesitante, cauteloso e questionador</p>
-                              <p><span className="text-gray-300">Gatilhos:</span> Depoimentos, garantias, segurança, prova social</p>
-                            </div>
-                          </div>
-                        )}
-                        {temperament === 'Sociável' && (
-                          <div>
-                            <p className="text-sm font-medium text-cyan-400 mb-2">Sociável</p>
-                            <div className="space-y-1 text-xs text-gray-400">
-                              <p><span className="text-gray-300">Estilo:</span> Leve, animado, entusiasmado e informal</p>
-                              <p><span className="text-gray-300">Gatilhos:</span> Amizade, humor, interesse genuíno, energia positiva</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Coluna Direita - Cenário */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Cenário do Roleplay</h3>
-
-                    {/* Persona */}
-                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                      <label className="text-sm font-medium text-gray-300 mb-3 block">Persona</label>
-                      {(businessType === 'Ambos' ? personas : personas.filter(p => p.business_type === businessType)).length === 0 ? (
-                        <div className="text-gray-500 text-sm py-4 text-center">
-                          Nenhuma persona {businessType} cadastrada.
-                        </div>
-                      ) : (
-                        <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
-                          {(() => {
-                            const { sortedGroups, noTagPersonas } = getGroupedPersonas()
-                            return (
-                              <>
-                                {sortedGroups.map(({ tag, personas: groupPersonas }) => (
-                                  <div key={tag.id} className="space-y-2">
-                                    <div className="flex items-center gap-2 py-1">
-                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
-                                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{tag.name}</span>
-                                    </div>
-                                    {groupPersonas.map((persona) => (
-                                      <div
-                                        key={persona.id}
-                                        onClick={() => setSelectedPersona(persona.id!)}
-                                        className={`cursor-pointer rounded-lg p-3 border transition-all ${
-                                          selectedPersona === persona.id
-                                            ? 'bg-green-500/10 border-green-500/50'
-                                            : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                            selectedPersona === persona.id ? 'bg-green-500/20' : 'bg-gray-800'
-                                          }`}>
-                                            <UserCircle2 className={`w-5 h-5 ${selectedPersona === persona.id ? 'text-green-400' : 'text-gray-500'}`} />
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-white truncate">
-                                              {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
-                                            </p>
-                                            {personaTags.get(persona.id!) && personaTags.get(persona.id!)!.length > 0 && (
-                                              <div className="flex flex-wrap gap-1 mt-1">
-                                                {personaTags.get(persona.id!)!.map((t) => (
-                                                  <span key={t.id} className="text-[10px] px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
-                                                ))}
-                                              </div>
-                                            )}
-                                            <p className="text-xs text-gray-500 mt-1 truncate">
-                                              {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
-                                            </p>
-                                          </div>
-                                          {selectedPersona === persona.id && <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />}
-                                          <button
-                                            onClick={(e) => { e.stopPropagation(); setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!) }}
-                                            className="p-1 text-gray-500 hover:text-gray-300"
-                                          >
-                                            {expandedPersonaId === persona.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                          </button>
-                                        </div>
-                                        {expandedPersonaId === persona.id && (
-                                          <div className="mt-3 pt-3 border-t border-gray-700 space-y-1 text-xs text-gray-400">
-                                            {persona.business_type === 'B2B' ? (
-                                              <>
-                                                <p><span className="text-gray-300">Empresa:</span> {(persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type}</p>
-                                                <p><span className="text-gray-300">Contexto:</span> {(persona as any).contexto || (persona as any).dores || (persona as PersonaB2B).business_challenges}</p>
-                                                <p><span className="text-gray-300">Busca:</span> {(persona as any).busca || (persona as PersonaB2B).company_goals}</p>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <p><span className="text-gray-300">Busca:</span> {(persona as any).busca || (persona as PersonaB2C).what_seeks}</p>
-                                                <p><span className="text-gray-300">Dores:</span> {(persona as any).dores || (persona as PersonaB2C).main_pains}</p>
-                                              </>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ))}
-                                {noTagPersonas.length > 0 && (
-                                  <div className="space-y-2">
-                                    {sortedGroups.length > 0 && (
-                                      <div className="flex items-center gap-2 py-1">
-                                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Sem Etiqueta</span>
-                                      </div>
-                                    )}
-                                    {noTagPersonas.map((persona) => (
-                                      <div
-                                        key={persona.id}
-                                        onClick={() => setSelectedPersona(persona.id!)}
-                                        className={`cursor-pointer rounded-lg p-3 border transition-all ${
-                                          selectedPersona === persona.id
-                                            ? 'bg-green-500/10 border-green-500/50'
-                                            : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                            selectedPersona === persona.id ? 'bg-green-500/20' : 'bg-gray-800'
-                                          }`}>
-                                            <UserCircle2 className={`w-5 h-5 ${selectedPersona === persona.id ? 'text-green-400' : 'text-gray-500'}`} />
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-white truncate">
-                                              {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
-                                            </p>
-                                            <p className="text-xs text-gray-500 mt-1 truncate">
-                                              {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
-                                            </p>
-                                          </div>
-                                          {selectedPersona === persona.id && <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />}
-                                          <button
-                                            onClick={(e) => { e.stopPropagation(); setExpandedPersonaId(expandedPersonaId === persona.id ? null : persona.id!) }}
-                                            className="p-1 text-gray-500 hover:text-gray-300"
-                                          >
-                                            {expandedPersonaId === persona.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                          </button>
-                                        </div>
-                                        {expandedPersonaId === persona.id && (
-                                          <div className="mt-3 pt-3 border-t border-gray-700 space-y-1 text-xs text-gray-400">
-                                            {persona.business_type === 'B2B' ? (
-                                              <>
-                                                <p><span className="text-gray-300">Empresa:</span> {(persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type}</p>
-                                                <p><span className="text-gray-300">Contexto:</span> {(persona as any).contexto || (persona as any).dores || (persona as PersonaB2B).business_challenges}</p>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <p><span className="text-gray-300">Busca:</span> {(persona as any).busca || (persona as PersonaB2C).what_seeks}</p>
-                                                <p><span className="text-gray-300">Dores:</span> {(persona as any).dores || (persona as PersonaB2C).main_pains}</p>
-                                              </>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </>
-                            )
-                          })()}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Objeções */}
-                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <label className="text-sm font-medium text-gray-300">Objeções</label>
-                        <span className="text-xs text-green-400 font-medium">{selectedObjections.length} selecionadas</span>
-                      </div>
-                      {objections.length === 0 ? (
-                        <div className="text-gray-500 text-sm py-4 text-center">Nenhuma objeção cadastrada.</div>
-                      ) : (
-                        <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                          {objections.map((objection) => (
-                            <div
-                              key={objection.id}
-                              className={`group rounded-lg p-3 border transition-all ${
-                                selectedObjections.includes(objection.id)
-                                  ? 'bg-green-500/10 border-green-500/50'
-                                  : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div
-                                  onClick={() => toggleObjection(objection.id)}
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all mt-0.5 ${
-                                    selectedObjections.includes(objection.id)
-                                      ? 'bg-green-500 border-green-500'
-                                      : 'border-gray-600 group-hover:border-gray-500'
-                                  }`}
-                                >
-                                  {selectedObjections.includes(objection.id) && (
-                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleObjection(objection.id)}>
-                                  <span className={`text-sm ${expandedObjectionId === objection.id ? '' : 'truncate block'} ${
-                                    selectedObjections.includes(objection.id) ? 'text-white font-medium' : 'text-gray-300'
-                                  }`}>{objection.name}</span>
-                                  {expandedObjectionId === objection.id && objection.rebuttals && objection.rebuttals.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-gray-700 space-y-1">
-                                      <p className="text-xs text-green-400 font-medium">Rebatidas:</p>
-                                      {objection.rebuttals.map((rebuttal, idx) => (
-                                        <p key={idx} className="text-xs text-gray-400">• {rebuttal}</p>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setExpandedObjectionId(expandedObjectionId === objection.id ? null : objection.id) }}
-                                  className="p-1 text-gray-500 hover:text-gray-300 flex-shrink-0"
-                                >
-                                  {expandedObjectionId === objection.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Objetivo */}
-                    <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                      <label className="text-sm font-medium text-gray-300 mb-3 block">
-                        Objetivo do Roleplay <span className="text-red-400">*</span>
-                      </label>
-                      {objectives.length === 0 ? (
-                        <div className="text-gray-500 text-sm py-4 text-center">Nenhum objetivo cadastrado.</div>
-                      ) : (
-                        <div className="space-y-2">
-                          {objectives.map((objective) => (
-                            <div
-                              key={objective.id}
-                              onClick={() => setSelectedObjective(objective.id)}
-                              className={`cursor-pointer rounded-lg p-3 border transition-all ${
-                                selectedObjective === objective.id
-                                  ? 'bg-green-500/10 border-green-500/50'
-                                  : 'bg-gray-800/30 border-gray-700 hover:border-gray-600'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                                  selectedObjective === objective.id ? 'bg-green-500 border-green-500' : 'border-gray-600'
-                                }`}>
-                                  {selectedObjective === objective.id && (
-                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <p className={`text-sm font-medium ${selectedObjective === objective.id ? 'text-white' : 'text-gray-300'}`}>
-                                    {objective.name}
-                                  </p>
-                                  {objective.description && (
-                                    <p className="text-xs text-gray-500 mt-1">{objective.description}</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Aviso de configuração incompleta */}
-                {(!selectedPersona || selectedObjections.length === 0 || !selectedObjective) && (
-                  <div className="mt-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30 p-3">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-yellow-400">
-                          {!selectedPersona && !selectedObjective && selectedObjections.length === 0
-                            ? 'Selecione uma Persona, Objeção e Objetivo'
-                            : !selectedPersona
-                            ? 'Selecione uma Persona'
-                            : selectedObjections.length === 0
-                            ? 'Selecione pelo menos uma Objeção'
-                            : 'Selecione um Objetivo'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer com botões */}
-              <div className="flex gap-3 px-6 py-4 border-t border-gray-800 bg-gray-900/50 flex-shrink-0">
-                <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowConfig(false); }}
-                  type="button"
-                  className="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg font-medium hover:bg-gray-700 transition-colors text-gray-300 text-sm"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleStartSimulation}
-                  type="button"
-                  disabled={!selectedPersona || selectedObjections.length === 0 || !selectedObjective}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all text-sm ${
-                    !selectedPersona || selectedObjections.length === 0 || !selectedObjective
-                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-500 text-white'
-                  }`}
-                >
-                  Iniciar Roleplay
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+      </div>
 
         {/* Modal de Loading - Avaliação */}
         {isEvaluating && (
@@ -2400,8 +2337,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
             </div>
           </div>
         )}
-      </div>
-    </div>
     </>
   )
 }

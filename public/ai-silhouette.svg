@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" fill="none">
+  <defs>
+    <linearGradient id="silhouetteGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6b7280;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#374151;stop-opacity:0.6" />
+    </linearGradient>
+  </defs>
+  <!-- Head -->
+  <ellipse cx="100" cy="70" rx="45" ry="55" fill="url(#silhouetteGradient)"/>
+  <!-- Neck -->
+  <rect x="80" y="120" width="40" height="30" fill="url(#silhouetteGradient)"/>
+  <!-- Shoulders and body -->
+  <path d="M 20 300 Q 20 180, 100 150 Q 180 180, 180 300 Z" fill="url(#silhouetteGradient)"/>
+</svg>

@@ -13,7 +13,13 @@ import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
 import FollowUpHistoryView from './FollowUpHistoryView'
 import MeetAnalysisView from './MeetAnalysisView'
-import { MessageCircle, Users, BarChart3, Target, Clock, User, Sparkles, Settings, LogOut, Link2, Home, Zap, Lock, FileSearch, History, Video } from 'lucide-react'
+import Sidebar from './dashboard/Sidebar'
+import StatsPanel from './dashboard/StatsPanel'
+import TopBanner from './dashboard/TopBanner'
+import FeatureCard from './dashboard/FeatureCard'
+import StreakIndicator from './dashboard/StreakIndicator'
+import { useTrainingStreak } from '@/hooks/useTrainingStreak'
+import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -38,13 +44,26 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
   const chatRef = useRef<ChatInterfaceHandle>(null)
+
+  // Performance data state
+  const [performanceData, setPerformanceData] = useState<{
+    overallAverage: number
+    totalSessions: number
+    spinScores: { S: number, P: number, I: number, N: number }
+  } | null>(null)
+  const [performanceLoading, setPerformanceLoading] = useState(true)
+
+  // Training streak hook
+  const { streak, loading: streakLoading } = useTrainingStreak(userId)
 
   // Hook para verificar limites do plano
   const {
@@ -71,8 +90,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [hasFollowUp, setHasFollowUp] = useState(true)
   const [showSelectionPlanModal, setShowSelectionPlanModal] = useState(false)
 
-  // Sempre usar tema Ramppy (verde espacial) para TODAS as empresas
-  const isRamppy = true
+  // Scroll-based navigation
+  const mainRef = useRef<HTMLElement>(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const lastScrollTime = useRef<number>(0)
 
   useEffect(() => {
     setMounted(true)
@@ -110,6 +131,223 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     checkFeatureAccess()
   }, [checkChatIAAccess, checkPDIAccess, checkFollowUpAccess])
 
+  // Scroll-based page navigation
+  const accumulatedScroll = useRef(0)
+  const scrollThreshold = 500 // Accumulated scroll needed to trigger page change (increased for less sensitivity)
+
+  useEffect(() => {
+    const getPageSequence = (): Array<typeof currentView> => {
+      const isAdmin = userRole?.toLowerCase() === 'admin'
+      const isGestor = userRole?.toLowerCase() === 'gestor'
+
+      const pages: Array<typeof currentView> = ['home', 'roleplay', 'perfil', 'historico']
+      if (hasPDI) pages.push('pdi')
+      pages.push('followup', 'followup-history')
+      if (isAdmin || isGestor) pages.push('roleplay-links')
+
+      return pages
+    }
+
+    const handleWheel = (e: WheelEvent) => {
+      const main = mainRef.current
+      if (!main || isTransitioning) return
+
+      // Don't trigger on chat view (has its own scrolling)
+      if (currentView === 'chat') return
+
+      const isAtBottom = main.scrollHeight - main.scrollTop <= main.clientHeight + 20
+      const isAtTop = main.scrollTop <= 20
+
+      const pages = getPageSequence()
+      const currentIndex = pages.indexOf(currentView)
+
+      // Accumulate scroll when at boundaries
+      if (e.deltaY > 0 && isAtBottom && currentIndex < pages.length - 1) {
+        e.preventDefault()
+        accumulatedScroll.current += e.deltaY
+
+        if (accumulatedScroll.current >= scrollThreshold) {
+          accumulatedScroll.current = 0
+          setIsTransitioning(true)
+
+          const nextView = pages[currentIndex + 1]
+
+          // Wait for fade out, then change view and scroll
+          setTimeout(() => {
+            if (mainRef.current) mainRef.current.scrollTop = 0
+            setCurrentView(nextView)
+            // Wait a frame then fade in
+            requestAnimationFrame(() => {
+              setIsTransitioning(false)
+            })
+          }, 150)
+        }
+      } else if (e.deltaY < 0 && isAtTop && currentIndex > 0) {
+        e.preventDefault()
+        accumulatedScroll.current += Math.abs(e.deltaY)
+
+        if (accumulatedScroll.current >= scrollThreshold) {
+          accumulatedScroll.current = 0
+          setIsTransitioning(true)
+
+          const prevView = pages[currentIndex - 1]
+
+          // Wait for fade out, then change view and scroll
+          setTimeout(() => {
+            setCurrentView(prevView)
+            // Wait a frame, then scroll to bottom and fade in
+            requestAnimationFrame(() => {
+              if (mainRef.current) {
+                mainRef.current.scrollTop = mainRef.current.scrollHeight
+              }
+              setIsTransitioning(false)
+            })
+          }, 150)
+        }
+      } else {
+        // Reset accumulated scroll when not at boundary
+        accumulatedScroll.current = 0
+      }
+    }
+
+    const main = mainRef.current
+    if (main) {
+      main.addEventListener('wheel', handleWheel, { passive: false })
+    }
+
+    return () => {
+      if (main) {
+        main.removeEventListener('wheel', handleWheel)
+      }
+    }
+  }, [currentView, isTransitioning, userRole, hasPDI])
+
+  // Fetch performance data when userId is available
+  useEffect(() => {
+    if (userId) {
+      fetchPerformanceData(userId)
+    }
+  }, [userId])
+
+  // Fetch performance data from user_performance_summaries with fallback to roleplay_sessions
+  const fetchPerformanceData = async (uid: string) => {
+    setPerformanceLoading(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+
+      // First try to get pre-calculated summary
+      const { data, error } = await supabase
+        .from('user_performance_summaries')
+        .select('overall_average, total_sessions, spin_s_average, spin_p_average, spin_i_average, spin_n_average')
+        .eq('user_id', uid)
+        .single()
+
+      if (data && data.total_sessions > 0) {
+        setPerformanceData({
+          overallAverage: data.overall_average || 0,
+          totalSessions: data.total_sessions || 0,
+          spinScores: {
+            S: data.spin_s_average || 0,
+            P: data.spin_p_average || 0,
+            I: data.spin_i_average || 0,
+            N: data.spin_n_average || 0
+          }
+        })
+        return
+      }
+
+      // Fallback: Calculate directly from roleplay_sessions
+      console.log('📊 Calculating performance from roleplay_sessions...')
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('roleplay_sessions')
+        .select('evaluation')
+        .eq('user_id', uid)
+        .not('evaluation', 'is', null)
+
+      if (sessionsError) {
+        console.error('Error fetching sessions:', sessionsError)
+        setPerformanceData({ overallAverage: 0, totalSessions: 0, spinScores: { S: 0, P: 0, I: 0, N: 0 } })
+        return
+      }
+
+      if (!sessions || sessions.length === 0) {
+        setPerformanceData({ overallAverage: 0, totalSessions: 0, spinScores: { S: 0, P: 0, I: 0, N: 0 } })
+        return
+      }
+
+      // Process evaluations
+      const getProcessedEvaluation = (evaluation: any) => {
+        if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+          try {
+            return JSON.parse(evaluation.output)
+          } catch {
+            return evaluation
+          }
+        }
+        return evaluation
+      }
+
+      const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
+      const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
+      let totalOverallScore = 0
+      let countOverallScore = 0
+
+      sessions.forEach((session) => {
+        const evaluation = getProcessedEvaluation(session.evaluation)
+
+        // Use overall_score from evaluation (same as PerfilView)
+        // Convert from 0-100 to 0-10 scale if necessary
+        if (evaluation?.overall_score !== undefined) {
+          let scoreValue = parseFloat(evaluation.overall_score)
+          if (scoreValue > 10) {
+            scoreValue = scoreValue / 10
+          }
+          totalOverallScore += scoreValue
+          countOverallScore++
+        }
+
+        // Calculate SPIN averages
+        if (evaluation?.spin_evaluation) {
+          const spin = evaluation.spin_evaluation
+
+          if (spin.S?.final_score !== undefined) {
+            spinTotals.S += spin.S.final_score
+            spinCounts.S++
+          }
+          if (spin.P?.final_score !== undefined) {
+            spinTotals.P += spin.P.final_score
+            spinCounts.P++
+          }
+          if (spin.I?.final_score !== undefined) {
+            spinTotals.I += spin.I.final_score
+            spinCounts.I++
+          }
+          if (spin.N?.final_score !== undefined) {
+            spinTotals.N += spin.N.final_score
+            spinCounts.N++
+          }
+        }
+      })
+
+      setPerformanceData({
+        overallAverage: countOverallScore > 0 ? totalOverallScore / countOverallScore : 0,
+        totalSessions: sessions.length,
+        spinScores: {
+          S: spinCounts.S > 0 ? spinTotals.S / spinCounts.S : 0,
+          P: spinCounts.P > 0 ? spinTotals.P / spinCounts.P : 0,
+          I: spinCounts.I > 0 ? spinTotals.I / spinCounts.I : 0,
+          N: spinCounts.N > 0 ? spinTotals.N / spinCounts.N : 0
+        }
+      })
+
+    } catch (error) {
+      console.error('Error fetching performance:', error)
+      setPerformanceData({ overallAverage: 0, totalSessions: 0, spinScores: { S: 0, P: 0, I: 0, N: 0 } })
+    } finally {
+      setPerformanceLoading(false)
+    }
+  }
+
   // Check if user is admin/gestor
   const checkUserRole = async () => {
     try {
@@ -119,6 +357,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
+        setUserId(user.id)
+
         // Check user's role and name from employees table
         const { data: employee } = await supabase
           .from('employees')
@@ -144,12 +384,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
   }
 
-  const handleViewChange = async (newView: typeof currentView) => {
+  const handleViewChange = async (newView: typeof currentView | string) => {
     // Se está saindo do chat, verificar se precisa confirmar
     if (currentView === 'chat' && newView !== 'chat' && chatRef.current) {
       await chatRef.current.requestLeave()
     }
-    setCurrentView(newView)
+    setCurrentView(newView as typeof currentView)
   }
 
   const renderContent = () => {
@@ -157,13 +397,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       if (!hasChatIA) {
         return (
           <div className="flex flex-col items-center justify-center h-full p-8">
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 max-w-md">
-              <Lock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white text-center mb-2">Chat IA Bloqueado</h2>
-              <p className="text-gray-400 text-center mb-4">
+            <div className="bg-white rounded-2xl p-8 border border-yellow-200 max-w-md shadow-lg">
+              <Lock className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Chat IA Bloqueado</h2>
+              <p className="text-gray-600 text-center mb-4">
                 O Chat IA não está disponível no plano {trainingPlan?.toUpperCase()}.
               </p>
-              <p className="text-sm text-yellow-400 text-center">
+              <p className="text-sm text-yellow-600 text-center">
                 Faça upgrade para o plano MAX ou OG para acessar esta funcionalidade.
               </p>
             </div>
@@ -181,13 +421,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       if (!hasPDI) {
         return (
           <div className="flex flex-col items-center justify-center h-full p-8">
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 max-w-md">
-              <Lock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white text-center mb-2">PDI Bloqueado</h2>
-              <p className="text-gray-400 text-center mb-4">
+            <div className="bg-white rounded-2xl p-8 border border-yellow-200 max-w-md shadow-lg">
+              <Lock className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-gray-900 text-center mb-2">PDI Bloqueado</h2>
+              <p className="text-gray-600 text-center mb-4">
                 O Plano de Desenvolvimento Individual não está disponível no plano {trainingPlan?.toUpperCase()}.
               </p>
-              <p className="text-sm text-yellow-400 text-center">
+              <p className="text-sm text-yellow-600 text-center">
                 Faça upgrade para o plano MAX ou OG para acessar esta funcionalidade.
               </p>
             </div>
@@ -223,292 +463,99 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     // Home view
     return (
-      <div className="py-16 px-6 relative z-10">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Welcome Section - Modern Hero */}
-          <div className="mb-16 text-center">
-            <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-              <p className="text-green-400/80 text-sm font-medium tracking-widest uppercase mb-3">
-                Plataforma de Treinamento
-              </p>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
-                <span className="text-white">Olá, </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-400 to-lime-400">
-                  {userName || 'Vendedor'}
-                </span>
-              </h1>
-              <p className="text-gray-400 text-lg max-w-xl mx-auto">
-                Aprimore suas habilidades de vendas com IA
-              </p>
-            </div>
-          </div>
-
-
-          {/* Setor 1: Treinamento */}
-          <div className="mb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
-                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  Treinamento
-                </span>
-              </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
-            {/* Roleplay Card */}
+      <div className="py-8 px-6 relative z-10">
+        <div className="max-w-[1200px]">
+          {/* Header with banner and greeting */}
+          <div className={`mb-8 flex flex-col lg:flex-row gap-4 items-stretch ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+            {/* Banner CTA with image */}
             <button
               onClick={() => handleViewChange('roleplay')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '100ms' }}
+              className="group relative overflow-hidden rounded-2xl bg-green-800 p-5 text-left transition-all hover:shadow-xl hover:scale-[1.01] lg:w-[280px] flex-shrink-0 min-h-[100px]"
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <Users className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Roleplay</h3>
-                    <span className="text-xs text-green-400/70">Treinamento ativo</span>
-                  </div>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Simule conversas reais de vendas e receba feedback baseado na metodologia SPIN.
-                </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Iniciar treino</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
+              {/* Background Image */}
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{
+                  backgroundImage: 'url(/images/banner-training.jpg)',
+                }}
+              />
+              {/* Green Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-r from-green-700/80 to-green-500/60" />
+              {/* Content */}
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <h2 className="text-lg font-bold text-white leading-tight">
+                  Treinar vendas agora
+                </h2>
               </div>
             </button>
 
-            {/* Meu Perfil Card */}
-            <button
-              onClick={() => handleViewChange('perfil')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '150ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <User className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Meu Perfil</h3>
-                    <span className="text-xs text-green-400/70">Análise de desempenho</span>
-                  </div>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Acompanhe sua evolução, métricas SPIN e performance geral nas vendas.
+            {/* Greeting */}
+            <div className="flex-1 flex items-center">
+              <div>
+                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">
+                  Plataforma de Treinamento
                 </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Ver perfil</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                <div className="flex items-center gap-4">
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                    Olá, {userName || 'Vendedor'}
+                  </h1>
+                  <StreakIndicator streak={streak} loading={streakLoading} />
                 </div>
               </div>
-            </button>
-
-            {/* Histórico Card */}
-            <button
-              onClick={() => handleViewChange('historico')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '200ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <Clock className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Histórico</h3>
-                    <span className="text-xs text-green-400/70">Sessões anteriores</span>
-                  </div>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Revise sessões anteriores com transcrições completas e análises detalhadas.
-                </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Ver histórico</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </button>
-
-            {/* PDI Card */}
-            {hasPDI && (
-              <button
-                onClick={() => handleViewChange('pdi')}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '250ms' }}
-              >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                      <Target className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">PDI</h3>
-                      <span className="text-xs text-green-400/70">Plano de desenvolvimento</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    Plano personalizado de 7 dias baseado na sua performance SPIN.
-                  </p>
-                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                    <span>Ver PDI</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </button>
-            )}
             </div>
           </div>
 
-          {/* Setor 2: Follow-ups */}
-          <div className="mb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
-                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  Follow-ups
-                </span>
-              </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+          {/* Section Headers */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-4">
+            <div className="col-span-2">
+              <h2 className="text-base font-semibold text-gray-900">Treinamento</h2>
+              <p className="text-sm text-gray-500">Ferramentas para desenvolver suas habilidades</p>
             </div>
-
-            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
-            {/* Follow-up Analysis Card */}
-            <button
-              onClick={() => handleViewChange('followup')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '300ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <FileSearch className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Análise de Follow-up</h3>
-                    <span className="text-xs text-green-400/70">WhatsApp</span>
-                  </div>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Envie prints do WhatsApp e receba análise detalhada do seu follow-up.
-                </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Analisar follow-up</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </button>
-
-            {/* Histórico de Follow-ups Card */}
-            <button
-              onClick={() => handleViewChange('followup-history')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '350ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <History className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Histórico de Follow-ups</h3>
-                    <span className="text-xs text-green-400/70">Feedback & Aprendizado</span>
-                  </div>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Revise seus follow-ups e marque resultados para melhorar a IA.
-                </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Ver histórico</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </button>
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Follow-ups</h2>
+              <p className="text-sm text-gray-500">Analise e gerencie seus follow-ups</p>
             </div>
-          </div>
-
-          {/* Setor 3: Análise de Reuniões */}
-          <div className="mb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
-                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  Análise de Reuniões
-                </span>
-              </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
-            {/* Análise de Google Meet Card */}
-            <button
-              onClick={() => handleViewChange('meet-analysis')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '400ms' }}
-            >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="absolute top-4 right-4">
-                  <span className="px-2.5 py-1 bg-yellow-500/20 text-yellow-400 text-[10px] font-semibold rounded-full border border-yellow-500/30">
-                    Beta
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <Video className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Análise de Google Meet</h3>
-                    <span className="text-xs text-green-400/70">Transcrição em tempo real</span>
-                  </div>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Cole o link da reunião e nosso bot transcreve a conversa automaticamente.
-                </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Analisar reunião</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </button>
-            </div>
-          </div>
-
-          {/* Setor 4: Gestão - Only for Admin and Gestor */}
-          {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
-          <div className="mb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
-                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  Gestão
-                </span>
-              </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
-            {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
-              <button
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Gestão</h2>
+                <p className="text-sm text-gray-500">Ferramentas administrativas</p>
+              </div>
+            )}
+          </div>
+
+          {/* 4x2 Grid Layout */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            {/* Row 1 */}
+            <FeatureCard
+              icon={Users}
+              title="Simulação"
+              subtitle="Treinamento ativo"
+              description="Simule conversas reais de vendas com feedback SPIN."
+              onClick={() => handleViewChange('roleplay')}
+            />
+
+            <FeatureCard
+              icon={User}
+              title="Meu Perfil"
+              subtitle="Desempenho"
+              description="Acompanhe sua evolução e métricas SPIN."
+              onClick={() => handleViewChange('perfil')}
+            />
+
+            <FeatureCard
+              icon={FileSearch}
+              title="Análise Follow-up"
+              subtitle="WhatsApp"
+              description="Análise detalhada do seu follow-up."
+              onClick={() => handleViewChange('followup')}
+            />
+
+            {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') ? (
+              <FeatureCard
+                icon={Link2}
+                title="Roleplay Público"
+                subtitle="Links externos"
+                description="Links públicos para roleplays externos."
                 onClick={() => {
                   if (selectionPlan) {
                     handleViewChange('roleplay-links')
@@ -516,79 +563,52 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                     setShowSelectionPlanModal(true)
                   }
                 }}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '400ms' }}
-              >
-                <div className={`relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2 ${!selectionPlan ? 'opacity-50' : ''}`}>
-                  {!selectionPlan && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10">
-                      <Lock className="w-12 h-12 text-gray-400" />
-                    </div>
-                  )}
-                  <div className="absolute top-4 right-4">
-                    <span className="px-2.5 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
-                      Admin
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 mb-4 pr-12">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                      <Link2 className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Roleplay Público</h3>
-                      <span className="text-xs text-green-400/70">Links externos</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    Gere links públicos para roleplays externos e acompanhe os resultados.
-                  </p>
-                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                    <span>Gerenciar links</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </button>
+                adminBadge
+                locked={!selectionPlan}
+              />
+            ) : (
+              <div className="hidden md:block" />
             )}
 
-            {/* Dashboard dos Vendedores Card - Admin only, não disponível no plano Individual */}
-            {userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
-              <button
-                onClick={() => setShowSalesDashboard(true)}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
-                style={{ animationDelay: '450ms' }}
-              >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                  <div className="absolute top-4 right-4">
-                    <span className="px-2.5 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
-                      Admin
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                      <Users className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Dashboard Vendedores</h3>
-                      <span className="text-xs text-green-400/70">Performance da equipe</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    Visualize métricas, performance SPIN e evolução de todos os vendedores.
-                  </p>
-                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                    <span>Ver dashboard</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </button>
+            {/* Row 2 */}
+            {hasPDI && (
+              <FeatureCard
+                icon={Target}
+                title="PDI"
+                subtitle="Plano de desenvolvimento"
+                description="Plano de 7 dias baseado na sua performance."
+                onClick={() => handleViewChange('pdi')}
+              />
             )}
-            </div>
+
+            <FeatureCard
+              icon={Clock}
+              title="Histórico"
+              subtitle="Sessões anteriores"
+              description="Revise sessões com transcrições e análises."
+              onClick={() => handleViewChange('historico')}
+            />
+
+            <FeatureCard
+              icon={History}
+              title="Histórico Follow-ups"
+              subtitle="Feedback"
+              description="Revise e marque resultados dos follow-ups."
+              onClick={() => handleViewChange('followup-history')}
+            />
+
+            {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') &&
+             userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
+              <FeatureCard
+                icon={Users}
+                title="Dashboard Vendedores"
+                subtitle="Performance da equipe"
+                description="Métricas e evolução dos vendedores."
+                onClick={() => setShowSalesDashboard(true)}
+                adminBadge
+              />
+            )}
           </div>
-          )}
         </div>
       </div>
     )
@@ -597,98 +617,61 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Tela de carregamento enquanto dados do usuário são carregados
   if (userDataLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="relative mb-6">
-            <div className="w-16 h-16 rounded-full border-4 border-green-500/20 border-t-green-500 animate-spin mx-auto" />
-            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-500/10 blur-xl mx-auto" />
+            <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-green-500 animate-spin mx-auto" />
           </div>
-          <p className="text-gray-400 text-lg font-medium">Carregando...</p>
+          <p className="text-gray-600 text-lg font-medium">Carregando...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* Animated background particles */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="stars"></div>
-        <div className="stars2"></div>
-        <div className="stars3"></div>
-      </div>
-
-      {/* Header Navigation */}
-      <header className="fixed top-0 w-full bg-black/70 backdrop-blur-xl z-50">
-        <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center h-20">
-          <div className="w-full flex items-center justify-between">
-            {/* Logo */}
-            <div className="cursor-pointer" onClick={() => handleViewChange('home')}>
-              <Image
-                src="/images/ramppy-logo.png"
-                alt="Ramppy"
-                width={600}
-                height={200}
-                className="h-40 w-auto"
-                priority
-              />
-            </div>
-
-            {/* Empty nav spacer */}
-            <nav className="hidden md:flex items-center"></nav>
-
-            {/* Right side buttons */}
-            <div className="flex items-center gap-3">
-              {/* Home button */}
-              <button
-                onClick={() => handleViewChange('home')}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-full font-medium shadow-lg shadow-green-500/50 hover:shadow-green-500/70 hover:scale-105 transition-all flex items-center gap-2"
-              >
-                <Home className="w-4 h-4" />
-                <span>Home</span>
-              </button>
-
-              {/* Meu Perfil button */}
-              <button
-                onClick={() => handleViewChange('perfil')}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-full font-medium shadow-lg shadow-green-500/50 hover:shadow-green-500/70 hover:scale-105 transition-all flex items-center gap-2"
-              >
-                <User className="w-4 h-4" />
-                <span>Meu Perfil</span>
-              </button>
-
-              {/* Config button - Admin only */}
-              {userRole?.toLowerCase() === 'admin' && (
-                <button
-                  onClick={() => setShowConfigHub(true)}
-                  className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
-                >
-                  <Settings className="w-4 h-4" />
-                  <span className="hidden sm:inline">Config</span>
-                </button>
-              )}
-              <button
-                onClick={onLogout}
-                className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Sair</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex">
+      {/* Sidebar */}
+      <Sidebar
+        currentView={currentView}
+        onViewChange={handleViewChange}
+        userRole={userRole}
+        hasChatIA={hasChatIA}
+        hasPDI={hasPDI}
+        onOpenConfig={() => setShowConfigHub(true)}
+        onLogout={onLogout}
+        isExpanded={isSidebarExpanded}
+        onExpandChange={setIsSidebarExpanded}
+      />
 
       {/* Main Content */}
-      <main className="pt-20 min-h-screen relative z-10">
+      <main
+        ref={mainRef}
+        className={`flex-1 h-screen overflow-y-auto ${isSidebarExpanded ? 'ml-56' : 'ml-16'} ${currentView === 'home' ? 'xl:mr-80' : ''}`}
+        style={{
+          transition: 'margin 300ms ease-in-out, opacity 150ms ease-out',
+          opacity: isTransitioning ? 0 : 1
+        }}
+      >
         {renderContent()}
       </main>
+
+      {/* Stats Panel - only on home */}
+      {currentView === 'home' && (
+        <StatsPanel
+          overallAverage={performanceData?.overallAverage || 0}
+          totalSessions={performanceData?.totalSessions || 0}
+          spinScores={performanceData?.spinScores || { S: 0, P: 0, I: 0, N: 0 }}
+          streak={streak}
+          onViewProfile={() => handleViewChange('perfil')}
+          onViewHistory={() => handleViewChange('historico')}
+          loading={performanceLoading}
+        />
+      )}
 
       {/* Config Hub Modal */}
       {showConfigHub && (
         <ConfigHub onClose={() => {
           setShowConfigHub(false)
-          // Refetch config status após fechar o ConfigHub
           refetchConfig()
         }} />
       )}
@@ -698,16 +681,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         <SalesDashboard onClose={() => setShowSalesDashboard(false)} />
       )}
 
-      {/* Configuration Required Overlay - Bloqueia features até configurar */}
+      {/* Configuration Required Overlay */}
       {!configLoading && !isConfigured && userRole !== null && currentView !== 'followup' && currentView !== 'followup-history' && (
         userRole?.toLowerCase() === 'admin' ? (
           <ConfigurationRequired
             isLoading={configLoading}
             missingItems={missingItems}
             details={configDetails}
-            onOpenConfig={() => {
-              setShowConfigHub(true)
-            }}
+            onOpenConfig={() => setShowConfigHub(true)}
             onLogout={async () => {
               const { supabase } = await import('@/lib/supabase')
               await supabase.auth.signOut()
@@ -715,30 +696,24 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             }}
           />
         ) : (
-          // Versão para vendedores (não podem configurar)
-          <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="fixed inset-0 z-0">
-              <div className="stars"></div>
-              <div className="stars2"></div>
-              <div className="stars3"></div>
-            </div>
-            <div className="relative z-10 max-w-lg w-full">
-              <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl border border-yellow-500/30 shadow-2xl p-8 text-center">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-yellow-500/30 to-orange-500/20 border border-yellow-500/40 flex items-center justify-center">
-                  <Lock className="w-10 h-10 text-yellow-400" />
+          <div className="fixed inset-0 z-[80] bg-white/95 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="max-w-lg w-full">
+              <div className="bg-white rounded-2xl border border-yellow-200 shadow-xl p-8 text-center">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-yellow-50 border border-yellow-200 flex items-center justify-center">
+                  <Lock className="w-10 h-10 text-yellow-500" />
                 </div>
-                <h1 className="text-2xl font-bold text-white mb-2">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
                   Configuração Pendente
                 </h1>
-                <p className="text-gray-400 mb-6">
+                <p className="text-gray-600 mb-6">
                   O administrador precisa configurar a empresa antes que você possa usar as funcionalidades de treinamento.
                 </p>
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
-                  <p className="text-sm text-yellow-400 font-medium mb-2">Itens pendentes:</p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                  <p className="text-sm text-yellow-700 font-medium mb-2">Itens pendentes:</p>
                   <ul className="space-y-1">
                     {missingItems.map((item, idx) => (
-                      <li key={idx} className="text-sm text-yellow-400/80 flex items-center justify-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
+                      <li key={idx} className="text-sm text-yellow-600 flex items-center justify-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
                         {item}
                       </li>
                     ))}
@@ -755,57 +730,50 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Modal de Plano de Processo Seletivo */}
       {showSelectionPlanModal && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-yellow-500/30 shadow-2xl shadow-yellow-500/20 animate-scale-in">
-            {/* Icon */}
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full border border-gray-200 shadow-2xl">
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-yellow-500/20 to-orange-500/10 rounded-2xl flex items-center justify-center border border-yellow-500/30">
-                <Lock className="w-10 h-10 text-yellow-400" />
+              <div className="w-20 h-20 bg-yellow-50 rounded-2xl flex items-center justify-center border border-yellow-200">
+                <Lock className="w-10 h-10 text-yellow-500" />
               </div>
             </div>
 
-            {/* Título */}
-            <h2 className="text-2xl font-bold text-white text-center mb-4">
-              <span className="bg-gradient-to-r from-yellow-400 via-orange-300 to-yellow-500 bg-clip-text text-transparent">
-                Recurso Bloqueado
-              </span>
+            <h2 className="text-2xl font-bold text-gray-900 text-center mb-4">
+              Recurso Bloqueado
             </h2>
 
-            {/* Mensagem */}
-            <p className="text-gray-300 text-center mb-6 leading-relaxed">
-              Para acessar o <span className="text-yellow-400 font-semibold">Roleplay Público</span> e criar links para processos seletivos externos, é necessário assinar o <span className="text-yellow-400 font-semibold">Plano de Processo Seletivo</span>.
+            <p className="text-gray-600 text-center mb-6 leading-relaxed">
+              Para acessar o <span className="text-green-600 font-semibold">Roleplay Público</span> e criar links para processos seletivos externos, é necessário assinar o <span className="text-green-600 font-semibold">Plano de Processo Seletivo</span>.
             </p>
 
-            {/* Benefícios */}
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
-              <p className="text-yellow-300 font-semibold text-sm mb-2">Com o Plano de Processo Seletivo:</p>
-              <ul className="space-y-1.5 text-gray-300 text-sm">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+              <p className="text-green-800 font-semibold text-sm mb-2">Com o Plano de Processo Seletivo:</p>
+              <ul className="space-y-1.5 text-gray-700 text-sm">
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-400 mt-0.5">✓</span>
+                  <span className="text-green-500 mt-0.5">✓</span>
                   <span>Crie links públicos para candidatos externos</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-400 mt-0.5">✓</span>
+                  <span className="text-green-500 mt-0.5">✓</span>
                   <span>Acompanhe resultados em tempo real</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-400 mt-0.5">✓</span>
+                  <span className="text-green-500 mt-0.5">✓</span>
                   <span>Avalie competências SPIN dos candidatos</span>
                 </li>
               </ul>
             </div>
 
-            {/* Botões */}
             <div className="space-y-3">
               <button
                 onClick={() => setShowSelectionPlanModal(false)}
-                className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-400 hover:from-yellow-400 hover:to-orange-300 rounded-xl font-bold text-white transition-all shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50 hover:scale-[1.02]"
+                className="w-full py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-white transition-all"
               >
                 Entendi
               </button>
               <button
                 onClick={() => setShowSelectionPlanModal(false)}
-                className="w-full py-3 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl font-semibold text-gray-300 transition-colors border border-gray-700/50"
+                className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-colors"
               >
                 Fechar
               </button>
