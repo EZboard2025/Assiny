@@ -14,8 +14,21 @@ import {
   RefreshCw,
   AlertTriangle,
   Copy,
-  Check
+  Check,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  MessageSquare,
+  Award,
+  AlertCircle,
+  Lightbulb,
+  X
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 // Vexa API config - production uses relative path via Nginx proxy
 const VEXA_API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
@@ -39,6 +52,64 @@ interface MeetingSession {
   transcript: TranscriptSegment[]
 }
 
+interface MeetEvaluation {
+  call_metadata: {
+    call_type: string
+    duration_estimated: string
+    participants_identified: string[]
+    call_outcome: string
+    transcription_quality: string
+  }
+  objections_analysis: Array<{
+    objection_id: string
+    objection_type: string
+    objection_nature: string
+    objection_text: string
+    score: number
+    detailed_analysis: string
+    critical_errors: string[] | null
+    ideal_response: string | null
+  }>
+  spin_evaluation: {
+    S: { final_score: number; technical_feedback: string; key_questions_asked: string[]; missed_opportunities: string[] }
+    P: { final_score: number; technical_feedback: string; problems_identified: string[]; missed_opportunities: string[] }
+    I: { final_score: number; technical_feedback: string; implications_raised: string[]; missed_opportunities: string[] }
+    N: { final_score: number; technical_feedback: string; value_propositions_used: string[]; missed_opportunities: string[] }
+  }
+  soft_skills_evaluation: {
+    rapport_score: number
+    rapport_feedback: string
+    conversation_control_score: number
+    control_feedback: string
+    active_listening_score: number
+    listening_feedback: string
+    stakeholder_management_score: number | null
+    stakeholder_feedback: string | null
+  }
+  overall_score: number
+  performance_level: string
+  executive_summary: string
+  top_strengths: string[]
+  critical_gaps: string[]
+  key_moments: Array<{
+    timestamp_approx: string
+    moment_type: string
+    description: string
+    impact: string
+  }>
+  priority_improvements: Array<{
+    area: string
+    current_gap: string
+    action_plan: string
+    priority: string
+    training_suggestion: string
+  }>
+  comparison_with_best_practices: {
+    aligned_with: string[]
+    deviated_from: string[]
+  }
+}
+
 // Consolidate consecutive messages from the same speaker
 const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment[] => {
   if (segments.length === 0) return []
@@ -47,15 +118,12 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
   let current: TranscriptSegment | null = null
 
   for (const segment of segments) {
-    // Normalize speaker names for comparison (case-insensitive, trimmed)
     const currentSpeaker = current?.speaker?.trim().toLowerCase() || ''
     const segmentSpeaker = segment.speaker?.trim().toLowerCase() || ''
 
     if (current && currentSpeaker === segmentSpeaker) {
-      // Same speaker - append text
       current.text = (current.text + ' ' + segment.text).trim()
     } else {
-      // Different speaker - save current and start new
       if (current) {
         consolidated.push(current)
       }
@@ -63,13 +131,33 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
     }
   }
 
-  // Don't forget the last one
   if (current) {
     consolidated.push(current)
   }
 
   console.log(`Consolidation: ${segments.length} segments -> ${consolidated.length} messages`)
   return consolidated
+}
+
+// Performance level colors and labels
+const getPerformanceConfig = (level: string) => {
+  const configs: Record<string, { color: string; bgColor: string; label: string }> = {
+    poor: { color: 'text-red-500', bgColor: 'bg-red-500/20', label: 'Reprovado' },
+    needs_improvement: { color: 'text-orange-500', bgColor: 'bg-orange-500/20', label: 'Precisa Melhorar' },
+    good: { color: 'text-yellow-500', bgColor: 'bg-yellow-500/20', label: 'Bom' },
+    very_good: { color: 'text-green-400', bgColor: 'bg-green-500/20', label: 'Muito Bom' },
+    excellent: { color: 'text-green-500', bgColor: 'bg-green-500/20', label: 'Excelente' },
+    legendary: { color: 'text-purple-500', bgColor: 'bg-purple-500/20', label: 'Lendário' }
+  }
+  return configs[level] || configs.good
+}
+
+// Score color helper
+const getScoreColor = (score: number) => {
+  if (score >= 8) return 'text-green-400'
+  if (score >= 6) return 'text-yellow-400'
+  if (score >= 4) return 'text-orange-400'
+  return 'text-red-400'
 }
 
 export default function MeetAnalysisView() {
@@ -81,11 +169,24 @@ export default function MeetAnalysisView() {
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Evaluation states
+  const [sellerName, setSellerName] = useState('')
+  const [callObjective, setCallObjective] = useState('')
+  const [funnelStage, setFunnelStage] = useState('')
+  const [isEvaluating, setIsEvaluating] = useState(false)
+  const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
+  const [evaluationError, setEvaluationError] = useState('')
+  const [showEvaluationModal, setShowEvaluationModal] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    spin: true,
+    objections: false,
+    softSkills: false,
+    improvements: false,
+    moments: false
+  })
+
   // Extract meeting ID from Google Meet URL
   const extractMeetingId = (url: string): string | null => {
-    // Patterns:
-    // https://meet.google.com/abc-defg-hij
-    // meet.google.com/abc-defg-hij
     const patterns = [
       /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i,
       /^([a-z]{3}-[a-z]{4}-[a-z]{3})$/i
@@ -120,6 +221,8 @@ export default function MeetAnalysisView() {
       transcript: []
     })
     setError('')
+    setEvaluation(null)
+    setEvaluationError('')
 
     try {
       const response = await fetch(`${VEXA_API_URL}/bots`, {
@@ -131,7 +234,7 @@ export default function MeetAnalysisView() {
         body: JSON.stringify({
           platform: 'google_meet',
           native_meeting_id: meetingId,
-          language: 'pt'  // Forçar transcrição em português
+          language: 'pt'
         })
       })
 
@@ -148,7 +251,6 @@ export default function MeetAnalysisView() {
         startTime: new Date()
       } : null)
 
-      // Start polling for status and transcripts using meeting ID
       startPolling(meetingId)
 
     } catch (err: any) {
@@ -166,21 +268,17 @@ export default function MeetAnalysisView() {
 
     const poll = async () => {
       try {
-        // Get all bots status using /bots/status endpoint
         const statusRes = await fetch(`${VEXA_API_URL}/bots/status`, {
           headers: { 'X-API-Key': VEXA_API_KEY }
         })
 
         if (statusRes.ok) {
           const statusData = await statusRes.json()
-          console.log('All bots status:', statusData)
 
-          // Find our bot by native_meeting_id
           const ourBot = statusData.running_bots?.find(
             (bot: any) => bot.native_meeting_id === nativeMeetingId
           )
 
-          // Update session status based on bot status
           setSession(prev => {
             if (!prev) return null
 
@@ -194,10 +292,8 @@ export default function MeetAnalysisView() {
                 newStatus = 'ended'
               }
             } else if (prev.status === 'joining') {
-              // Bot might still be starting up
               newStatus = 'joining'
             } else if (prev.status === 'in_meeting' || prev.status === 'transcribing') {
-              // Bot was running but now not in list - might have ended
               newStatus = 'ended'
             }
 
@@ -205,7 +301,6 @@ export default function MeetAnalysisView() {
           })
         }
 
-        // Get transcripts
         const transcriptRes = await fetch(
           `${VEXA_API_URL}/transcripts/google_meet/${nativeMeetingId}`,
           { headers: { 'X-API-Key': VEXA_API_KEY } }
@@ -213,9 +308,7 @@ export default function MeetAnalysisView() {
 
         if (transcriptRes.ok) {
           const transcriptData = await transcriptRes.json()
-          console.log('Transcript data:', transcriptData)
 
-          // Handle different response formats
           let segments = []
           if (transcriptData.segments && Array.isArray(transcriptData.segments)) {
             segments = transcriptData.segments
@@ -226,14 +319,12 @@ export default function MeetAnalysisView() {
           }
 
           if (segments.length > 0) {
-            // Map raw segments to our format
             const mappedSegments = segments.map((seg: any) => ({
               speaker: seg.speaker || seg.speaker_id || 'Participante',
               text: seg.text || seg.content || '',
               timestamp: seg.start_time || seg.timestamp || ''
             }))
 
-            // Consolidate consecutive messages from the same speaker
             const consolidatedTranscript = consolidateTranscript(mappedSegments)
 
             setSession(prev => {
@@ -252,10 +343,7 @@ export default function MeetAnalysisView() {
       }
     }
 
-    // Initial poll
     poll()
-
-    // Poll every 2 seconds
     pollIntervalRef.current = setInterval(poll, 2000)
   }
 
@@ -273,7 +361,6 @@ export default function MeetAnalysisView() {
 
     if (session?.meetingId) {
       try {
-        // Use correct endpoint: DELETE /bots/{platform}/{native_meeting_id}
         await fetch(`${VEXA_API_URL}/bots/google_meet/${session.meetingId}`, {
           method: 'DELETE',
           headers: { 'X-API-Key': VEXA_API_KEY }
@@ -293,6 +380,11 @@ export default function MeetAnalysisView() {
     setMeetUrl('')
     setMeetingId('')
     setError('')
+    setEvaluation(null)
+    setEvaluationError('')
+    setSellerName('')
+    setCallObjective('')
+    setFunnelStage('')
   }
 
   // Copy meeting ID
@@ -300,6 +392,68 @@ export default function MeetAnalysisView() {
     navigator.clipboard.writeText(meetingId)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  // Evaluate call
+  const evaluateCall = async () => {
+    if (!session?.transcript || session.transcript.length === 0) {
+      setEvaluationError('Nenhuma transcrição disponível para avaliar')
+      return
+    }
+
+    if (!sellerName.trim()) {
+      setEvaluationError('Por favor, informe o nome do vendedor')
+      return
+    }
+
+    setIsEvaluating(true)
+    setEvaluationError('')
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const companyId = await getCompanyId()
+
+      if (!user || !companyId) {
+        throw new Error('Usuário não autenticado')
+      }
+
+      const response = await fetch('/api/meet/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: session.transcript,
+          sellerName: sellerName.trim(),
+          callObjective: callObjective.trim() || null,
+          funnelStage: funnelStage || null,
+          meetingId: session.meetingId,
+          userId: user.id,
+          companyId
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Falha ao avaliar call')
+      }
+
+      const data = await response.json()
+      setEvaluation(data.evaluation)
+      setShowEvaluationModal(true)
+
+    } catch (err: any) {
+      console.error('Evaluation error:', err)
+      setEvaluationError(err.message || 'Erro ao avaliar call')
+    } finally {
+      setIsEvaluating(false)
+    }
+  }
+
+  // Toggle section expansion
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
   }
 
   // Scroll to bottom of transcript
@@ -339,6 +493,19 @@ export default function MeetAnalysisView() {
     )
   }
 
+  // Render SPIN score card
+  const renderSpinScore = (letter: string, score: number, feedback: string) => (
+    <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-lg font-bold text-white">{letter}</span>
+        <span className={`text-2xl font-bold ${getScoreColor(score)}`}>
+          {score.toFixed(1)}
+        </span>
+      </div>
+      <p className="text-sm text-gray-400 line-clamp-3">{feedback}</p>
+    </div>
+  )
+
   return (
     <div className="min-h-screen py-8 px-6">
       <div className="max-w-4xl mx-auto">
@@ -351,7 +518,7 @@ export default function MeetAnalysisView() {
             Análise de Google Meet
           </h1>
           <p className="text-gray-400">
-            Cole o link da reunião e nosso bot entrará para transcrever a conversa
+            Cole o link da reunião e nosso bot entrará para transcrever e avaliar a conversa
           </p>
         </div>
 
@@ -418,7 +585,7 @@ export default function MeetAnalysisView() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-400 font-bold">4.</span>
-                  A transcrição aparecerá em tempo real aqui
+                  A transcrição aparecerá em tempo real e você poderá avaliar ao final
                 </li>
               </ol>
             </div>
@@ -535,14 +702,85 @@ export default function MeetAnalysisView() {
               </div>
             </div>
 
-            {/* Actions when ended */}
+            {/* Evaluation Section - Only when ended with transcript */}
             {session.status === 'ended' && session.transcript.length > 0 && (
               <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/30">
-                <h3 className="text-lg font-bold text-white mb-4">Sessão Encerrada</h3>
-                <p className="text-gray-400 mb-4">
-                  A transcrição foi capturada com sucesso. Você pode:
-                </p>
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-blue-400" />
+                  Avaliar Desempenho do Vendedor
+                </h3>
+
+                {/* Evaluation Form */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1.5">
+                      Nome do Vendedor *
+                    </label>
+                    <input
+                      type="text"
+                      value={sellerName}
+                      onChange={(e) => setSellerName(e.target.value)}
+                      placeholder="Ex: João Silva"
+                      className="w-full px-3 py-2.5 bg-gray-800/60 border border-gray-600/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 transition-all text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1.5">
+                      Objetivo da Call
+                    </label>
+                    <input
+                      type="text"
+                      value={callObjective}
+                      onChange={(e) => setCallObjective(e.target.value)}
+                      placeholder="Ex: Apresentar proposta"
+                      className="w-full px-3 py-2.5 bg-gray-800/60 border border-gray-600/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 transition-all text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1.5">
+                      Estágio do Funil
+                    </label>
+                    <select
+                      value={funnelStage}
+                      onChange={(e) => setFunnelStage(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-800/60 border border-gray-600/50 rounded-lg text-white focus:outline-none focus:border-blue-400/60 transition-all text-sm"
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="prospeccao">Prospecção</option>
+                      <option value="discovery">Discovery</option>
+                      <option value="demo">Demo/Apresentação</option>
+                      <option value="negociacao">Negociação</option>
+                      <option value="fechamento">Fechamento</option>
+                      <option value="follow_up">Follow-up</option>
+                    </select>
+                  </div>
+                </div>
+
+                {evaluationError && (
+                  <div className="mb-4 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-lg border border-red-500/30">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    {evaluationError}
+                  </div>
+                )}
+
                 <div className="flex gap-3">
+                  <button
+                    onClick={evaluateCall}
+                    disabled={isEvaluating || !sellerName.trim()}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
+                  >
+                    {isEvaluating ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Avaliando... (pode levar até 30s)
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 className="w-5 h-5" />
+                        Avaliar Call com IA
+                      </>
+                    )}
+                  </button>
                   <button
                     onClick={() => {
                       const text = session.transcript
@@ -550,21 +788,261 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors flex items-center gap-2 border border-blue-500/30"
+                    className="px-4 py-3 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 rounded-xl transition-colors flex items-center gap-2 border border-gray-600/50"
                   >
                     <Copy className="w-4 h-4" />
-                    Copiar Transcrição
-                  </button>
-                  <button
-                    onClick={resetSession}
-                    className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors flex items-center gap-2 border border-green-500/30"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Nova Análise
+                    Copiar
                   </button>
                 </div>
+
+                {/* Show evaluation result button if already evaluated */}
+                {evaluation && (
+                  <button
+                    onClick={() => setShowEvaluationModal(true)}
+                    className="w-full mt-4 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl transition-colors flex items-center justify-center gap-2 border border-green-500/30"
+                  >
+                    <Award className="w-5 h-5" />
+                    Ver Resultado da Avaliação (Nota: {evaluation.overall_score})
+                  </button>
+                )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Evaluation Modal */}
+        {showEvaluationModal && evaluation && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto py-8 px-4">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl w-full max-w-4xl border border-gray-700/50 shadow-2xl">
+              {/* Modal Header */}
+              <div className="sticky top-0 bg-gray-900/95 backdrop-blur-sm px-6 py-4 border-b border-gray-700/50 rounded-t-2xl flex items-center justify-between z-10">
+                <div className="flex items-center gap-4">
+                  <div className={`px-4 py-2 rounded-xl ${getPerformanceConfig(evaluation.performance_level).bgColor}`}>
+                    <span className={`text-3xl font-bold ${getPerformanceConfig(evaluation.performance_level).color}`}>
+                      {evaluation.overall_score}
+                    </span>
+                    <span className="text-gray-400 text-sm ml-1">/100</span>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Avaliação da Call</h2>
+                    <p className={`text-sm ${getPerformanceConfig(evaluation.performance_level).color}`}>
+                      {getPerformanceConfig(evaluation.performance_level).label}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEvaluationModal(false)}
+                  className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-400" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 space-y-6">
+                {/* Executive Summary */}
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50">
+                  <h3 className="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-blue-400" />
+                    Resumo Executivo
+                  </h3>
+                  <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
+                    {evaluation.executive_summary}
+                  </p>
+                </div>
+
+                {/* Strengths & Gaps */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {evaluation.top_strengths.length > 0 && (
+                    <div className="bg-green-500/10 rounded-xl p-4 border border-green-500/30">
+                      <h3 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" />
+                        Pontos Fortes
+                      </h3>
+                      <ul className="space-y-2">
+                        {evaluation.top_strengths.map((strength, idx) => (
+                          <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                            <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                            {strength}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {evaluation.critical_gaps.length > 0 && (
+                    <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/30">
+                      <h3 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+                        <TrendingDown className="w-4 h-4" />
+                        Gaps Críticos
+                      </h3>
+                      <ul className="space-y-2">
+                        {evaluation.critical_gaps.map((gap, idx) => (
+                          <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                            {gap}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* SPIN Evaluation */}
+                <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => toggleSection('spin')}
+                    className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                  >
+                    <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                      <Target className="w-4 h-4 text-purple-400" />
+                      Avaliação SPIN
+                    </h3>
+                    {expandedSections.spin ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+                  {expandedSections.spin && (
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {renderSpinScore('S', evaluation.spin_evaluation.S.final_score, evaluation.spin_evaluation.S.technical_feedback)}
+                      {renderSpinScore('P', evaluation.spin_evaluation.P.final_score, evaluation.spin_evaluation.P.technical_feedback)}
+                      {renderSpinScore('I', evaluation.spin_evaluation.I.final_score, evaluation.spin_evaluation.I.technical_feedback)}
+                      {renderSpinScore('N', evaluation.spin_evaluation.N.final_score, evaluation.spin_evaluation.N.technical_feedback)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Objections Analysis */}
+                {evaluation.objections_analysis.length > 0 && (
+                  <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => toggleSection('objections')}
+                      className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                    >
+                      <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-orange-400" />
+                        Análise de Objeções ({evaluation.objections_analysis.length})
+                      </h3>
+                      {expandedSections.objections ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </button>
+                    {expandedSections.objections && (
+                      <div className="p-4 space-y-4">
+                        {evaluation.objections_analysis.map((obj, idx) => (
+                          <div key={idx} className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">
+                                {obj.objection_type} • {obj.objection_nature}
+                              </span>
+                              <span className={`text-lg font-bold ${getScoreColor(obj.score)}`}>
+                                {obj.score}/10
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-300 italic mb-2">"{obj.objection_text}"</p>
+                            <p className="text-sm text-gray-400">{obj.detailed_analysis}</p>
+                            {obj.ideal_response && (
+                              <div className="mt-3 p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                                <p className="text-xs text-green-400 font-semibold mb-1">Resposta Ideal:</p>
+                                <p className="text-sm text-gray-300">{obj.ideal_response}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Soft Skills */}
+                <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => toggleSection('softSkills')}
+                    className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                  >
+                    <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-cyan-400" />
+                      Soft Skills
+                    </h3>
+                    {expandedSections.softSkills ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+                  {expandedSections.softSkills && (
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
+                        <span className="text-sm text-gray-300">Rapport</span>
+                        <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.rapport_score)}`}>
+                          {evaluation.soft_skills_evaluation.rapport_score}/10
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
+                        <span className="text-sm text-gray-300">Controle da Conversa</span>
+                        <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.conversation_control_score)}`}>
+                          {evaluation.soft_skills_evaluation.conversation_control_score}/10
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
+                        <span className="text-sm text-gray-300">Escuta Ativa</span>
+                        <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.active_listening_score)}`}>
+                          {evaluation.soft_skills_evaluation.active_listening_score}/10
+                        </span>
+                      </div>
+                      {evaluation.soft_skills_evaluation.stakeholder_management_score !== null && (
+                        <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
+                          <span className="text-sm text-gray-300">Gestão de Stakeholders</span>
+                          <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.stakeholder_management_score)}`}>
+                            {evaluation.soft_skills_evaluation.stakeholder_management_score}/10
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Priority Improvements */}
+                {evaluation.priority_improvements.length > 0 && (
+                  <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => toggleSection('improvements')}
+                      className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                    >
+                      <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-yellow-400" />
+                        Melhorias Prioritárias ({evaluation.priority_improvements.length})
+                      </h3>
+                      {expandedSections.improvements ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </button>
+                    {expandedSections.improvements && (
+                      <div className="p-4 space-y-4">
+                        {evaluation.priority_improvements.map((imp, idx) => (
+                          <div key={idx} className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                'bg-yellow-500/20 text-yellow-400'
+                              }`}>
+                                {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
+                              </span>
+                              <span className="text-sm font-semibold text-white">{imp.area}</span>
+                            </div>
+                            <p className="text-sm text-gray-400 mb-2">{imp.current_gap}</p>
+                            <p className="text-sm text-gray-300">{imp.action_plan}</p>
+                            {imp.training_suggestion && (
+                              <p className="text-xs text-blue-400 mt-2">💡 {imp.training_suggestion}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="sticky bottom-0 bg-gray-900/95 backdrop-blur-sm px-6 py-4 border-t border-gray-700/50 rounded-b-2xl">
+                <button
+                  onClick={() => setShowEvaluationModal(false)}
+                  className="w-full py-3 bg-gray-700/50 hover:bg-gray-700/70 rounded-xl font-semibold text-white transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
