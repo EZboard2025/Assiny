@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
@@ -52,6 +52,12 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  // Estados e refs para interface de videochamada
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isCameraOn, setIsCameraOn] = useState(true)
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
+  const [showChatSidebar, setShowChatSidebar] = useState(false)
 
   // Configurações do roleplay
   const [age, setAge] = useState(30)
@@ -149,6 +155,43 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     // Selecionar primeiro objetivo se existir
     if (objectivesData.length > 0) {
       setSelectedObjective(objectivesData[0].id)
+    }
+  }
+
+  // Funções para gerenciar webcam na interface de videochamada
+  const startWebcam = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false // Áudio é gerenciado separadamente pelo MediaRecorder
+      })
+      setWebcamStream(mediaStream)
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream
+      }
+      setIsCameraOn(true)
+    } catch (err) {
+      console.error('Erro ao acessar câmera:', err)
+      setIsCameraOn(false)
+    }
+  }
+
+  const stopWebcam = () => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop())
+      setWebcamStream(null)
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsCameraOn(false)
+  }
+
+  const toggleCamera = async () => {
+    if (isCameraOn) {
+      stopWebcam()
+    } else {
+      await startWebcam()
     }
   }
 
@@ -377,6 +420,9 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
     setIsSimulating(true)
     setIsLoading(true)
 
+    // Iniciar webcam para interface de videochamada
+    startWebcam()
+
     try {
       // Buscar userId e companyId
       const { supabase } = await import('@/lib/supabase')
@@ -599,6 +645,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
   const handleEndSession = async () => {
     console.log('🛑 Encerrando simulação...')
+
+    // Parar webcam
+    stopWebcam()
 
     // Parar gravação se estiver ativa
     if (mediaRecorderRef.current) {
@@ -1268,12 +1317,151 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
-      <div className="min-h-screen py-20 px-6 relative z-10">
+
+      {/* Interface de Videochamada - Exibida durante a sessão ativa */}
+      {isSimulating && (
+        <div className="fixed inset-0 bg-[#1a1a1a] z-50 flex flex-col">
+          {/* Header minimalista */}
+          <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800">
+            <span className="text-white/60 text-sm">Roleplay em andamento</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowChatSidebar(!showChatSidebar)}
+                className={`p-2 rounded-lg transition-colors ${showChatSidebar ? 'bg-green-600/20 text-green-400' : 'hover:bg-gray-800 text-white/70'}`}
+                title="Mostrar/Ocultar Chat"
+              >
+                <MessageCircle size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 flex overflow-hidden">
+            {/* Área dos vídeos */}
+            <div className={`flex-1 flex items-center justify-center gap-4 p-6 transition-all ${showChatSidebar ? 'pr-0' : ''}`}>
+              {/* Ícone do Cliente Virtual */}
+              <div className="flex-1 max-w-[600px] aspect-video bg-gray-800 rounded-xl flex items-center justify-center relative overflow-hidden">
+                <img
+                  src="/icone-call.png"
+                  alt="Cliente Virtual"
+                  className="w-full h-full object-cover"
+                />
+                {isPlayingAudio && (
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2 text-green-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
+                    <Volume2 size={16} className="animate-pulse" />
+                    <span>Falando...</span>
+                  </div>
+                )}
+                {isLoading && !isPlayingAudio && (
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2 text-gray-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processando...</span>
+                  </div>
+                )}
+                <div className="absolute top-4 left-4 text-white/40 text-xs font-medium">Cliente Virtual</div>
+              </div>
+
+              {/* Webcam usuário */}
+              <div className="flex-1 max-w-[600px] aspect-video bg-gray-900 rounded-xl overflow-hidden relative">
+                {isCameraOn ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                    <UserCircle2 className="w-24 h-24 text-gray-600" />
+                  </div>
+                )}
+                {isRecording && (
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2 text-red-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    <span>Gravando...</span>
+                  </div>
+                )}
+                <div className="absolute top-4 left-4 text-white/40 text-xs font-medium">Você</div>
+              </div>
+            </div>
+
+            {/* Chat Sidebar */}
+            {showChatSidebar && (
+              <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col flex-shrink-0">
+                <div className="p-4 border-b border-gray-800 flex items-center gap-2">
+                  <MessageCircle size={18} className="text-green-400" />
+                  <h3 className="text-white font-medium">Chat da Simulação</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                  {messages.length === 0 ? (
+                    <p className="text-gray-500 text-sm text-center py-8">Aguardando início da conversa...</p>
+                  ) : (
+                    messages.map((msg, i) => (
+                      <div key={i} className={`p-3 rounded-lg text-sm ${
+                        msg.role === 'seller'
+                          ? 'bg-green-600/20 text-green-100 ml-4'
+                          : 'bg-gray-800 text-gray-100 mr-4'
+                      }`}>
+                        <span className="text-xs opacity-60 block mb-1">
+                          {msg.role === 'seller' ? 'Você' : 'Cliente'}
+                        </span>
+                        {msg.text}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Controles */}
+          <div className="flex justify-center items-center gap-4 p-6 bg-[#1a1a1a] border-t border-gray-800">
+            {/* Botão Câmera */}
+            <button
+              onClick={toggleCamera}
+              className={`p-4 rounded-full transition-colors ${
+                isCameraOn
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+              }`}
+              title={isCameraOn ? 'Desligar câmera' : 'Ligar câmera'}
+            >
+              {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
+            </button>
+
+            {/* Botão Microfone */}
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isPlayingAudio || isLoading || showFinalizingMessage}
+              className={`p-4 rounded-full transition-colors ${
+                isRecording
+                  ? 'bg-green-500 text-white hover:bg-green-600'
+                  : 'bg-gray-700 hover:bg-gray-600 text-white'
+              } ${(isPlayingAudio || isLoading || showFinalizingMessage) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
+            >
+              {isRecording ? <Mic size={24} /> : <MicOff size={24} />}
+            </button>
+
+            {/* Botão Encerrar */}
+            <button
+              onClick={handleEndSession}
+              className="p-4 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+              title="Encerrar chamada"
+            >
+              <PhoneOff size={24} />
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      <div className={`min-h-screen py-20 px-6 relative z-10 ${isSimulating ? 'hidden' : ''}`}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className={`text-center mb-12 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
           <h1 className="text-5xl md:text-6xl font-bold mb-4">
-            Treinamento de Roleplay
+            Simulação de Vendas
           </h1>
           <p className="text-xl text-gray-400">
             Pratique suas habilidades de vendas com nosso cliente virtual inteligente.
@@ -1352,207 +1540,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     minute: '2-digit',
                   })}
                 </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Chat Section - Centralizado */}
-        <div className="flex justify-center max-w-3xl mx-auto">
-          {/* Chat da Simulação */}
-          <div className={`w-full ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '200ms' }}>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-              <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-3xl p-6 border border-green-500/30">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-green-500/20">
-                  <MessageCircle className="w-5 h-5 text-green-400" />
-                  <h3 className="text-xl font-bold">Chat da Simulação</h3>
-                </div>
-
-                <div className="space-y-4 mb-4 h-96 overflow-y-auto pr-2">
-                  {/* Real messages from OpenAI Assistant */}
-                  {messages.map((msg, index) => (
-                    <div
-                      key={index}
-                      className={`flex gap-3 ${msg.role === 'seller' ? 'justify-end' : ''} animate-slide-up`}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      {msg.role === 'client' && (
-                        <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                          <User className="w-4 h-4 text-green-400" />
-                        </div>
-                      )}
-                      <div className={`flex-1 ${msg.role === 'seller' ? 'flex flex-col items-end' : ''}`}>
-                        <div className="text-xs text-gray-400 mb-1">
-                          {msg.role === 'client' ? 'Cliente virtual (IA)' : 'Vendedor (você)'}
-                        </div>
-                        <div
-                          className={`${
-                            msg.role === 'client'
-                              ? 'bg-gray-800/50 rounded-2xl rounded-tl-none'
-                              : `${
-                                  msg.text === lastUserMessage && lastUserMessage !== ''
-                                    ? 'bg-gradient-to-r from-green-600/30 to-green-500/30 border border-green-500/40'
-                                    : 'bg-green-600/20'
-                                } rounded-2xl rounded-tr-none max-w-md`
-                          } p-4 text-sm text-gray-300 transition-all duration-300`}
-                        >
-                          {msg.text}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Loading indicator */}
-                  {isLoading && (
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-green-600/20 rounded-full flex items-center justify-center flex-shrink-0">
-                        <User className="w-4 h-4 text-green-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-400 mb-1">Cliente virtual (IA)</div>
-                        <div className="bg-gray-800/50 rounded-2xl rounded-tl-none p-4 text-sm text-gray-300">
-                          <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Audio playing indicator */}
-                  {isPlayingAudio && (
-                    <div className="flex items-center justify-center py-2">
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 rounded-full">
-                        <Volume2 className="w-4 h-4 text-green-400 animate-pulse" />
-                        <span className="text-xs text-green-400">Cliente falando...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recording indicator */}
-                  {isRecording && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-center">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-red-600/20 rounded-full animate-pulse">
-                          <Mic className="w-4 h-4 text-red-400" />
-                          <span className="text-xs text-red-400">🎤 Gravando...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Status da transcrição - sempre visível quando tem conteúdo */}
-                  {currentTranscription && (
-                    <div className="mx-4 animate-slide-up">
-                      <div className={`p-4 rounded-xl border transition-all duration-300 ${
-                        currentTranscription.includes('✅')
-                          ? 'bg-green-900/20 border-green-500/30 shadow-lg shadow-green-500/10'
-                          : currentTranscription.includes('📤')
-                          ? 'bg-blue-900/20 border-blue-500/30 shadow-lg shadow-blue-500/10'
-                          : currentTranscription.includes('❌')
-                          ? 'bg-red-900/20 border-red-500/30 shadow-lg shadow-red-500/10'
-                          : 'bg-gray-800/50 border-green-500/20'
-                      }`}>
-                        <p className="text-sm text-center font-medium">
-                          {currentTranscription}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mensagem de Finalização Automática */}
-                  {showFinalizingMessage && (
-                    <div className="mx-4 animate-slide-up">
-                      <div className="p-4 rounded-xl border bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-yellow-500/40 shadow-lg shadow-yellow-500/20">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="w-5 h-5 text-yellow-400 animate-pulse" />
-                            <p className="text-sm font-semibold text-yellow-400">
-                              Roleplay Finalizado pela IA
-                            </p>
-                          </div>
-                          <p className="text-xs text-gray-300 text-center">
-                            Finalizando automaticamente...
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Empty state when no simulation */}
-                  {!isSimulating && messages.length === 0 && (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-gray-500 text-sm">Clique em "Iniciar Simulação" para começar</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-center gap-2 pt-4 border-t border-green-500/20">
-                  {/* Botões de controle de gravação */}
-                  {isSimulating && (
-                    <div className="flex items-center gap-3">
-                      {isPlayingAudio && (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-green-600/20 rounded-full">
-                          <Volume2 className="w-4 h-4 text-green-400 animate-pulse" />
-                          <span className="text-sm text-green-400">Aguarde o cliente terminar...</span>
-                        </div>
-                      )}
-
-                      {isLoading && !isRecording && !isPlayingAudio && (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-600/20 rounded-full">
-                          <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                          </div>
-                          <span className="text-sm text-gray-400">Processando...</span>
-                        </div>
-                      )}
-
-                      {/* Container flex para botões lado a lado */}
-                      <div className="flex items-center gap-4">
-                        {/* Botão de Iniciar Gravação / Finalizar Fala */}
-                        {!isPlayingAudio && !isRecording && !isLoading && (
-                          <button
-                            onClick={startRecording}
-                            disabled={showFinalizingMessage}
-                            className={`p-4 border rounded-full transition-all ${
-                              showFinalizingMessage
-                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
-                                : 'bg-green-600/20 border-green-500/30 hover:bg-green-600/30'
-                            }`}
-                            title={showFinalizingMessage ? "Finalizando sessão..." : "Clique para começar a falar"}
-                          >
-                            <Mic className={`w-6 h-6 ${showFinalizingMessage ? 'text-gray-500' : 'text-green-400'}`} />
-                          </button>
-                        )}
-
-                        {isRecording && (
-                          <button
-                            onClick={stopRecording}
-                            disabled={showFinalizingMessage}
-                            className={`px-6 py-3 border rounded-xl transition-all flex items-center gap-2 ${
-                              showFinalizingMessage
-                                ? 'bg-gray-800/20 border-gray-600/30 cursor-not-allowed opacity-50'
-                                : 'bg-red-600/20 border-red-500/30 hover:bg-red-600/30'
-                            }`}
-                            title={showFinalizingMessage ? "Finalizando sessão..." : "Clique para finalizar e enviar"}
-                          >
-                            <MicOff className={`w-5 h-5 ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`} />
-                            <span className={`text-sm font-medium ${showFinalizingMessage ? 'text-gray-500' : 'text-red-400'}`}>Finalizar Fala</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {!isSimulating && (
-                    <p className="text-gray-500 text-sm">Clique em "Iniciar Simulação" para começar a conversa por voz</p>
-                  )}
-                </div>
               </div>
             </div>
           </div>

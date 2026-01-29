@@ -218,21 +218,18 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     // Home view
     return (
-      <div className="py-16 px-6 relative z-10">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Welcome Section - Modern Hero */}
-          <div className="mb-16 text-center">
+      <div className="py-12 px-6 relative z-10">
+        <div className="max-w-[1200px] mx-auto">
+          {/* Welcome Section */}
+          <div className="mb-12">
             <div className={`${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-              <p className="text-green-400/80 text-sm font-medium tracking-widest uppercase mb-3">
+              <p className="text-gray-500 text-sm font-medium uppercase mb-2">
                 Plataforma de Treinamento
               </p>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
-                <span className="text-white">Olá, </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-400 to-lime-400">
-                  {userName || 'Vendedor'}
-                </span>
+              <h1 className="text-3xl md:text-4xl font-bold mb-2 text-gray-900">
+                Olá, {userName || 'Vendedor'}
               </h1>
-              <p className="text-gray-400 text-lg max-w-xl mx-auto">
+              <p className="text-gray-500 text-base">
                 Aprimore suas habilidades de vendas com IA
               </p>
             </div>
@@ -240,40 +237,37 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
 
           {/* Setor 1: Treinamento */}
-          <div className="mb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
-                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  Treinamento
-                </span>
+          <div className="mb-12">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Treinamento
               </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+              <p className="text-sm text-gray-500">Ferramentas para desenvolver suas habilidades</p>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Roleplay Card */}
             <button
               onClick={() => handleViewChange('roleplay')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '100ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <Users className="w-6 h-6 text-green-400" />
+              <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <Users className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Roleplay</h3>
-                    <span className="text-xs text-green-400/70">Treinamento ativo</span>
+                    <h3 className="text-base font-semibold text-gray-900">Simulacao</h3>
+                    <span className="text-xs text-gray-500">Treinamento ativo</span>
                   </div>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Simule conversas reais de vendas e receba feedback baseado na metodologia SPIN.
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Simule conversas reais de vendas com feedback SPIN.
                 </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Iniciar treino</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
+                  <span>Iniciar</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -283,25 +277,25 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Meu Perfil Card */}
             <button
               onClick={() => handleViewChange('perfil')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '150ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <User className="w-6 h-6 text-green-400" />
+              <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <User className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Meu Perfil</h3>
-                    <span className="text-xs text-green-400/70">Análise de desempenho</span>
+                    <h3 className="text-base font-semibold text-gray-900">Meu Perfil</h3>
+                    <span className="text-xs text-gray-500">Desempenho</span>
                   </div>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Acompanhe sua evolução, métricas SPIN e performance geral nas vendas.
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Acompanhe sua evolução e métricas SPIN.
                 </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
+                <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
                   <span>Ver perfil</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -311,25 +305,25 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Histórico Card */}
             <button
               onClick={() => handleViewChange('historico')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '200ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <Clock className="w-6 h-6 text-green-400" />
+              <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Histórico</h3>
-                    <span className="text-xs text-green-400/70">Sessões anteriores</span>
+                    <h3 className="text-base font-semibold text-gray-900">Historico</h3>
+                    <span className="text-xs text-gray-500">Sessoes anteriores</span>
                   </div>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Revise sessões anteriores com transcrições completas e análises detalhadas.
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Revise sessoes com transcricoes e analises.
                 </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Ver histórico</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
+                  <span>Ver historico</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -340,25 +334,25 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {hasPDI && (
               <button
                 onClick={() => handleViewChange('pdi')}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '250ms' }}
               >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                      <Target className="w-6 h-6 text-green-400" />
+                <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                      <Target className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white">PDI</h3>
-                      <span className="text-xs text-green-400/70">Plano de desenvolvimento</span>
+                      <h3 className="text-base font-semibold text-gray-900">PDI</h3>
+                      <span className="text-xs text-gray-500">Plano de desenvolvimento</span>
                     </div>
                   </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    Plano personalizado de 7 dias baseado na sua performance SPIN.
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Plano de 7 dias baseado na sua performance.
                   </p>
-                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
+                  <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
                     <span>Ver PDI</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -369,40 +363,37 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           </div>
 
           {/* Setor 2: Follow-ups */}
-          <div className="mb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
-                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  Follow-ups
-                </span>
+          <div className="mb-12">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Follow-ups
               </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+              <p className="text-sm text-gray-500">Analise e gerencie seus follow-ups</p>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Follow-up Analysis Card */}
             <button
               onClick={() => handleViewChange('followup')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '300ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <FileSearch className="w-6 h-6 text-green-400" />
+              <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <FileSearch className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Análise de Follow-up</h3>
-                    <span className="text-xs text-green-400/70">WhatsApp</span>
+                    <h3 className="text-base font-semibold text-gray-900">Analise Follow-up</h3>
+                    <span className="text-xs text-gray-500">WhatsApp</span>
                   </div>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Envie prints do WhatsApp e receba análise detalhada do seu follow-up.
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Analise detalhada do seu follow-up.
                 </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Analisar follow-up</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
+                  <span>Analisar</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -412,25 +403,25 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {/* Histórico de Follow-ups Card */}
             <button
               onClick={() => handleViewChange('followup-history')}
-              className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+              className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
               style={{ animationDelay: '350ms' }}
             >
-              <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                    <History className="w-6 h-6 text-green-400" />
+              <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <History className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Histórico de Follow-ups</h3>
-                    <span className="text-xs text-green-400/70">Feedback & Aprendizado</span>
+                    <h3 className="text-base font-semibold text-gray-900">Historico Follow-ups</h3>
+                    <span className="text-xs text-gray-500">Feedback</span>
                   </div>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Revise seus follow-ups e marque resultados para melhorar a IA.
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Revise e marque resultados dos follow-ups.
                 </p>
-                <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                  <span>Ver histórico</span>
-                  <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
+                  <span>Ver historico</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -441,18 +432,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
           {/* Setor 3: Gestão - Only for Admin and Gestor */}
           {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
-          <div className="mb-16">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
-              <h2 className="text-xl font-bold text-white uppercase tracking-wider">
-                <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  Gestão
-                </span>
+          <div className="mb-12">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Gestao
               </h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-green-500/30 to-transparent"></div>
+              <p className="text-sm text-gray-500">Ferramentas administrativas</p>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-6 max-w-[1200px] mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Roleplay Público Card - Admin/Gestor only */}
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <button
@@ -463,35 +451,35 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                     setShowSelectionPlanModal(true)
                   }
                 }}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '400ms' }}
               >
-                <div className={`relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2 ${!selectionPlan ? 'opacity-50' : ''}`}>
+                <div className={`relative bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md ${!selectionPlan ? 'opacity-50' : ''}`}>
                   {!selectionPlan && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10">
-                      <Lock className="w-12 h-12 text-gray-400" />
+                    <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center z-10">
+                      <Lock className="w-8 h-8 text-gray-400" />
                     </div>
                   )}
-                  <div className="absolute top-4 right-4">
-                    <span className="px-2.5 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-medium rounded">
                       Admin
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 mb-4 pr-12">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                      <Link2 className="w-6 h-6 text-green-400" />
+                  <div className="flex items-center gap-3 mb-3 pr-12">
+                    <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                      <Link2 className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white">Roleplay Público</h3>
-                      <span className="text-xs text-green-400/70">Links externos</span>
+                      <h3 className="text-base font-semibold text-gray-900">Roleplay Publico</h3>
+                      <span className="text-xs text-gray-500">Links externos</span>
                     </div>
                   </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    Gere links públicos para roleplays externos e acompanhe os resultados.
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Links publicos para roleplays externos.
                   </p>
-                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
-                    <span>Gerenciar links</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
+                    <span>Gerenciar</span>
+                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -503,30 +491,30 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
               <button
                 onClick={() => setShowSalesDashboard(true)}
-                className={`group text-left w-full md:w-[calc(50%-12px)] lg:w-[360px] ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
+                className={`group text-left ${mounted ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '450ms' }}
               >
-                <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 h-full hover:bg-gray-900/70 shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)] group-hover:-translate-y-2">
-                  <div className="absolute top-4 right-4">
-                    <span className="px-2.5 py-1 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded-full border border-green-500/30">
+                <div className="relative bg-white rounded-xl p-5 border border-gray-200 hover:border-green-300 transition-all duration-200 h-full hover:shadow-md">
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-medium rounded">
                       Admin
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-xl flex items-center justify-center group-hover:from-green-500/30 group-hover:to-emerald-500/20 transition-colors border border-green-500/20">
-                      <Users className="w-6 h-6 text-green-400" />
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                      <Users className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white">Dashboard Vendedores</h3>
-                      <span className="text-xs text-green-400/70">Performance da equipe</span>
+                      <h3 className="text-base font-semibold text-gray-900">Dashboard Vendedores</h3>
+                      <span className="text-xs text-gray-500">Performance da equipe</span>
                     </div>
                   </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    Visualize métricas, performance SPIN e evolução de todos os vendedores.
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Metricas e evolucao dos vendedores.
                   </p>
-                  <div className="mt-5 flex items-center text-green-400 text-sm font-semibold group-hover:text-green-300 transition-colors">
+                  <div className="mt-4 flex items-center text-green-600 text-sm font-medium">
                     <span>Ver dashboard</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -544,29 +532,21 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Tela de carregamento enquanto dados do usuário são carregados
   if (userDataLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="relative mb-6">
-            <div className="w-16 h-16 rounded-full border-4 border-green-500/20 border-t-green-500 animate-spin mx-auto" />
-            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-500/10 blur-xl mx-auto" />
+            <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-green-500 animate-spin mx-auto" />
           </div>
-          <p className="text-gray-400 text-lg font-medium">Carregando...</p>
+          <p className="text-gray-600 text-lg font-medium">Carregando...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* Animated background particles */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="stars"></div>
-        <div className="stars2"></div>
-        <div className="stars3"></div>
-      </div>
-
+    <div className="min-h-screen bg-gray-50 text-gray-900 overflow-hidden relative">
       {/* Header Navigation */}
-      <header className="fixed top-0 w-full bg-black/70 backdrop-blur-xl z-50">
+      <header className="fixed top-0 w-full bg-white border-b border-gray-200 z-50">
         <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center h-20">
           <div className="w-full flex items-center justify-between">
             {/* Logo */}
@@ -585,11 +565,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <nav className="hidden md:flex items-center"></nav>
 
             {/* Right side buttons */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {/* Home button */}
               <button
                 onClick={() => handleViewChange('home')}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-full font-medium shadow-lg shadow-green-500/50 hover:shadow-green-500/70 hover:scale-105 transition-all flex items-center gap-2"
+                className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-all flex items-center gap-2"
               >
                 <Home className="w-4 h-4" />
                 <span>Home</span>
@@ -598,7 +578,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               {/* Meu Perfil button */}
               <button
                 onClick={() => handleViewChange('perfil')}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 text-white rounded-full font-medium shadow-lg shadow-green-500/50 hover:shadow-green-500/70 hover:scale-105 transition-all flex items-center gap-2"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all flex items-center gap-2"
               >
                 <User className="w-4 h-4" />
                 <span>Meu Perfil</span>
@@ -608,7 +588,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               {userRole?.toLowerCase() === 'admin' && (
                 <button
                   onClick={() => setShowConfigHub(true)}
-                  className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center gap-2"
                 >
                   <Settings className="w-4 h-4" />
                   <span className="hidden sm:inline">Config</span>
@@ -616,7 +596,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               )}
               <button
                 onClick={onLogout}
-                className="px-4 py-2 bg-gray-800/50 backdrop-blur-sm text-white rounded-full font-medium hover:bg-gray-700/50 transition-colors flex items-center gap-2 border border-green-500/30"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Sair</span>
