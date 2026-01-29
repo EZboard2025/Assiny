@@ -39,6 +39,39 @@ interface MeetingSession {
   transcript: TranscriptSegment[]
 }
 
+// Consolidate consecutive messages from the same speaker
+const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment[] => {
+  if (segments.length === 0) return []
+
+  const consolidated: TranscriptSegment[] = []
+  let current: TranscriptSegment | null = null
+
+  for (const segment of segments) {
+    // Normalize speaker names for comparison (case-insensitive, trimmed)
+    const currentSpeaker = current?.speaker?.trim().toLowerCase() || ''
+    const segmentSpeaker = segment.speaker?.trim().toLowerCase() || ''
+
+    if (current && currentSpeaker === segmentSpeaker) {
+      // Same speaker - append text
+      current.text = (current.text + ' ' + segment.text).trim()
+    } else {
+      // Different speaker - save current and start new
+      if (current) {
+        consolidated.push(current)
+      }
+      current = { ...segment }
+    }
+  }
+
+  // Don't forget the last one
+  if (current) {
+    consolidated.push(current)
+  }
+
+  console.log(`Consolidation: ${segments.length} segments -> ${consolidated.length} messages`)
+  return consolidated
+}
+
 export default function MeetAnalysisView() {
   const [meetUrl, setMeetUrl] = useState('')
   const [meetingId, setMeetingId] = useState('')
@@ -193,16 +226,22 @@ export default function MeetAnalysisView() {
           }
 
           if (segments.length > 0) {
+            // Map raw segments to our format
+            const mappedSegments = segments.map((seg: any) => ({
+              speaker: seg.speaker || seg.speaker_id || 'Participante',
+              text: seg.text || seg.content || '',
+              timestamp: seg.start_time || seg.timestamp || ''
+            }))
+
+            // Consolidate consecutive messages from the same speaker
+            const consolidatedTranscript = consolidateTranscript(mappedSegments)
+
             setSession(prev => {
               if (!prev) return null
               return {
                 ...prev,
                 status: 'transcribing',
-                transcript: segments.map((seg: any) => ({
-                  speaker: seg.speaker || seg.speaker_id || 'Participante',
-                  text: seg.text || seg.content || '',
-                  timestamp: seg.start_time || seg.timestamp || ''
-                }))
+                transcript: consolidatedTranscript
               }
             })
           }
@@ -434,7 +473,7 @@ export default function MeetAnalysisView() {
                   Transcrição em Tempo Real
                   {session.transcript.length > 0 && (
                     <span className="text-xs text-gray-500">
-                      ({session.transcript.length} segmentos)
+                      ({session.transcript.length} {session.transcript.length === 1 ? 'fala' : 'falas'})
                     </span>
                   )}
                 </h3>
@@ -450,6 +489,9 @@ export default function MeetAnalysisView() {
                       <>
                         <Loader2 className="w-8 h-8 animate-spin mb-3" />
                         <p>Aguardando bot entrar na reunião...</p>
+                        <p className="text-sm text-gray-400 mt-2">
+                          Isso geralmente leva de 10 a 15 segundos
+                        </p>
                         <p className="text-sm text-yellow-400 mt-2">
                           Lembre-se de aceitar o "VexaBot" quando ele pedir para entrar!
                         </p>
