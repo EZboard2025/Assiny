@@ -10,6 +10,7 @@ interface FeatureCardProps {
   onClick: () => void
   disabled?: boolean
   adminBadge?: boolean
+  betaBadge?: boolean
   locked?: boolean
 }
 
@@ -21,6 +22,7 @@ export default function FeatureCard({
   onClick,
   disabled = false,
   adminBadge = false,
+  betaBadge = false,
   locked = false
 }: FeatureCardProps) {
   return (
@@ -52,8 +54,17 @@ export default function FeatureCard({
           </div>
         )}
 
+        {/* Beta badge */}
+        {betaBadge && !adminBadge && (
+          <div className="absolute top-3 right-3">
+            <span className="px-2 py-0.5 bg-yellow-50 text-yellow-600 text-[10px] font-medium rounded border border-yellow-200">
+              Beta
+            </span>
+          </div>
+        )}
+
         {/* Header with icon */}
-        <div className={`flex items-center gap-3 mb-3 ${adminBadge ? 'pr-12' : ''}`}>
+        <div className={`flex items-center gap-3 mb-3 ${adminBadge || betaBadge ? 'pr-12' : ''}`}>
           <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
             <Icon className="w-5 h-5 text-green-600" />
           </div>

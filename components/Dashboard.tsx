@@ -597,6 +597,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               onClick={() => handleViewChange('followup-history')}
             />
 
+            <FeatureCard
+              icon={Video}
+              title="Análise Google Meet"
+              subtitle="Transcrição em tempo real"
+              description="Bot transcreve reuniões do Google Meet automaticamente."
+              onClick={() => handleViewChange('meet-analysis')}
+              betaBadge
+            />
+
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') &&
              userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
               <FeatureCard
