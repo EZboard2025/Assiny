@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
+import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
+
+const MEET_ANALYSIS_CREDIT_COST = 3 // Custo em créditos por análise de Meet
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -488,6 +491,70 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verificar créditos disponíveis da empresa (análise de Meet custa 3 créditos)
+    const { data: companyCredits, error: creditsError } = await supabaseAdmin
+      .from('companies')
+      .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+      .eq('id', companyId)
+      .single()
+
+    if (creditsError || !companyCredits) {
+      console.error('❌ Erro ao verificar créditos:', creditsError)
+      return NextResponse.json(
+        { error: 'Empresa não encontrada' },
+        { status: 404 }
+      )
+    }
+
+    // Verificar se precisa resetar o contador mensal
+    const lastReset = new Date(companyCredits.monthly_credits_reset_at)
+    const now = new Date()
+    const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
+                       now.getFullYear() !== lastReset.getFullYear()
+
+    let currentCreditsUsed = companyCredits.monthly_credits_used || 0
+    let currentExtraCredits = companyCredits.extra_monthly_credits || 0
+
+    if (isNewMonth) {
+      await supabaseAdmin
+        .from('companies')
+        .update({
+          monthly_credits_used: 0,
+          extra_monthly_credits: 0,
+          monthly_credits_reset_at: now.toISOString()
+        })
+        .eq('id', companyId)
+
+      currentCreditsUsed = 0
+      currentExtraCredits = 0
+      console.log('🔄 Reset mensal aplicado para empresa:', companyId)
+    }
+
+    // Calcular limite total (plano + extras)
+    const planConfig = PLAN_CONFIGS[companyCredits.training_plan as PlanType]
+    const baseLimit = planConfig?.monthlyCredits
+
+    // Verificar se tem créditos suficientes (análise de Meet custa 3 créditos)
+    if (baseLimit !== null) {
+      const totalLimit = baseLimit + currentExtraCredits
+      const remaining = totalLimit - currentCreditsUsed
+
+      if (remaining < MEET_ANALYSIS_CREDIT_COST) {
+        console.log(`❌ Empresa ${companyId} sem créditos suficientes: ${remaining} restantes, precisa de ${MEET_ANALYSIS_CREDIT_COST}`)
+        return NextResponse.json(
+          {
+            error: 'Créditos insuficientes',
+            message: `Análise de Meet requer ${MEET_ANALYSIS_CREDIT_COST} créditos. Você tem apenas ${remaining} créditos disponíveis.`
+          },
+          { status: 403 }
+        )
+      }
+
+      console.log(`✅ Créditos disponíveis para análise de Meet: ${remaining} restantes (custo: ${MEET_ANALYSIS_CREDIT_COST})`)
+    } else {
+      console.log('♾️ Empresa com créditos ilimitados (Enterprise)')
+    }
+
     // Format transcript for the AI
     const formattedTranscript = transcript
       .map((seg: { speaker: string; text: string; timestamp?: string }) =>
@@ -640,10 +707,30 @@ export async function POST(request: NextRequest) {
 
     console.log('💾 Evaluation saved to database')
 
+    // Consumir 3 créditos da empresa após avaliação bem-sucedida
+    const { data: updatedCompany } = await supabaseAdmin
+      .from('companies')
+      .select('monthly_credits_used')
+      .eq('id', companyId)
+      .single()
+
+    const currentUsed = updatedCompany?.monthly_credits_used || 0
+    const { error: creditError } = await supabaseAdmin
+      .from('companies')
+      .update({ monthly_credits_used: currentUsed + MEET_ANALYSIS_CREDIT_COST })
+      .eq('id', companyId)
+
+    if (creditError) {
+      console.error('⚠️ Erro ao incrementar créditos:', creditError)
+    } else {
+      console.log(`💳 ${MEET_ANALYSIS_CREDIT_COST} créditos consumidos para análise de Meet: ${currentUsed} → ${currentUsed + MEET_ANALYSIS_CREDIT_COST}`)
+    }
+
     return NextResponse.json({
       evaluation,
       saved: true,
-      evaluationId: savedEvaluation.id
+      evaluationId: savedEvaluation.id,
+      creditsUsed: MEET_ANALYSIS_CREDIT_COST
     })
   } catch (error) {
     console.error('Meet evaluation error:', error)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getRandomMaleClientName } from '@/lib/utils/randomNames'
+import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
 
 const N8N_ROLEPLAY_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/d40a1fd9-bfb3-4588-bd45-7bcf2123725d/chat'
 
@@ -32,6 +33,72 @@ export async function POST(request: Request) {
         { error: 'Nome e empresa são obrigatórios' },
         { status: 400 }
       )
+    }
+
+    // Verificar créditos disponíveis da empresa
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from('companies')
+      .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+      .eq('id', companyId)
+      .single()
+
+    if (companyError || !company) {
+      console.error('❌ Erro ao buscar empresa:', companyError)
+      return NextResponse.json(
+        { error: 'Empresa não encontrada' },
+        { status: 404 }
+      )
+    }
+
+    // Verificar se precisa resetar o contador mensal
+    const lastReset = new Date(company.monthly_credits_reset_at)
+    const now = new Date()
+    const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
+                       now.getFullYear() !== lastReset.getFullYear()
+
+    // Valores atuais (ou resetados se mudou o mês)
+    let currentCreditsUsed = company.monthly_credits_used || 0
+    let currentExtraCredits = company.extra_monthly_credits || 0
+
+    if (isNewMonth) {
+      // Resetar contadores
+      await supabaseAdmin
+        .from('companies')
+        .update({
+          monthly_credits_used: 0,
+          extra_monthly_credits: 0,
+          monthly_credits_reset_at: now.toISOString()
+        })
+        .eq('id', companyId)
+
+      currentCreditsUsed = 0
+      currentExtraCredits = 0
+      console.log('🔄 Reset mensal aplicado para empresa:', companyId)
+    }
+
+    // Calcular limite total (plano + extras)
+    const planConfig = PLAN_CONFIGS[company.training_plan as PlanType]
+    const baseLimit = planConfig?.monthlyCredits
+
+    // Verificar se tem créditos disponíveis (null = ilimitado)
+    if (baseLimit !== null) {
+      const totalLimit = baseLimit + currentExtraCredits
+      const remaining = totalLimit - currentCreditsUsed
+
+      if (remaining <= 0) {
+        console.log(`❌ Empresa ${companyId} sem créditos: ${currentCreditsUsed}/${totalLimit} usados`)
+        return NextResponse.json(
+          {
+            error: 'Limite de créditos atingido',
+            message: 'Esta empresa atingiu o limite de créditos mensais para roleplay.'
+          },
+          { status: 403 }
+        )
+      }
+
+      console.log(`✅ Créditos disponíveis: ${remaining} restantes (${currentCreditsUsed}/${totalLimit})`)
+    } else {
+      console.log('♾️ Empresa com créditos ilimitados (Enterprise)')
     }
 
     // Gerar threadId único para o N8N
@@ -217,6 +284,19 @@ PERFIL DO CLIENTE B2C:
         { error: 'Erro ao criar sessão' },
         { status: 500 }
       )
+    }
+
+    // Consumir 1 crédito da empresa (incrementar contador de créditos usados)
+    const { error: creditError } = await supabaseAdmin
+      .from('companies')
+      .update({ monthly_credits_used: currentCreditsUsed + 1 })
+      .eq('id', companyId)
+
+    if (creditError) {
+      console.error('⚠️ Erro ao incrementar créditos (sessão já criada):', creditError)
+      // Não retornar erro pois a sessão já foi criada
+    } else {
+      console.log(`💳 Crédito consumido para empresa ${companyId}: ${currentCreditsUsed} → ${currentCreditsUsed + 1}`)
     }
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
+import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
 
 // N8N webhook para análise de follow-up
 const N8N_FOLLOWUP_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/followup-analyzer'
@@ -182,6 +183,72 @@ Retorne as mensagens organizadas conforme o formato especificado.`
 
           companyId = employeeData?.company_id
           console.log('🏢 Company ID para N8N:', companyId)
+        }
+      }
+
+      // Verificar créditos disponíveis da empresa antes de continuar
+      if (companyId) {
+        const { data: companyCredits, error: creditsError } = await supabaseAdmin
+          .from('companies')
+          .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+          .eq('id', companyId)
+          .single()
+
+        if (creditsError || !companyCredits) {
+          console.error('❌ Erro ao verificar créditos:', creditsError)
+          return NextResponse.json(
+            { error: 'Empresa não encontrada' },
+            { status: 404 }
+          )
+        }
+
+        // Verificar se precisa resetar o contador mensal
+        const lastReset = new Date(companyCredits.monthly_credits_reset_at)
+        const now = new Date()
+        const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
+                           now.getFullYear() !== lastReset.getFullYear()
+
+        let currentCreditsUsed = companyCredits.monthly_credits_used || 0
+        let currentExtraCredits = companyCredits.extra_monthly_credits || 0
+
+        if (isNewMonth) {
+          await supabaseAdmin
+            .from('companies')
+            .update({
+              monthly_credits_used: 0,
+              extra_monthly_credits: 0,
+              monthly_credits_reset_at: now.toISOString()
+            })
+            .eq('id', companyId)
+
+          currentCreditsUsed = 0
+          currentExtraCredits = 0
+          console.log('🔄 Reset mensal aplicado para empresa:', companyId)
+        }
+
+        // Calcular limite total (plano + extras)
+        const planConfig = PLAN_CONFIGS[companyCredits.training_plan as PlanType]
+        const baseLimit = planConfig?.monthlyCredits
+
+        // Verificar se tem créditos disponíveis (null = ilimitado)
+        if (baseLimit !== null) {
+          const totalLimit = baseLimit + currentExtraCredits
+          const remaining = totalLimit - currentCreditsUsed
+
+          if (remaining <= 0) {
+            console.log(`❌ Empresa ${companyId} sem créditos: ${currentCreditsUsed}/${totalLimit} usados`)
+            return NextResponse.json(
+              {
+                error: 'Limite de créditos atingido',
+                message: 'Sua empresa atingiu o limite de créditos mensais. Aguarde o próximo mês ou adquira créditos extras.'
+              },
+              { status: 403 }
+            )
+          }
+
+          console.log(`✅ Créditos disponíveis para follow-up: ${remaining} restantes (${currentCreditsUsed}/${totalLimit})`)
+        } else {
+          console.log('♾️ Empresa com créditos ilimitados (Enterprise)')
         }
       }
 
@@ -513,6 +580,27 @@ Retorne as mensagens organizadas conforme o formato especificado.`
               }
             } catch (fallbackError) {
               console.error('❌ Erro no fallback:', fallbackError)
+            }
+          }
+
+          // Consumir 1 crédito da empresa após análise bem-sucedida
+          if (companyId) {
+            const { data: companyCredits } = await supabaseAdmin
+              .from('companies')
+              .select('monthly_credits_used')
+              .eq('id', companyId)
+              .single()
+
+            const currentUsed = companyCredits?.monthly_credits_used || 0
+            const { error: creditError } = await supabaseAdmin
+              .from('companies')
+              .update({ monthly_credits_used: currentUsed + 1 })
+              .eq('id', companyId)
+
+            if (creditError) {
+              console.error('⚠️ Erro ao incrementar créditos:', creditError)
+            } else {
+              console.log(`💳 Crédito consumido para follow-up: ${currentUsed} → ${currentUsed + 1}`)
             }
           }
 
