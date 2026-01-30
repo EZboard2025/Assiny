@@ -131,96 +131,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     checkFeatureAccess()
   }, [checkChatIAAccess, checkPDIAccess, checkFollowUpAccess])
 
-  // Scroll-based page navigation
-  const accumulatedScroll = useRef(0)
-  const scrollThreshold = 500 // Accumulated scroll needed to trigger page change (increased for less sensitivity)
-
-  useEffect(() => {
-    const getPageSequence = (): Array<typeof currentView> => {
-      const isAdmin = userRole?.toLowerCase() === 'admin'
-      const isGestor = userRole?.toLowerCase() === 'gestor'
-
-      const pages: Array<typeof currentView> = ['home', 'roleplay', 'perfil', 'historico']
-      if (hasPDI) pages.push('pdi')
-      pages.push('followup', 'followup-history')
-      if (isAdmin || isGestor) pages.push('roleplay-links')
-
-      return pages
-    }
-
-    const handleWheel = (e: WheelEvent) => {
-      const main = mainRef.current
-      if (!main || isTransitioning) return
-
-      // Don't trigger on chat view (has its own scrolling)
-      if (currentView === 'chat') return
-
-      const isAtBottom = main.scrollHeight - main.scrollTop <= main.clientHeight + 20
-      const isAtTop = main.scrollTop <= 20
-
-      const pages = getPageSequence()
-      const currentIndex = pages.indexOf(currentView)
-
-      // Accumulate scroll when at boundaries
-      if (e.deltaY > 0 && isAtBottom && currentIndex < pages.length - 1) {
-        e.preventDefault()
-        accumulatedScroll.current += e.deltaY
-
-        if (accumulatedScroll.current >= scrollThreshold) {
-          accumulatedScroll.current = 0
-          setIsTransitioning(true)
-
-          const nextView = pages[currentIndex + 1]
-
-          // Wait for fade out, then change view and scroll
-          setTimeout(() => {
-            if (mainRef.current) mainRef.current.scrollTop = 0
-            setCurrentView(nextView)
-            // Wait a frame then fade in
-            requestAnimationFrame(() => {
-              setIsTransitioning(false)
-            })
-          }, 150)
-        }
-      } else if (e.deltaY < 0 && isAtTop && currentIndex > 0) {
-        e.preventDefault()
-        accumulatedScroll.current += Math.abs(e.deltaY)
-
-        if (accumulatedScroll.current >= scrollThreshold) {
-          accumulatedScroll.current = 0
-          setIsTransitioning(true)
-
-          const prevView = pages[currentIndex - 1]
-
-          // Wait for fade out, then change view and scroll
-          setTimeout(() => {
-            setCurrentView(prevView)
-            // Wait a frame, then scroll to bottom and fade in
-            requestAnimationFrame(() => {
-              if (mainRef.current) {
-                mainRef.current.scrollTop = mainRef.current.scrollHeight
-              }
-              setIsTransitioning(false)
-            })
-          }, 150)
-        }
-      } else {
-        // Reset accumulated scroll when not at boundary
-        accumulatedScroll.current = 0
-      }
-    }
-
-    const main = mainRef.current
-    if (main) {
-      main.addEventListener('wheel', handleWheel, { passive: false })
-    }
-
-    return () => {
-      if (main) {
-        main.removeEventListener('wheel', handleWheel)
-      }
-    }
-  }, [currentView, isTransitioning, userRole, hasPDI])
+  // Scroll-based page navigation (DISABLED)
+  // const accumulatedScroll = useRef(0)
+  // const scrollThreshold = 500
+  // useEffect disabled - scroll navigation temporarily turned off
 
   // Fetch performance data when userId is available
   useEffect(() => {

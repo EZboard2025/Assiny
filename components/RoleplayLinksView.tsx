@@ -708,18 +708,18 @@ export default function RoleplayLinksView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
-        <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6 max-w-md">
-          <h3 className="text-red-400 font-bold mb-2">Erro ao carregar</h3>
-          <p className="text-red-300 mb-4">{error}</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white border border-red-200 rounded-xl p-6 max-w-md shadow-lg">
+          <h3 className="text-red-600 font-bold mb-2">Erro ao carregar</h3>
+          <p className="text-red-500 mb-4">{error}</p>
 
           {error.includes('autenticado') || error.includes('Sessão') ? (
             <div className="flex flex-col gap-2">
@@ -738,7 +738,7 @@ export default function RoleplayLinksView() {
                   setLoading(true)
                   loadData()
                 }}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-white transition-colors"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors border border-gray-200"
               >
                 Tentar novamente
               </button>
@@ -762,15 +762,15 @@ export default function RoleplayLinksView() {
 
   if (!roleplayLink) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
-        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 max-w-md">
-          <p className="text-yellow-300">Configuração de roleplay não encontrada</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white border border-amber-200 rounded-xl p-6 max-w-md shadow-lg">
+          <p className="text-amber-600">Configuração de roleplay não encontrada</p>
           <button
             onClick={() => {
               setLoading(true)
               loadData()
             }}
-            className="mt-4 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-white transition-colors"
+            className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-white transition-colors"
           >
             Recarregar
           </button>
@@ -780,43 +780,36 @@ export default function RoleplayLinksView() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* Animated background particles */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="stars"></div>
-        <div className="stars2"></div>
-        <div className="stars3"></div>
-      </div>
-
-      <div className="relative z-10 py-20 px-6">
+    <div className="min-h-screen bg-gray-50 overflow-hidden relative">
+      <div className="py-12 px-6">
         <div className="max-w-5xl mx-auto">
           {/* Cabeçalho */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Configure o <span className="text-gradient-green">Roleplay Público</span>
+          <div className="text-center mb-10">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+              Configure o <span className="text-green-600">Roleplay Público</span>
             </h1>
-            <p className="text-gray-300 text-lg max-w-2xl mx-auto">
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto">
               Defina o cenário de treinamento que sua equipe irá praticar através do link público
             </p>
           </div>
 
           {/* Card do Link */}
-          <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-green-500/20 mb-8 glow-green-subtle">
+          <div className="bg-white rounded-2xl p-8 border border-gray-200 mb-8 shadow-sm">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-2xl flex items-center justify-center">
-                  <Link2 className="w-7 h-7 text-green-400" />
+                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center">
+                  <Link2 className="w-7 h-7 text-green-600" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                  <h2 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
                     Link de Treinamento
                     {roleplayLink.is_active && (
-                      <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
+                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                         ATIVO
                       </span>
                     )}
                   </h2>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <p className="text-sm text-gray-500 mt-1">
                     Compartilhe este link com sua equipe para treinamento
                   </p>
                 </div>
@@ -831,8 +824,8 @@ export default function RoleplayLinksView() {
                   }}
                   className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
                     showHistorico
-                      ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 shadow-lg shadow-green-500/30'
-                      : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white border border-gray-700'
+                      ? 'bg-green-600 text-white hover:bg-green-700 shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                   }`}
                 >
                   <History className="w-5 h-5" />
@@ -848,8 +841,8 @@ export default function RoleplayLinksView() {
                   ))}
                   className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
                     roleplayLink.is_active
-                      ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 glow-green'
-                      : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                      ? 'bg-green-600 text-white hover:bg-green-700 shadow-md'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                   title={
                     !roleplayLink.is_active &&
@@ -867,20 +860,20 @@ export default function RoleplayLinksView() {
             </div>
 
             {/* URL */}
-            <div className="bg-black/60 border border-green-500/10 rounded-2xl p-5 mb-6">
-              <p className="text-sm font-medium text-green-400 mb-3">URL do Roleplay:</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-6">
+              <p className="text-sm font-medium text-green-700 mb-3">URL do Roleplay:</p>
               <div className="flex items-center gap-3">
-                <code className="flex-1 text-white bg-black/40 px-4 py-3 rounded-xl text-sm font-mono border border-green-500/20">
+                <code className="flex-1 text-gray-800 bg-white px-4 py-3 rounded-xl text-sm font-mono border border-gray-200">
                   {getRoleplayUrl()}
                 </code>
                 <button
                   onClick={copyLink}
-                  className="p-3 bg-gradient-to-r from-green-600/20 to-lime-500/20 hover:from-green-600/30 hover:to-lime-500/30 rounded-xl transition-all hover:scale-105"
+                  className="p-3 bg-green-100 hover:bg-green-200 rounded-xl transition-all hover:scale-105"
                 >
                   {copied ? (
-                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    <CheckCircle className="w-5 h-5 text-green-600" />
                   ) : (
-                    <Copy className="w-5 h-5 text-green-400" />
+                    <Copy className="w-5 h-5 text-green-600" />
                   )}
                 </button>
               </div>
@@ -888,12 +881,12 @@ export default function RoleplayLinksView() {
 
             {/* Estatísticas */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-r from-green-600/10 to-lime-500/10 rounded-2xl p-5 border border-green-500/20">
+              <div className="bg-green-50 rounded-xl p-5 border border-green-100">
                 <div className="flex items-center gap-3 mb-2">
-                  <Users className="w-5 h-5 text-green-400" />
-                  <p className="text-sm font-medium text-gray-300">Total de Usos</p>
+                  <Users className="w-5 h-5 text-green-600" />
+                  <p className="text-sm font-medium text-gray-600">Total de Usos</p>
                 </div>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-3xl font-bold text-gray-900">
                   {roleplayLink.usage_count}
                 </p>
               </div>
@@ -918,27 +911,27 @@ export default function RoleplayLinksView() {
                   const used = roleplayLink.usage_count || 0
 
                   return (
-                    <div className="bg-gradient-to-r from-yellow-600/10 to-orange-500/10 rounded-2xl p-5 border border-yellow-500/20">
+                    <div className="bg-amber-50 rounded-xl p-5 border border-amber-100">
                       <div className="flex items-center gap-3 mb-2">
-                        <Target className="w-5 h-5 text-yellow-400" />
-                        <p className="text-sm font-medium text-gray-300">Limite do Plano</p>
+                        <Target className="w-5 h-5 text-amber-600" />
+                        <p className="text-sm font-medium text-gray-600">Limite do Plano</p>
                       </div>
                       {maxCandidates === null ? (
                         <div>
-                          <p className="text-2xl font-bold text-white">Ilimitado</p>
-                          <p className="text-xs text-gray-400 mt-1">{used} realizados</p>
+                          <p className="text-2xl font-bold text-gray-900">Ilimitado</p>
+                          <p className="text-xs text-gray-500 mt-1">{used} realizados</p>
                         </div>
                       ) : (
                         <div>
-                          <p className="text-2xl font-bold text-white">
+                          <p className="text-2xl font-bold text-gray-900">
                             {used}/{maxCandidates}
                           </p>
                           <div className="mt-2">
-                            <div className="w-full bg-black/40 rounded-full h-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
                               <div
                                 className={`h-2 rounded-full transition-all ${
                                   (used / maxCandidates) * 100 >= 100 ? 'bg-red-500' :
-                                  (used / maxCandidates) * 100 >= 80 ? 'bg-yellow-500' :
+                                  (used / maxCandidates) * 100 >= 80 ? 'bg-amber-500' :
                                   'bg-green-500'
                                 }`}
                                 style={{ width: `${Math.min((used / maxCandidates) * 100, 100)}%` }}
@@ -946,9 +939,9 @@ export default function RoleplayLinksView() {
                             </div>
                           </div>
                           <p className={`text-xs mt-1 ${
-                            Math.max(0, maxCandidates - used) === 0 ? 'text-red-400' :
-                            Math.max(0, maxCandidates - used) <= 2 ? 'text-yellow-400' :
-                            'text-gray-400'
+                            Math.max(0, maxCandidates - used) === 0 ? 'text-red-600' :
+                            Math.max(0, maxCandidates - used) <= 2 ? 'text-amber-600' :
+                            'text-gray-500'
                           }`}>
                             {Math.max(0, maxCandidates - used) === 0
                               ? '⚠️ Limite atingido'
@@ -962,12 +955,12 @@ export default function RoleplayLinksView() {
                 })()
               )}
 
-              <div className="bg-gradient-to-r from-green-600/10 to-lime-500/10 rounded-2xl p-5 border border-green-500/20">
+              <div className="bg-green-50 rounded-xl p-5 border border-green-100">
                 <div className="flex items-center gap-3 mb-2">
-                  <BarChart3 className="w-5 h-5 text-green-400" />
-                  <p className="text-sm font-medium text-gray-300">Status</p>
+                  <BarChart3 className="w-5 h-5 text-green-600" />
+                  <p className="text-sm font-medium text-gray-600">Status</p>
                 </div>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-3xl font-bold text-gray-900">
                   {roleplayLink.is_active ? 'Ativo' : 'Inativo'}
                 </p>
               </div>
@@ -977,11 +970,11 @@ export default function RoleplayLinksView() {
             {selectionPlan && PLAN_CONFIGS[selectionPlan]?.isSelectionPlan &&
              PLAN_CONFIGS[selectionPlan].maxSelectionCandidates !== null &&
              roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates && (
-              <div className="mt-4 bg-red-900/20 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-red-400 font-semibold mb-1">Limite de Candidatos Atingido</h4>
-                  <p className="text-red-300/80 text-sm">
+                  <h4 className="text-red-700 font-semibold mb-1">Limite de Candidatos Atingido</h4>
+                  <p className="text-red-600 text-sm">
                     Você atingiu o limite de {PLAN_CONFIGS[selectionPlan].maxSelectionCandidates} candidatos do seu plano.
                     Para avaliar mais candidatos, considere fazer upgrade do plano.
                   </p>
@@ -993,19 +986,19 @@ export default function RoleplayLinksView() {
           {/* Conteúdo Condicional */}
           {!showHistorico ? (
             /* Configuração do Roleplay */
-            <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-green-500/20">
+            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-xl flex items-center justify-center">
-                  <Settings className="w-5 h-5 text-green-400" />
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                  <Settings className="w-5 h-5 text-green-600" />
                 </div>
-                <h2 className="text-2xl font-semibold text-white">
+                <h2 className="text-2xl font-semibold text-gray-900">
                   Configuração do Cenário
                 </h2>
               </div>
               {editMode && (
-                <div className="px-4 py-2 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
-                  <p className="text-sm text-yellow-300 flex items-center gap-2">
+                <div className="px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-sm text-amber-700 flex items-center gap-2">
                     <Edit2 className="w-4 h-4" />
                     Modo de Edição
                   </p>
@@ -1016,17 +1009,17 @@ export default function RoleplayLinksView() {
             <div className="space-y-6">
               {/* Faixa Etária */}
               <div>
-                <label className="block text-sm font-medium text-green-400 mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
                   Faixa Etária do Cliente
                 </label>
                 <select
                   value={config.age}
                   onChange={(e) => setConfig({ ...config, age: e.target.value })}
                   disabled={!editMode}
-                  className={`w-full px-5 py-4 border border-green-500/20 rounded-xl text-white transition-colors ${
+                  className={`w-full px-5 py-4 border rounded-xl text-gray-900 transition-colors ${
                     editMode
-                      ? 'bg-black/60 focus:outline-none focus:border-green-500/40 cursor-pointer'
-                      : 'bg-black/30 cursor-not-allowed opacity-70'
+                      ? 'bg-white border-gray-300 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 cursor-pointer'
+                      : 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-70'
                   }`}
                 >
                   <option value="18-24">18-24 anos</option>
@@ -1038,17 +1031,17 @@ export default function RoleplayLinksView() {
 
               {/* Temperamento */}
               <div>
-                <label className="block text-sm font-medium text-green-400 mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
                   Temperamento do Cliente
                 </label>
                 <select
                   value={config.temperament}
                   onChange={(e) => setConfig({ ...config, temperament: e.target.value })}
                   disabled={!editMode}
-                  className={`w-full px-5 py-4 border border-green-500/20 rounded-xl text-white transition-colors ${
+                  className={`w-full px-5 py-4 border rounded-xl text-gray-900 transition-colors ${
                     editMode
-                      ? 'bg-black/60 focus:outline-none focus:border-green-500/40 cursor-pointer'
-                      : 'bg-black/30 cursor-not-allowed opacity-70'
+                      ? 'bg-white border-gray-300 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 cursor-pointer'
+                      : 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-70'
                   }`}
                 >
                   <option value="Analítico">Analítico</option>
@@ -1061,12 +1054,12 @@ export default function RoleplayLinksView() {
 
               {/* Persona */}
               <div>
-                <label className="block text-sm font-medium text-green-400 mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
                   Persona do Cliente
                 </label>
                 {personas.length === 0 ? (
-                  <div className="p-6 bg-yellow-900/20 border border-yellow-500/30 rounded-2xl">
-                    <p className="text-yellow-300 text-sm flex items-center gap-2">
+                  <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-amber-700 text-sm flex items-center gap-2">
                       <Sparkles className="w-4 h-4" />
                       Nenhuma persona cadastrada. Configure personas no ConfigHub primeiro.
                     </p>
@@ -1076,10 +1069,10 @@ export default function RoleplayLinksView() {
                     value={config.persona_id || ''}
                     onChange={(e) => setConfig({ ...config, persona_id: e.target.value || null })}
                     disabled={!editMode}
-                    className={`w-full px-5 py-4 border border-green-500/20 rounded-xl text-white transition-colors ${
+                    className={`w-full px-5 py-4 border rounded-xl text-gray-900 transition-colors ${
                       editMode
-                        ? 'bg-black/60 focus:outline-none focus:border-green-500/40 cursor-pointer'
-                        : 'bg-black/30 cursor-not-allowed opacity-70'
+                        ? 'bg-white border-gray-300 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 cursor-pointer'
+                        : 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-70'
                     }`}
                   >
                     <option value="">Selecione uma persona</option>
@@ -1101,15 +1094,15 @@ export default function RoleplayLinksView() {
 
               {/* Objeções */}
               <div>
-                <label className="block text-sm font-medium text-green-400 mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
                   Objeções do Cliente
                   {config.objection_ids.length > 0 && (
-                    <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full">
+                    <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                       {config.objection_ids.length} selecionada{config.objection_ids.length > 1 ? 's' : ''}
                     </span>
                   )}
                 </label>
-                <div className="space-y-2 max-h-60 overflow-y-auto bg-black/40 rounded-2xl p-5 border border-green-500/10">
+                <div className="space-y-2 max-h-60 overflow-y-auto bg-gray-50 rounded-xl p-5 border border-gray-200">
                   {objections.length === 0 ? (
                     <p className="text-gray-500 text-sm">Nenhuma objeção cadastrada</p>
                   ) : (
@@ -1121,10 +1114,10 @@ export default function RoleplayLinksView() {
                         <label
                           key={objection.id}
                           className={`flex items-center gap-3 p-3 rounded-xl transition-all group relative ${
-                            editMode ? 'hover:bg-green-500/5 cursor-pointer' : 'cursor-not-allowed opacity-70'
+                            editMode ? 'hover:bg-green-50 cursor-pointer' : 'cursor-not-allowed opacity-70'
                           } ${
                             isSaved && isSelected
-                              ? 'border-2 border-green-500/60 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
+                              ? 'border-2 border-green-500 bg-green-50'
                               : 'border border-transparent'
                           }`}
                         >
@@ -1145,18 +1138,18 @@ export default function RoleplayLinksView() {
                                 })
                               }
                             }}
-                            className="w-5 h-5 text-green-600 bg-black border-green-500/30 rounded focus:ring-green-500 focus:ring-2"
+                            className="w-5 h-5 text-green-600 bg-white border-gray-300 rounded focus:ring-green-500 focus:ring-2"
                           />
-                          <span className={`group-hover:text-white transition-colors flex items-center gap-2 ${
-                            isSaved && isSelected ? 'text-green-300 font-medium' : 'text-gray-300'
+                          <span className={`group-hover:text-gray-900 transition-colors flex items-center gap-2 ${
+                            isSaved && isSelected ? 'text-green-700 font-medium' : 'text-gray-700'
                           }`}>
                             {objection.name}
                             {isSelected && (
-                              <CheckCircle className={`w-4 h-4 ${isSaved ? 'text-green-400' : 'text-green-400'}`} />
+                              <CheckCircle className={`w-4 h-4 ${isSaved ? 'text-green-600' : 'text-green-600'}`} />
                             )}
                           </span>
                           {isSaved && isSelected && (
-                            <span className="absolute top-2 right-2 px-2 py-0.5 bg-green-500/20 text-green-400 text-[10px] font-bold rounded-full">
+                            <span className="absolute top-2 right-2 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full">
                               SALVA
                             </span>
                           )}
@@ -1169,19 +1162,19 @@ export default function RoleplayLinksView() {
 
               {/* Preview da Configuração */}
               {config.persona_id && config.objection_ids.length > 0 && (
-                <div className="bg-gradient-to-r from-green-600/10 to-lime-500/10 border border-green-500/30 rounded-2xl p-6">
-                  <h3 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                  <h3 className="text-sm font-medium text-green-700 mb-3 flex items-center gap-2">
                     <Sparkles className="w-4 h-4" />
                     Cenário Configurado
                   </h3>
-                  <p className="text-gray-300 leading-relaxed">
-                    Os participantes farão roleplay com um cliente de <span className="text-white font-medium">{config.age} anos</span>,
-                    com temperamento <span className="text-white font-medium">{config.temperament.toLowerCase()}</span>,
-                    representando <span className="text-white font-medium">{(() => {
+                  <p className="text-gray-600 leading-relaxed">
+                    Os participantes farão roleplay com um cliente de <span className="text-gray-900 font-medium">{config.age} anos</span>,
+                    com temperamento <span className="text-gray-900 font-medium">{config.temperament.toLowerCase()}</span>,
+                    representando <span className="text-gray-900 font-medium">{(() => {
                       const persona = personas.find(p => p.id === config.persona_id)
                       return persona?.job_title || persona?.profession || 'perfil selecionado'
                     })()}</span>,
-                    com <span className="text-white font-medium">{config.objection_ids.length} objeção(ões)</span> preparada(s).
+                    com <span className="text-gray-900 font-medium">{config.objection_ids.length} objeção(ões)</span> preparada(s).
                   </p>
                 </div>
               )}
@@ -1193,7 +1186,7 @@ export default function RoleplayLinksView() {
                   <button
                     onClick={saveConfig}
                     disabled={saving}
-                    className="flex-1 py-4 bg-gradient-to-r from-green-600 to-lime-500 rounded-2xl font-semibold text-white hover:scale-[1.02] transition-all disabled:opacity-50 glow-green flex items-center justify-center gap-2"
+                    className="flex-1 py-4 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white hover:scale-[1.02] transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
                   >
                     {saving ? (
                       <>
@@ -1211,7 +1204,7 @@ export default function RoleplayLinksView() {
                     <button
                       onClick={handleCancel}
                       disabled={saving}
-                      className="px-6 py-4 bg-gray-800/50 hover:bg-gray-700/50 rounded-2xl font-semibold text-gray-300 transition-all flex items-center justify-center gap-2"
+                      className="px-6 py-4 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-all flex items-center justify-center gap-2 border border-gray-200"
                     >
                       <X className="w-5 h-5" />
                       Cancelar
@@ -1222,7 +1215,7 @@ export default function RoleplayLinksView() {
                 // Modo visualização - mostrar botão Editar
                 <button
                   onClick={handleEdit}
-                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl font-semibold text-white hover:scale-[1.02] transition-all glow-blue flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-semibold text-white hover:scale-[1.02] transition-all shadow-md flex items-center justify-center gap-2"
                 >
                   <Edit2 className="w-5 h-5" />
                   Editar Configuração
@@ -1232,36 +1225,36 @@ export default function RoleplayLinksView() {
           </div>
           ) : (
             /* Histórico de Roleplays */
-            <div className="bg-black/40 backdrop-blur-xl rounded-3xl p-8 border border-green-500/20">
+            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
               <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-gradient-to-r from-green-600/20 to-lime-500/20 rounded-xl flex items-center justify-center">
-                  <History className="w-5 h-5 text-green-400" />
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                  <History className="w-5 h-5 text-green-600" />
                 </div>
-                <h2 className="text-2xl font-semibold text-white">
+                <h2 className="text-2xl font-semibold text-gray-900">
                   Roleplays Realizados
                 </h2>
               </div>
 
               {loadingHistorico ? (
                 <div className="flex items-center justify-center py-20">
-                  <Loader2 className="w-10 h-10 text-green-400 animate-spin" />
+                  <Loader2 className="w-10 h-10 text-green-600 animate-spin" />
                 </div>
               ) : historico.length === 0 ? (
                 <div className="text-center py-20">
-                  <History className="w-20 h-20 text-gray-700 mx-auto mb-4" />
-                  <p className="text-gray-400 text-xl font-medium">Nenhum roleplay realizado ainda</p>
-                  <p className="text-gray-500 mt-2">Compartilhe o link para começar</p>
+                  <History className="w-20 h-20 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-xl font-medium">Nenhum roleplay realizado ainda</p>
+                  <p className="text-gray-400 mt-2">Compartilhe o link para começar</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Controles de ordenação e estatísticas */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                     <div className="flex items-center gap-4">
-                      <p className="text-gray-400">
+                      <p className="text-gray-500">
                         {historico.length} roleplay{historico.length !== 1 ? 's' : ''} realizad{historico.length !== 1 ? 'os' : 'o'}
                       </p>
                       {selectedForComparison.length > 0 && compareMode && (
-                        <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-full border border-green-500/30">
+                        <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">
                           {selectedForComparison.length} selecionado{selectedForComparison.length > 1 ? 's' : ''}
                         </span>
                       )}
@@ -1270,13 +1263,13 @@ export default function RoleplayLinksView() {
                     {/* Controles de Ordenação e Comparação */}
                     <div className="flex flex-wrap gap-2">
                       {/* Botões de tipo de ordenação */}
-                      <div className="flex bg-black/60 rounded-xl p-1 border border-green-500/20">
+                      <div className="flex bg-gray-100 rounded-xl p-1">
                         <button
                           onClick={() => setSortBy('date')}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                             sortBy === 'date'
-                              ? 'bg-green-600/30 text-green-400 border border-green-500/30'
-                              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                              ? 'bg-white text-green-700 shadow-sm'
+                              : 'text-gray-500 hover:text-gray-900'
                           }`}
                         >
                           <Calendar className="w-4 h-4" />
@@ -1286,8 +1279,8 @@ export default function RoleplayLinksView() {
                           onClick={() => setSortBy('score')}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                             sortBy === 'score'
-                              ? 'bg-green-600/30 text-green-400 border border-green-500/30'
-                              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                              ? 'bg-white text-green-700 shadow-sm'
+                              : 'text-gray-500 hover:text-gray-900'
                           }`}
                         >
                           <Trophy className="w-4 h-4" />
@@ -1298,7 +1291,7 @@ export default function RoleplayLinksView() {
                       {/* Botão de direção de ordenação */}
                       <button
                         onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-                        className="px-4 py-2 bg-black/60 hover:bg-gray-800/50 rounded-xl text-sm font-medium text-gray-400 hover:text-white transition-all flex items-center gap-2 border border-green-500/20"
+                        className="px-4 py-2 bg-white hover:bg-gray-50 rounded-xl text-sm font-medium text-gray-600 hover:text-gray-900 transition-all flex items-center gap-2 border border-gray-200"
                         title={sortOrder === 'desc' ? 'Ordem decrescente' : 'Ordem crescente'}
                       >
                         <ArrowUpDown className="w-4 h-4" />
@@ -1314,8 +1307,8 @@ export default function RoleplayLinksView() {
                         onClick={toggleCompareMode}
                         className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 border ${
                           compareMode
-                            ? 'bg-green-600/30 text-green-400 border-green-500/30'
-                            : 'bg-black/60 hover:bg-gray-800/50 text-gray-400 hover:text-white border-green-500/20'
+                            ? 'bg-green-100 text-green-700 border-green-200'
+                            : 'bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 border-gray-200'
                         }`}
                       >
                         <GitCompare className="w-4 h-4" />
@@ -1326,7 +1319,7 @@ export default function RoleplayLinksView() {
                       {compareMode && selectedForComparison.length >= 2 && (
                         <button
                           onClick={startComparison}
-                          className="px-4 py-2 bg-gradient-to-r from-green-600 to-lime-500 rounded-xl text-sm font-medium text-white hover:scale-105 transition-all flex items-center gap-2"
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-xl text-sm font-medium text-white hover:scale-105 transition-all flex items-center gap-2 shadow-md"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Comparar {selectedForComparison.length} Selecionados
@@ -1354,13 +1347,13 @@ export default function RoleplayLinksView() {
                     // Mapear performance_level para cor
                     const getScoreColor = (level: string) => {
                       switch (level) {
-                        case 'legendary': return 'text-purple-400'
-                        case 'excellent': return 'text-green-400'
-                        case 'very_good': return 'text-blue-400'
-                        case 'good': return 'text-yellow-400'
-                        case 'needs_improvement': return 'text-orange-400'
-                        case 'poor': return 'text-red-400'
-                        default: return 'text-gray-400'
+                        case 'legendary': return 'text-purple-600'
+                        case 'excellent': return 'text-green-600'
+                        case 'very_good': return 'text-blue-600'
+                        case 'good': return 'text-amber-600'
+                        case 'needs_improvement': return 'text-orange-600'
+                        case 'poor': return 'text-red-600'
+                        default: return 'text-gray-500'
                       }
                     }
 
@@ -1380,10 +1373,10 @@ export default function RoleplayLinksView() {
                     return (
                       <div
                         key={roleplay.id}
-                        className={`bg-black/60 border rounded-2xl p-6 transition-all relative ${
+                        className={`bg-white border rounded-xl p-6 transition-all relative shadow-sm ${
                           selectedForComparison.includes(roleplay.id)
-                            ? 'border-green-500/50 bg-green-500/5'
-                            : 'border-green-500/10 hover:border-green-500/30'
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-gray-200 hover:border-green-300 hover:shadow-md'
                         }`}
                       >
                         {/* Checkbox de seleção */}
@@ -1393,8 +1386,8 @@ export default function RoleplayLinksView() {
                               onClick={() => toggleSelectForComparison(roleplay.id)}
                               className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
                                 selectedForComparison.includes(roleplay.id)
-                                  ? 'bg-green-500 border-green-500'
-                                  : 'border-green-500/30 hover:border-green-500/50'
+                                  ? 'bg-green-600 border-green-600'
+                                  : 'border-gray-300 hover:border-green-500'
                               }`}
                             >
                               {selectedForComparison.includes(roleplay.id) && (
@@ -1406,22 +1399,22 @@ export default function RoleplayLinksView() {
 
                         <div className={`flex items-start justify-between ${compareMode ? 'pl-10' : ''}`}>
                           <div className="flex-1">
-                            <h3 className="text-xl font-bold text-white mb-3">
+                            <h3 className="text-xl font-bold text-gray-900 mb-3">
                               {roleplay.participant_name}
                             </h3>
-                            <div className="space-y-2 text-sm text-gray-400">
+                            <div className="space-y-2 text-sm text-gray-600">
                               <p>
-                                <span className="text-gray-500">Data:</span> {formattedDate} às {formattedTime}
+                                <span className="text-gray-400">Data:</span> {formattedDate} às {formattedTime}
                               </p>
                               {roleplay.config && (
                                 <>
                                   <p>
-                                    <span className="text-gray-500">Cliente:</span>{' '}
+                                    <span className="text-gray-400">Cliente:</span>{' '}
                                     {roleplay.config.age} anos, {roleplay.config.temperament}
                                   </p>
                                   {roleplay.config.persona && (
                                     <p>
-                                      <span className="text-gray-500">Cargo:</span>{' '}
+                                      <span className="text-gray-400">Cargo:</span>{' '}
                                       {roleplay.config.persona.cargo || roleplay.config.persona.job_title || 'N/A'}
                                     </p>
                                   )}
@@ -1436,7 +1429,7 @@ export default function RoleplayLinksView() {
                                 {(overallScore / 10).toFixed(1)}/10
                               </div>
                             ) : (
-                              <div className="text-sm text-gray-500">
+                              <div className="text-sm text-gray-400">
                                 Sem avaliação
                               </div>
                             )}
@@ -1446,7 +1439,7 @@ export default function RoleplayLinksView() {
                         {evaluation && (
                           <button
                             onClick={() => setSelectedEvaluation(roleplay)}
-                            className="mt-4 w-full py-3 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 hover:border-green-500/50 rounded-xl text-green-400 font-semibold transition-all"
+                            className="mt-4 w-full py-3 bg-green-50 hover:bg-green-100 border border-green-200 hover:border-green-300 rounded-xl text-green-700 font-semibold transition-all"
                           >
                             Ver Avaliação Completa
                           </button>
@@ -1463,39 +1456,29 @@ export default function RoleplayLinksView() {
 
       {/* Modal de Avaliação Detalhada */}
       {selectedEvaluation && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl max-h-[80vh] flex flex-col bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-3xl border border-green-500/30">
-            {/* Header - sem position sticky ou relative */}
-            <div className="rounded-t-3xl border-b border-green-500/30 p-4 bg-gradient-to-br from-gray-900 to-gray-800">
-              {/* Botão simples sem containers extras */}
-              <div className="text-right mb-4 mt-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[80vh] flex flex-col bg-white rounded-2xl shadow-2xl">
+            {/* Header */}
+            <div className="rounded-t-2xl border-b border-gray-200 p-6 bg-gradient-to-r from-green-50 to-white">
+              {/* Botão Fechar */}
+              <div className="text-right mb-4">
                 <button
                   onClick={() => setSelectedEvaluation(null)}
-                  className="inline-block px-6 py-2 rounded-lg text-xs font-bold text-white shadow-lg"
-                  style={{
-                    background: 'linear-gradient(to right, #22c55e, #a3e635)',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
-                  }}
+                  className="px-6 py-2 rounded-lg text-xs font-bold text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md"
                 >
                   FECHAR
                 </button>
               </div>
 
-              <h2 className="text-xl font-bold text-center text-white mb-2">🎯 AVALIAÇÃO DETALHADA</h2>
-              <p className="text-center text-gray-400 text-sm mb-3">
+              <h2 className="text-xl font-bold text-center text-gray-900 mb-2">Avaliação Detalhada</h2>
+              <p className="text-center text-gray-500 text-sm mb-3">
                 {selectedEvaluation.participant_name} - {new Date(selectedEvaluation.created_at).toLocaleString('pt-BR')}
               </p>
 
               {/* Score Geral */}
-              <div className="bg-gray-800/40 rounded-xl p-3 border border-green-500/20">
+              <div className="bg-green-50 rounded-xl p-4 border border-green-200">
                 <div className="text-center">
-                  <div className="text-4xl font-bold text-green-400">
+                  <div className="text-4xl font-bold text-green-600">
                     {selectedEvaluation.evaluation?.overall_score ? (selectedEvaluation.evaluation.overall_score / 10).toFixed(1) : '0.0'}/10
                   </div>
                 </div>
@@ -1503,24 +1486,24 @@ export default function RoleplayLinksView() {
             </div>
 
             {/* Content - scrollable area */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {/* Resumo Executivo */}
               {selectedEvaluation.evaluation?.executive_summary && (
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                  <h3 className="text-base font-bold text-green-400 mb-2">📋 Resumo Executivo</h3>
-                  <p className="text-sm text-gray-300 leading-relaxed">{selectedEvaluation.evaluation.executive_summary}</p>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <h3 className="text-base font-bold text-green-700 mb-2">Resumo Executivo</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{selectedEvaluation.evaluation.executive_summary}</p>
                 </div>
               )}
 
               {/* SPIN Scores */}
               {selectedEvaluation.evaluation?.spin_evaluation && (
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                  <h3 className="text-base font-bold text-green-400 mb-3">📊 Métricas SPIN</h3>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <h3 className="text-base font-bold text-green-700 mb-3">Métricas SPIN</h3>
                   <div className="grid grid-cols-4 gap-3">
                     {['S', 'P', 'I', 'N'].map((key) => (
-                      <div key={key} className="text-center bg-gray-900/50 rounded-lg p-3 border border-green-500/10">
-                        <div className="text-xs text-gray-400 mb-1">{key}</div>
-                        <div className="text-2xl font-bold text-white">
+                      <div key={key} className="text-center bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                        <div className="text-xs text-gray-500 mb-1">{key}</div>
+                        <div className="text-2xl font-bold text-gray-900">
                           {selectedEvaluation.evaluation.spin_evaluation[key]?.final_score?.toFixed(1) || '0.0'}
                         </div>
                       </div>
@@ -1531,12 +1514,12 @@ export default function RoleplayLinksView() {
 
               {/* Pontos Fortes */}
               {selectedEvaluation.evaluation?.top_strengths && selectedEvaluation.evaluation.top_strengths.length > 0 && (
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                  <h3 className="text-base font-bold text-green-400 mb-2">✅ Pontos Fortes</h3>
+                <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                  <h3 className="text-base font-bold text-green-700 mb-2">Pontos Fortes</h3>
                   <ul className="space-y-2">
                     {selectedEvaluation.evaluation.top_strengths.map((strength: string, index: number) => (
-                      <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                        <span className="text-green-400 mt-0.5">•</span>
+                      <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                        <span className="text-green-600 mt-0.5">•</span>
                         <span>{strength}</span>
                       </li>
                     ))}
@@ -1546,12 +1529,12 @@ export default function RoleplayLinksView() {
 
               {/* Gaps Críticos */}
               {selectedEvaluation.evaluation?.critical_gaps && selectedEvaluation.evaluation.critical_gaps.length > 0 && (
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-red-500/20">
-                  <h3 className="text-base font-bold text-red-400 mb-2">⚠️ Gaps Críticos</h3>
+                <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                  <h3 className="text-base font-bold text-red-700 mb-2">Gaps Críticos</h3>
                   <ul className="space-y-2">
                     {selectedEvaluation.evaluation.critical_gaps.map((gap: string, index: number) => (
-                      <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                        <span className="text-red-400 mt-0.5">•</span>
+                      <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                        <span className="text-red-600 mt-0.5">•</span>
                         <span>{gap}</span>
                       </li>
                     ))}
@@ -1561,20 +1544,20 @@ export default function RoleplayLinksView() {
 
               {/* Melhorias Prioritárias */}
               {selectedEvaluation.evaluation?.priority_improvements && selectedEvaluation.evaluation.priority_improvements.length > 0 && (
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-yellow-500/20">
-                  <h3 className="text-base font-bold text-yellow-400 mb-3">🎯 Melhorias Prioritárias</h3>
+                <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                  <h3 className="text-base font-bold text-amber-700 mb-3">Melhorias Prioritárias</h3>
                   <div className="space-y-3">
                     {selectedEvaluation.evaluation.priority_improvements.map((improvement: any, index: number) => (
-                      <div key={index} className="bg-gray-900/50 rounded-lg p-3 border border-yellow-500/10">
+                      <div key={index} className="bg-white rounded-lg p-3 border border-amber-100 shadow-sm">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs uppercase font-bold text-yellow-400">
+                          <span className="text-xs uppercase font-bold text-amber-600">
                             {improvement.priority}
                           </span>
                           <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-300">{improvement.area}</span>
+                          <span className="text-xs text-gray-600">{improvement.area}</span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-2">{improvement.current_gap}</p>
-                        <p className="text-sm text-gray-300">{improvement.action_plan}</p>
+                        <p className="text-sm text-gray-500 mb-2">{improvement.current_gap}</p>
+                        <p className="text-sm text-gray-700">{improvement.action_plan}</p>
                       </div>
                     ))}
                   </div>
@@ -1584,17 +1567,7 @@ export default function RoleplayLinksView() {
               {/* Botão Fechar */}
               <button
                 onClick={() => setSelectedEvaluation(null)}
-                className="w-full py-3 rounded-xl font-bold text-white shadow-xl"
-                style={{
-                  background: 'linear-gradient(to right, #22c55e, #a3e635)',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
-                }}
+                className="w-full py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md"
               >
                 FECHAR AVALIAÇÃO
               </button>
@@ -1605,16 +1578,16 @@ export default function RoleplayLinksView() {
 
       {/* Modal de Comparação */}
       {showComparison && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-6">
-          <div className="w-full max-w-6xl h-[80vh] flex flex-col bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-2xl border border-green-500/30">
-            {/* Header simples */}
-            <div className="px-4 py-3 border-b border-green-500/30">
-              <div className="flex items-center justify-between mb-2">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="w-full max-w-6xl h-[80vh] flex flex-col bg-white rounded-2xl shadow-2xl">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-white rounded-t-2xl">
+              <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <GitCompare className="w-5 h-5 text-green-400" />
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <GitCompare className="w-5 h-5 text-green-600" />
                     Comparação de Roleplays
-                    <span className="text-sm text-gray-400 font-normal">
+                    <span className="text-sm text-gray-500 font-normal">
                       ({selectedForComparison.length} selecionados)
                     </span>
                   </h2>
@@ -1625,17 +1598,7 @@ export default function RoleplayLinksView() {
                     setSelectedForComparison([])
                     setCompareMode(false)
                   }}
-                  className="px-6 py-1.5 rounded-lg text-xs font-bold text-white shadow-lg mt-4"
-                  style={{
-                    background: 'linear-gradient(to right, #22c55e, #a3e635)',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
-                  }}
+                  className="px-6 py-2 rounded-lg text-xs font-bold text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md"
                 >
                   FECHAR
                 </button>
@@ -1643,7 +1606,7 @@ export default function RoleplayLinksView() {
             </div>
 
             {/* Content com scroll */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-6">
               {/* Grid de Comparação */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {selectedForComparison.map(roleplayId => {
@@ -1655,22 +1618,22 @@ export default function RoleplayLinksView() {
                   const spinScores = evaluation?.spin_evaluation
 
                   return (
-                    <div key={roleplayId} className="bg-black/60 border border-green-500/20 rounded-xl p-3">
+                    <div key={roleplayId} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                       {/* Header do Card */}
-                      <div className="mb-3 pb-2 border-b border-green-500/20">
-                        <h3 className="font-bold text-white text-base mb-1">
+                      <div className="mb-3 pb-2 border-b border-gray-100">
+                        <h3 className="font-bold text-gray-900 text-base mb-1">
                           {roleplay.participant_name}
                         </h3>
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-[10px] text-gray-500">
                           {new Date(roleplay.created_at).toLocaleString('pt-BR')}
                         </p>
                         <div className="mt-1">
                           {overallScore !== null && overallScore !== undefined ? (
-                            <div className="text-2xl font-bold text-green-400">
+                            <div className="text-2xl font-bold text-green-600">
                               {(overallScore / 10).toFixed(1)}/10
                             </div>
                           ) : (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-400">
                               Sem avaliação
                             </div>
                           )}
@@ -1680,12 +1643,12 @@ export default function RoleplayLinksView() {
                       {/* SPIN Scores */}
                       {spinScores && (
                         <div className="mb-3">
-                          <h4 className="text-xs font-bold text-green-400 mb-1">SPIN</h4>
+                          <h4 className="text-xs font-bold text-green-700 mb-1">SPIN</h4>
                           <div className="grid grid-cols-2 gap-1">
                             {['S', 'P', 'I', 'N'].map((key) => (
-                              <div key={key} className="bg-gray-900/50 rounded p-1 text-center">
-                                <div className="text-[9px] text-gray-400">{key}</div>
-                                <div className="text-sm font-bold text-white">
+                              <div key={key} className="bg-gray-50 rounded p-1 text-center border border-gray-100">
+                                <div className="text-[9px] text-gray-500">{key}</div>
+                                <div className="text-sm font-bold text-gray-900">
                                   {spinScores[key]?.final_score?.toFixed(1) || '0.0'}
                                 </div>
                               </div>
@@ -1697,8 +1660,8 @@ export default function RoleplayLinksView() {
                       {/* Resumo Compacto */}
                       {evaluation?.executive_summary && (
                         <div className="mb-2">
-                          <h4 className="text-xs font-bold text-green-400 mb-1">Resumo</h4>
-                          <p className="text-[10px] text-gray-300 leading-relaxed line-clamp-2">
+                          <h4 className="text-xs font-bold text-green-700 mb-1">Resumo</h4>
+                          <p className="text-[10px] text-gray-600 leading-relaxed line-clamp-2">
                             {evaluation.executive_summary}
                           </p>
                         </div>
@@ -1707,8 +1670,8 @@ export default function RoleplayLinksView() {
                       {/* Pontos Fortes - Apenas 1 */}
                       {evaluation?.top_strengths && evaluation.top_strengths.length > 0 && (
                         <div className="mb-2">
-                          <h4 className="text-xs font-bold text-green-400 mb-1">✅ Principal Forte</h4>
-                          <p className="text-[10px] text-gray-300 line-clamp-1">
+                          <h4 className="text-xs font-bold text-green-700 mb-1">Principal Forte</h4>
+                          <p className="text-[10px] text-gray-600 line-clamp-1">
                             • {evaluation.top_strengths[0]}
                           </p>
                         </div>
@@ -1717,8 +1680,8 @@ export default function RoleplayLinksView() {
                       {/* Gap Principal - Apenas 1 */}
                       {evaluation?.critical_gaps && evaluation.critical_gaps.length > 0 && (
                         <div className="mb-2">
-                          <h4 className="text-xs font-bold text-red-400 mb-1">⚠️ Principal Gap</h4>
-                          <p className="text-[10px] text-gray-300 line-clamp-1">
+                          <h4 className="text-xs font-bold text-red-700 mb-1">Principal Gap</h4>
+                          <p className="text-[10px] text-gray-600 line-clamp-1">
                             • {evaluation.critical_gaps[0]}
                           </p>
                         </div>
@@ -1731,7 +1694,7 @@ export default function RoleplayLinksView() {
                             e.stopPropagation()
                             setSelectedEvaluation(roleplay)
                           }}
-                          className="w-full mt-2 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 hover:border-green-500/50 rounded-lg text-[10px] text-green-400 font-semibold transition-all"
+                          className="w-full mt-2 py-1.5 bg-green-50 hover:bg-green-100 border border-green-200 hover:border-green-300 rounded-lg text-[10px] text-green-700 font-semibold transition-all"
                         >
                           Ver Detalhes
                         </button>
@@ -1742,20 +1705,20 @@ export default function RoleplayLinksView() {
               </div>
 
               {/* Tabela Comparativa de Métricas */}
-              <div className="mt-4 overflow-x-auto">
-                <h3 className="text-base font-bold text-white mb-3">📊 Comparação de Métricas</h3>
-                <table className="w-full bg-black/40 rounded-xl overflow-hidden text-sm">
-                  <thead className="bg-green-500/10 border-b border-green-500/20">
+              <div className="mt-6 overflow-x-auto">
+                <h3 className="text-base font-bold text-gray-900 mb-3">Comparação de Métricas</h3>
+                <table className="w-full bg-white rounded-xl overflow-hidden text-sm border border-gray-200">
+                  <thead className="bg-green-50 border-b border-green-100">
                     <tr>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-green-400">Participante</th>
-                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">Nota</th>
-                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">S</th>
-                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">P</th>
-                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">I</th>
-                      <th className="text-center px-2 py-2 text-xs font-medium text-green-400">N</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-green-700">Participante</th>
+                      <th className="text-center px-3 py-3 text-xs font-medium text-green-700">Nota</th>
+                      <th className="text-center px-3 py-3 text-xs font-medium text-green-700">S</th>
+                      <th className="text-center px-3 py-3 text-xs font-medium text-green-700">P</th>
+                      <th className="text-center px-3 py-3 text-xs font-medium text-green-700">I</th>
+                      <th className="text-center px-3 py-3 text-xs font-medium text-green-700">N</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-green-500/10">
+                  <tbody className="divide-y divide-gray-100">
                     {selectedForComparison.map(roleplayId => {
                       const roleplay = historico.find(r => r.id === roleplayId)
                       if (!roleplay) return null
@@ -1764,25 +1727,25 @@ export default function RoleplayLinksView() {
                       const spinScores = evaluation?.spin_evaluation
 
                       return (
-                        <tr key={roleplayId} className="hover:bg-green-500/5 transition-colors">
-                          <td className="px-3 py-2 text-xs text-white font-medium">
+                        <tr key={roleplayId} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-xs text-gray-900 font-medium">
                             {roleplay.participant_name}
                           </td>
-                          <td className="text-center px-2 py-2">
-                            <span className="text-sm font-bold text-green-400">
+                          <td className="text-center px-3 py-3">
+                            <span className="text-sm font-bold text-green-600">
                               {evaluation?.overall_score ? (evaluation.overall_score / 10).toFixed(1) : '0.0'}
                             </span>
                           </td>
-                          <td className="text-center px-2 py-2 text-xs text-white">
+                          <td className="text-center px-3 py-3 text-xs text-gray-700">
                             {spinScores?.S?.final_score?.toFixed(1) || '0.0'}
                           </td>
-                          <td className="text-center px-2 py-2 text-xs text-white">
+                          <td className="text-center px-3 py-3 text-xs text-gray-700">
                             {spinScores?.P?.final_score?.toFixed(1) || '0.0'}
                           </td>
-                          <td className="text-center px-2 py-2 text-xs text-white">
+                          <td className="text-center px-3 py-3 text-xs text-gray-700">
                             {spinScores?.I?.final_score?.toFixed(1) || '0.0'}
                           </td>
-                          <td className="text-center px-2 py-2 text-xs text-white">
+                          <td className="text-center px-3 py-3 text-xs text-gray-700">
                             {spinScores?.N?.final_score?.toFixed(1) || '0.0'}
                           </td>
                         </tr>
@@ -1799,17 +1762,7 @@ export default function RoleplayLinksView() {
                   setSelectedForComparison([])
                   setCompareMode(false)
                 }}
-                className="w-full mt-4 py-2 rounded-xl font-bold text-sm text-white shadow-xl"
-                style={{
-                  background: 'linear-gradient(to right, #22c55e, #a3e635)',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #16a34a, #84cc16)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(to right, #22c55e, #a3e635)'
-                }}
+                className="w-full mt-6 py-3 rounded-xl font-bold text-sm text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md"
               >
                 FECHAR COMPARAÇÃO
               </button>

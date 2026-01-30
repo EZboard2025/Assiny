@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone, Shuffle, EyeOff, Eye } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
@@ -64,6 +64,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [selectedPersona, setSelectedPersona] = useState('')
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
   const [selectedObjective, setSelectedObjective] = useState('')
+  const [hiddenMode, setHiddenMode] = useState(false) // Modo oculto - esconde seleções
 
   // Dados do banco
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
@@ -178,9 +179,6 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
         audio: false // Áudio é gerenciado separadamente pelo MediaRecorder
       })
       setWebcamStream(mediaStream)
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-      }
       setIsCameraOn(true)
     } catch (err) {
       console.error('Erro ao acessar câmera:', err)
@@ -206,6 +204,13 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       await startWebcam()
     }
   }
+
+  // Efeito para conectar o stream ao elemento de vídeo quando ambos existirem
+  useEffect(() => {
+    if (isCameraOn && webcamStream && videoRef.current) {
+      videoRef.current.srcObject = webcamStream
+    }
+  }, [isCameraOn, webcamStream])
 
   // Helper functions for evaluation modal (matching HistoricoView design)
   const getScoreColor = (score: number) => {
@@ -326,6 +331,41 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   }
 
   const temperaments = ['Analítico', 'Empático', 'Determinado', 'Indeciso', 'Sociável']
+
+  // Função para seleção aleatória de todas as configurações
+  const handleRandomSelection = () => {
+    // Idade aleatória entre 18 e 60
+    const randomAge = Math.floor(Math.random() * (60 - 18 + 1)) + 18
+    setAge(randomAge)
+
+    // Temperamento aleatório
+    const randomTemperament = temperaments[Math.floor(Math.random() * temperaments.length)]
+    setTemperament(randomTemperament)
+
+    // Persona aleatória (considerando o business type)
+    const filteredPersonas = businessType === 'Ambos'
+      ? personas
+      : personas.filter(p => p.business_type === businessType)
+
+    if (filteredPersonas.length > 0) {
+      const randomPersona = filteredPersonas[Math.floor(Math.random() * filteredPersonas.length)]
+      setSelectedPersona(randomPersona.id!)
+    }
+
+    // Objeções aleatórias (1 a 3 objeções)
+    if (objections.length > 0) {
+      const numObjections = Math.min(Math.floor(Math.random() * 3) + 1, objections.length)
+      const shuffled = [...objections].sort(() => Math.random() - 0.5)
+      const randomObjections = shuffled.slice(0, numObjections).map(o => o.id!)
+      setSelectedObjections(randomObjections)
+    }
+
+    // Objetivo aleatório
+    if (objectives.length > 0) {
+      const randomObjective = objectives[Math.floor(Math.random() * objectives.length)]
+      setSelectedObjective(randomObjective.id!)
+    }
+  }
 
   // Função para agrupar e ordenar personas por tags
   const getGroupedPersonas = () => {
@@ -1006,7 +1046,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   const startRecording = async () => {
     try {
       console.log('🎤 Iniciando gravação...')
-      setCurrentTranscription('') // Limpar transcrição anterior
+
+      // Limpar estados anteriores que podem estar travados
+      setCurrentTranscription('')
+
+      // Garantir que stream anterior esteja parado
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current = null
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
@@ -1071,6 +1123,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     } catch (error) {
       console.error('Erro ao acessar microfone:', error)
       alert('Erro ao acessar o microfone. Verifique as permissões.')
+      // Garantir reset dos estados em caso de erro
+      setIsRecording(false)
+      setIsLoading(false)
+      streamRef.current = null
+      mediaRecorderRef.current = null
     }
   }
 
@@ -1243,8 +1300,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       // Configurar visualizador de áudio
       setupAudioVisualizer(audio)
 
-      // Quando o áudio terminar, limpar visualizador e possivelmente finalizar
-      audio.onended = () => {
+      // Função para limpar estado do áudio
+      const cleanupAudio = () => {
         setIsPlayingAudio(false)
         setAudioVolume(0)
         URL.revokeObjectURL(audioUrl)
@@ -1254,7 +1311,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           cancelAnimationFrame(animationFrameRef.current)
           animationFrameRef.current = null
         }
+      }
 
+      // Quando o áudio terminar, limpar visualizador e possivelmente finalizar
+      audio.onended = () => {
+        cleanupAudio()
         console.log('🔊 Áudio do cliente finalizado')
 
         // Se for mensagem de finalização, finalizar automaticamente
@@ -1271,9 +1332,20 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         }
       }
 
+      // Tratar erros de áudio
+      audio.onerror = (e) => {
+        console.error('❌ Erro no elemento de áudio:', e)
+        cleanupAudio()
+      }
+
       // Tocar o áudio
-      await audio.play()
-      console.log('🔊 Áudio tocando')
+      try {
+        await audio.play()
+        console.log('🔊 Áudio tocando')
+      } catch (playError) {
+        console.error('❌ Erro ao reproduzir áudio (autoplay blocked?):', playError)
+        cleanupAudio()
+      }
     } catch (error) {
       console.error('❌ Erro ao converter texto em áudio:', error)
       setIsPlayingAudio(false)
@@ -1470,73 +1542,33 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       {/* Tela de Configuração - Layout integrado com fundo branco */}
       <div className={`min-h-screen relative z-10 py-8 px-6 ${isSimulating ? 'hidden' : ''}`}>
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className={`mb-6 text-center ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-            <h1 className="text-3xl font-bold text-gray-900">Simulação de Vendas</h1>
-            <p className="text-gray-500 mt-1">
-              Pratique suas habilidades de vendas com nosso cliente virtual inteligente.
-            </p>
+          {/* Header com título e contador */}
+          <div className={`mb-6 flex items-start justify-between ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+            {/* Título à esquerda */}
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Simulação de Vendas</h1>
+              <p className="text-gray-500 mt-1">
+                Pratique suas habilidades de vendas com nosso cliente sintético inteligente.
+              </p>
+            </div>
+
+            {/* Contador de Créditos à direita */}
+            {planUsage && (
+              <div className={`flex items-center gap-2 ${
+                planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
+                  ? 'text-red-500'
+                  : 'text-green-500'
+              }`}>
+                <Zap className="w-6 h-6" />
+                <span className="text-2xl font-bold">
+                  {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Contador de Créditos Mensais */}
-          {planUsage && (
-            <div className="flex justify-center mb-6">
-              <div className={`px-4 py-2 rounded-xl flex items-center gap-3 ${
-                planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                  ? 'bg-red-100 border border-red-300'
-                  : 'bg-green-100 border border-green-300'
-              }`}>
-                <Zap className={`w-5 h-5 ${
-                  planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                    ? 'text-red-500'
-                    : 'text-green-500'
-                }`} />
-                <div className="flex flex-col">
-                  <span className={`text-sm font-medium ${
-                    planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                      ? 'text-red-600'
-                      : 'text-green-600'
-                  }`}>
-                    Créditos este mês: {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
-                  </span>
-                  {planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used === planUsage.training?.credits?.limit - 1 && (
-                    <span className="text-xs text-yellow-600 font-semibold animate-pulse">
-                      ⚠️ Último crédito disponível!
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Layout: Ícone de chamada na esquerda + Painel de config na direita */}
-          <div className="flex flex-col lg:flex-row gap-0">
-            {/* Esquerda - Ícone de Chamada (Botão de Iniciar) */}
-            <div className="hidden lg:flex lg:w-56 flex-shrink-0 items-start justify-center pt-20">
-              <div className="flex flex-col items-center">
-                <button
-                  onClick={handleStartSimulation}
-                  disabled={roleplayLimitReached || dataLoading}
-                  className={`w-44 h-44 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${
-                    roleplayLimitReached || dataLoading
-                      ? 'bg-gray-400 cursor-not-allowed opacity-60'
-                      : 'bg-green-600 hover:bg-green-500 hover:scale-105 hover:shadow-green-500/40 hover:shadow-2xl cursor-pointer'
-                  }`}
-                >
-                  <Phone className={`w-20 h-20 transition-colors duration-300 ${
-                    roleplayLimitReached || dataLoading ? 'text-gray-200' : 'text-white'
-                  }`} />
-                </button>
-                <p className={`text-sm mt-4 text-center font-medium ${
-                  roleplayLimitReached ? 'text-red-500' : dataLoading ? 'text-gray-400' : 'text-gray-500'
-                }`}>
-                  {dataLoading ? 'Carregando...' : roleplayLimitReached ? 'Limite atingido' : 'Clique para iniciar'}
-                </p>
-              </div>
-            </div>
-
-            {/* Direita - Painel de Configuração (Branco) */}
-            <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          {/* Painel de Configuração */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               {/* Loading Skeleton */}
               {dataLoading ? (
                 <div className="relative">
@@ -1601,9 +1633,63 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 </div>
               ) : (
               <>
-              {/* Grid de 2 colunas internas */}
+              {/* Layout em 2 linhas */}
+              {/* Linha 1: Iniciar Simulação + Perfil do Cliente */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Coluna 1 - Perfil do Cliente */}
+                {/* Coluna 1 - Iniciar Simulação */}
+                <div className="flex flex-col">
+                  {/* Botões Aleatório e Oculto */}
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={handleRandomSelection}
+                      disabled={dataLoading || personas.length === 0 || objections.length === 0 || objectives.length === 0}
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all hover:scale-105 shadow-sm"
+                      title="Selecionar configuração aleatória"
+                    >
+                      <Shuffle className="w-4 h-4" />
+                      Aleatório
+                    </button>
+                    <button
+                      onClick={() => setHiddenMode(!hiddenMode)}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all hover:scale-105 shadow-sm ${
+                        hiddenMode
+                          ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                      }`}
+                      title={hiddenMode ? 'Mostrar seleções' : 'Ocultar seleções'}
+                    >
+                      {hiddenMode ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      {hiddenMode ? 'Mostrar' : 'Ocultar'}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center flex-1">
+                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6">Iniciar Simulação</h3>
+                  <button
+                    onClick={handleStartSimulation}
+                    disabled={roleplayLimitReached || dataLoading || !selectedPersona || selectedObjections.length === 0 || !selectedObjective}
+                    className={`w-40 h-40 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ${
+                      roleplayLimitReached || dataLoading || !selectedPersona || selectedObjections.length === 0 || !selectedObjective
+                        ? 'bg-gray-300 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-500 hover:scale-105 hover:shadow-green-500/30 hover:shadow-xl cursor-pointer'
+                    }`}
+                  >
+                    <Phone className={`w-20 h-20 ${
+                      roleplayLimitReached || dataLoading || !selectedPersona || selectedObjections.length === 0 || !selectedObjective
+                        ? 'text-gray-400'
+                        : 'text-white'
+                    }`} />
+                  </button>
+                  <p className={`text-sm mt-4 text-center font-medium ${
+                    roleplayLimitReached ? 'text-red-500' : dataLoading ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    {dataLoading ? 'Carregando...' : roleplayLimitReached ? 'Limite atingido' :
+                      (!selectedPersona || selectedObjections.length === 0 || !selectedObjective) ? 'Configure a sessão' : 'Clique para iniciar'}
+                  </p>
+                  </div>
+                </div>
+
+                {/* Coluna 2 - Perfil do Cliente */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Perfil do Cliente</h3>
 
@@ -1611,50 +1697,65 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-sm font-medium text-gray-700">Idade do Cliente</label>
-                      <span className="text-lg font-bold text-green-600">{age} anos</span>
+                      <span className={`text-lg font-bold ${hiddenMode ? 'text-gray-400' : 'text-green-600'}`}>
+                        {hiddenMode ? '?? anos' : `${age} anos`}
+                      </span>
                     </div>
                     <input
                       type="range"
                       min="18"
                       max="60"
-                      value={age}
+                      value={hiddenMode ? 39 : age}
                       onChange={(e) => setAge(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                        hiddenMode
+                          ? 'bg-gray-300 accent-gray-400 pointer-events-none'
+                          : 'bg-gray-200 accent-green-500'
+                      }`}
                     />
-                    <div className="flex justify-between text-xs text-gray-400 mt-2">
+                    <div className={`flex justify-between text-xs mt-2 ${hiddenMode ? 'text-gray-300' : 'text-gray-400'}`}>
                       <span>18</span>
                       <span>60</span>
                     </div>
 
                     {/* Info da faixa etária */}
                     <div className="mt-3 bg-white rounded-lg p-2 border border-gray-200">
-                      {age >= 18 && age <= 24 && (
-                        <div>
-                          <p className="text-xs font-medium text-blue-600 mb-1">18 a 24 anos</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Informal e moderno</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Aceita novidades</p>
+                      {hiddenMode ? (
+                        <div className="bg-gray-100 rounded p-2">
+                          <p className="text-xs font-medium text-gray-400 mb-1">Faixa etária</p>
+                          <p className="text-[10px] text-gray-400">••••••••••••••</p>
                         </div>
-                      )}
-                      {age >= 25 && age <= 34 && (
-                        <div>
-                          <p className="text-xs font-medium text-green-600 mb-1">25 a 34 anos</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Pragmático e orientado a resultados</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Foco em ROI • Aceita risco calculado</p>
-                        </div>
-                      )}
-                      {age >= 35 && age <= 44 && (
-                        <div>
-                          <p className="text-xs font-medium text-yellow-600 mb-1">35 a 44 anos</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Valoriza compliance • Cauteloso</p>
-                        </div>
-                      )}
-                      {age >= 45 && age <= 60 && (
-                        <div>
-                          <p className="text-xs font-medium text-orange-600 mb-1">45 a 60 anos</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Conservador e formal</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Foco em segurança • Avesso a riscos</p>
-                        </div>
+                      ) : (
+                        <>
+                          {age >= 18 && age <= 24 && (
+                            <div>
+                              <p className="text-xs font-medium text-blue-600 mb-1">18 a 24 anos</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Informal e moderno</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Aceita novidades</p>
+                            </div>
+                          )}
+                          {age >= 25 && age <= 34 && (
+                            <div>
+                              <p className="text-xs font-medium text-green-600 mb-1">25 a 34 anos</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Pragmático e orientado a resultados</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Foco em ROI • Aceita risco calculado</p>
+                            </div>
+                          )}
+                          {age >= 35 && age <= 44 && (
+                            <div>
+                              <p className="text-xs font-medium text-yellow-600 mb-1">35 a 44 anos</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Equilibrado entre desempenho e estabilidade</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Valoriza compliance • Cauteloso</p>
+                            </div>
+                          )}
+                          {age >= 45 && age <= 60 && (
+                            <div>
+                              <p className="text-xs font-medium text-orange-600 mb-1">45 a 60 anos</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Tom:</span> Conservador e formal</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Comportamento:</span> Foco em segurança • Avesso a riscos</p>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -1662,15 +1763,17 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   {/* Temperamento */}
                   <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
                     <label className="text-sm font-medium text-gray-700 mb-3 block">Temperamento</label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className={`flex flex-wrap gap-2 ${hiddenMode ? 'blur-sm select-none pointer-events-none' : ''}`}>
                       {temperaments.map((temp) => (
                         <button
                           key={temp}
                           onClick={() => setTemperament(temp)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            temperament === temp
-                              ? 'bg-green-500 text-white border border-green-500'
-                              : 'bg-white text-gray-600 border border-gray-300 hover:border-gray-400'
+                            hiddenMode
+                              ? 'bg-gray-300 text-gray-500 border border-gray-300'
+                              : temperament === temp
+                                ? 'bg-green-500 text-white border border-green-500'
+                                : 'bg-white text-gray-600 border border-gray-300 hover:border-gray-400'
                           }`}
                         >
                           {temp}
@@ -1680,52 +1783,63 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Info do temperamento */}
                     <div className="mt-3 bg-white rounded-lg p-2 border border-gray-200">
-                      {temperament === 'Analítico' && (
-                        <div>
-                          <p className="text-xs font-medium text-green-600 mb-1">Analítico</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Formal, racional, calmo e preciso</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Dados concretos, estatísticas</p>
+                      {hiddenMode ? (
+                        <div className="bg-gray-100 rounded p-2">
+                          <p className="text-xs font-medium text-gray-400 mb-1">Temperamento</p>
+                          <p className="text-[10px] text-gray-400">••••••••••••••</p>
                         </div>
-                      )}
-                      {temperament === 'Empático' && (
-                        <div>
-                          <p className="text-xs font-medium text-pink-600 mb-1">Empático</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Afável, próximo, gentil e emocional</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Histórias reais, propósito</p>
-                        </div>
-                      )}
-                      {temperament === 'Determinado' && (
-                        <div>
-                          <p className="text-xs font-medium text-red-600 mb-1">Determinado</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Soluções rápidas, eficiência</p>
-                        </div>
-                      )}
-                      {temperament === 'Indeciso' && (
-                        <div>
-                          <p className="text-xs font-medium text-yellow-600 mb-1">Indeciso</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Hesitante, cauteloso e questionador</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Depoimentos, garantias, segurança</p>
-                        </div>
-                      )}
-                      {temperament === 'Sociável' && (
-                        <div>
-                          <p className="text-xs font-medium text-cyan-600 mb-1">Sociável</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Leve, animado, entusiasmado e informal</p>
-                          <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Amizade, humor, energia positiva</p>
-                        </div>
+                      ) : (
+                        <>
+                          {temperament === 'Analítico' && (
+                            <div>
+                              <p className="text-xs font-medium text-green-600 mb-1">Analítico</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Formal, racional, calmo e preciso</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Dados concretos, estatísticas</p>
+                            </div>
+                          )}
+                          {temperament === 'Empático' && (
+                            <div>
+                              <p className="text-xs font-medium text-pink-600 mb-1">Empático</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Afável, próximo, gentil e emocional</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Histórias reais, propósito</p>
+                            </div>
+                          )}
+                          {temperament === 'Determinado' && (
+                            <div>
+                              <p className="text-xs font-medium text-red-600 mb-1">Determinado</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Objetivo, seguro, impaciente e assertivo</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Soluções rápidas, eficiência</p>
+                            </div>
+                          )}
+                          {temperament === 'Indeciso' && (
+                            <div>
+                              <p className="text-xs font-medium text-yellow-600 mb-1">Indeciso</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Hesitante, cauteloso e questionador</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Depoimentos, garantias, segurança</p>
+                            </div>
+                          )}
+                          {temperament === 'Sociável' && (
+                            <div>
+                              <p className="text-xs font-medium text-cyan-600 mb-1">Sociável</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Estilo:</span> Leve, animado, entusiasmado e informal</p>
+                              <p className="text-[10px] text-gray-500"><span className="text-gray-700">Gatilhos:</span> Amizade, humor, energia positiva</p>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Coluna 2 - Cenário do Roleplay */}
+              {/* Linha 2: Persona + Objeções */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                {/* Coluna 1 - Persona */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Cenário do Roleplay</h3>
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Persona</h3>
 
                   {/* Persona */}
                   <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                    <span className="text-sm font-medium text-gray-700 mb-3 block">Persona</span>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
@@ -1751,26 +1865,28 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                       key={persona.id}
                                       onClick={() => setSelectedPersona(persona.id!)}
                                       className={`cursor-pointer rounded-lg p-2 border transition-all ${
-                                        selectedPersona === persona.id
-                                          ? 'bg-green-50 border-green-500'
-                                          : 'bg-white border-gray-200 hover:border-gray-300'
+                                        hiddenMode
+                                          ? 'bg-gray-100 border-gray-200'
+                                          : selectedPersona === persona.id
+                                            ? 'bg-green-50 border-green-500'
+                                            : 'bg-white border-gray-200 hover:border-gray-300'
                                       }`}
                                     >
                                       <div className="flex items-center gap-2">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                          selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                          hiddenMode ? 'bg-gray-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
                                         }`}>
-                                          <UserCircle2 className={`w-4 h-4 ${selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-medium text-gray-900 truncate">
-                                            {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
+                                            {hiddenMode ? '••••••••••' : (persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession))}
                                           </p>
                                           <p className="text-[10px] text-gray-500 truncate">
-                                            {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
+                                            {hiddenMode ? '••••••••' : (persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks))}
                                           </p>
                                         </div>
-                                        {selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
                                       </div>
                                     </div>
                                   ))}
@@ -1788,26 +1904,28 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                       key={persona.id}
                                       onClick={() => setSelectedPersona(persona.id!)}
                                       className={`cursor-pointer rounded-lg p-2 border transition-all ${
-                                        selectedPersona === persona.id
-                                          ? 'bg-green-50 border-green-500'
-                                          : 'bg-white border-gray-200 hover:border-gray-300'
+                                        hiddenMode
+                                          ? 'bg-gray-100 border-gray-200'
+                                          : selectedPersona === persona.id
+                                            ? 'bg-green-50 border-green-500'
+                                            : 'bg-white border-gray-200 hover:border-gray-300'
                                       }`}
                                     >
                                       <div className="flex items-center gap-2">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                          selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                          hiddenMode ? 'bg-gray-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
                                         }`}>
-                                          <UserCircle2 className={`w-4 h-4 ${selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-medium text-gray-900 truncate">
-                                            {persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession)}
+                                            {hiddenMode ? '••••••••••' : (persona.business_type === 'B2B' ? ((persona as any).cargo || (persona as PersonaB2B).job_title) : ((persona as any).profissao || (persona as PersonaB2C).profession))}
                                           </p>
                                           <p className="text-[10px] text-gray-500 truncate">
-                                            {persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks)}
+                                            {hiddenMode ? '••••••••' : (persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks))}
                                           </p>
                                         </div>
-                                        {selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
                                       </div>
                                     </div>
                                   ))}
@@ -1819,12 +1937,17 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Coluna 2 - Objeções */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Objeções</h3>
 
                   {/* Objeções */}
                   <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-gray-700">Objeções</span>
-                      {!dataLoading && <span className="text-xs text-green-600 font-medium">{selectedObjections.length} selecionadas</span>}
+                      <span className="text-sm font-medium text-gray-700">Selecione as objeções</span>
+                      {!dataLoading && <span className={`text-xs font-medium ${hiddenMode ? 'text-gray-400' : 'text-green-600'}`}>{hiddenMode ? '? selecionadas' : `${selectedObjections.length} selecionadas`}</span>}
                     </div>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
@@ -1838,26 +1961,32 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           <label
                             key={objection.id}
                             className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-                              selectedObjections.includes(objection.id)
-                                ? 'bg-green-50 border border-green-500'
-                                : 'bg-white border border-gray-200 hover:border-gray-300'
+                              hiddenMode
+                                ? 'bg-gray-100 border border-gray-200'
+                                : selectedObjections.includes(objection.id)
+                                  ? 'bg-green-50 border border-green-500'
+                                  : 'bg-white border border-gray-200 hover:border-gray-300'
                             }`}
                           >
                             <div
                               onClick={(e) => { e.preventDefault(); toggleObjection(objection.id) }}
                               className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all ${
-                                selectedObjections.includes(objection.id)
-                                  ? 'bg-green-500 border-green-500'
-                                  : 'border-gray-300'
+                                hiddenMode
+                                  ? 'bg-gray-300 border-gray-300'
+                                  : selectedObjections.includes(objection.id)
+                                    ? 'bg-green-500 border-green-500'
+                                    : 'border-gray-300'
                               }`}
                             >
-                              {selectedObjections.includes(objection.id) && (
+                              {!hiddenMode && selectedObjections.includes(objection.id) && (
                                 <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
                             </div>
-                            <span className="text-xs text-gray-700 truncate">{objection.name}</span>
+                            <span className="text-xs text-gray-700 truncate">
+                              {hiddenMode ? '••••••••••••' : objection.name}
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -1879,13 +2008,21 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       <select
                         value={selectedObjective}
                         onChange={(e) => setSelectedObjective(e.target.value)}
-                        className="w-full bg-green-600 text-white p-2.5 rounded-lg text-sm font-medium cursor-pointer hover:bg-green-500 transition-colors"
+                        className={`w-full p-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                          hiddenMode
+                            ? 'bg-gray-400 text-gray-600'
+                            : 'bg-green-600 text-white hover:bg-green-500'
+                        }`}
                       >
-                        {objectives.map((objective) => (
-                          <option key={objective.id} value={objective.id}>
-                            {objective.name}
-                          </option>
-                        ))}
+                        {hiddenMode ? (
+                          <option value="">••••••••••••••</option>
+                        ) : (
+                          objectives.map((objective) => (
+                            <option key={objective.id} value={objective.id}>
+                              {objective.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                     )}
                   </div>
@@ -1954,9 +2091,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
             </div>
           </div>
         </div>
-      </div>
 
-        {/* Modal de Loading - Avaliação */}
+      {/* Modal de Loading - Avaliação */}
         {isEvaluating && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">

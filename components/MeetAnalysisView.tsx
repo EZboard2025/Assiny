@@ -18,7 +18,12 @@ import {
 } from 'lucide-react'
 
 // Vexa API config - production uses relative path via Nginx proxy
-const VEXA_API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+const isDevelopment = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.port === '3000' ||
+  window.location.hostname.startsWith('192.168.')
+)
+const VEXA_API_URL = isDevelopment
   ? 'http://localhost:8056'  // Development
   : '/vexa-api'              // Production (proxied via Nginx)
 const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
@@ -319,13 +324,13 @@ export default function MeetAnalysisView() {
     if (!session) return null
 
     const statusConfig: Record<BotStatus, { icon: any; text: string; color: string }> = {
-      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-400' },
-      sending: { icon: Loader2, text: 'Enviando bot...', color: 'text-yellow-400' },
-      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-yellow-400' },
-      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-400' },
-      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-400' },
-      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-400' },
-      error: { icon: XCircle, text: 'Erro', color: 'text-red-400' }
+      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500' },
+      sending: { icon: Loader2, text: 'Enviando bot...', color: 'text-amber-600' },
+      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600' },
+      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600' },
+      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600' },
+      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600' },
+      error: { icon: XCircle, text: 'Erro', color: 'text-red-600' }
     }
 
     const config = statusConfig[session.status]
@@ -340,25 +345,25 @@ export default function MeetAnalysisView() {
   }
 
   return (
-    <div className="min-h-screen py-8 px-6">
+    <div className="min-h-screen bg-gray-50 py-8 px-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-2xl flex items-center justify-center border border-green-500/30">
-            <Video className="w-8 h-8 text-green-400" />
+          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-2xl flex items-center justify-center">
+            <Video className="w-8 h-8 text-green-600" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Análise de Google Meet
           </h1>
-          <p className="text-gray-400">
+          <p className="text-gray-500">
             Cole o link da reunião e nosso bot entrará para transcrever a conversa
           </p>
         </div>
 
         {/* Input Section */}
         {!session && (
-          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 mb-6">
-            <label className="block text-sm font-semibold text-gray-300 mb-3">
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
               Link do Google Meet
             </label>
             <div className="flex gap-3">
@@ -368,18 +373,18 @@ export default function MeetAnalysisView() {
                   value={meetUrl}
                   onChange={(e) => handleUrlChange(e.target.value)}
                   placeholder="https://meet.google.com/abc-defg-hij"
-                  className="w-full px-4 py-3.5 bg-gray-800/60 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-400/60 focus:bg-gray-800/80 transition-all"
+                  className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                 />
                 {meetingId && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
+                    <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
                       {meetingId}
                     </span>
                     <button
                       onClick={copyMeetingId}
-                      className="text-gray-400 hover:text-green-400 transition-colors"
+                      className="text-gray-400 hover:text-green-600 transition-colors"
                     >
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                 )}
@@ -387,37 +392,37 @@ export default function MeetAnalysisView() {
               <button
                 onClick={sendBot}
                 disabled={!meetingId}
-                className="px-6 py-3.5 bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-400 hover:to-emerald-300 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-green-500/30 hover:shadow-green-500/50"
+                className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
               >
                 <Send className="w-5 h-5" />
                 Enviar Bot
               </button>
             </div>
             {error && (
-              <div className="mt-3 flex items-center gap-2 text-red-400 text-sm">
+              <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
                 <AlertTriangle className="w-4 h-4" />
                 {error}
               </div>
             )}
 
             {/* Instructions */}
-            <div className="mt-6 p-4 bg-gray-800/40 rounded-xl border border-gray-700/50">
-              <h3 className="text-sm font-semibold text-gray-300 mb-2">Como funciona:</h3>
-              <ol className="text-sm text-gray-400 space-y-1.5">
+            <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Como funciona:</h3>
+              <ol className="text-sm text-gray-600 space-y-1.5">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">1.</span>
+                  <span className="text-green-600 font-bold">1.</span>
                   Cole o link da reunião do Google Meet acima
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">2.</span>
+                  <span className="text-green-600 font-bold">2.</span>
                   Clique em "Enviar Bot" - um participante chamado "VexaBot" pedirá para entrar
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">3.</span>
-                  <strong className="text-yellow-400">Aceite o bot na reunião</strong> quando ele pedir para participar
+                  <span className="text-green-600 font-bold">3.</span>
+                  <strong className="text-amber-600">Aceite o bot na reunião</strong> quando ele pedir para participar
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">4.</span>
+                  <span className="text-green-600 font-bold">4.</span>
                   A transcrição aparecerá em tempo real aqui
                 </li>
               </ol>
@@ -429,7 +434,7 @@ export default function MeetAnalysisView() {
         {session && (
           <div className="space-y-6">
             {/* Status Bar */}
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-4 border border-green-500/30">
+            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {getStatusDisplay()}
@@ -440,13 +445,13 @@ export default function MeetAnalysisView() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 bg-gray-800/60 px-3 py-1.5 rounded-lg">
+                  <span className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg font-medium">
                     Meeting: {session.meetingId}
                   </span>
                   {session.status !== 'ended' && session.status !== 'error' && (
                     <button
                       onClick={endSession}
-                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors flex items-center gap-2 border border-red-500/30"
+                      className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors flex items-center gap-2 border border-red-200"
                     >
                       <StopCircle className="w-4 h-4" />
                       Encerrar
@@ -455,7 +460,7 @@ export default function MeetAnalysisView() {
                   {(session.status === 'ended' || session.status === 'error') && (
                     <button
                       onClick={resetSession}
-                      className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors flex items-center gap-2 border border-green-500/30"
+                      className="px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-green-200"
                     >
                       <RefreshCw className="w-4 h-4" />
                       Nova Análise
@@ -466,10 +471,10 @@ export default function MeetAnalysisView() {
             </div>
 
             {/* Transcript */}
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl border border-green-500/30 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-700/50 bg-gray-800/40">
-                <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-green-400" />
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-green-600" />
                   Transcrição em Tempo Real
                   {session.transcript.length > 0 && (
                     <span className="text-xs text-gray-500">
@@ -481,51 +486,51 @@ export default function MeetAnalysisView() {
 
               <div
                 ref={transcriptRef}
-                className="h-[400px] overflow-y-auto p-4 space-y-4"
+                className="h-[400px] overflow-y-auto p-4 space-y-4 bg-white"
               >
                 {session.transcript.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     {session.status === 'joining' || session.status === 'sending' ? (
                       <>
-                        <Loader2 className="w-8 h-8 animate-spin mb-3" />
-                        <p>Aguardando bot entrar na reunião...</p>
-                        <p className="text-sm text-gray-400 mt-2">
+                        <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
+                        <p className="text-gray-600">Aguardando bot entrar na reunião...</p>
+                        <p className="text-sm text-gray-500 mt-2">
                           Isso geralmente leva de 10 a 15 segundos
                         </p>
-                        <p className="text-sm text-yellow-400 mt-2">
+                        <p className="text-sm text-amber-600 mt-2 font-medium">
                           Lembre-se de aceitar o "VexaBot" quando ele pedir para entrar!
                         </p>
                       </>
                     ) : session.status === 'in_meeting' ? (
                       <>
-                        <Video className="w-8 h-8 mb-3 text-green-400" />
-                        <p>Bot na reunião. Aguardando transcrição...</p>
+                        <Video className="w-8 h-8 mb-3 text-green-600" />
+                        <p className="text-gray-600">Bot na reunião. Aguardando transcrição...</p>
                       </>
                     ) : (
                       <>
-                        <Clock className="w-8 h-8 mb-3" />
-                        <p>Nenhuma transcrição ainda</p>
+                        <Clock className="w-8 h-8 mb-3 text-gray-400" />
+                        <p className="text-gray-500">Nenhuma transcrição ainda</p>
                       </>
                     )}
                   </div>
                 ) : (
                   session.transcript.map((segment, idx) => (
                     <div key={idx} className="flex gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/10 flex items-center justify-center border border-green-500/30">
-                        <User className="w-5 h-5 text-green-400" />
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <User className="w-5 h-5 text-green-600" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-baseline gap-2 mb-1">
-                          <span className="font-semibold text-green-400 text-sm">
+                          <span className="font-semibold text-green-700 text-sm">
                             {segment.speaker}
                           </span>
                           {segment.timestamp && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-400">
                               {segment.timestamp}
                             </span>
                           )}
                         </div>
-                        <p className="text-gray-300 text-sm leading-relaxed">
+                        <p className="text-gray-700 text-sm leading-relaxed">
                           {segment.text}
                         </p>
                       </div>
@@ -537,9 +542,9 @@ export default function MeetAnalysisView() {
 
             {/* Actions when ended */}
             {session.status === 'ended' && session.transcript.length > 0 && (
-              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/30">
-                <h3 className="text-lg font-bold text-white mb-4">Sessão Encerrada</h3>
-                <p className="text-gray-400 mb-4">
+              <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Sessão Encerrada</h3>
+                <p className="text-gray-600 mb-4">
                   A transcrição foi capturada com sucesso. Você pode:
                 </p>
                 <div className="flex gap-3">
@@ -550,14 +555,14 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors flex items-center gap-2 border border-blue-500/30"
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
                   >
                     <Copy className="w-4 h-4" />
                     Copiar Transcrição
                   </button>
                   <button
                     onClick={resetSession}
-                    className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors flex items-center gap-2 border border-green-500/30"
+                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-gray-200 font-medium"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Nova Análise
