@@ -25,7 +25,11 @@ import {
   Award,
   AlertCircle,
   Lightbulb,
-  X
+  X,
+  FileText,
+  History,
+  Play,
+  Eye
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
@@ -50,6 +54,16 @@ interface MeetingSession {
   status: BotStatus
   startTime?: Date
   transcript: TranscriptSegment[]
+}
+
+interface SavedEvaluation {
+  id: string
+  seller_name: string
+  call_objective: string | null
+  overall_score: number
+  performance_level: string
+  created_at: string
+  evaluation: MeetEvaluation
 }
 
 interface MeetEvaluation {
@@ -177,6 +191,18 @@ export default function MeetAnalysisView() {
   // Call context
   const [callObjective, setCallObjective] = useState('')
 
+  // Mode: 'bot' | 'manual' | 'history'
+  const [activeMode, setActiveMode] = useState<'bot' | 'manual' | 'history'>('bot')
+
+  // Manual transcript testing
+  const [manualTranscript, setManualTranscript] = useState('')
+  const [parsedManualTranscript, setParsedManualTranscript] = useState<TranscriptSegment[]>([])
+
+  // History
+  const [savedEvaluations, setSavedEvaluations] = useState<SavedEvaluation[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [selectedEvaluation, setSelectedEvaluation] = useState<SavedEvaluation | null>(null)
+
   // Evaluation states
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
@@ -219,6 +245,163 @@ export default function MeetAnalysisView() {
     }
     fetchUserInfo()
   }, [])
+
+  // Parse manual transcript text into segments
+  const parseManualTranscript = (text: string): TranscriptSegment[] => {
+    const segments: TranscriptSegment[] = []
+    const lines = text.split('\n').filter(line => line.trim())
+
+    for (const line of lines) {
+      // Try to match formats like "Speaker: text" or "Speaker - text" or "[Speaker] text"
+      const colonMatch = line.match(/^([^:]+):\s*(.+)$/i)
+      const dashMatch = line.match(/^([^-]+)\s*-\s*(.+)$/i)
+      const bracketMatch = line.match(/^\[([^\]]+)\]\s*(.+)$/i)
+
+      if (colonMatch) {
+        segments.push({
+          speaker: colonMatch[1].trim(),
+          text: colonMatch[2].trim(),
+          timestamp: ''
+        })
+      } else if (bracketMatch) {
+        segments.push({
+          speaker: bracketMatch[1].trim(),
+          text: bracketMatch[2].trim(),
+          timestamp: ''
+        })
+      } else if (dashMatch && dashMatch[1].length < 30) {
+        // Only use dash match if speaker name is reasonably short
+        segments.push({
+          speaker: dashMatch[1].trim(),
+          text: dashMatch[2].trim(),
+          timestamp: ''
+        })
+      } else if (line.trim()) {
+        // If no speaker pattern found, treat as continuation or unknown speaker
+        if (segments.length > 0) {
+          segments[segments.length - 1].text += ' ' + line.trim()
+        } else {
+          segments.push({
+            speaker: 'Participante',
+            text: line.trim(),
+            timestamp: ''
+          })
+        }
+      }
+    }
+
+    return consolidateTranscript(segments)
+  }
+
+  // Update parsed transcript when manual text changes
+  useEffect(() => {
+    if (manualTranscript.trim()) {
+      const parsed = parseManualTranscript(manualTranscript)
+      setParsedManualTranscript(parsed)
+    } else {
+      setParsedManualTranscript([])
+    }
+  }, [manualTranscript])
+
+  // Load evaluation history
+  const loadHistory = async () => {
+    if (!userId) return
+
+    setIsLoadingHistory(true)
+    try {
+      const { data, error } = await supabase
+        .from('meet_evaluations')
+        .select('id, seller_name, call_objective, overall_score, performance_level, created_at, evaluation')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      if (error) throw error
+      setSavedEvaluations(data || [])
+    } catch (err) {
+      console.error('Error loading history:', err)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  // Load history when switching to history tab
+  useEffect(() => {
+    if (activeMode === 'history' && userId) {
+      loadHistory()
+    }
+  }, [activeMode, userId])
+
+  // Evaluate manual transcript
+  const evaluateManualTranscript = async () => {
+    if (parsedManualTranscript.length === 0) {
+      setEvaluationError('Cole uma transcrição válida para avaliar')
+      return
+    }
+
+    if (!userId || !companyId) {
+      setEvaluationError('Usuário não autenticado')
+      return
+    }
+
+    setIsEvaluating(true)
+    setEvaluationError('')
+
+    try {
+      // Fetch company objections from ConfigHub
+      const { data: objectionsData } = await supabase
+        .from('objections')
+        .select('name, rebuttals')
+        .eq('company_id', companyId)
+
+      // Format objections for the AI
+      let objectionsText = ''
+      if (objectionsData && objectionsData.length > 0) {
+        objectionsText = objectionsData.map(obj => {
+          const rebuttals = obj.rebuttals && Array.isArray(obj.rebuttals)
+            ? obj.rebuttals.join('; ')
+            : ''
+          return `- Objeção: "${obj.name}" | Formas de quebrar: ${rebuttals || 'Não configurado'}`
+        }).join('\n')
+      }
+
+      const response = await fetch('/api/meet/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: parsedManualTranscript,
+          sellerName: sellerName.trim(),
+          callObjective: callObjective.trim() || null,
+          objections: objectionsText || null,
+          meetingId: `manual_${Date.now()}`,
+          userId,
+          companyId
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Falha ao avaliar call')
+      }
+
+      const data = await response.json()
+      setEvaluation(data.evaluation)
+      setShowEvaluationModal(true)
+
+    } catch (err: any) {
+      console.error('Evaluation error:', err)
+      setEvaluationError(err.message || 'Erro ao avaliar call')
+    } finally {
+      setIsEvaluating(false)
+    }
+  }
+
+  // View saved evaluation
+  const viewSavedEvaluation = (saved: SavedEvaluation) => {
+    setSelectedEvaluation(saved)
+    setEvaluation(saved.evaluation)
+    setShowEvaluationModal(true)
+  }
 
   // Extract meeting ID from Google Meet URL
   const extractMeetingId = (url: string): string | null => {
@@ -537,16 +720,95 @@ export default function MeetAnalysisView() {
     )
   }
 
-  // Render SPIN score card
-  const renderSpinScore = (letter: string, score: number, feedback: string) => (
+  // Render SPIN score card - Full version
+  const renderSpinScoreFull = (
+    letter: string,
+    label: string,
+    data: {
+      final_score: number
+      technical_feedback: string
+      key_questions_asked?: string[]
+      problems_identified?: string[]
+      implications_raised?: string[]
+      value_propositions_used?: string[]
+      missed_opportunities: string[]
+    }
+  ) => (
     <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-lg font-bold text-white">{letter}</span>
-        <span className={`text-2xl font-bold ${getScoreColor(score)}`}>
-          {score.toFixed(1)}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-bold text-white bg-purple-500/20 px-3 py-1 rounded-lg">{letter}</span>
+          <span className="text-sm text-gray-400">{label}</span>
+        </div>
+        <span className={`text-2xl font-bold ${getScoreColor(data.final_score)}`}>
+          {data.final_score.toFixed(1)}
         </span>
       </div>
-      <p className="text-sm text-gray-400 line-clamp-3">{feedback}</p>
+      <p className="text-sm text-gray-300 mb-3 leading-relaxed">{data.technical_feedback}</p>
+
+      {/* Questions/Items identified */}
+      {data.key_questions_asked && data.key_questions_asked.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-green-400 mb-1">Perguntas feitas:</p>
+          <ul className="text-xs text-gray-400 space-y-1">
+            {data.key_questions_asked.map((q, i) => (
+              <li key={i} className="flex items-start gap-1">
+                <span className="text-green-500">•</span> {q}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.problems_identified && data.problems_identified.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-blue-400 mb-1">Problemas identificados:</p>
+          <ul className="text-xs text-gray-400 space-y-1">
+            {data.problems_identified.map((p, i) => (
+              <li key={i} className="flex items-start gap-1">
+                <span className="text-blue-500">•</span> {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.implications_raised && data.implications_raised.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-orange-400 mb-1">Implicações levantadas:</p>
+          <ul className="text-xs text-gray-400 space-y-1">
+            {data.implications_raised.map((imp, i) => (
+              <li key={i} className="flex items-start gap-1">
+                <span className="text-orange-500">•</span> {imp}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.value_propositions_used && data.value_propositions_used.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-purple-400 mb-1">Propostas de valor usadas:</p>
+          <ul className="text-xs text-gray-400 space-y-1">
+            {data.value_propositions_used.map((v, i) => (
+              <li key={i} className="flex items-start gap-1">
+                <span className="text-purple-500">•</span> {v}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Missed opportunities */}
+      {data.missed_opportunities && data.missed_opportunities.length > 0 && (
+        <div className="mt-3 p-2 bg-red-500/10 rounded-lg border border-red-500/20">
+          <p className="text-xs font-semibold text-red-400 mb-1">Oportunidades perdidas:</p>
+          <ul className="text-xs text-gray-400 space-y-1">
+            {data.missed_opportunities.map((opp, i) => (
+              <li key={i} className="flex items-start gap-1">
+                <span className="text-red-500">•</span> {opp}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 
@@ -562,12 +824,225 @@ export default function MeetAnalysisView() {
             Análise de Google Meet
           </h1>
           <p className="text-gray-400">
-            Cole o link da reunião e nosso bot entrará para transcrever e avaliar a conversa
+            Avalie o desempenho em calls de venda com IA
           </p>
         </div>
 
-        {/* Input Section */}
+        {/* Mode Tabs */}
         {!session && (
+          <div className="flex gap-2 mb-6 bg-gray-800/40 p-1.5 rounded-xl border border-gray-700/50">
+            <button
+              onClick={() => setActiveMode('bot')}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                activeMode === 'bot'
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              Bot ao Vivo
+            </button>
+            <button
+              onClick={() => setActiveMode('manual')}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                activeMode === 'manual'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Colar Transcrição
+            </button>
+            <button
+              onClick={() => setActiveMode('history')}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                activeMode === 'history'
+                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              Histórico
+            </button>
+          </div>
+        )}
+
+        {/* Manual Transcript Mode */}
+        {!session && activeMode === 'manual' && (
+          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/30 mb-6">
+            <div className="space-y-4">
+              {/* Call Objective */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Objetivo da Call <span className="text-gray-500 font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={callObjective}
+                  onChange={(e) => setCallObjective(e.target.value)}
+                  placeholder="Ex: Apresentar proposta comercial, Fazer discovery, Negociar contrato..."
+                  className="w-full px-4 py-3 bg-gray-800/60 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 focus:bg-gray-800/80 transition-all"
+                />
+              </div>
+
+              {/* Manual Transcript Input */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Cole a Transcrição da Call
+                </label>
+                <textarea
+                  value={manualTranscript}
+                  onChange={(e) => setManualTranscript(e.target.value)}
+                  placeholder={`Cole a transcrição aqui no formato:\n\nVendedor: Olá, como vai?\nCliente: Bem, obrigado.\nVendedor: Gostaria de apresentar nossa solução...\n\nOu em outros formatos como:\n[Vendedor] texto...\nCliente - texto...`}
+                  className="w-full h-64 px-4 py-3 bg-gray-800/60 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 focus:bg-gray-800/80 transition-all font-mono text-sm resize-none"
+                />
+                {parsedManualTranscript.length > 0 && (
+                  <p className="text-xs text-blue-400 mt-2">
+                    ✓ {parsedManualTranscript.length} segmentos identificados
+                  </p>
+                )}
+              </div>
+
+              {/* Preview of parsed transcript */}
+              {parsedManualTranscript.length > 0 && (
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50 max-h-48 overflow-y-auto">
+                  <h4 className="text-xs font-semibold text-gray-400 mb-3">Preview da transcrição parseada:</h4>
+                  <div className="space-y-2">
+                    {parsedManualTranscript.slice(0, 5).map((seg, idx) => (
+                      <div key={idx} className="text-sm">
+                        <span className="font-semibold text-blue-400">{seg.speaker}:</span>
+                        <span className="text-gray-300 ml-2">{seg.text.substring(0, 100)}{seg.text.length > 100 ? '...' : ''}</span>
+                      </div>
+                    ))}
+                    {parsedManualTranscript.length > 5 && (
+                      <p className="text-xs text-gray-500">... e mais {parsedManualTranscript.length - 5} segmentos</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {evaluationError && (
+                <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-lg border border-red-500/30">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  {evaluationError}
+                </div>
+              )}
+
+              {/* Evaluate Button */}
+              <button
+                onClick={evaluateManualTranscript}
+                disabled={isEvaluating || parsedManualTranscript.length === 0}
+                className="w-full px-6 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50"
+              >
+                {isEvaluating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Avaliando... (pode levar até 30s)
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-5 h-5" />
+                    Avaliar Transcrição
+                  </>
+                )}
+              </button>
+
+              {/* Show result if already evaluated */}
+              {evaluation && !showEvaluationModal && (
+                <button
+                  onClick={() => setShowEvaluationModal(true)}
+                  className="w-full px-4 py-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl transition-colors flex items-center justify-center gap-2 border border-green-500/30"
+                >
+                  <Award className="w-5 h-5" />
+                  Ver Resultado da Avaliação (Nota: {evaluation.overall_score})
+                </button>
+              )}
+            </div>
+
+            {/* Format Instructions */}
+            <div className="mt-6 p-4 bg-gray-800/40 rounded-xl border border-gray-700/50">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">Formatos aceitos:</h3>
+              <div className="text-sm text-gray-400 space-y-1.5">
+                <p><code className="text-blue-400">Nome: texto</code> - Formato com dois pontos</p>
+                <p><code className="text-blue-400">[Nome] texto</code> - Formato com colchetes</p>
+                <p><code className="text-blue-400">Nome - texto</code> - Formato com hífen</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* History Mode */}
+        {!session && activeMode === 'history' && (
+          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <History className="w-5 h-5 text-purple-400" />
+                Histórico de Avaliações
+              </h3>
+              <button
+                onClick={loadHistory}
+                disabled={isLoadingHistory}
+                className="px-3 py-1.5 text-sm bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors flex items-center gap-2 border border-purple-500/30"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+            </div>
+
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+              </div>
+            ) : savedEvaluations.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Nenhuma avaliação encontrada</p>
+                <p className="text-sm mt-1">Avalie uma call para ver o histórico aqui</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {savedEvaluations.map((saved) => {
+                  const config = getPerformanceConfig(saved.performance_level)
+                  return (
+                    <div
+                      key={saved.id}
+                      className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50 hover:border-purple-500/30 transition-colors cursor-pointer group"
+                      onClick={() => viewSavedEvaluation(saved)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <span className={`text-2xl font-bold ${config.color}`}>
+                              {saved.overall_score}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded ${config.bgColor} ${config.color}`}>
+                              {config.label}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-300">
+                            {saved.seller_name}
+                            {saved.call_objective && (
+                              <span className="text-gray-500"> • {saved.call_objective}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(saved.created_at).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                        <button className="p-2 bg-purple-500/10 rounded-lg text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Eye className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bot Mode - Input Section */}
+        {!session && activeMode === 'bot' && (
           <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 mb-6">
             <div className="space-y-4">
               {/* Meet URL */}
@@ -929,16 +1404,16 @@ export default function MeetAnalysisView() {
                   >
                     <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                       <Target className="w-4 h-4 text-purple-400" />
-                      Avaliação SPIN
+                      Avaliação SPIN Detalhada
                     </h3>
                     {expandedSections.spin ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
                   </button>
                   {expandedSections.spin && (
-                    <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {renderSpinScore('S', evaluation.spin_evaluation.S.final_score, evaluation.spin_evaluation.S.technical_feedback)}
-                      {renderSpinScore('P', evaluation.spin_evaluation.P.final_score, evaluation.spin_evaluation.P.technical_feedback)}
-                      {renderSpinScore('I', evaluation.spin_evaluation.I.final_score, evaluation.spin_evaluation.I.technical_feedback)}
-                      {renderSpinScore('N', evaluation.spin_evaluation.N.final_score, evaluation.spin_evaluation.N.technical_feedback)}
+                    <div className="p-4 space-y-4">
+                      {renderSpinScoreFull('S', 'Situação', evaluation.spin_evaluation.S)}
+                      {renderSpinScoreFull('P', 'Problema', evaluation.spin_evaluation.P)}
+                      {renderSpinScoreFull('I', 'Implicação', evaluation.spin_evaluation.I)}
+                      {renderSpinScoreFull('N', 'Necessidade', evaluation.spin_evaluation.N)}
                     </div>
                   )}
                 </div>

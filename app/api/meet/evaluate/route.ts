@@ -519,7 +519,33 @@ export async function POST(request: NextRequest) {
 
     userMessage += `\nAvalie esta call de vendas seguindo rigorosamente os critérios estabelecidos.`
 
-    console.log('🎯 Calling OpenAI for meet evaluation...')
+    // === DETAILED LOGGING FOR DEBUGGING ===
+    console.log('\n' + '='.repeat(80))
+    console.log('🎯 MEET EVALUATION - REQUEST DETAILS')
+    console.log('='.repeat(80))
+
+    console.log('\n📋 VARIÁVEIS RECEBIDAS:')
+    console.log('- sellerName:', sellerName)
+    console.log('- callObjective:', callObjective || '(não informado)')
+    console.log('- productInfo:', productInfo ? `${productInfo.substring(0, 100)}...` : '(não informado)')
+    console.log('- objections:', objections ? `${objections.substring(0, 200)}...` : '(não informado)')
+    console.log('- meetingId:', meetingId)
+    console.log('- userId:', userId)
+    console.log('- companyId:', companyId)
+    console.log('- transcript segments:', transcript.length)
+
+    console.log('\n📝 USER MESSAGE COMPLETA ENVIADA AO AGENTE:')
+    console.log('-'.repeat(60))
+    console.log(userMessage)
+    console.log('-'.repeat(60))
+
+    console.log('\n📜 SYSTEM PROMPT (primeiros 500 chars):')
+    console.log('-'.repeat(60))
+    console.log(SYSTEM_PROMPT.substring(0, 500) + '...')
+    console.log('-'.repeat(60))
+
+    console.log('\n🚀 Calling OpenAI for meet evaluation...')
+    console.log('='.repeat(80) + '\n')
 
     // Call OpenAI
     const response = await openai.chat.completions.create({
@@ -539,6 +565,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('📝 OpenAI response received, parsing JSON...')
+    console.log('Raw response length:', content?.length, 'chars')
 
     // Parse the JSON response
     let evaluation
@@ -565,6 +592,20 @@ export async function POST(request: NextRequest) {
     const spinP = evaluation.spin_evaluation?.P?.final_score
     const spinI = evaluation.spin_evaluation?.I?.final_score
     const spinN = evaluation.spin_evaluation?.N?.final_score
+
+    // === LOG EVALUATION RESULTS ===
+    console.log('\n' + '='.repeat(80))
+    console.log('📊 RESULTADO DA AVALIAÇÃO')
+    console.log('='.repeat(80))
+    console.log('- Overall Score:', overallScore)
+    console.log('- Performance Level:', performanceLevel)
+    console.log('- SPIN S:', spinS)
+    console.log('- SPIN P:', spinP)
+    console.log('- SPIN I:', spinI)
+    console.log('- SPIN N:', spinN)
+    console.log('- Top Strengths:', evaluation.top_strengths?.slice(0, 2).join(', ') || 'N/A')
+    console.log('- Critical Gaps:', evaluation.critical_gaps?.slice(0, 2).join(', ') || 'N/A')
+    console.log('='.repeat(80) + '\n')
 
     // Save to database
     const { data: savedEvaluation, error: dbError } = await supabaseAdmin
