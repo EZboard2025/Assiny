@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" fill="none">
+  <defs>
+    <linearGradient id="personGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Person 1 -->
+  <g transform="translate(50, 20)">
+    <ellipse cx="30" cy="25" rx="20" ry="25" fill="url(#personGrad)"/>
+    <path d="M 0 150 Q 0 80, 30 60 Q 60 80, 60 150 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 2 -->
+  <g transform="translate(130, 30)">
+    <ellipse cx="25" cy="20" rx="18" ry="22" fill="url(#personGrad)"/>
+    <path d="M 0 130 Q 0 70, 25 55 Q 50 70, 50 130 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 3 -->
+  <g transform="translate(200, 10)">
+    <ellipse cx="30" cy="25" rx="22" ry="27" fill="url(#personGrad)"/>
+    <path d="M 0 160 Q 0 85, 30 65 Q 60 85, 60 160 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 4 -->
+  <g transform="translate(290, 25)">
+    <ellipse cx="25" cy="22" rx="18" ry="22" fill="url(#personGrad)"/>
+    <path d="M 0 140 Q 0 75, 25 58 Q 50 75, 50 140 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 5 -->
+  <g transform="translate(360, 15)">
+    <ellipse cx="28" cy="24" rx="20" ry="24" fill="url(#personGrad)"/>
+    <path d="M 0 150 Q 0 80, 28 62 Q 56 80, 56 150 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 6 -->
+  <g transform="translate(440, 30)">
+    <ellipse cx="22" cy="20" rx="16" ry="20" fill="url(#personGrad)"/>
+    <path d="M 0 125 Q 0 68, 22 52 Q 44 68, 44 125 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 7 -->
+  <g transform="translate(500, 20)">
+    <ellipse cx="28" cy="24" rx="20" ry="24" fill="url(#personGrad)"/>
+    <path d="M 0 150 Q 0 80, 28 62 Q 56 80, 56 150 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 8 -->
+  <g transform="translate(580, 35)">
+    <ellipse cx="24" cy="20" rx="17" ry="21" fill="url(#personGrad)"/>
+    <path d="M 0 130 Q 0 70, 24 55 Q 48 70, 48 130 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 9 -->
+  <g transform="translate(650, 18)">
+    <ellipse cx="26" cy="23" rx="19" ry="23" fill="url(#personGrad)"/>
+    <path d="M 0 145 Q 0 78, 26 60 Q 52 78, 52 145 Z" fill="url(#personGrad)"/>
+  </g>
+
+  <!-- Person 10 -->
+  <g transform="translate(720, 28)">
+    <ellipse cx="24" cy="21" rx="17" ry="21" fill="url(#personGrad)"/>
+    <path d="M 0 135 Q 0 72, 24 56 Q 48 72, 48 135 Z" fill="url(#personGrad)"/>
+  </g>
+</svg>

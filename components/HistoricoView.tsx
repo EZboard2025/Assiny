@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown } from 'lucide-react'
+import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, History, CheckCircle } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 
 export default function HistoricoView() {
@@ -73,15 +73,24 @@ export default function HistoricoView() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-400'
-    if (score >= 6) return 'text-yellow-400'
-    return 'text-red-400'
+    if (score >= 8) return 'text-green-600'
+    if (score >= 6) return 'text-yellow-600'
+    if (score >= 4) return 'text-orange-600'
+    return 'text-red-600'
   }
 
   const getScoreBg = (score: number) => {
-    if (score >= 8) return 'bg-green-500/20 border-green-500/30'
-    if (score >= 6) return 'bg-yellow-500/20 border-yellow-500/30'
-    return 'bg-red-500/20 border-red-500/30'
+    if (score >= 8) return 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
+    if (score >= 6) return 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200'
+    if (score >= 4) return 'bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200'
+    return 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
+  }
+
+  const getScoreListBg = (score: number) => {
+    if (score >= 8) return 'bg-green-50'
+    if (score >= 6) return 'bg-blue-50'
+    if (score >= 4) return 'bg-yellow-50'
+    return 'bg-red-50'
   }
 
   const getPerformanceLabel = (level: string) => {
@@ -253,33 +262,42 @@ export default function HistoricoView() {
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header simples */}
-        <div className={`mb-8 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          <h1 className="text-3xl font-bold text-white mb-2">Histórico de Sessões</h1>
-          <p className="text-gray-400">Analise suas sessões de roleplay e acompanhe sua evolução</p>
+        {/* Header Card - Design Profissional */}
+        <div className={`bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+              <History className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Histórico de Sessões</h1>
+              <p className="text-gray-500 text-sm">Analise suas sessões de roleplay e acompanhe sua evolução</p>
+            </div>
+          </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-green-500/30 border-t-green-500 rounded-full animate-spin"></div>
+            <div className="w-10 h-10 border-4 border-green-100 border-t-green-500 rounded-full animate-spin"></div>
           </div>
         ) : sessions.length === 0 ? (
           <div className="text-center py-20">
-            <MessageCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400 text-lg">Nenhuma sessão encontrada</p>
-            <p className="text-gray-500 text-sm mt-2">Comece um roleplay para ver seu histórico aqui</p>
+            <div className="w-20 h-20 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+              <History className="w-10 h-10 text-gray-400" />
+            </div>
+            <p className="text-gray-900 font-semibold text-lg mb-2">Nenhuma sessão encontrada</p>
+            <p className="text-gray-500 text-sm">Complete um roleplay para ver seu histórico aqui</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Lista de sessões - Coluna estreita */}
             <div className="lg:col-span-4 xl:col-span-3">
-              <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-                <div className="p-4 border-b border-gray-800">
-                  <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
                     {sessions.length} Sessões
                   </h2>
                 </div>
-                <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
+                <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
                   {sessions.map((session) => {
                     const evaluation = getProcessedEvaluation(session)
                     const score = evaluation?.overall_score !== undefined
@@ -290,42 +308,34 @@ export default function HistoricoView() {
                       <button
                         key={session.id}
                         onClick={() => setSelectedSession(session)}
-                        className={`w-full text-left p-3 border-b border-gray-800/50 transition-colors ${
+                        className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
                           selectedSession?.id === session.id
-                            ? 'bg-green-500/10 border-l-2 border-l-green-500'
-                            : 'hover:bg-gray-800/50 border-l-2 border-l-transparent'
+                            ? 'bg-green-50 border-l-4 border-l-green-500'
+                            : 'hover:bg-gray-50 border-l-4 border-l-transparent'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           {/* Nota em destaque */}
                           {score !== null ? (
-                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              score >= 8 ? 'bg-green-500/20' :
-                              score >= 6 ? 'bg-yellow-500/20' :
-                              'bg-red-500/20'
-                            }`}>
-                              <span className={`text-lg font-bold ${
-                                score >= 8 ? 'text-green-400' :
-                                score >= 6 ? 'text-yellow-400' :
-                                'text-red-400'
-                              }`}>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${getScoreListBg(score)}`}>
+                              <span className={`text-lg font-bold ${getScoreColor(score)}`}>
                                 {score.toFixed(1)}
                               </span>
                             </div>
                           ) : (
-                            <div className="w-12 h-12 rounded-lg bg-gray-800/50 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs text-gray-500">--</span>
+                            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs text-gray-400 font-medium">--</span>
                             </div>
                           )}
 
                           {/* Info da sessão */}
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm text-white mb-0.5">
+                            <div className="text-sm font-medium text-gray-900 mb-0.5">
                               {formatDuration(session.duration_seconds) || 'Sem duração'}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                               <span>{session.messages.length} mensagens</span>
-                              <span className="text-gray-700">•</span>
+                              <span className="text-gray-300">•</span>
                               <span>{formatDate(session.created_at)}</span>
                             </div>
                           </div>
@@ -340,31 +350,34 @@ export default function HistoricoView() {
             {/* Detalhes da sessão - Coluna larga */}
             <div className="lg:col-span-8 xl:col-span-9">
               {!selectedSession ? (
-                <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-12 text-center">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                    <MessageCircle className="w-8 h-8 text-gray-400" />
+                  </div>
                   <p className="text-gray-500">Selecione uma sessão para ver os detalhes</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Header da sessão */}
-                  <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                     {/* Linha superior: Data, tempo e ações */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-green-400" />
-                          <span className="text-white font-medium">{formatDate(selectedSession.created_at)}</span>
+                          <Calendar className="w-4 h-4 text-green-600" />
+                          <span className="text-gray-900 font-semibold">{formatDate(selectedSession.created_at)}</span>
                           <span className="text-gray-500">{formatTime(selectedSession.created_at)}</span>
                         </div>
                         {selectedSession.duration_seconds && (
-                          <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded-lg">
-                            <Clock className="w-3.5 h-3.5 text-green-400" />
-                            <span className="text-sm text-green-400 font-medium">{formatDuration(selectedSession.duration_seconds)}</span>
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-100 rounded-lg">
+                            <Clock className="w-3.5 h-3.5 text-green-600" />
+                            <span className="text-sm text-green-700 font-medium">{formatDuration(selectedSession.duration_seconds)}</span>
                           </div>
                         )}
                       </div>
                       <button
                         onClick={() => handleDelete(selectedSession.id)}
-                        className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Excluir sessão"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -373,31 +386,31 @@ export default function HistoricoView() {
 
                     {/* Cards de configuração */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="bg-gray-800/50 rounded-lg p-3">
-                        <span className="text-xs text-purple-400 block mb-1">Temperamento</span>
-                        <span className="text-white">{selectedSession.config.temperament}</span>
+                      <div className="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+                        <span className="text-[10px] text-purple-600 font-medium uppercase tracking-wider">Temperamento</span>
+                        <span className="text-gray-900 font-semibold block">{selectedSession.config.temperament}</span>
                       </div>
-                      <div className="bg-gray-800/50 rounded-lg p-3">
-                        <span className="text-xs text-blue-400 block mb-1">Idade</span>
-                        <span className="text-white">{selectedSession.config.age} anos</span>
+                      <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                        <span className="text-[10px] text-blue-600 font-medium uppercase tracking-wider">Idade</span>
+                        <span className="text-gray-900 font-semibold block">{selectedSession.config.age} anos</span>
                       </div>
-                      <div className="bg-gray-800/50 rounded-lg p-3 sm:col-span-1">
-                        <span className="text-xs text-amber-400 block mb-1">Persona</span>
-                        <span className="text-white text-sm leading-snug">{selectedSession.config.segment}</span>
+                      <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 sm:col-span-1">
+                        <span className="text-[10px] text-amber-600 font-medium uppercase tracking-wider">Persona</span>
+                        <span className="text-gray-900 font-medium text-sm leading-snug block">{selectedSession.config.segment}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Tabs de navegação */}
-                  <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1">
+                  <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
                     {['resumo', 'spin', 'transcricao'].map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActiveTab(tab as typeof activeTab)}
-                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                        className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                           activeTab === tab
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                            ? 'bg-green-500 text-white shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                         }`}
                       >
                         {tab === 'resumo' && 'Resumo'}
@@ -414,7 +427,10 @@ export default function HistoricoView() {
                     if (activeTab === 'resumo') {
                       if (!evaluation) {
                         return (
-                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center">
+                          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                              <AlertTriangle className="w-8 h-8 text-gray-400" />
+                            </div>
                             <p className="text-gray-500">Esta sessão não possui avaliação</p>
                           </div>
                         )
@@ -427,22 +443,22 @@ export default function HistoricoView() {
                       return (
                         <div className="space-y-4">
                           {/* Score principal */}
-                          <div className={`rounded-xl border p-6 text-center ${getScoreBg(score || 0)}`}>
-                            <div className={`text-5xl font-bold mb-1 ${getScoreColor(score || 0)}`}>
+                          <div className={`rounded-2xl border p-8 text-center ${getScoreBg(score || 0)}`}>
+                            <div className={`text-6xl font-bold mb-2 ${getScoreColor(score || 0)}`}>
                               {score?.toFixed(1) || 'N/A'}
                             </div>
-                            <div className="text-sm text-gray-400">
+                            <div className={`text-sm font-medium ${getScoreColor(score || 0)} opacity-80`}>
                               {evaluation.performance_level && getPerformanceLabel(evaluation.performance_level)}
                             </div>
                           </div>
 
                           {/* Resumo executivo */}
                           {evaluation.executive_summary && (
-                            <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                              <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                                 Resumo Executivo
                               </h4>
-                              <p className="text-gray-300 text-sm leading-relaxed">
+                              <p className="text-gray-700 leading-relaxed">
                                 {evaluation.executive_summary}
                               </p>
                             </div>
@@ -452,15 +468,15 @@ export default function HistoricoView() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Pontos fortes */}
                             {evaluation.top_strengths?.length > 0 && (
-                              <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                                <h4 className="flex items-center gap-2 text-sm font-medium text-green-400 mb-3">
-                                  <TrendingUp className="w-4 h-4" />
-                                  Pontos Fortes
-                                </h4>
+                              <div className="bg-green-50 rounded-2xl border border-green-100 p-5">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <CheckCircle className="w-5 h-5 text-green-600" />
+                                  <h4 className="text-sm font-semibold text-green-700">Pontos Fortes</h4>
+                                </div>
                                 <ul className="space-y-2">
                                   {evaluation.top_strengths.map((strength: string, i: number) => (
-                                    <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                      <span className="text-green-400 mt-0.5">•</span>
+                                    <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                      <span className="text-green-500 mt-1 flex-shrink-0">•</span>
                                       {strength}
                                     </li>
                                   ))}
@@ -470,15 +486,15 @@ export default function HistoricoView() {
 
                             {/* Gaps críticos */}
                             {evaluation.critical_gaps?.length > 0 && (
-                              <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                                <h4 className="flex items-center gap-2 text-sm font-medium text-red-400 mb-3">
-                                  <AlertTriangle className="w-4 h-4" />
-                                  Pontos a Melhorar
-                                </h4>
+                              <div className="bg-red-50 rounded-2xl border border-red-100 p-5">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                                  <h4 className="text-sm font-semibold text-red-700">Pontos a Melhorar</h4>
+                                </div>
                                 <ul className="space-y-2">
                                   {evaluation.critical_gaps.map((gap: string, i: number) => (
-                                    <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                      <span className="text-red-400 mt-0.5">•</span>
+                                    <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                      <span className="text-red-500 mt-1 flex-shrink-0">•</span>
                                       {gap}
                                     </li>
                                   ))}
@@ -489,26 +505,26 @@ export default function HistoricoView() {
 
                           {/* Prioridades de melhoria */}
                           {evaluation.priority_improvements?.length > 0 && (
-                            <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                              <h4 className="flex items-center gap-2 text-sm font-medium text-yellow-400 mb-3">
-                                <Lightbulb className="w-4 h-4" />
-                                Prioridades de Melhoria
-                              </h4>
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                              <div className="flex items-center gap-2 mb-4">
+                                <Lightbulb className="w-5 h-5 text-amber-500" />
+                                <h4 className="text-sm font-semibold text-gray-900">Prioridades de Melhoria</h4>
+                              </div>
                               <div className="space-y-3">
                                 {evaluation.priority_improvements.map((imp: any, i: number) => (
-                                  <div key={i} className="bg-gray-800/50 rounded-lg p-3">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className={`text-xs px-2 py-0.5 rounded ${
-                                        imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                        imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                        'bg-yellow-500/20 text-yellow-400'
+                                  <div key={i} className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                                        imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                                        imp.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                        'bg-yellow-100 text-yellow-700'
                                       }`}>
                                         {imp.priority === 'critical' ? 'Crítico' :
                                          imp.priority === 'high' ? 'Alta' : 'Média'}
                                       </span>
-                                      <span className="text-sm font-medium text-white">{imp.area}</span>
+                                      <span className="text-sm font-semibold text-gray-900">{imp.area}</span>
                                     </div>
-                                    <p className="text-xs text-gray-400">{imp.action_plan}</p>
+                                    <p className="text-sm text-gray-600">{imp.action_plan}</p>
                                   </div>
                                 ))}
                               </div>
@@ -521,7 +537,10 @@ export default function HistoricoView() {
                     if (activeTab === 'spin') {
                       if (!evaluation?.spin_evaluation) {
                         return (
-                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-8 text-center">
+                          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                              <Target className="w-8 h-8 text-gray-400" />
+                            </div>
                             <p className="text-gray-500">Esta sessão não possui análise SPIN</p>
                           </div>
                         )
@@ -534,18 +553,18 @@ export default function HistoricoView() {
                           {/* Grid de scores SPIN */}
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {[
-                              { key: 'S', label: 'Situação', color: 'text-blue-400' },
-                              { key: 'P', label: 'Problema', color: 'text-purple-400' },
-                              { key: 'I', label: 'Implicação', color: 'text-orange-400' },
-                              { key: 'N', label: 'Necessidade', color: 'text-green-400' }
-                            ].map(({ key, label, color }) => {
+                              { key: 'S', label: 'Situação', gradient: 'from-cyan-50 to-blue-50', border: 'border-cyan-200', color: 'text-cyan-700' },
+                              { key: 'P', label: 'Problema', gradient: 'from-green-50 to-emerald-50', border: 'border-green-200', color: 'text-green-700' },
+                              { key: 'I', label: 'Implicação', gradient: 'from-yellow-50 to-orange-50', border: 'border-yellow-200', color: 'text-yellow-700' },
+                              { key: 'N', label: 'Necessidade', gradient: 'from-pink-50 to-rose-50', border: 'border-pink-200', color: 'text-pink-700' }
+                            ].map(({ key, label, gradient, border, color }) => {
                               const score = spin[key]?.final_score || 0
                               return (
-                                <div key={key} className="bg-gray-900/50 rounded-xl border border-gray-800 p-4 text-center">
+                                <div key={key} className={`bg-gradient-to-br ${gradient} rounded-xl border ${border} p-4 text-center`}>
                                   <div className={`text-3xl font-bold mb-1 ${color}`}>
                                     {score.toFixed(1)}
                                   </div>
-                                  <div className="text-xs text-gray-500 uppercase tracking-wider">
+                                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium">
                                     {label}
                                   </div>
                                 </div>
@@ -554,8 +573,8 @@ export default function HistoricoView() {
                           </div>
 
                           {/* Média SPIN */}
-                          <div className="bg-green-500/10 rounded-xl border border-green-500/20 p-4 text-center">
-                            <div className="text-2xl font-bold text-green-400 mb-1">
+                          <div className="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
+                            <div className="text-2xl font-bold text-green-600 mb-1">
                               {(
                                 ((spin.S?.final_score || 0) +
                                 (spin.P?.final_score || 0) +
@@ -563,7 +582,7 @@ export default function HistoricoView() {
                                 (spin.N?.final_score || 0)) / 4
                               ).toFixed(1)}
                             </div>
-                            <div className="text-xs text-gray-400 uppercase tracking-wider">
+                            <div className="text-xs text-green-600 uppercase tracking-wider font-medium">
                               Média Geral SPIN
                             </div>
                           </div>
@@ -580,49 +599,56 @@ export default function HistoricoView() {
                               'N': 'Necessidade'
                             }
 
+                            const letterColors: Record<string, string> = {
+                              'S': 'bg-cyan-100 text-cyan-700',
+                              'P': 'bg-green-100 text-green-700',
+                              'I': 'bg-yellow-100 text-yellow-700',
+                              'N': 'bg-pink-100 text-pink-700'
+                            }
+
                             return (
-                              <details key={letter} className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
-                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                              <details key={letter} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
+                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
                                   <div className="flex items-center gap-3">
-                                    <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-sm font-bold text-green-400">
+                                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${letterColors[letter]}`}>
                                       {letter}
                                     </span>
-                                    <span className="font-medium text-white">{labels[letter]}</span>
+                                    <span className="font-semibold text-gray-900">{labels[letter]}</span>
                                   </div>
                                   <div className="flex items-center gap-3">
-                                    <span className="text-lg font-bold text-white">
+                                    <span className={`text-lg font-bold ${getScoreColor(data.final_score || 0)}`}>
                                       {data.final_score?.toFixed(1)}
                                     </span>
-                                    <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
+                                    <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
                                   </div>
                                 </summary>
-                                <div className="p-4 pt-0 space-y-3">
+                                <div className="p-4 pt-0 space-y-3 border-t border-gray-100">
                                   {/* Feedback */}
                                   {data.technical_feedback && (
-                                    <p className="text-sm text-gray-300 leading-relaxed">
+                                    <p className="text-sm text-gray-600 leading-relaxed pt-3">
                                       {data.technical_feedback}
                                     </p>
                                   )}
 
                                   {/* Indicadores */}
                                   {data.indicators && Object.keys(data.indicators).length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="flex flex-wrap gap-2 pt-2">
                                       {Object.entries(data.indicators).map(([key, value]: [string, any]) => {
                                         const score = typeof value === 'number' ? value : 0
                                         const getIndicatorStyle = (s: number) => {
-                                          if (s >= 8) return 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-300'
-                                          if (s >= 6) return 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30 text-yellow-300'
-                                          return 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-500/30 text-red-300'
+                                          if (s >= 8) return 'bg-green-50 border-green-200 text-green-700'
+                                          if (s >= 6) return 'bg-yellow-50 border-yellow-200 text-yellow-700'
+                                          return 'bg-red-50 border-red-200 text-red-700'
                                         }
                                         const getScoreStyle = (s: number) => {
-                                          if (s >= 8) return 'text-green-400 font-semibold'
-                                          if (s >= 6) return 'text-yellow-400 font-semibold'
-                                          return 'text-red-400 font-semibold'
+                                          if (s >= 8) return 'text-green-600 font-semibold'
+                                          if (s >= 6) return 'text-yellow-600 font-semibold'
+                                          return 'text-red-600 font-semibold'
                                         }
                                         return (
                                           <span
                                             key={key}
-                                            className={`text-xs px-3 py-1.5 rounded-lg border backdrop-blur-sm transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
+                                            className={`text-xs px-3 py-1.5 rounded-lg border transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
                                           >
                                             {translateIndicator(key)}: <span className={getScoreStyle(score)}>{value}/10</span>
                                           </span>
@@ -633,11 +659,14 @@ export default function HistoricoView() {
 
                                   {/* Oportunidades perdidas */}
                                   {data.missed_opportunities?.length > 0 && (
-                                    <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
-                                      <p className="text-xs font-medium text-orange-400 mb-2">Oportunidades Perdidas</p>
+                                    <div className="bg-orange-50 rounded-xl p-4 border border-orange-100 mt-3">
+                                      <p className="text-xs font-semibold text-orange-600 mb-2 uppercase tracking-wider">Oportunidades Perdidas</p>
                                       <ul className="space-y-1">
                                         {data.missed_opportunities.map((opp: string, i: number) => (
-                                          <li key={i} className="text-xs text-orange-300">• {opp}</li>
+                                          <li key={i} className="text-sm text-orange-700 flex items-start gap-2">
+                                            <span className="text-orange-400 mt-0.5">•</span>
+                                            {opp}
+                                          </li>
                                         ))}
                                       </ul>
                                     </div>
@@ -649,37 +678,37 @@ export default function HistoricoView() {
 
                           {/* Análise de objeções */}
                           {evaluation.objections_analysis?.length > 0 && (
-                            <details className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
-                              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                            <details className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
+                              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center gap-3">
-                                  <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center">
-                                    <Target className="w-4 h-4 text-green-400" />
+                                  <span className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                                    <Target className="w-4 h-4 text-purple-600" />
                                   </span>
-                                  <span className="font-medium text-white">Análise de Objeções</span>
+                                  <span className="font-semibold text-gray-900">Análise de Objeções</span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <span className="text-sm text-gray-400">
+                                  <span className="text-sm text-gray-500 font-medium">
                                     {evaluation.objections_analysis.length} objeções
                                   </span>
-                                  <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
+                                  <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
                                 </div>
                               </summary>
-                              <div className="p-4 pt-0 space-y-3">
+                              <div className="p-4 pt-0 space-y-3 border-t border-gray-100">
                                 {evaluation.objections_analysis.map((obj: any, idx: number) => (
-                                  <div key={idx} className="bg-gray-800/50 rounded-lg p-3">
+                                  <div key={idx} className="bg-gray-50 rounded-xl border border-gray-100 p-4 mt-3 first:mt-0">
                                     <div className="flex items-center justify-between mb-2">
-                                      <span className="text-xs px-2 py-0.5 bg-gray-700 rounded text-gray-300">
+                                      <span className="text-xs px-2.5 py-1 bg-gray-200 rounded-full text-gray-700 font-medium">
                                         {obj.objection_type}
                                       </span>
                                       <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
                                         {obj.score}/10
                                       </span>
                                     </div>
-                                    <p className="text-sm text-gray-300 italic mb-2">
+                                    <p className="text-sm text-gray-600 italic mb-2">
                                       "{obj.objection_text}"
                                     </p>
                                     {obj.detailed_analysis && (
-                                      <p className="text-xs text-gray-400">{obj.detailed_analysis}</p>
+                                      <p className="text-sm text-gray-500">{obj.detailed_analysis}</p>
                                     )}
                                   </div>
                                 ))}
@@ -692,36 +721,40 @@ export default function HistoricoView() {
 
                     if (activeTab === 'transcricao') {
                       return (
-                        <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                          <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
                             {selectedSession.messages.length} mensagens
                           </h4>
-                          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                             {selectedSession.messages.map((msg, index) => (
                               <div
                                 key={index}
                                 className={`flex gap-3 ${msg.role === 'seller' ? 'flex-row-reverse' : ''}`}
                               >
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
                                   msg.role === 'client'
-                                    ? 'bg-gray-800'
-                                    : 'bg-green-500/20'
+                                    ? 'bg-gray-200'
+                                    : 'bg-green-100'
                                 }`}>
                                   <User className={`w-4 h-4 ${
-                                    msg.role === 'client' ? 'text-gray-400' : 'text-green-400'
+                                    msg.role === 'client' ? 'text-gray-600' : 'text-green-600'
                                   }`} />
                                 </div>
                                 <div className={`flex-1 max-w-[80%] ${msg.role === 'seller' ? 'text-right' : ''}`}>
-                                  <div className="text-xs text-gray-500 mb-1">
-                                    {msg.role === 'client' ? 'Cliente' : 'Você'} • {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
+                                  <div className="text-xs text-gray-500 mb-1.5 flex items-center gap-2">
+                                    <span className={`font-medium ${msg.role === 'client' ? 'text-gray-600' : 'text-green-600'}`}>
+                                      {msg.role === 'client' ? 'Cliente' : 'Você'}
+                                    </span>
+                                    <span>•</span>
+                                    <span>{new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
                                       hour: '2-digit',
                                       minute: '2-digit'
-                                    })}
+                                    })}</span>
                                   </div>
-                                  <div className={`inline-block p-3 rounded-xl text-sm ${
+                                  <div className={`inline-block p-4 rounded-2xl text-sm leading-relaxed ${
                                     msg.role === 'client'
-                                      ? 'bg-gray-800 text-gray-300 rounded-tl-none'
-                                      : 'bg-green-500/20 text-green-100 rounded-tr-none'
+                                      ? 'bg-gray-100 text-gray-700 rounded-tl-sm'
+                                      : 'bg-green-50 text-gray-700 border border-green-100 rounded-tr-sm'
                                   }`}>
                                     {msg.text}
                                   </div>
