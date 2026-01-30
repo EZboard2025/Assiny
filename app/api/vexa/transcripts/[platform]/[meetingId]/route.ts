@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Vexa Self-Hosted API (running on same server via Docker)
 const VEXA_API_URL = 'http://localhost:8056'
-const VEXA_API_KEY = 'VexaRamppy2025SecureToken'
+const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
 
 // GET /api/vexa/transcripts/[platform]/[meetingId] - Get transcripts
 export async function GET(
