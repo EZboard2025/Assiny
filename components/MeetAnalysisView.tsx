@@ -34,11 +34,8 @@ import {
 import { supabase } from '@/lib/supabase'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
-// Vexa API config - production uses relative path via Nginx proxy
-const VEXA_API_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-  ? 'http://localhost:8056'  // Development
-  : '/vexa-api'              // Production (proxied via Nginx)
-const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
+// Vexa API - uses Next.js API routes as proxy (works in both dev and production)
+const VEXA_API_URL = '/api/vexa'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'error'
 
@@ -446,8 +443,7 @@ export default function MeetAnalysisView() {
       const response = await fetch(`${VEXA_API_URL}/bots`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': VEXA_API_KEY
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           platform: 'google_meet',
@@ -486,9 +482,7 @@ export default function MeetAnalysisView() {
 
     const poll = async () => {
       try {
-        const statusRes = await fetch(`${VEXA_API_URL}/bots/status`, {
-          headers: { 'X-API-Key': VEXA_API_KEY }
-        })
+        const statusRes = await fetch(`${VEXA_API_URL}/bots/status`)
 
         if (statusRes.ok) {
           const statusData = await statusRes.json()
@@ -520,8 +514,7 @@ export default function MeetAnalysisView() {
         }
 
         const transcriptRes = await fetch(
-          `${VEXA_API_URL}/transcripts/google_meet/${nativeMeetingId}`,
-          { headers: { 'X-API-Key': VEXA_API_KEY } }
+          `${VEXA_API_URL}/transcripts/google_meet/${nativeMeetingId}`
         )
 
         if (transcriptRes.ok) {
@@ -580,8 +573,7 @@ export default function MeetAnalysisView() {
     if (session?.meetingId) {
       try {
         await fetch(`${VEXA_API_URL}/bots/google_meet/${session.meetingId}`, {
-          method: 'DELETE',
-          headers: { 'X-API-Key': VEXA_API_KEY }
+          method: 'DELETE'
         })
       } catch (err) {
         console.error('Error stopping bot:', err)
