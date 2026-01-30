@@ -409,8 +409,10 @@ function ConfigurationInterface({
   // Estados para aba de Usage (consumo de créditos)
   interface UsageBreakdown {
     roleplay: number
+    publicRoleplay: number
     followup: number
     meet: number
+    pdi: number
   }
   interface UsageData {
     monthlyCredits: number | null
@@ -1203,8 +1205,15 @@ function ConfigurationInterface({
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      // Buscar breakdown de uso por tipo (roleplays deste mês)
+      // Buscar breakdown de uso por tipo (roleplays internos deste mês - roleplay_sessions)
       const { count: roleplayCount } = await supabase
+        .from('roleplay_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', userCompanyId)
+        .gte('created_at', startOfMonth)
+
+      // Buscar roleplays públicos deste mês (roleplays_unicos - links públicos)
+      const { count: publicRoleplayCount } = await supabase
         .from('roleplays_unicos')
         .select('*', { count: 'exact', head: true })
         .eq('company_id', userCompanyId)
@@ -1224,6 +1233,13 @@ function ConfigurationInterface({
         .eq('company_id', userCompanyId)
         .gte('created_at', startOfMonth)
 
+      // Buscar PDIs criados deste mês
+      const { count: pdiCount } = await supabase
+        .from('pdis')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', userCompanyId)
+        .gte('created_at', startOfMonth)
+
       // Obter limite de créditos do plano
       const { PLAN_CONFIGS } = await import('@/lib/types/plans')
       const planConfig = PLAN_CONFIGS[companyData.training_plan as PlanType]
@@ -1235,8 +1251,10 @@ function ConfigurationInterface({
         resetDate: companyData.monthly_credits_reset_at,
         breakdown: {
           roleplay: roleplayCount || 0,
+          publicRoleplay: publicRoleplayCount || 0,
           followup: followupCount || 0,
-          meet: (meetCount || 0) * 3 // Cada análise de Meet custa 3 créditos
+          meet: meetCount || 0,
+          pdi: pdiCount || 0
         }
       })
     } catch (error) {
@@ -4838,20 +4856,37 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Detalhamento por Tipo</h4>
                     </div>
                     <div className="divide-y divide-gray-100">
-                      {/* Roleplay */}
+                      {/* Roleplay Interno */}
                       <div className="p-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                             <MessageSquare className="w-5 h-5 text-purple-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">Roleplay</p>
+                            <p className="text-sm font-medium text-gray-900">Roleplay (Treino)</p>
                             <p className="text-xs text-gray-500">1 crédito por sessão</p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-bold text-purple-600">{usageData.breakdown.roleplay}</p>
                           <p className="text-xs text-gray-500">sessões</p>
+                        </div>
+                      </div>
+
+                      {/* Roleplay Público */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                            <Link2 className="w-5 h-5 text-pink-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Roleplay Público</p>
+                            <p className="text-xs text-gray-500">1 crédito por candidato</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-pink-600">{usageData.breakdown.publicRoleplay}</p>
+                          <p className="text-xs text-gray-500">candidatos</p>
                         </div>
                       </div>
 
@@ -4886,6 +4921,23 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <div className="text-right">
                           <p className="text-lg font-bold text-green-600">{usageData.breakdown.meet}</p>
                           <p className="text-xs text-gray-500">análises</p>
+                        </div>
+                      </div>
+
+                      {/* PDI */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">PDI</p>
+                            <p className="text-xs text-gray-500">1 crédito por geração</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-amber-600">{usageData.breakdown.pdi}</p>
+                          <p className="text-xs text-gray-500">gerados</p>
                         </div>
                       </div>
                     </div>
