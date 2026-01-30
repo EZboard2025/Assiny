@@ -842,69 +842,6 @@ export default function RoleplayLinksView() {
                 </p>
               </div>
 
-              {/* Card de Limites do Plano */}
-              {selectionPlan && (
-                (() => {
-                  console.log('🎯 Renderizando card de limite para plano:', selectionPlan)
-                  const planConfig = PLAN_CONFIGS[selectionPlan]
-
-                  if (!planConfig) {
-                    console.error('❌ Configuração não encontrada para:', selectionPlan)
-                    return null
-                  }
-
-                  if (!planConfig.isSelectionPlan) {
-                    console.log('⚠️ Não é plano de seleção:', selectionPlan)
-                    return null
-                  }
-
-                  const maxCandidates = planConfig.maxSelectionCandidates
-                  const used = roleplayLink.usage_count || 0
-
-                  return (
-                    <div className="bg-amber-50 rounded-xl p-5 border border-amber-100">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Target className="w-5 h-5 text-amber-600" />
-                        <p className="text-sm font-medium text-gray-600">Limite do Plano</p>
-                      </div>
-                      {maxCandidates === null ? (
-                        <div>
-                          <p className="text-2xl font-bold text-gray-900">Ilimitado</p>
-                          <p className="text-xs text-gray-500 mt-1">{used} realizados</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {used}/{maxCandidates}
-                          </p>
-                          <div className="mt-2">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full transition-all ${
-                                  (used / maxCandidates) * 100 >= 100 ? 'bg-red-500' :
-                                  (used / maxCandidates) * 100 >= 80 ? 'bg-amber-500' :
-                                  'bg-green-500'
-                                }`}
-                                style={{ width: `${Math.min((used / maxCandidates) * 100, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          <p className={`text-xs mt-1 ${
-                            Math.max(0, maxCandidates - used) === 0 ? 'text-red-600' :
-                            Math.max(0, maxCandidates - used) <= 2 ? 'text-amber-600' :
-                            'text-gray-500'
-                          }`}>
-                            {Math.max(0, maxCandidates - used) === 0
-                              ? '⚠️ Limite atingido'
-                              : `${Math.max(0, maxCandidates - used)} ${Math.max(0, maxCandidates - used) === 1 ? 'restante' : 'restantes'}`
-                            }
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()
-              )}
 
               <div className="bg-green-50 rounded-xl p-5 border border-green-100">
                 <div className="flex items-center gap-3 mb-2">
@@ -917,21 +854,6 @@ export default function RoleplayLinksView() {
               </div>
             </div>
 
-            {/* Aviso de limite atingido */}
-            {selectionPlan && PLAN_CONFIGS[selectionPlan]?.isSelectionPlan &&
-             PLAN_CONFIGS[selectionPlan].maxSelectionCandidates !== null &&
-             roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates && (
-              <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-red-700 font-semibold mb-1">Limite de Candidatos Atingido</h4>
-                  <p className="text-red-600 text-sm">
-                    Você atingiu o limite de {PLAN_CONFIGS[selectionPlan].maxSelectionCandidates} candidatos do seu plano.
-                    Para avaliar mais candidatos, considere fazer upgrade do plano.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Conteúdo Condicional */}
