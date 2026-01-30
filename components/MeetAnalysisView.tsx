@@ -732,8 +732,8 @@ export default function MeetAnalysisView() {
           <span className="text-xl font-bold text-white bg-purple-500/20 px-3 py-1 rounded-lg">{letter}</span>
           <span className="text-sm text-gray-400">{label}</span>
         </div>
-        <span className={`text-2xl font-bold ${getScoreColor(data.final_score)}`}>
-          {data.final_score.toFixed(1)}
+        <span className={`text-2xl font-bold ${getScoreColor(data?.final_score ?? 0)}`}>
+          {typeof data?.final_score === 'number' ? data.final_score.toFixed(1) : 'N/A'}
         </span>
       </div>
       <p className="text-sm text-gray-300 mb-3 leading-relaxed">{data.technical_feedback}</p>
@@ -1402,16 +1402,16 @@ export default function MeetAnalysisView() {
                   </button>
                   {expandedSections.spin && (
                     <div className="p-4 space-y-4">
-                      {renderSpinScoreFull('S', 'Situação', evaluation.spin_evaluation.S)}
-                      {renderSpinScoreFull('P', 'Problema', evaluation.spin_evaluation.P)}
-                      {renderSpinScoreFull('I', 'Implicação', evaluation.spin_evaluation.I)}
-                      {renderSpinScoreFull('N', 'Necessidade', evaluation.spin_evaluation.N)}
+                      {evaluation.spin_evaluation?.S && renderSpinScoreFull('S', 'Situação', evaluation.spin_evaluation.S)}
+                      {evaluation.spin_evaluation?.P && renderSpinScoreFull('P', 'Problema', evaluation.spin_evaluation.P)}
+                      {evaluation.spin_evaluation?.I && renderSpinScoreFull('I', 'Implicação', evaluation.spin_evaluation.I)}
+                      {evaluation.spin_evaluation?.N && renderSpinScoreFull('N', 'Necessidade', evaluation.spin_evaluation.N)}
                     </div>
                   )}
                 </div>
 
                 {/* Objections Analysis */}
-                {evaluation.objections_analysis.length > 0 && (
+                {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
                   <div className="border border-gray-700/50 rounded-xl overflow-hidden">
                     <button
                       onClick={() => toggleSection('objections')}
