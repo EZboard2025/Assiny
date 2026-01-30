@@ -26,9 +26,7 @@ import {
   AlertCircle,
   Lightbulb,
   X,
-  FileText,
   History,
-  Play,
   Eye
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -188,12 +186,8 @@ export default function MeetAnalysisView() {
   // Call context
   const [callObjective, setCallObjective] = useState('')
 
-  // Mode: 'bot' | 'manual' | 'history'
-  const [activeMode, setActiveMode] = useState<'bot' | 'manual' | 'history'>('bot')
-
-  // Manual transcript testing
-  const [manualTranscript, setManualTranscript] = useState('')
-  const [parsedManualTranscript, setParsedManualTranscript] = useState<TranscriptSegment[]>([])
+  // Mode: 'bot' | 'history'
+  const [activeMode, setActiveMode] = useState<'bot' | 'history'>('bot')
 
   // History
   const [savedEvaluations, setSavedEvaluations] = useState<SavedEvaluation[]>([])
@@ -243,63 +237,6 @@ export default function MeetAnalysisView() {
     fetchUserInfo()
   }, [])
 
-  // Parse manual transcript text into segments
-  const parseManualTranscript = (text: string): TranscriptSegment[] => {
-    const segments: TranscriptSegment[] = []
-    const lines = text.split('\n').filter(line => line.trim())
-
-    for (const line of lines) {
-      // Try to match formats like "Speaker: text" or "Speaker - text" or "[Speaker] text"
-      const colonMatch = line.match(/^([^:]+):\s*(.+)$/i)
-      const dashMatch = line.match(/^([^-]+)\s*-\s*(.+)$/i)
-      const bracketMatch = line.match(/^\[([^\]]+)\]\s*(.+)$/i)
-
-      if (colonMatch) {
-        segments.push({
-          speaker: colonMatch[1].trim(),
-          text: colonMatch[2].trim(),
-          timestamp: ''
-        })
-      } else if (bracketMatch) {
-        segments.push({
-          speaker: bracketMatch[1].trim(),
-          text: bracketMatch[2].trim(),
-          timestamp: ''
-        })
-      } else if (dashMatch && dashMatch[1].length < 30) {
-        // Only use dash match if speaker name is reasonably short
-        segments.push({
-          speaker: dashMatch[1].trim(),
-          text: dashMatch[2].trim(),
-          timestamp: ''
-        })
-      } else if (line.trim()) {
-        // If no speaker pattern found, treat as continuation or unknown speaker
-        if (segments.length > 0) {
-          segments[segments.length - 1].text += ' ' + line.trim()
-        } else {
-          segments.push({
-            speaker: 'Participante',
-            text: line.trim(),
-            timestamp: ''
-          })
-        }
-      }
-    }
-
-    return consolidateTranscript(segments)
-  }
-
-  // Update parsed transcript when manual text changes
-  useEffect(() => {
-    if (manualTranscript.trim()) {
-      const parsed = parseManualTranscript(manualTranscript)
-      setParsedManualTranscript(parsed)
-    } else {
-      setParsedManualTranscript([])
-    }
-  }, [manualTranscript])
-
   // Load evaluation history
   const loadHistory = async () => {
     if (!userId) return
@@ -328,70 +265,6 @@ export default function MeetAnalysisView() {
       loadHistory()
     }
   }, [activeMode, userId])
-
-  // Evaluate manual transcript
-  const evaluateManualTranscript = async () => {
-    if (parsedManualTranscript.length === 0) {
-      setEvaluationError('Cole uma transcrição válida para avaliar')
-      return
-    }
-
-    if (!userId || !companyId) {
-      setEvaluationError('Usuário não autenticado')
-      return
-    }
-
-    setIsEvaluating(true)
-    setEvaluationError('')
-
-    try {
-      // Fetch company objections from ConfigHub
-      const { data: objectionsData } = await supabase
-        .from('objections')
-        .select('name, rebuttals')
-        .eq('company_id', companyId)
-
-      // Format objections for the AI
-      let objectionsText = ''
-      if (objectionsData && objectionsData.length > 0) {
-        objectionsText = objectionsData.map(obj => {
-          const rebuttals = obj.rebuttals && Array.isArray(obj.rebuttals)
-            ? obj.rebuttals.join('; ')
-            : ''
-          return `- Objeção: "${obj.name}" | Formas de quebrar: ${rebuttals || 'Não configurado'}`
-        }).join('\n')
-      }
-
-      const response = await fetch('/api/meet/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: parsedManualTranscript,
-          sellerName: sellerName.trim(),
-          callObjective: callObjective.trim() || null,
-          objections: objectionsText || null,
-          meetingId: `manual_${Date.now()}`,
-          userId,
-          companyId
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Falha ao avaliar call')
-      }
-
-      const data = await response.json()
-      setEvaluation(data.evaluation)
-      setShowEvaluationModal(true)
-
-    } catch (err: any) {
-      console.error('Evaluation error:', err)
-      setEvaluationError(err.message || 'Erro ao avaliar call')
-    } finally {
-      setIsEvaluating(false)
-    }
-  }
 
   // View saved evaluation
   const viewSavedEvaluation = (saved: SavedEvaluation) => {
@@ -835,17 +708,6 @@ export default function MeetAnalysisView() {
               Bot ao Vivo
             </button>
             <button
-              onClick={() => setActiveMode('manual')}
-              className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                activeMode === 'manual'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Colar Transcrição
-            </button>
-            <button
               onClick={() => setActiveMode('history')}
               className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
                 activeMode === 'history'
@@ -859,109 +721,6 @@ export default function MeetAnalysisView() {
           </div>
         )}
 
-        {/* Manual Transcript Mode */}
-        {!session && activeMode === 'manual' && (
-          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/30 mb-6">
-            <div className="space-y-4">
-              {/* Call Objective */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Objetivo da Call <span className="text-gray-500 font-normal">(opcional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={callObjective}
-                  onChange={(e) => setCallObjective(e.target.value)}
-                  placeholder="Ex: Apresentar proposta comercial, Fazer discovery, Negociar contrato..."
-                  className="w-full px-4 py-3 bg-gray-800/60 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 focus:bg-gray-800/80 transition-all"
-                />
-              </div>
-
-              {/* Manual Transcript Input */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Cole a Transcrição da Call
-                </label>
-                <textarea
-                  value={manualTranscript}
-                  onChange={(e) => setManualTranscript(e.target.value)}
-                  placeholder={`Cole a transcrição aqui no formato:\n\nVendedor: Olá, como vai?\nCliente: Bem, obrigado.\nVendedor: Gostaria de apresentar nossa solução...\n\nOu em outros formatos como:\n[Vendedor] texto...\nCliente - texto...`}
-                  className="w-full h-64 px-4 py-3 bg-gray-800/60 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 focus:bg-gray-800/80 transition-all font-mono text-sm resize-none"
-                />
-                {parsedManualTranscript.length > 0 && (
-                  <p className="text-xs text-blue-400 mt-2">
-                    ✓ {parsedManualTranscript.length} segmentos identificados
-                  </p>
-                )}
-              </div>
-
-              {/* Preview of parsed transcript */}
-              {parsedManualTranscript.length > 0 && (
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50 max-h-48 overflow-y-auto">
-                  <h4 className="text-xs font-semibold text-gray-400 mb-3">Preview da transcrição parseada:</h4>
-                  <div className="space-y-2">
-                    {parsedManualTranscript.slice(0, 5).map((seg, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-semibold text-blue-400">{seg.speaker}:</span>
-                        <span className="text-gray-300 ml-2">{seg.text.substring(0, 100)}{seg.text.length > 100 ? '...' : ''}</span>
-                      </div>
-                    ))}
-                    {parsedManualTranscript.length > 5 && (
-                      <p className="text-xs text-gray-500">... e mais {parsedManualTranscript.length - 5} segmentos</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {evaluationError && (
-                <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-lg border border-red-500/30">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  {evaluationError}
-                </div>
-              )}
-
-              {/* Evaluate Button */}
-              <button
-                onClick={evaluateManualTranscript}
-                disabled={isEvaluating || parsedManualTranscript.length === 0}
-                className="w-full px-6 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50"
-              >
-                {isEvaluating ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Avaliando... (pode levar até 30s)
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-5 h-5" />
-                    Avaliar Transcrição
-                  </>
-                )}
-              </button>
-
-              {/* Show result if already evaluated */}
-              {evaluation && !showEvaluationModal && (
-                <button
-                  onClick={() => setShowEvaluationModal(true)}
-                  className="w-full px-4 py-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl transition-colors flex items-center justify-center gap-2 border border-green-500/30"
-                >
-                  <Award className="w-5 h-5" />
-                  Ver Resultado da Avaliação (Nota: {evaluation.overall_score})
-                </button>
-              )}
-            </div>
-
-            {/* Format Instructions */}
-            <div className="mt-6 p-4 bg-gray-800/40 rounded-xl border border-gray-700/50">
-              <h3 className="text-sm font-semibold text-gray-300 mb-2">Formatos aceitos:</h3>
-              <div className="text-sm text-gray-400 space-y-1.5">
-                <p><code className="text-blue-400">Nome: texto</code> - Formato com dois pontos</p>
-                <p><code className="text-blue-400">[Nome] texto</code> - Formato com colchetes</p>
-                <p><code className="text-blue-400">Nome - texto</code> - Formato com hífen</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* History Mode */}
         {!session && activeMode === 'history' && (
