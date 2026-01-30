@@ -32,16 +32,11 @@ import {
 import { supabase } from '@/lib/supabase'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
-// Vexa API config - production uses relative path via Nginx proxy
-const isDevelopment = typeof window !== 'undefined' && (
-  window.location.hostname === 'localhost' ||
-  window.location.port === '3000' ||
-  window.location.hostname.startsWith('192.168.')
-)
-const VEXA_API_URL = isDevelopment
-  ? 'http://localhost:8056'  // Development
-  : '/vexa-api'              // Production (proxied via Nginx)
-const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
+// Vexa API - uses Next.js API routes as proxy (works in both dev and production)
+const VEXA_API_URL = '/api/vexa'
+
+// LocalStorage key for persisting session
+const MEET_SESSION_STORAGE_KEY = 'meet_analysis_session'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'error'
 
