@@ -414,6 +414,7 @@ function ConfigurationInterface({
     meet: number
     pdi: number
     aiGeneration: number
+    dailyChallenges: number
   }
   interface UsageData {
     monthlyCredits: number | null
@@ -1305,6 +1306,20 @@ function ConfigurationInterface({
         console.log('Tabela ai_generations não disponível')
       }
 
+      // Buscar desafios diários gerados deste mês (1 crédito cada)
+      let dailyChallengesCount = 0
+      try {
+        const { count } = await supabase
+          .from('daily_challenges')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', userCompanyId)
+          .gte('created_at', startOfMonth)
+        dailyChallengesCount = count || 0
+      } catch (e) {
+        // Tabela pode não existir ainda
+        console.log('Tabela daily_challenges não disponível')
+      }
+
       // Obter limite de créditos do plano
       const { PLAN_CONFIGS } = await import('@/lib/types/plans')
       const planConfig = PLAN_CONFIGS[companyData.training_plan as PlanType]
@@ -1317,7 +1332,8 @@ function ConfigurationInterface({
         (followupCount || 0) * 1 +        // Follow-up: 1 crédito
         (meetCount || 0) * 3 +            // Análise de Meet: 3 créditos
         (pdiCount || 0) * 1 +             // PDI: 1 crédito
-        aiGenerationCount * 0.5           // Geração IA: 0.5 créditos
+        aiGenerationCount * 0.5 +         // Geração IA: 0.5 créditos
+        dailyChallengesCount * 1          // Desafios Diários: 1 crédito
 
       setUsageData({
         monthlyCredits: planConfig?.monthlyCredits || null,
@@ -1331,7 +1347,8 @@ function ConfigurationInterface({
           followup: followupCount || 0,
           meet: meetCount || 0,
           pdi: pdiCount || 0,
-          aiGeneration: aiGenerationCount
+          aiGeneration: aiGenerationCount,
+          dailyChallenges: dailyChallengesCount
         }
       })
     } catch (error) {
@@ -4975,6 +4992,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             { label: 'Análise de Meet', value: usageData.breakdown.meet, credits: usageData.breakdown.meet * 3, color: 'bg-green-500' },
                             { label: 'PDI', value: usageData.breakdown.pdi, credits: usageData.breakdown.pdi * 1, color: 'bg-amber-500' },
                             { label: 'Geração com IA', value: usageData.breakdown.aiGeneration, credits: usageData.breakdown.aiGeneration * 0.5, color: 'bg-cyan-500' },
+                            { label: 'Desafios Diários', value: usageData.breakdown.dailyChallenges, credits: usageData.breakdown.dailyChallenges * 1, color: 'bg-orange-500' },
                             { label: 'Disponível', value: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), credits: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), color: 'bg-gray-300' }
                           ].filter(item => item.credits > 0 || item.label === 'Disponível').map((item, index) => (
                             <div key={index} className="flex items-center gap-2">
@@ -5095,6 +5113,23 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <div className="text-right">
                           <p className="text-lg font-bold text-cyan-600">{usageData.breakdown.aiGeneration}</p>
                           <p className="text-xs text-gray-500">gerações</p>
+                        </div>
+                      </div>
+
+                      {/* Desafios Diários */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <Target className="w-5 h-5 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Desafios Diários</p>
+                            <p className="text-xs text-gray-500">1 crédito por desafio</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-orange-600">{usageData.breakdown.dailyChallenges}</p>
+                          <p className="text-xs text-gray-500">desafios</p>
                         </div>
                       </div>
                     </div>

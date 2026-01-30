@@ -19,6 +19,7 @@ import TopBanner from './dashboard/TopBanner'
 import FeatureCard from './dashboard/FeatureCard'
 import StreakIndicator from './dashboard/StreakIndicator'
 import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
+import ChallengeHistoryView from './dashboard/ChallengeHistoryView'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
 import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
@@ -46,7 +47,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis' | 'challenge-history'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -387,6 +388,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       return <MeetAnalysisView />
     }
 
+    if (currentView === 'challenge-history') {
+      return (
+        <ChallengeHistoryView
+          userId={userId || ''}
+          onStartChallenge={handleStartChallenge}
+          onBack={() => handleViewChange('home')}
+        />
+      )
+    }
+
     // Home view
     return (
       <div className="py-8 px-6 relative z-10">
@@ -438,6 +449,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 userId={userId}
                 companyId={companyId}
                 onStartChallenge={handleStartChallenge}
+                onViewHistory={() => handleViewChange('challenge-history')}
               />
             </div>
           )}

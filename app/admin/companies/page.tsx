@@ -165,6 +165,36 @@ export default function CompaniesAdmin() {
     }
   }
 
+  // Generate challenges now (manual trigger)
+  const generateChallengesNow = async () => {
+    if (generatingChallenges) return
+
+    setGeneratingChallenges(true)
+    try {
+      const response = await fetch('/api/admin/challenges/generate-now', {
+        method: 'POST'
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        showToast(
+          'success',
+          'Desafios Gerados!',
+          `${data.summary.generated} gerados, ${data.summary.skipped} pulados, ${data.deleted} deletados`
+        )
+        // Reload challenge info
+        loadChallengeGenInfo()
+      } else {
+        showToast('error', 'Erro ao gerar desafios', data.error || 'Erro desconhecido')
+      }
+    } catch (error) {
+      console.error('Erro ao gerar desafios:', error)
+      showToast('error', 'Erro ao gerar desafios', 'Falha na requisição')
+    } finally {
+      setGeneratingChallenges(false)
+    }
+  }
+
   const loadMetrics = async () => {
     setLoadingMetrics(true)
     try {
@@ -900,6 +930,23 @@ export default function CompaniesAdmin() {
                 <div className="text-xs text-gray-500">
                   Todos os dias às 10:00
                 </div>
+                <button
+                  onClick={generateChallengesNow}
+                  disabled={generatingChallenges}
+                  className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  {generatingChallenges ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3 h-3" />
+                      Gerar Agora
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

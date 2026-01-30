@@ -48,9 +48,10 @@ interface Props {
   userId: string
   companyId: string
   onStartChallenge: (challenge: DailyChallenge) => void
+  onViewHistory?: () => void
 }
 
-export default function DailyChallengeBanner({ userId, companyId, onStartChallenge }: Props) {
+export default function DailyChallengeBanner({ userId, companyId, onStartChallenge, onViewHistory }: Props) {
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -172,26 +173,36 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
               {error || 'Gere um desafio personalizado baseado em suas fraquezas'}
             </p>
           </div>
-          <button
-            onClick={generateChallenge}
-            disabled={generating}
-            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {generating ? (
-              <>
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Gerando...
-              </>
-            ) : (
-              <>
-                <span>✨</span>
-                Gerar Desafio
-              </>
+          <div className="flex items-center gap-3">
+            {onViewHistory && (
+              <button
+                onClick={onViewHistory}
+                className="px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
+              >
+                Ver Histórico
+              </button>
             )}
-          </button>
+            <button
+              onClick={generateChallenge}
+              disabled={generating}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {generating ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <span>✨</span>
+                  Gerar Desafio
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -221,7 +232,17 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
               </div>
             )}
           </div>
-          <div className="text-green-400 text-4xl">🏆</div>
+          <div className="flex items-center gap-4">
+            {onViewHistory && (
+              <button
+                onClick={onViewHistory}
+                className="px-4 py-2 text-green-400 hover:text-green-300 text-sm font-medium transition-colors"
+              >
+                Ver Histórico
+              </button>
+            )}
+            <div className="text-green-400 text-4xl">🏆</div>
+          </div>
         </div>
       </div>
     )
@@ -239,7 +260,17 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
             </h3>
             <p className="text-gray-500 text-sm mt-1">{challenge.challenge_config.title}</p>
           </div>
-          <p className="text-gray-500 text-sm">Volte amanhã para um novo desafio!</p>
+          <div className="flex items-center gap-4">
+            {onViewHistory && (
+              <button
+                onClick={onViewHistory}
+                className="px-4 py-2 text-gray-400 hover:text-gray-300 text-sm font-medium transition-colors"
+              >
+                Ver Histórico
+              </button>
+            )}
+            <p className="text-gray-500 text-sm">Volte amanhã para um novo desafio!</p>
+          </div>
         </div>
       </div>
     )
@@ -322,12 +353,22 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
 
       {/* Actions */}
       <div className="p-6 pt-4 bg-black/10 flex items-center justify-between gap-4">
-        <button
-          onClick={skipChallenge}
-          className="px-4 py-2 text-gray-400 hover:text-gray-300 text-sm transition-colors"
-        >
-          Pular desafio
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={skipChallenge}
+            className="px-4 py-2 text-gray-400 hover:text-gray-300 text-sm transition-colors"
+          >
+            Pular desafio
+          </button>
+          {onViewHistory && (
+            <button
+              onClick={onViewHistory}
+              className="px-4 py-2 text-purple-400 hover:text-purple-300 text-sm transition-colors"
+            >
+              Ver Histórico
+            </button>
+          )}
+        </div>
         <button
           onClick={startChallenge}
           className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all transform hover:scale-105 flex items-center gap-2 shadow-lg shadow-purple-500/25"
