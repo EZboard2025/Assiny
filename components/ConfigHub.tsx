@@ -1308,9 +1308,19 @@ function ConfigurationInterface({
       const { PLAN_CONFIGS } = await import('@/lib/types/plans')
       const planConfig = PLAN_CONFIGS[companyData.training_plan as PlanType]
 
+      // Calcular créditos usados diretamente das tabelas de features
+      // (em vez de usar o contador monthly_credits_used que pode estar desatualizado)
+      const calculatedCreditsUsed =
+        (roleplayCount || 0) * 1 +        // Roleplay interno: 1 crédito
+        (publicRoleplayCount || 0) * 1 +  // Roleplay público: 1 crédito
+        (followupCount || 0) * 1 +        // Follow-up: 1 crédito
+        (meetCount || 0) * 3 +            // Análise de Meet: 3 créditos
+        (pdiCount || 0) * 1 +             // PDI: 1 crédito
+        aiGenerationCount * 0.5           // Geração IA: 0.5 créditos
+
       setUsageData({
         monthlyCredits: planConfig?.monthlyCredits || null,
-        creditsUsed: companyData.monthly_credits_used || 0,
+        creditsUsed: calculatedCreditsUsed,
         extraCredits: companyData.extra_monthly_credits || 0,
         resetDate: companyData.monthly_credits_reset_at,
         breakdown: {
