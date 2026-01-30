@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Vexa Self-Hosted API (running on same server via Docker)
 const VEXA_API_URL = 'http://localhost:8056'
+const VEXA_API_KEY = 'VexaRamppy2025SecureToken'
 
 // DELETE /api/vexa/bots/[platform]/[meetingId] - Delete/stop a bot
 export async function DELETE(
@@ -14,7 +15,10 @@ export async function DELETE(
     const response = await fetch(
       `${VEXA_API_URL}/bots/${platform}/${meetingId}`,
       {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'X-API-Key': VEXA_API_KEY
+        }
       }
     )
 

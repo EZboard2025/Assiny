@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Vexa Self-Hosted API (running on same server via Docker)
 const VEXA_API_URL = 'http://localhost:8056'
+const VEXA_API_KEY = 'VexaRamppy2025SecureToken'
 
 // POST /api/vexa/bots - Create a new bot
 export async function POST(request: NextRequest) {
@@ -15,7 +16,8 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${VEXA_API_URL}/bots`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-API-Key': VEXA_API_KEY
       },
       body: JSON.stringify(body)
     })

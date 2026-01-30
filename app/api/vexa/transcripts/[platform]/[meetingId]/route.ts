@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Vexa Self-Hosted API (running on same server via Docker)
 const VEXA_API_URL = 'http://localhost:8056'
+const VEXA_API_KEY = 'VexaRamppy2025SecureToken'
 
 // GET /api/vexa/transcripts/[platform]/[meetingId] - Get transcripts
 export async function GET(
@@ -12,7 +13,12 @@ export async function GET(
     const { platform, meetingId } = await params
 
     const response = await fetch(
-      `${VEXA_API_URL}/transcripts/${platform}/${meetingId}`
+      `${VEXA_API_URL}/transcripts/${platform}/${meetingId}`,
+      {
+        headers: {
+          'X-API-Key': VEXA_API_KEY
+        }
+      }
     )
 
     const text = await response.text()
