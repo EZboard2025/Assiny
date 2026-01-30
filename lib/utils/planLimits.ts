@@ -33,17 +33,19 @@ export async function getCompanyPlanData(companyId: string): Promise<CompanyPlan
     const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
                        now.getFullYear() !== lastReset.getFullYear()
 
-    // Se mudou o mês, resetar contador
+    // Se mudou o mês, resetar contador - zera créditos usados E créditos extras
     if (isNewMonth) {
       await supabase
         .from('companies')
         .update({
           monthly_credits_used: 0,
+          extra_monthly_credits: 0, // Créditos extras também são zerados no reset mensal
           monthly_credits_reset_at: now.toISOString()
         })
         .eq('id', companyId)
 
       data.monthly_credits_used = 0
+      data.extra_monthly_credits = 0
       data.monthly_credits_reset_at = now.toISOString()
     }
 

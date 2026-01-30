@@ -786,11 +786,11 @@ export default function CompaniesAdmin() {
               Administre as empresas do sistema multi-tenant
             </p>
 
-            {/* Timer para reset semanal */}
+            {/* Timer para reset mensal */}
             <div className="mt-4 bg-gradient-to-r from-emerald-900/20 to-green-900/20 border border-emerald-500/30 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
               <Clock className="w-5 h-5 text-emerald-400" />
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">Reset semanal em:</span>
+                <span className="text-sm text-gray-400">Reset mensal em:</span>
                 <div className="flex items-center gap-4 text-white font-mono">
                   {timeUntilReset.days > 0 && (
                     <div className="flex items-center gap-1">
@@ -813,7 +813,7 @@ export default function CompaniesAdmin() {
                 </div>
               </div>
               <div className="ml-auto text-xs text-gray-500">
-                Próxima segunda-feira 00:00
+                Dia 1 do próximo mês às 00:00
               </div>
             </div>
           </div>

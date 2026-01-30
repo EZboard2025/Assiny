@@ -6,25 +6,12 @@ export function getTimeUntilReset(): {
   nextResetDate: Date
 } {
   const now = new Date()
-  const nextMonday = new Date(now)
 
-  // Calculate days until next Monday (0 = Sunday, 1 = Monday, etc.)
-  const daysUntilMonday = (8 - now.getDay()) % 7
-
-  // If it's Monday, check if it's before or after 00:00
-  if (daysUntilMonday === 0) {
-    // It's Monday - set to next Monday
-    nextMonday.setDate(nextMonday.getDate() + 7)
-  } else {
-    // Set to next Monday
-    nextMonday.setDate(nextMonday.getDate() + daysUntilMonday)
-  }
-
-  // Set to 00:00:00.000
-  nextMonday.setHours(0, 0, 0, 0)
+  // Calculate first day of next month at 00:00:00
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0)
 
   // Calculate difference in milliseconds
-  const diff = nextMonday.getTime() - now.getTime()
+  const diff = nextMonth.getTime() - now.getTime()
 
   // Convert to days, hours, minutes, seconds
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -37,7 +24,7 @@ export function getTimeUntilReset(): {
     hours,
     minutes,
     seconds,
-    nextResetDate: nextMonday
+    nextResetDate: nextMonth
   }
 }
 
@@ -51,4 +38,14 @@ export function formatTimeUntilReset(): string {
   } else {
     return `${minutes}m`
   }
+}
+
+// Helper to get the name of next month's first day
+export function getNextResetDateFormatted(): string {
+  const { nextResetDate } = getTimeUntilReset()
+  return nextResetDate.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit'
+  })
 }

@@ -1,5 +1,7 @@
 -- Adicionar coluna para créditos extras mensais
 -- Esta coluna armazena créditos adicionais comprados que são somados ao limite do plano
+-- IMPORTANTE: Os créditos extras são ZERADOS no reset mensal (dia 1 de cada mês)
+-- A empresa volta a ter apenas o limite do plano base
 
 -- Adicionar coluna extra_monthly_credits se não existir
 DO $$
@@ -9,7 +11,7 @@ BEGIN
         WHERE table_name = 'companies' AND column_name = 'extra_monthly_credits'
     ) THEN
         ALTER TABLE companies ADD COLUMN extra_monthly_credits INTEGER DEFAULT 0;
-        COMMENT ON COLUMN companies.extra_monthly_credits IS 'Créditos extras comprados que são somados ao limite mensal do plano';
+        COMMENT ON COLUMN companies.extra_monthly_credits IS 'Créditos extras comprados que são somados ao limite mensal do plano. Zerados no reset mensal.';
     END IF;
 END $$;
 
