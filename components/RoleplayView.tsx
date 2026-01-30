@@ -108,8 +108,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   // Verificar limite de créditos mensais
   useEffect(() => {
     if (planUsage && trainingPlan) {
-      const used = planUsage.training?.credits?.used || 0
-      const limit = planUsage.training?.credits?.limit
+      const used = planUsage?.credits?.used || 0
+      const limit = planUsage?.credits?.limit
 
       if (limit !== null && used >= limit) {
         setRoleplayLimitReached(true)
@@ -1482,24 +1482,24 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           {planUsage && (
             <div className="flex justify-center mb-6">
               <div className={`px-4 py-2 rounded-xl flex items-center gap-3 ${
-                planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
+                planUsage?.credits?.limit !== null && planUsage?.credits?.used >= planUsage?.credits?.limit
                   ? 'bg-red-100 border border-red-300'
                   : 'bg-green-100 border border-green-300'
               }`}>
                 <Zap className={`w-5 h-5 ${
-                  planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
+                  planUsage?.credits?.limit !== null && planUsage?.credits?.used >= planUsage?.credits?.limit
                     ? 'text-red-500'
                     : 'text-green-500'
                 }`} />
                 <div className="flex flex-col">
                   <span className={`text-sm font-medium ${
-                    planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
+                    planUsage?.credits?.limit !== null && planUsage?.credits?.used >= planUsage?.credits?.limit
                       ? 'text-red-600'
                       : 'text-green-600'
                   }`}>
-                    Créditos este mês: {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
+                    Créditos este mês: {planUsage?.credits?.used || 0}/{planUsage?.credits?.limit === null ? '∞' : planUsage?.credits?.limit || 0}
                   </span>
-                  {planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used === planUsage.training?.credits?.limit - 1 && (
+                  {planUsage?.credits?.limit !== null && planUsage?.credits?.used === planUsage?.credits?.limit - 1 && (
                     <span className="text-xs text-yellow-600 font-semibold animate-pulse">
                       ⚠️ Último crédito disponível!
                     </span>

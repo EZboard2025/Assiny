@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -19,6 +19,7 @@ interface Company {
   locked?: boolean
   monthly_credits_used?: number
   monthly_credits_reset_at?: string
+  extra_monthly_credits?: number
   _count?: {
     employees: number
   }
@@ -100,6 +101,7 @@ interface MetricsTotals {
 export default function CompaniesAdmin() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -760,6 +762,13 @@ export default function CompaniesAdmin() {
     )
   }
 
+  // Filtrar empresas baseado na busca
+  const filteredCompanies = companies.filter(company =>
+    searchQuery === '' ||
+    company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    company.subdomain.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black py-20 px-6">
       <div className="max-w-7xl mx-auto">
@@ -824,6 +833,28 @@ export default function CompaniesAdmin() {
               <Plus className="w-5 h-5" />
               Nova Empresa
             </button>
+          </div>
+        </div>
+
+        {/* Search Input */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Pesquisar empresa por nome ou subdomínio..."
+              className="w-full pl-12 pr-4 py-3 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1019,9 +1050,20 @@ export default function CompaniesAdmin() {
             <Building2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400">Nenhuma empresa cadastrada</p>
           </div>
+        ) : filteredCompanies.length === 0 ? (
+          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-20 text-center border border-emerald-500/30">
+            <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400">Nenhuma empresa encontrada para "{searchQuery}"</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="mt-4 text-emerald-400 hover:text-emerald-300 transition-colors text-sm"
+            >
+              Limpar busca
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {companies.map((company) => (
+            {filteredCompanies.map((company) => (
               <div
                 key={company.id}
                 className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-emerald-500/30 hover:border-emerald-500/40 transition-all"
@@ -1050,11 +1092,14 @@ export default function CompaniesAdmin() {
                           </span>
                         </div>
                       )}
-                      {/* Créditos usados */}
+                      {/* Créditos usados / total */}
                       <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-yellow-600/20 to-amber-600/20 rounded-full">
                         <Zap className="w-3 h-3 text-yellow-400" />
                         <span className="text-xs font-medium text-yellow-300">
-                          {company.monthly_credits_used || 0} créditos usados
+                          {company.monthly_credits_used || 0}/{(PLAN_CONFIGS[company.training_plan!]?.monthlyCredits || 0) + (company.extra_monthly_credits || 0)} créditos
+                          {(company.extra_monthly_credits || 0) > 0 && (
+                            <span className="text-green-400"> (+{company.extra_monthly_credits})</span>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -2203,15 +2248,33 @@ export default function CompaniesAdmin() {
               </div>
 
               {/* Créditos atuais */}
-              <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
+              <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Créditos usados este mês:</span>
+                  <span className="text-gray-400">Limite do plano:</span>
+                  <span className="text-lg font-bold text-emerald-400">
+                    {PLAN_CONFIGS[companyToAddCredits.training_plan!]?.monthlyCredits ?? 'Ilimitado'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Créditos extras:</span>
+                  <span className="text-lg font-bold text-green-400">
+                    +{companyToAddCredits.extra_monthly_credits || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-700 pt-3">
+                  <span className="text-gray-400">Limite total:</span>
                   <span className="text-xl font-bold text-yellow-400">
+                    {(PLAN_CONFIGS[companyToAddCredits.training_plan!]?.monthlyCredits || 0) + (companyToAddCredits.extra_monthly_credits || 0)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Créditos usados:</span>
+                  <span className="text-lg text-gray-300">
                     {companyToAddCredits.monthly_credits_used || 0}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Ao adicionar créditos, o contador de créditos usados será reduzido.
+                <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
+                  Os créditos adicionados aumentam o limite mensal total da empresa.
                 </p>
               </div>
 

@@ -24,10 +24,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Buscar créditos atuais da empresa
+    // Buscar créditos extras atuais da empresa
     const { data: company, error: fetchError } = await supabaseAdmin
       .from('companies')
-      .select('monthly_credits_used, name')
+      .select('extra_monthly_credits, name')
       .eq('id', companyId)
       .single()
 
@@ -38,34 +38,34 @@ export async function POST(request: Request) {
       )
     }
 
-    // Calcular novo valor (reduzir o contador de créditos usados)
-    const currentUsed = company.monthly_credits_used || 0
-    const newUsed = Math.max(0, currentUsed - credits) // Não pode ser negativo
+    // Adicionar aos créditos extras (acumula com o plano base)
+    const currentExtra = company.extra_monthly_credits || 0
+    const newExtra = currentExtra + credits
 
-    // Atualizar créditos usados
+    // Atualizar créditos extras
     const { error: updateError } = await supabaseAdmin
       .from('companies')
       .update({
-        monthly_credits_used: newUsed,
+        extra_monthly_credits: newExtra,
         updated_at: new Date().toISOString()
       })
       .eq('id', companyId)
 
     if (updateError) {
-      console.error('Erro ao atualizar créditos:', updateError)
+      console.error('Erro ao atualizar créditos extras:', updateError)
       return NextResponse.json(
-        { error: 'Erro ao atualizar créditos' },
+        { error: 'Erro ao atualizar créditos extras' },
         { status: 500 }
       )
     }
 
-    console.log(`✅ Créditos adicionados para ${company.name}: -${credits} (${currentUsed} -> ${newUsed})`)
+    console.log(`✅ Créditos extras adicionados para ${company.name}: +${credits} (${currentExtra} -> ${newExtra})`)
 
     return NextResponse.json({
       success: true,
-      message: `${credits} créditos adicionados com sucesso`,
-      previousUsed: currentUsed,
-      newUsed: newUsed,
+      message: `${credits} créditos extras adicionados com sucesso`,
+      previousExtra: currentExtra,
+      newExtra: newExtra,
       creditsAdded: credits
     })
 

@@ -56,10 +56,10 @@ export async function canCreateRoleplay(companyId: string, userId?: string): Pro
   // Resetar contador se necessário
   await checkAndResetMonthlyCredits(companyId)
 
-  // Buscar plano e contador atual
+  // Buscar plano e contador atual (incluindo créditos extras)
   const { data: company } = await supabase
     .from('companies')
-    .select('training_plan, monthly_credits_used')
+    .select('training_plan, monthly_credits_used, extra_monthly_credits')
     .eq('id', companyId)
     .single()
 
@@ -69,6 +69,7 @@ export async function canCreateRoleplay(companyId: string, userId?: string): Pro
 
   const plan = company.training_plan as PlanType
   const currentUsage = company.monthly_credits_used || 0
+  const extraCredits = company.extra_monthly_credits || 0
   const config = PLAN_CONFIGS[plan]
 
   // Planos ilimitados (Enterprise)
@@ -76,15 +77,16 @@ export async function canCreateRoleplay(companyId: string, userId?: string): Pro
     return { allowed: true }
   }
 
-  // Verificar limite de créditos mensais
-  const limit = config.monthlyCredits
-  const remaining = limit - currentUsage
+  // Verificar limite de créditos mensais (plano + extras)
+  const baseLimit = config.monthlyCredits
+  const totalLimit = baseLimit + extraCredits
+  const remaining = totalLimit - currentUsage
 
   if (remaining <= 0) {
     return {
       allowed: false,
-      reason: `Limite de ${limit} créditos/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
-      limit,
+      reason: `Limite de ${totalLimit} créditos/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
+      limit: totalLimit,
       currentUsage,
       remaining: 0
     }
@@ -92,7 +94,7 @@ export async function canCreateRoleplay(companyId: string, userId?: string): Pro
 
   return {
     allowed: true,
-    limit,
+    limit: totalLimit,
     currentUsage,
     remaining
   }
@@ -190,7 +192,7 @@ export async function getPlanUsageSummary(companyId: string) {
 
   const { data: company } = await supabase
     .from('companies')
-    .select('monthly_credits_used, monthly_credits_reset_at')
+    .select('monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
     .eq('id', companyId)
     .single()
 
@@ -200,12 +202,18 @@ export async function getPlanUsageSummary(companyId: string) {
     .eq('company_id', companyId)
 
   const trainingConfig = PLAN_CONFIGS[trainingPlan]
+  const baseLimit = trainingConfig.monthlyCredits
+  const extraCredits = company?.extra_monthly_credits || 0
+  // Calcular limite total (plano base + créditos extras)
+  const totalLimit = baseLimit !== null ? baseLimit + extraCredits : null
 
   return {
     plan: trainingPlan,
     credits: {
       used: company?.monthly_credits_used || 0,
-      limit: trainingConfig.monthlyCredits,
+      limit: totalLimit,
+      baseLimit: baseLimit,
+      extraCredits: extraCredits,
       resetDate: company?.monthly_credits_reset_at
     },
     sellers: {
@@ -232,7 +240,7 @@ export async function getRemainingCredits(companyId: string): Promise<{
 
   const { data: company } = await supabase
     .from('companies')
-    .select('training_plan, monthly_credits_used, monthly_credits_reset_at')
+    .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
     .eq('id', companyId)
     .single()
 
@@ -243,11 +251,14 @@ export async function getRemainingCredits(companyId: string): Promise<{
   const plan = company.training_plan as PlanType
   const config = PLAN_CONFIGS[plan]
   const used = company.monthly_credits_used || 0
-  const limit = config.monthlyCredits
+  const extraCredits = company.extra_monthly_credits || 0
+  // Limite total = plano base + créditos extras
+  const baseLimit = config.monthlyCredits
+  const totalLimit = baseLimit !== null ? baseLimit + extraCredits : null
 
   return {
-    remaining: limit !== null ? Math.max(0, limit - used) : null,
-    limit,
+    remaining: totalLimit !== null ? Math.max(0, totalLimit - used) : null,
+    limit: totalLimit,
     used,
     resetDate: company.monthly_credits_reset_at
   }
