@@ -420,6 +420,7 @@ function ConfigurationInterface({
     creditsUsed: number
     extraCredits: number
     resetDate: string | null
+    challengesEnabled: boolean
     breakdown: UsageBreakdown
   }
   const [usageData, setUsageData] = useState<UsageData | null>(null)
@@ -1242,7 +1243,7 @@ function ConfigurationInterface({
       // Buscar dados de créditos da empresa
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
-        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits, daily_challenges_enabled')
         .eq('id', userCompanyId)
         .single()
 
@@ -1323,6 +1324,7 @@ function ConfigurationInterface({
         creditsUsed: calculatedCreditsUsed,
         extraCredits: companyData.extra_monthly_credits || 0,
         resetDate: companyData.monthly_credits_reset_at,
+        challengesEnabled: companyData.daily_challenges_enabled !== false,
         breakdown: {
           roleplay: roleplayCount || 0,
           publicRoleplay: publicRoleplayCount || 0,
@@ -5115,6 +5117,70 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   <p className="text-sm">Não foi possível carregar os dados de uso.</p>
                 </div>
               )}
+            </div>
+
+            {/* Seção de Configurações */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-purple-600" />
+                  Configurações
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Gerencie as configurações de funcionalidades da sua empresa.
+                </p>
+              </div>
+
+              <div className="p-4">
+                {/* Toggle Desafios Diários */}
+                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50/50 to-pink-50/50 rounded-xl border border-purple-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Target className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Desafios Diários</h4>
+                      <p className="text-xs text-gray-500">
+                        IA analisa dados e gera desafios personalizados
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!userCompanyId) return
+                      try {
+                        const { supabase } = await import('@/lib/supabase')
+                        const { data: company } = await supabase
+                          .from('companies')
+                          .select('daily_challenges_enabled')
+                          .eq('id', userCompanyId)
+                          .single()
+
+                        const newValue = !(company?.daily_challenges_enabled ?? true)
+
+                        await supabase
+                          .from('companies')
+                          .update({ daily_challenges_enabled: newValue })
+                          .eq('id', userCompanyId)
+
+                        // Force re-render
+                        loadUsageData()
+                      } catch (error) {
+                        console.error('Erro ao atualizar configuração:', error)
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      usageData?.challengesEnabled !== false ? 'bg-purple-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        usageData?.challengesEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

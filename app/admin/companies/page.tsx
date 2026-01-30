@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap, Search } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, UserCog, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap, Search, Target } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -152,6 +152,19 @@ export default function CompaniesAdmin() {
     return () => clearInterval(interval)
   }, [])
 
+  // Load challenge generation info
+  const loadChallengeGenInfo = async () => {
+    try {
+      const response = await fetch('/api/challenges/generate-all')
+      const data = await response.json()
+      if (response.ok) {
+        setChallengeGenInfo(data)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar info de desafios:', error)
+    }
+  }
+
   const loadMetrics = async () => {
     setLoadingMetrics(true)
     try {
@@ -213,6 +226,16 @@ export default function CompaniesAdmin() {
   const [loadingRoleplays, setLoadingRoleplays] = useState(false)
   const [selectedRoleplay, setSelectedRoleplay] = useState<RoleplaySession | null>(null)
 
+  // Estados para desafios diários
+  const [challengeGenInfo, setChallengeGenInfo] = useState<{
+    lastGeneration: { timestamp: string; generated: number; skipped: number; errors: number; creditsUsed: number } | null
+    nextGeneration: string
+    enabledCompanies: number
+    totalEmployees: number
+  } | null>(null)
+  const [generatingChallenges, setGeneratingChallenges] = useState(false)
+  const [timeUntilChallengeGen, setTimeUntilChallengeGen] = useState({ hours: 0, minutes: 0, seconds: 0 })
+
   useEffect(() => {
     // Verificar se já tem senha salva no sessionStorage
     const savedAuth = sessionStorage.getItem('admin-companies-auth')
@@ -221,6 +244,38 @@ export default function CompaniesAdmin() {
       loadCompanies()
     }
   }, [])
+
+  // Update challenge generation timer
+  useEffect(() => {
+    if (!challengeGenInfo?.nextGeneration) return
+
+    const updateTimer = () => {
+      const now = new Date()
+      const next = new Date(challengeGenInfo.nextGeneration)
+      const diff = next.getTime() - now.getTime()
+
+      if (diff <= 0) {
+        setTimeUntilChallengeGen({ hours: 0, minutes: 0, seconds: 0 })
+        return
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+      setTimeUntilChallengeGen({ hours, minutes, seconds })
+    }
+
+    updateTimer()
+    const interval = setInterval(updateTimer, 1000)
+    return () => clearInterval(interval)
+  }, [challengeGenInfo?.nextGeneration])
+
+  // Load challenge info when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadChallengeGenInfo()
+    }
+  }, [isAuthenticated])
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -814,6 +869,37 @@ export default function CompaniesAdmin() {
               </div>
               <div className="ml-auto text-xs text-gray-500">
                 Dia 1 do próximo mês às 00:00
+              </div>
+            </div>
+
+            {/* Timer para geração de desafios diários */}
+            <div className="mt-3 bg-gradient-to-r from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
+              <Target className="w-5 h-5 text-purple-400" />
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">Próxima geração de desafios:</span>
+                <div className="flex items-center gap-4 text-white font-mono">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-purple-400">{String(timeUntilChallengeGen.hours).padStart(2, '0')}</span>
+                    <span className="text-xs text-gray-400">h</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-pink-400">{String(timeUntilChallengeGen.minutes).padStart(2, '0')}</span>
+                    <span className="text-xs text-gray-400">m</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-purple-300">{String(timeUntilChallengeGen.seconds).padStart(2, '0')}</span>
+                    <span className="text-xs text-gray-400">s</span>
+                  </div>
+                </div>
+              </div>
+              <div className="ml-auto flex items-center gap-4">
+                <div className="text-xs text-gray-400">
+                  <span className="text-purple-400 font-medium">{challengeGenInfo?.enabledCompanies || 0}</span> empresas |{' '}
+                  <span className="text-pink-400 font-medium">{challengeGenInfo?.totalEmployees || 0}</span> vendedores
+                </div>
+                <div className="text-xs text-gray-500">
+                  Todos os dias às 10:00
+                </div>
               </div>
             </div>
           </div>

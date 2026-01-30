@@ -8,11 +8,35 @@ import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanLimitWarning } from '@/components/PlanLimitWarning'
 
-interface RoleplayViewProps {
-  onNavigateToHistory?: () => void
+interface ChallengeConfig {
+  title: string
+  description: string
+  target_weakness: string
+  roleplay_config: {
+    persona_id: string
+    objection_ids: string[]
+    age_range: string
+    temperament: string
+    objective_id?: string
+  }
+  success_criteria: {
+    spin_letter_target: string
+    spin_min_score: number
+    primary_indicator: string
+    primary_min_score: number
+    objection_handling_min: number
+  }
+  coaching_tips: string[]
 }
 
-export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps = {}) {
+interface RoleplayViewProps {
+  onNavigateToHistory?: () => void
+  challengeConfig?: ChallengeConfig
+  challengeId?: string
+  onChallengeComplete?: () => void
+}
+
+export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete }: RoleplayViewProps = {}) {
   // Hook para verificar limites do plano
   const {
     checkRoleplayLimit,
@@ -163,6 +187,39 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       // Selecionar primeiro objetivo se existir
       if (objectivesData.length > 0) {
         setSelectedObjective(objectivesData[0].id)
+      }
+
+      // Apply challenge configuration if present
+      if (challengeConfig) {
+        console.log('🎯 Aplicando configuração do desafio:', challengeConfig)
+
+        // Set persona
+        if (challengeConfig.roleplay_config.persona_id) {
+          setSelectedPersona(challengeConfig.roleplay_config.persona_id)
+        }
+
+        // Set objections
+        if (challengeConfig.roleplay_config.objection_ids?.length > 0) {
+          setSelectedObjections(challengeConfig.roleplay_config.objection_ids)
+        }
+
+        // Set objective
+        if (challengeConfig.roleplay_config.objective_id) {
+          setSelectedObjective(challengeConfig.roleplay_config.objective_id)
+        }
+
+        // Set temperament
+        if (challengeConfig.roleplay_config.temperament) {
+          setTemperament(challengeConfig.roleplay_config.temperament)
+        }
+
+        // Set age from range (e.g., "35-44" -> 40)
+        if (challengeConfig.roleplay_config.age_range) {
+          const [minAge, maxAge] = challengeConfig.roleplay_config.age_range.split('-').map(Number)
+          if (!isNaN(minAge) && !isNaN(maxAge)) {
+            setAge(Math.floor((minAge + maxAge) / 2))
+          }
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -817,6 +874,28 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               console.log('✅ Resumo de performance atualizado')
             } catch (error) {
               console.error('Erro ao atualizar resumo de performance:', error)
+            }
+
+            // Complete challenge if this is a challenge roleplay
+            if (challengeId && sessionId) {
+              try {
+                const completeResponse = await fetch('/api/challenges/complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    challengeId,
+                    roleplaySessionId: sessionId
+                  })
+                })
+                const completeResult = await completeResponse.json()
+                console.log('🎯 Desafio completado:', completeResult)
+
+                if (onChallengeComplete) {
+                  onChallengeComplete()
+                }
+              } catch (error) {
+                console.error('Erro ao completar desafio:', error)
+              }
             }
           }
         } else {
@@ -1566,6 +1645,53 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </div>
             )}
           </div>
+
+          {/* Challenge Banner - quando inciando de um desafio */}
+          {challengeConfig && (
+            <div className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 p-6">
+              <div className="flex items-start gap-4">
+                <div className="text-3xl">🎯</div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-bold text-gray-900">{challengeConfig.title}</h3>
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                      Desafio Diário
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-sm mb-4">{challengeConfig.description}</p>
+
+                  {/* Meta */}
+                  <div className="flex items-center gap-4 text-sm mb-4">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4 text-purple-500" />
+                      <span className="text-gray-600">Meta:</span>
+                      <span className="font-semibold text-purple-700">
+                        {challengeConfig.success_criteria.spin_letter_target} ≥ {challengeConfig.success_criteria.spin_min_score}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dicas de Coaching */}
+                  {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
+                    <div className="bg-white/50 rounded-lg p-4 border border-purple-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Lightbulb className="w-4 h-4 text-amber-500" />
+                        <span className="text-sm font-semibold text-gray-700">Dicas para este desafio:</span>
+                      </div>
+                      <ul className="space-y-1">
+                        {challengeConfig.coaching_tips.map((tip, index) => (
+                          <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
+                            <span className="text-purple-400 mt-0.5">•</span>
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Painel de Configuração */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">

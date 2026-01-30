@@ -18,6 +18,7 @@ import StatsPanel from './dashboard/StatsPanel'
 import TopBanner from './dashboard/TopBanner'
 import FeatureCard from './dashboard/FeatureCard'
 import StreakIndicator from './dashboard/StreakIndicator'
+import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
 import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
@@ -51,6 +52,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [activeChallenge, setActiveChallenge] = useState<any | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
   const chatRef = useRef<ChatInterfaceHandle>(null)
 
@@ -304,6 +306,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     setCurrentView(newView as typeof currentView)
   }
 
+  const handleStartChallenge = (challenge: any) => {
+    setActiveChallenge(challenge)
+    setCurrentView('roleplay')
+  }
+
   const renderContent = () => {
     if (currentView === 'chat') {
       if (!hasChatIA) {
@@ -326,7 +333,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'roleplay') {
-      return <RoleplayView onNavigateToHistory={() => handleViewChange('historico')} />
+      return (
+        <RoleplayView
+          onNavigateToHistory={() => handleViewChange('historico')}
+          challengeConfig={activeChallenge?.challenge_config}
+          challengeId={activeChallenge?.id}
+          onChallengeComplete={() => setActiveChallenge(null)}
+        />
+      )
     }
 
     if (currentView === 'pdi') {
@@ -416,6 +430,17 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div>
           </div>
+
+          {/* Daily Challenge Banner */}
+          {userId && companyId && (
+            <div className={`mb-8 ${mounted ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: '100ms' }}>
+              <DailyChallengeBanner
+                userId={userId}
+                companyId={companyId}
+                onStartChallenge={handleStartChallenge}
+              />
+            </div>
+          )}
 
           {/* Section Headers */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-4">
