@@ -100,19 +100,20 @@ export async function POST(req: NextRequest) {
 
     console.log(`💳 ${AI_GENERATION_CREDIT_COST} créditos consumidos para ${generationType || 'geração IA'}: ${currentCreditsUsed} → ${newCreditsUsed}`)
 
-    // Registrar na tabela de gerações (se existir)
-    try {
-      await supabaseAdmin
-        .from('ai_generations')
-        .insert({
-          company_id: companyId,
-          generation_type: generationType || 'unknown',
-          credits_used: AI_GENERATION_CREDIT_COST,
-          created_at: new Date().toISOString()
-        })
-    } catch (e) {
-      // Tabela pode não existir ainda, não é crítico
-      console.log('ℹ️ Tabela ai_generations não disponível, continuando sem log')
+    // Registrar na tabela de gerações
+    const { error: insertError } = await supabaseAdmin
+      .from('ai_generations')
+      .insert({
+        company_id: companyId,
+        generation_type: generationType || 'unknown',
+        credits_used: AI_GENERATION_CREDIT_COST,
+        created_at: new Date().toISOString()
+      })
+
+    if (insertError) {
+      console.error('⚠️ Erro ao registrar geração de IA:', insertError)
+    } else {
+      console.log(`📝 Geração registrada: ${generationType} para empresa ${companyId}`)
     }
 
     return NextResponse.json({
