@@ -32,11 +32,16 @@ import {
 import { supabase } from '@/lib/supabase'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
-// Vexa API - uses Next.js API routes as proxy (works in both dev and production)
-const VEXA_API_URL = '/api/vexa'
-
-// LocalStorage key for persisting session
-const MEET_SESSION_STORAGE_KEY = 'meet_analysis_session'
+// Vexa API config - production uses relative path via Nginx proxy
+const isDevelopment = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.port === '3000' ||
+  window.location.hostname.startsWith('192.168.')
+)
+const VEXA_API_URL = isDevelopment
+  ? 'http://localhost:8056'  // Development
+  : '/vexa-api'              // Production (proxied via Nginx)
+const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'error'
 
@@ -631,8 +636,8 @@ export default function MeetAnalysisView() {
 
     const statusConfig: Record<BotStatus, { icon: any; text: string; color: string }> = {
       idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500' },
-      sending: { icon: Loader2, text: 'Enviando bot...', color: 'text-yellow-600' },
-      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-yellow-600' },
+      sending: { icon: Loader2, text: 'Enviando bot...', color: 'text-amber-600' },
+      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600' },
       in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600' },
       transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600' },
       ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600' },
@@ -743,174 +748,56 @@ export default function MeetAnalysisView() {
   )
 
   return (
-    <div className="min-h-screen py-8 px-6 bg-gray-50">
+    <div className="min-h-screen bg-gray-50 py-8 px-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-green-50 rounded-2xl flex items-center justify-center border border-green-200">
+          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-2xl flex items-center justify-center">
             <Video className="w-8 h-8 text-green-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Análise de Google Meet
           </h1>
-          <p className="text-gray-600">
-            Avalie o desempenho em calls de venda com IA
+          <p className="text-gray-500">
+            Cole o link da reunião e nosso bot entrará para transcrever a conversa
           </p>
         </div>
 
         {/* Mode Tabs */}
         {!session && (
-          <div className="flex gap-2 mb-6 bg-white p-1.5 rounded-xl border border-gray-200 shadow-sm">
-            <button
-              onClick={() => setActiveMode('bot')}
-              className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                activeMode === 'bot'
-                  ? 'bg-green-50 text-green-700 border border-green-200'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Video className="w-4 h-4" />
-              Bot ao Vivo
-            </button>
-            <button
-              onClick={() => setActiveMode('history')}
-              className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                activeMode === 'history'
-                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <History className="w-4 h-4" />
-              Histórico
-            </button>
-          </div>
-        )}
-
-
-        {/* History Mode */}
-        {!session && activeMode === 'history' && (
-          <div className="bg-white rounded-2xl p-6 border border-purple-200 shadow-sm mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <History className="w-5 h-5 text-purple-600" />
-                Histórico de Avaliações
-              </h3>
-              <button
-                onClick={loadHistory}
-                disabled={isLoadingHistory}
-                className="px-3 py-1.5 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center gap-2 border border-purple-200"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoadingHistory ? 'animate-spin' : ''}`} />
-                Atualizar
-              </button>
-            </div>
-
-            {isLoadingHistory ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-              </div>
-            ) : savedEvaluations.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma avaliação encontrada</p>
-                <p className="text-sm mt-1">Avalie uma call para ver o histórico aqui</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {savedEvaluations.map((saved) => {
-                  const config = getPerformanceConfig(saved.performance_level)
-                  return (
-                    <div
-                      key={saved.id}
-                      className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-purple-300 transition-colors cursor-pointer group"
-                      onClick={() => viewSavedEvaluation(saved)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
-                            <span className={`text-2xl font-bold ${config.color}`}>
-                              {saved.overall_score}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded ${config.bgColor} ${config.color}`}>
-                              {config.label}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-700">
-                            {saved.seller_name}
-                            {saved.call_objective && (
-                              <span className="text-gray-500"> • {saved.call_objective}</span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(saved.created_at).toLocaleString('pt-BR')}
-                          </p>
-                        </div>
-                        <button className="p-2 bg-purple-50 rounded-lg text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Eye className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Bot Mode - Input Section */}
-        {!session && activeMode === 'bot' && (
-          <div className="bg-white rounded-2xl p-6 border border-green-200 shadow-sm mb-6">
-            <div className="space-y-4">
-              {/* Meet URL */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Link do Google Meet
-                </label>
-                <div className="flex gap-3">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      value={meetUrl}
-                      onChange={(e) => handleUrlChange(e.target.value)}
-                      placeholder="https://meet.google.com/abc-defg-hij"
-                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100 transition-all"
-                    />
-                    {meetingId && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
-                          {meetingId}
-                        </span>
-                        <button
-                          onClick={copyMeetingId}
-                          className="text-gray-400 hover:text-green-600 transition-colors"
-                        >
-                          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Call Objective */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Objetivo da Call <span className="text-gray-400 font-normal">(opcional)</span>
-                </label>
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              Link do Google Meet
+            </label>
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
                 <input
                   type="text"
-                  value={callObjective}
-                  onChange={(e) => setCallObjective(e.target.value)}
-                  placeholder="Ex: Apresentar proposta comercial, Fazer discovery, Negociar contrato..."
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100 transition-all"
+                  value={meetUrl}
+                  onChange={(e) => handleUrlChange(e.target.value)}
+                  placeholder="https://meet.google.com/abc-defg-hij"
+                  className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                 />
+                {meetingId && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
+                      {meetingId}
+                    </span>
+                    <button
+                      onClick={copyMeetingId}
+                      className="text-gray-400 hover:text-green-600 transition-colors"
+                    >
+                      {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Send Button */}
               <button
                 onClick={sendBot}
                 disabled={!meetingId}
-                className="w-full px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
               >
                 <Send className="w-5 h-5" />
                 Enviar Bot para a Reunião
@@ -918,7 +805,7 @@ export default function MeetAnalysisView() {
             </div>
 
             {error && (
-              <div className="mt-3 flex items-center gap-2 text-red-600 text-sm">
+              <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
                 <AlertTriangle className="w-4 h-4" />
                 {error}
               </div>
@@ -938,11 +825,11 @@ export default function MeetAnalysisView() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 font-bold">3.</span>
-                  <strong className="text-yellow-600">Aceite o bot na reunião</strong> quando ele pedir para participar
+                  <strong className="text-amber-600">Aceite o bot na reunião</strong> quando ele pedir para participar
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 font-bold">4.</span>
-                  A transcrição aparecerá em tempo real e você poderá avaliar ao final
+                  A transcrição aparecerá em tempo real aqui
                 </li>
               </ol>
             </div>
@@ -953,7 +840,7 @@ export default function MeetAnalysisView() {
         {session && (
           <div className="space-y-6">
             {/* Status Bar */}
-            <div className="bg-white rounded-2xl p-4 border border-green-200 shadow-sm">
+            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {getStatusDisplay()}
@@ -964,7 +851,7 @@ export default function MeetAnalysisView() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">
+                  <span className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg font-medium">
                     Meeting: {session.meetingId}
                   </span>
                   {session.status !== 'ended' && session.status !== 'error' && (
@@ -990,7 +877,7 @@ export default function MeetAnalysisView() {
             </div>
 
             {/* Transcript */}
-            <div className="bg-white rounded-2xl border border-green-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                   <Users className="w-4 h-4 text-green-600" />
@@ -1012,30 +899,30 @@ export default function MeetAnalysisView() {
                     {session.status === 'joining' || session.status === 'sending' ? (
                       <>
                         <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
-                        <p>Aguardando bot entrar na reunião...</p>
-                        <p className="text-sm text-gray-400 mt-2">
+                        <p className="text-gray-600">Aguardando bot entrar na reunião...</p>
+                        <p className="text-sm text-gray-500 mt-2">
                           Isso geralmente leva de 10 a 15 segundos
                         </p>
-                        <p className="text-sm text-yellow-600 mt-2">
+                        <p className="text-sm text-amber-600 mt-2 font-medium">
                           Lembre-se de aceitar o "VexaBot" quando ele pedir para entrar!
                         </p>
                       </>
                     ) : session.status === 'in_meeting' ? (
                       <>
                         <Video className="w-8 h-8 mb-3 text-green-600" />
-                        <p>Bot na reunião. Aguardando transcrição...</p>
+                        <p className="text-gray-600">Bot na reunião. Aguardando transcrição...</p>
                       </>
                     ) : (
                       <>
-                        <Clock className="w-8 h-8 mb-3" />
-                        <p>Nenhuma transcrição ainda</p>
+                        <Clock className="w-8 h-8 mb-3 text-gray-400" />
+                        <p className="text-gray-500">Nenhuma transcrição ainda</p>
                       </>
                     )}
                   </div>
                 ) : (
                   session.transcript.map((segment, idx) => (
                     <div key={idx} className="flex gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-50 flex items-center justify-center border border-green-200">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                         <User className="w-5 h-5 text-green-600" />
                       </div>
                       <div className="flex-1">
@@ -1044,7 +931,7 @@ export default function MeetAnalysisView() {
                             {segment.speaker}
                           </span>
                           {segment.timestamp && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-400">
                               {segment.timestamp}
                             </span>
                           )}
@@ -1061,33 +948,11 @@ export default function MeetAnalysisView() {
 
             {/* Evaluation Section - Only when ended with transcript */}
             {session.status === 'ended' && session.transcript.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 border border-blue-200 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  Avaliar Desempenho do Vendedor
-                </h3>
-
-                {/* Info Summary */}
-                <div className="flex flex-wrap gap-3 mb-4">
-                  <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <span className="text-xs text-gray-500">Vendedor:</span>
-                    <span className="text-sm text-gray-900 ml-2">{sellerName}</span>
-                  </div>
-                  {callObjective && (
-                    <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                      <span className="text-xs text-gray-500">Objetivo:</span>
-                      <span className="text-sm text-gray-900 ml-2">{callObjective}</span>
-                    </div>
-                  )}
-                </div>
-
-                {evaluationError && (
-                  <div className="mb-4 flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
-                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                    {evaluationError}
-                  </div>
-                )}
-
+              <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Sessão Encerrada</h3>
+                <p className="text-gray-600 mb-4">
+                  A transcrição foi capturada com sucesso. Você pode:
+                </p>
                 <div className="flex gap-3">
                   <button
                     onClick={evaluateCall}
@@ -1113,10 +978,17 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors flex items-center gap-2 border border-gray-200"
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
                   >
                     <Copy className="w-4 h-4" />
-                    Copiar
+                    Copiar Transcrição
+                  </button>
+                  <button
+                    onClick={resetSession}
+                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-gray-200 font-medium"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Nova Análise
                   </button>
                 </div>
 
