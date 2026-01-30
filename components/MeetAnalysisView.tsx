@@ -35,6 +35,9 @@ import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 // Vexa API - uses Next.js API routes as proxy (works in both dev and production)
 const VEXA_API_URL = '/api/vexa'
 
+// LocalStorage key for persisting session
+const MEET_SESSION_STORAGE_KEY = 'meet_analysis_session'
+
 type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'error'
 
 interface TranscriptSegment {
@@ -236,6 +239,66 @@ export default function MeetAnalysisView() {
     }
     fetchUserInfo()
   }, [])
+
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedSession = localStorage.getItem(MEET_SESSION_STORAGE_KEY)
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession)
+        // Restore the session with proper date parsing
+        const restoredSession: MeetingSession = {
+          ...parsed,
+          startTime: parsed.startTime ? new Date(parsed.startTime) : undefined
+        }
+
+        // Only restore if session is still active (not ended or error)
+        if (restoredSession.status !== 'ended' && restoredSession.status !== 'error') {
+          console.log('🔄 Restoring Meet session from localStorage:', restoredSession.meetingId)
+          setSession(restoredSession)
+          setMeetingId(restoredSession.meetingId)
+          setMeetUrl(`https://meet.google.com/${restoredSession.meetingId}`)
+
+          // Restore call objective if saved
+          if (parsed.callObjective) {
+            setCallObjective(parsed.callObjective)
+          }
+
+          // Restart polling for active sessions
+          if (['joining', 'in_meeting', 'transcribing', 'sending'].includes(restoredSession.status)) {
+            console.log('▶️ Restarting polling for active session')
+            startPolling(restoredSession.meetingId)
+          }
+        } else {
+          // Clear ended/error sessions from storage
+          localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
+        }
+      }
+    } catch (err) {
+      console.error('Error restoring session from localStorage:', err)
+      localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
+    }
+  }, [])
+
+  // Save session to localStorage when it changes
+  useEffect(() => {
+    if (session) {
+      // Save active sessions to localStorage
+      if (session.status !== 'ended' && session.status !== 'error') {
+        const sessionToSave = {
+          ...session,
+          startTime: session.startTime?.toISOString(),
+          callObjective: callObjective // Also save the call objective
+        }
+        localStorage.setItem(MEET_SESSION_STORAGE_KEY, JSON.stringify(sessionToSave))
+        console.log('💾 Session saved to localStorage:', session.meetingId)
+      } else {
+        // Clear storage when session ends or errors
+        localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
+        console.log('🗑️ Session cleared from localStorage')
+      }
+    }
+  }, [session, callObjective])
 
   // Load evaluation history
   const loadHistory = async () => {
@@ -466,6 +529,8 @@ export default function MeetAnalysisView() {
     setEvaluation(null)
     setEvaluationError('')
     setCallObjective('')
+    // Clear localStorage
+    localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
     // Note: sellerName is not reset because it's auto-fetched from user profile
   }
 
