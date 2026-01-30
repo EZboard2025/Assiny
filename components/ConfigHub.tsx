@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, Link2, Clock, UserPlus, RefreshCw } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -65,7 +65,7 @@ import {
   getPlanUsageSummary,
   getCompanyTrainingPlan
 } from '@/lib/utils/planLimitsChecker'
-import { PlanType } from '@/lib/types/plans'
+import { PlanType, PLAN_CONFIGS, PLAN_NAMES } from '@/lib/types/plans'
 import { useToast } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 
@@ -331,7 +331,7 @@ function ConfigurationInterface({
 
   // Plano Individual não tem acesso à aba de funcionários
   const isIndividualPlan = trainingPlan === PlanType.INDIVIDUAL
-  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'funnel'>(isIndividualPlan ? 'personas' : 'employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'funnel' | 'usage'>(isIndividualPlan ? 'personas' : 'employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
@@ -405,6 +405,22 @@ function ConfigurationInterface({
     id: null,
     name: ''
   })
+
+  // Estados para aba de Usage (consumo de créditos)
+  interface UsageBreakdown {
+    roleplay: number
+    followup: number
+    meet: number
+  }
+  interface UsageData {
+    monthlyCredits: number | null
+    creditsUsed: number
+    extraCredits: number
+    resetDate: string | null
+    breakdown: UsageBreakdown
+  }
+  const [usageData, setUsageData] = useState<UsageData | null>(null)
+  const [loadingUsage, setLoadingUsage] = useState(false)
 
   // Paleta de cores para tags
   const tagColorPalette = [
@@ -591,6 +607,13 @@ function ConfigurationInterface({
   useEffect(() => {
     if (activeTab === 'employees' && userCompanyId) {
       loadPendingRegistrations()
+    }
+  }, [activeTab, userCompanyId])
+
+  // Carregar dados de uso quando aba 'usage' for ativada
+  useEffect(() => {
+    if (activeTab === 'usage' && userCompanyId) {
+      loadUsageData()
     }
   }, [activeTab, userCompanyId])
 
@@ -1153,6 +1176,72 @@ function ConfigurationInterface({
       setPersonaTags(newPersonaTags)
     } catch (error) {
       console.error('Erro ao carregar tags:', error)
+    }
+  }
+
+  // Função para carregar dados de uso de créditos
+  const loadUsageData = async () => {
+    if (!userCompanyId) return
+
+    setLoadingUsage(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+
+      // Buscar dados de créditos da empresa
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+        .eq('id', userCompanyId)
+        .single()
+
+      if (companyError || !companyData) {
+        console.error('Erro ao buscar dados da empresa:', companyError)
+        return
+      }
+
+      // Calcular início do mês atual
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+      // Buscar breakdown de uso por tipo (roleplays deste mês)
+      const { count: roleplayCount } = await supabase
+        .from('roleplays_unicos')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', userCompanyId)
+        .gte('created_at', startOfMonth)
+
+      // Buscar análises de follow-up deste mês
+      const { count: followupCount } = await supabase
+        .from('followup_analyses')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', userCompanyId)
+        .gte('created_at', startOfMonth)
+
+      // Buscar análises de Meet deste mês (cada uma custa 3 créditos)
+      const { count: meetCount } = await supabase
+        .from('meet_evaluations')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', userCompanyId)
+        .gte('created_at', startOfMonth)
+
+      // Obter limite de créditos do plano
+      const planConfig = PLAN_CONFIGS[companyData.training_plan as PlanType]
+
+      setUsageData({
+        monthlyCredits: planConfig?.monthlyCredits || null,
+        creditsUsed: companyData.monthly_credits_used || 0,
+        extraCredits: companyData.extra_monthly_credits || 0,
+        resetDate: companyData.monthly_credits_reset_at,
+        breakdown: {
+          roleplay: roleplayCount || 0,
+          followup: followupCount || 0,
+          meet: (meetCount || 0) * 3 // Cada análise de Meet custa 3 créditos
+        }
+      })
+    } catch (error) {
+      console.error('Erro ao carregar dados de uso:', error)
+    } finally {
+      setLoadingUsage(false)
     }
   }
 
@@ -2592,6 +2681,17 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         >
           <Target className="w-4 h-4" />
           <span>Fases do Funil</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('usage')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'usage'
+              ? 'bg-amber-500/20 text-amber-400'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Uso</span>
         </button>
       </div>
 
@@ -4598,6 +4698,207 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Usage Tab - Consumo de Créditos */}
+        {activeTab === 'usage' && (
+          <div className="space-y-6">
+            {loadingUsage ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+              </div>
+            ) : usageData ? (
+              <>
+                {/* Card Principal de Créditos */}
+                <div className="bg-gray-900/50 rounded-xl border border-amber-500/30 overflow-hidden">
+                  <div className="p-4 border-b border-gray-800 bg-amber-500/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white">Créditos do Mês</h3>
+                        <p className="text-sm text-gray-400">
+                          Plano {trainingPlan ? PLAN_NAMES[trainingPlan] : 'Carregando...'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    {/* Barra de Progresso */}
+                    {usageData.monthlyCredits !== null ? (
+                      <div className="mb-6">
+                        <div className="flex items-end justify-between mb-2">
+                          <div>
+                            <span className="text-4xl font-bold text-white">{usageData.creditsUsed}</span>
+                            <span className="text-gray-400 text-lg ml-1">/ {usageData.monthlyCredits + usageData.extraCredits}</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-gray-400">Créditos restantes</p>
+                            <p className="text-2xl font-bold text-green-400">
+                              {Math.max(0, (usageData.monthlyCredits + usageData.extraCredits) - usageData.creditsUsed)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="w-full h-4 bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) >= 0.9
+                                ? 'bg-red-500'
+                                : (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) >= 0.7
+                                ? 'bg-amber-500'
+                                : 'bg-green-500'
+                            }`}
+                            style={{
+                              width: `${Math.min(100, (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) * 100)}%`
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {((usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) * 100).toFixed(1)}% utilizado
+                        </p>
+
+                        {/* Info de créditos extras */}
+                        {usageData.extraCredits > 0 && (
+                          <div className="mt-3 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                            <p className="text-sm text-green-400">
+                              +{usageData.extraCredits} créditos extras adicionados
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mb-6 text-center py-4">
+                        <p className="text-3xl font-bold text-amber-400">♾️ Ilimitado</p>
+                        <p className="text-sm text-gray-400 mt-1">Plano Enterprise - sem limite de créditos</p>
+                      </div>
+                    )}
+
+                    {/* Data de Reset */}
+                    {usageData.resetDate && (
+                      <div className="flex items-center gap-2 text-sm text-gray-400 border-t border-gray-800 pt-4">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          Créditos renovam em:{' '}
+                          <span className="text-white font-medium">
+                            {(() => {
+                              const resetDate = new Date(usageData.resetDate)
+                              const nextMonth = new Date(resetDate.getFullYear(), resetDate.getMonth() + 1, 1)
+                              return nextMonth.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
+                            })()}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Breakdown de Uso */}
+                <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+                  <div className="p-4 border-b border-gray-800">
+                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Detalhamento do Uso</h3>
+                    <p className="text-xs text-gray-500 mt-1">Como seus créditos estão sendo utilizados neste mês</p>
+                  </div>
+
+                  <div className="p-4 space-y-4">
+                    {/* Roleplay */}
+                    <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                          <Zap className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">Roleplay de Vendas</p>
+                          <p className="text-xs text-gray-500">1 crédito por sessão</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-purple-400">{usageData.breakdown.roleplay}</p>
+                        <p className="text-xs text-gray-500">sessões</p>
+                      </div>
+                    </div>
+
+                    {/* Follow-up */}
+                    <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                          <MessageSquare className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">Análise de Follow-up</p>
+                          <p className="text-xs text-gray-500">1 crédito por análise</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-blue-400">{usageData.breakdown.followup}</p>
+                        <p className="text-xs text-gray-500">análises</p>
+                      </div>
+                    </div>
+
+                    {/* Meet Analysis */}
+                    <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                          <Video className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">Análise de Google Meet</p>
+                          <p className="text-xs text-gray-500">3 créditos por análise</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-green-400">{usageData.breakdown.meet / 3}</p>
+                        <p className="text-xs text-gray-500">análises ({usageData.breakdown.meet} créditos)</p>
+                      </div>
+                    </div>
+
+                    {/* Total */}
+                    <div className="flex items-center justify-between p-4 bg-amber-500/10 rounded-xl border border-amber-500/30 mt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                          <BarChart3 className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">Total Consumido</p>
+                          <p className="text-xs text-gray-500">Neste período</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-amber-400">
+                          {usageData.breakdown.roleplay + usageData.breakdown.followup + usageData.breakdown.meet}
+                        </p>
+                        <p className="text-xs text-gray-500">créditos</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botão de atualizar */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={loadUsageData}
+                    disabled={loadingUsage}
+                    className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingUsage ? 'animate-spin' : ''}`} />
+                    Atualizar dados
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Não foi possível carregar os dados de uso.</p>
+                <button
+                  onClick={loadUsageData}
+                  className="mt-4 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm font-medium hover:bg-amber-500/30 transition-colors"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
           </div>
         )}
 
