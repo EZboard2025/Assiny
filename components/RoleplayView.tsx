@@ -109,8 +109,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   // Verificar limite de créditos mensais
   useEffect(() => {
     if (planUsage && trainingPlan) {
-      const used = planUsage?.credits?.used || 0
-      const limit = planUsage?.credits?.limit
+      const used = planUsage.training?.credits?.used || 0
+      const limit = planUsage.training?.credits?.limit
 
       if (limit !== null && used >= limit) {
         setRoleplayLimitReached(true)
