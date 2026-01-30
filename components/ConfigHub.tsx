@@ -4826,26 +4826,86 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </div>
                   </div>
 
-                  {/* Barra de Progresso */}
+                  {/* Gráfico de Donut + Legenda */}
                   {usageData.monthlyCredits !== null && (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-600">Consumo do Mês</span>
-                        <span className="text-xs font-medium text-gray-500">
-                          {Math.round((usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) * 100)}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) >= 0.9
-                              ? 'bg-gradient-to-r from-red-500 to-rose-500'
-                              : (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) >= 0.7
-                                ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                                : 'bg-gradient-to-r from-green-500 to-emerald-500'
-                          }`}
-                          style={{ width: `${Math.min(100, (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) * 100)}%` }}
-                        />
+                    <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                      <div className="flex flex-col md:flex-row items-center gap-8">
+                        {/* Donut Chart */}
+                        <div className="relative w-48 h-48 flex-shrink-0">
+                          <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                            {(() => {
+                              const total = usageData.monthlyCredits + usageData.extraCredits
+                              const remaining = Math.max(0, total - usageData.creditsUsed)
+
+                              // Calculate credits used per feature (considering cost multipliers)
+                              const roleplayCredits = usageData.breakdown.roleplay * 1
+                              const publicRoleplayCredits = usageData.breakdown.publicRoleplay * 1
+                              const followupCredits = usageData.breakdown.followup * 1
+                              const meetCredits = usageData.breakdown.meet * 3
+                              const pdiCredits = usageData.breakdown.pdi * 1
+
+                              const segments = [
+                                { value: roleplayCredits, color: '#9333ea', label: 'Roleplay' },
+                                { value: publicRoleplayCredits, color: '#ec4899', label: 'Roleplay Público' },
+                                { value: followupCredits, color: '#3b82f6', label: 'Follow-up' },
+                                { value: meetCredits, color: '#22c55e', label: 'Meet' },
+                                { value: pdiCredits, color: '#f59e0b', label: 'PDI' },
+                                { value: remaining, color: '#e5e7eb', label: 'Disponível' }
+                              ].filter(s => s.value > 0)
+
+                              const radius = 40
+                              const circumference = 2 * Math.PI * radius
+                              let currentOffset = 0
+
+                              return segments.map((segment, index) => {
+                                const percentage = segment.value / total
+                                const dashLength = percentage * circumference
+                                const dashOffset = -currentOffset
+                                currentOffset += dashLength
+
+                                return (
+                                  <circle
+                                    key={index}
+                                    cx="50"
+                                    cy="50"
+                                    r={radius}
+                                    fill="none"
+                                    stroke={segment.color}
+                                    strokeWidth="16"
+                                    strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                                    strokeDashoffset={dashOffset}
+                                    className="transition-all duration-500"
+                                  />
+                                )
+                              })
+                            })()}
+                          </svg>
+                          {/* Center text */}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-2xl font-bold text-gray-900">{usageData.creditsUsed}</span>
+                            <span className="text-xs text-gray-500">de {usageData.monthlyCredits + usageData.extraCredits}</span>
+                          </div>
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex-1 grid grid-cols-2 gap-3">
+                          {[
+                            { label: 'Roleplay (Treino)', value: usageData.breakdown.roleplay, credits: usageData.breakdown.roleplay * 1, color: 'bg-purple-500' },
+                            { label: 'Roleplay Público', value: usageData.breakdown.publicRoleplay, credits: usageData.breakdown.publicRoleplay * 1, color: 'bg-pink-500' },
+                            { label: 'Follow-up', value: usageData.breakdown.followup, credits: usageData.breakdown.followup * 1, color: 'bg-blue-500' },
+                            { label: 'Análise de Meet', value: usageData.breakdown.meet, credits: usageData.breakdown.meet * 3, color: 'bg-green-500' },
+                            { label: 'PDI', value: usageData.breakdown.pdi, credits: usageData.breakdown.pdi * 1, color: 'bg-amber-500' },
+                            { label: 'Disponível', value: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), credits: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), color: 'bg-gray-300' }
+                          ].filter(item => item.credits > 0 || item.label === 'Disponível').map((item, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${item.color} flex-shrink-0`} />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-gray-700 truncate">{item.label}</p>
+                                <p className="text-xs text-gray-500">{item.credits} crédito{item.credits !== 1 ? 's' : ''}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
