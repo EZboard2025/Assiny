@@ -460,7 +460,6 @@ export async function POST(request: NextRequest) {
       transcript,
       sellerName,
       callObjective,
-      funnelStage,
       productInfo,
       objections,
       meetingId,
@@ -505,25 +504,17 @@ export async function POST(request: NextRequest) {
       userMessage += `- Objetivo da call: ${callObjective}\n`
     }
 
-    if (funnelStage) {
-      const stageLabels: Record<string, string> = {
-        prospeccao: 'Prospecção',
-        discovery: 'Discovery',
-        demo: 'Demo/Apresentação',
-        negociacao: 'Negociação',
-        fechamento: 'Fechamento',
-        follow_up: 'Follow-up'
-      }
-      userMessage += `- Estágio do funil: ${stageLabels[funnelStage] || funnelStage}\n`
-    }
-
-    if (productInfo) {
+    // Add company knowledge if available
+    if (productInfo || objections) {
       userMessage += `\nCONHECIMENTO BASE DA EMPRESA:\n`
-      userMessage += `- Informações sobre produtos/serviços: ${productInfo}\n`
-    }
 
-    if (objections) {
-      userMessage += `- Objeções comuns e respostas recomendadas: ${objections}\n`
+      if (productInfo) {
+        userMessage += `Informações sobre produtos/serviços:\n${productInfo}\n\n`
+      }
+
+      if (objections) {
+        userMessage += `Objeções conhecidas e formas de quebrar (configuradas pelo gestor):\n${objections}\n`
+      }
     }
 
     userMessage += `\nAvalie esta call de vendas seguindo rigorosamente os critérios estabelecidos.`
@@ -584,7 +575,6 @@ export async function POST(request: NextRequest) {
         meeting_id: meetingId || `meet_${Date.now()}`,
         seller_name: sellerName,
         call_objective: callObjective || null,
-        funnel_stage: funnelStage || null,
         transcript: transcript,
         evaluation: evaluation,
         overall_score: overallScore,

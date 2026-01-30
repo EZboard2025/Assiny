@@ -40,6 +40,12 @@ CREATE INDEX IF NOT EXISTS idx_meet_evaluations_created_at ON meet_evaluations(c
 -- RLS
 ALTER TABLE meet_evaluations ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (para reexecução segura)
+DROP POLICY IF EXISTS "Users can view their own meet evaluations" ON meet_evaluations;
+DROP POLICY IF EXISTS "Users can insert their own meet evaluations" ON meet_evaluations;
+DROP POLICY IF EXISTS "Users can update their own meet evaluations" ON meet_evaluations;
+DROP POLICY IF EXISTS "Users can delete their own meet evaluations" ON meet_evaluations;
+
 -- Policy: Users can see their own evaluations
 CREATE POLICY "Users can view their own meet evaluations"
 ON meet_evaluations FOR SELECT TO authenticated
@@ -68,6 +74,8 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_meet_evaluations_updated_at ON meet_evaluations;
 
 CREATE TRIGGER trigger_update_meet_evaluations_updated_at
 BEFORE UPDATE ON meet_evaluations

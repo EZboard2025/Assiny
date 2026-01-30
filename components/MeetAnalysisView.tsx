@@ -169,10 +169,15 @@ export default function MeetAnalysisView() {
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Evaluation states
+  // User info (auto-fetched)
   const [sellerName, setSellerName] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+
+  // Call context
   const [callObjective, setCallObjective] = useState('')
-  const [funnelStage, setFunnelStage] = useState('')
+
+  // Evaluation states
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
   const [evaluationError, setEvaluationError] = useState('')
@@ -184,6 +189,36 @@ export default function MeetAnalysisView() {
     improvements: false,
     moments: false
   })
+
+  // Fetch user info on mount
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setUserId(user.id)
+          // Get user name from employees table
+          const { data: employee } = await supabase
+            .from('employees')
+            .select('name')
+            .eq('id', user.id)
+            .single()
+          if (employee?.name) {
+            setSellerName(employee.name)
+          } else {
+            // Fallback to email
+            setSellerName(user.email?.split('@')[0] || 'Vendedor')
+          }
+        }
+        // Get company ID
+        const compId = await getCompanyId()
+        setCompanyId(compId)
+      } catch (err) {
+        console.error('Error fetching user info:', err)
+      }
+    }
+    fetchUserInfo()
+  }, [])
 
   // Extract meeting ID from Google Meet URL
   const extractMeetingId = (url: string): string | null => {
@@ -382,9 +417,8 @@ export default function MeetAnalysisView() {
     setError('')
     setEvaluation(null)
     setEvaluationError('')
-    setSellerName('')
     setCallObjective('')
-    setFunnelStage('')
+    // Note: sellerName is not reset because it's auto-fetched from user profile
   }
 
   // Copy meeting ID
@@ -401,8 +435,8 @@ export default function MeetAnalysisView() {
       return
     }
 
-    if (!sellerName.trim()) {
-      setEvaluationError('Por favor, informe o nome do vendedor')
+    if (!userId || !companyId) {
+      setEvaluationError('Usuário não autenticado')
       return
     }
 
@@ -410,11 +444,21 @@ export default function MeetAnalysisView() {
     setEvaluationError('')
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const companyId = await getCompanyId()
+      // Fetch company objections from ConfigHub
+      const { data: objectionsData } = await supabase
+        .from('objections')
+        .select('name, rebuttals')
+        .eq('company_id', companyId)
 
-      if (!user || !companyId) {
-        throw new Error('Usuário não autenticado')
+      // Format objections for the AI
+      let objectionsText = ''
+      if (objectionsData && objectionsData.length > 0) {
+        objectionsText = objectionsData.map(obj => {
+          const rebuttals = obj.rebuttals && Array.isArray(obj.rebuttals)
+            ? obj.rebuttals.join('; ')
+            : ''
+          return `- Objeção: "${obj.name}" | Formas de quebrar: ${rebuttals || 'Não configurado'}`
+        }).join('\n')
       }
 
       const response = await fetch('/api/meet/evaluate', {
@@ -424,9 +468,9 @@ export default function MeetAnalysisView() {
           transcript: session.transcript,
           sellerName: sellerName.trim(),
           callObjective: callObjective.trim() || null,
-          funnelStage: funnelStage || null,
+          objections: objectionsText || null,
           meetingId: session.meetingId,
-          userId: user.id,
+          userId,
           companyId
         })
       })
@@ -525,41 +569,63 @@ export default function MeetAnalysisView() {
         {/* Input Section */}
         {!session && (
           <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 mb-6">
-            <label className="block text-sm font-semibold text-gray-300 mb-3">
-              Link do Google Meet
-            </label>
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
+            <div className="space-y-4">
+              {/* Meet URL */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Link do Google Meet
+                </label>
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={meetUrl}
+                      onChange={(e) => handleUrlChange(e.target.value)}
+                      placeholder="https://meet.google.com/abc-defg-hij"
+                      className="w-full px-4 py-3.5 bg-gray-800/60 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-400/60 focus:bg-gray-800/80 transition-all"
+                    />
+                    {meetingId && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
+                          {meetingId}
+                        </span>
+                        <button
+                          onClick={copyMeetingId}
+                          className="text-gray-400 hover:text-green-400 transition-colors"
+                        >
+                          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Call Objective */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Objetivo da Call <span className="text-gray-500 font-normal">(opcional)</span>
+                </label>
                 <input
                   type="text"
-                  value={meetUrl}
-                  onChange={(e) => handleUrlChange(e.target.value)}
-                  placeholder="https://meet.google.com/abc-defg-hij"
-                  className="w-full px-4 py-3.5 bg-gray-800/60 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-400/60 focus:bg-gray-800/80 transition-all"
+                  value={callObjective}
+                  onChange={(e) => setCallObjective(e.target.value)}
+                  placeholder="Ex: Apresentar proposta comercial, Fazer discovery, Negociar contrato..."
+                  className="w-full px-4 py-3 bg-gray-800/60 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-400/60 focus:bg-gray-800/80 transition-all"
                 />
-                {meetingId && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
-                      {meetingId}
-                    </span>
-                    <button
-                      onClick={copyMeetingId}
-                      className="text-gray-400 hover:text-green-400 transition-colors"
-                    >
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  </div>
-                )}
               </div>
+
+              {/* Send Button */}
               <button
                 onClick={sendBot}
                 disabled={!meetingId}
-                className="px-6 py-3.5 bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-400 hover:to-emerald-300 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-green-500/30 hover:shadow-green-500/50"
+                className="w-full px-6 py-3.5 bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-400 hover:to-emerald-300 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 hover:shadow-green-500/50"
               >
                 <Send className="w-5 h-5" />
-                Enviar Bot
+                Enviar Bot para a Reunião
               </button>
             </div>
+
             {error && (
               <div className="mt-3 flex items-center gap-2 text-red-400 text-sm">
                 <AlertTriangle className="w-4 h-4" />
@@ -710,50 +776,18 @@ export default function MeetAnalysisView() {
                   Avaliar Desempenho do Vendedor
                 </h3>
 
-                {/* Evaluation Form */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">
-                      Nome do Vendedor *
-                    </label>
-                    <input
-                      type="text"
-                      value={sellerName}
-                      onChange={(e) => setSellerName(e.target.value)}
-                      placeholder="Ex: João Silva"
-                      className="w-full px-3 py-2.5 bg-gray-800/60 border border-gray-600/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 transition-all text-sm"
-                    />
+                {/* Info Summary */}
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <div className="px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-600/50">
+                    <span className="text-xs text-gray-400">Vendedor:</span>
+                    <span className="text-sm text-white ml-2">{sellerName}</span>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">
-                      Objetivo da Call
-                    </label>
-                    <input
-                      type="text"
-                      value={callObjective}
-                      onChange={(e) => setCallObjective(e.target.value)}
-                      placeholder="Ex: Apresentar proposta"
-                      className="w-full px-3 py-2.5 bg-gray-800/60 border border-gray-600/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-400/60 transition-all text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">
-                      Estágio do Funil
-                    </label>
-                    <select
-                      value={funnelStage}
-                      onChange={(e) => setFunnelStage(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-800/60 border border-gray-600/50 rounded-lg text-white focus:outline-none focus:border-blue-400/60 transition-all text-sm"
-                    >
-                      <option value="">Selecione...</option>
-                      <option value="prospeccao">Prospecção</option>
-                      <option value="discovery">Discovery</option>
-                      <option value="demo">Demo/Apresentação</option>
-                      <option value="negociacao">Negociação</option>
-                      <option value="fechamento">Fechamento</option>
-                      <option value="follow_up">Follow-up</option>
-                    </select>
-                  </div>
+                  {callObjective && (
+                    <div className="px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-600/50">
+                      <span className="text-xs text-gray-400">Objetivo:</span>
+                      <span className="text-sm text-white ml-2">{callObjective}</span>
+                    </div>
+                  )}
                 </div>
 
                 {evaluationError && (
@@ -766,7 +800,7 @@ export default function MeetAnalysisView() {
                 <div className="flex gap-3">
                   <button
                     onClick={evaluateCall}
-                    disabled={isEvaluating || !sellerName.trim()}
+                    disabled={isEvaluating}
                     className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
                   >
                     {isEvaluating ? (
