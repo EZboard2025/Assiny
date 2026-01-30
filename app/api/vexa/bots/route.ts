@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Vexa Cloud API
-const VEXA_API_URL = 'https://api.cloud.vexa.ai'
-const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
+// Vexa Self-Hosted API (running on same server via Docker)
+const VEXA_API_URL = 'http://localhost:8056'
 
 // POST /api/vexa/bots - Create a new bot
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    console.log('🤖 Vexa Cloud API - Creating bot...')
+    console.log('🤖 Vexa Self-Hosted API - Creating bot...')
     console.log('URL:', `${VEXA_API_URL}/bots`)
     console.log('Body:', JSON.stringify(body))
 
     const response = await fetch(`${VEXA_API_URL}/bots`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': VEXA_API_KEY
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(body)
     })
