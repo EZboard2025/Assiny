@@ -151,22 +151,22 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
 // Performance level colors and labels
 const getPerformanceConfig = (level: string) => {
   const configs: Record<string, { color: string; bgColor: string; label: string }> = {
-    poor: { color: 'text-red-500', bgColor: 'bg-red-500/20', label: 'Reprovado' },
-    needs_improvement: { color: 'text-orange-500', bgColor: 'bg-orange-500/20', label: 'Precisa Melhorar' },
-    good: { color: 'text-yellow-500', bgColor: 'bg-yellow-500/20', label: 'Bom' },
-    very_good: { color: 'text-green-400', bgColor: 'bg-green-500/20', label: 'Muito Bom' },
-    excellent: { color: 'text-green-500', bgColor: 'bg-green-500/20', label: 'Excelente' },
-    legendary: { color: 'text-purple-500', bgColor: 'bg-purple-500/20', label: 'Lendário' }
+    poor: { color: 'text-red-600', bgColor: 'bg-red-50', label: 'Reprovado' },
+    needs_improvement: { color: 'text-orange-600', bgColor: 'bg-orange-50', label: 'Precisa Melhorar' },
+    good: { color: 'text-yellow-600', bgColor: 'bg-yellow-50', label: 'Bom' },
+    very_good: { color: 'text-green-600', bgColor: 'bg-green-50', label: 'Muito Bom' },
+    excellent: { color: 'text-green-600', bgColor: 'bg-green-50', label: 'Excelente' },
+    legendary: { color: 'text-purple-600', bgColor: 'bg-purple-50', label: 'Lendário' }
   }
   return configs[level] || configs.good
 }
 
 // Score color helper
 const getScoreColor = (score: number) => {
-  if (score >= 8) return 'text-green-400'
-  if (score >= 6) return 'text-yellow-400'
-  if (score >= 4) return 'text-orange-400'
-  return 'text-red-400'
+  if (score >= 8) return 'text-green-600'
+  if (score >= 6) return 'text-yellow-600'
+  if (score >= 4) return 'text-orange-600'
+  return 'text-red-600'
 }
 
 export default function MeetAnalysisView() {
@@ -565,13 +565,13 @@ export default function MeetAnalysisView() {
     if (!session) return null
 
     const statusConfig: Record<BotStatus, { icon: any; text: string; color: string }> = {
-      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-400' },
-      sending: { icon: Loader2, text: 'Enviando bot...', color: 'text-yellow-400' },
-      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-yellow-400' },
-      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-400' },
-      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-400' },
-      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-400' },
-      error: { icon: XCircle, text: 'Erro', color: 'text-red-400' }
+      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500' },
+      sending: { icon: Loader2, text: 'Enviando bot...', color: 'text-yellow-600' },
+      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-yellow-600' },
+      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600' },
+      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600' },
+      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600' },
+      error: { icon: XCircle, text: 'Erro', color: 'text-red-600' }
     }
 
     const config = statusConfig[session.status]
@@ -599,26 +599,26 @@ export default function MeetAnalysisView() {
       missed_opportunities: string[]
     }
   ) => (
-    <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50">
+    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-white bg-purple-500/20 px-3 py-1 rounded-lg">{letter}</span>
-          <span className="text-sm text-gray-400">{label}</span>
+          <span className="text-xl font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-lg">{letter}</span>
+          <span className="text-sm text-gray-600">{label}</span>
         </div>
         <span className={`text-2xl font-bold ${getScoreColor(data?.final_score ?? 0)}`}>
           {typeof data?.final_score === 'number' ? data.final_score.toFixed(1) : 'N/A'}
         </span>
       </div>
-      <p className="text-sm text-gray-300 mb-3 leading-relaxed">{data.technical_feedback}</p>
+      <p className="text-sm text-gray-700 mb-3 leading-relaxed">{data.technical_feedback}</p>
 
       {/* Questions/Items identified */}
       {data.key_questions_asked && data.key_questions_asked.length > 0 && (
         <div className="mb-3">
-          <p className="text-xs font-semibold text-green-400 mb-1">Perguntas feitas:</p>
-          <ul className="text-xs text-gray-400 space-y-1">
+          <p className="text-xs font-semibold text-green-600 mb-1">Perguntas feitas:</p>
+          <ul className="text-xs text-gray-600 space-y-1">
             {data.key_questions_asked.map((q, i) => (
               <li key={i} className="flex items-start gap-1">
-                <span className="text-green-500">•</span> {q}
+                <span className="text-green-600">•</span> {q}
               </li>
             ))}
           </ul>
@@ -626,11 +626,11 @@ export default function MeetAnalysisView() {
       )}
       {data.problems_identified && data.problems_identified.length > 0 && (
         <div className="mb-3">
-          <p className="text-xs font-semibold text-blue-400 mb-1">Problemas identificados:</p>
-          <ul className="text-xs text-gray-400 space-y-1">
+          <p className="text-xs font-semibold text-blue-600 mb-1">Problemas identificados:</p>
+          <ul className="text-xs text-gray-600 space-y-1">
             {data.problems_identified.map((p, i) => (
               <li key={i} className="flex items-start gap-1">
-                <span className="text-blue-500">•</span> {p}
+                <span className="text-blue-600">•</span> {p}
               </li>
             ))}
           </ul>
@@ -638,11 +638,11 @@ export default function MeetAnalysisView() {
       )}
       {data.implications_raised && data.implications_raised.length > 0 && (
         <div className="mb-3">
-          <p className="text-xs font-semibold text-orange-400 mb-1">Implicações levantadas:</p>
-          <ul className="text-xs text-gray-400 space-y-1">
+          <p className="text-xs font-semibold text-orange-600 mb-1">Implicações levantadas:</p>
+          <ul className="text-xs text-gray-600 space-y-1">
             {data.implications_raised.map((imp, i) => (
               <li key={i} className="flex items-start gap-1">
-                <span className="text-orange-500">•</span> {imp}
+                <span className="text-orange-600">•</span> {imp}
               </li>
             ))}
           </ul>
@@ -650,11 +650,11 @@ export default function MeetAnalysisView() {
       )}
       {data.value_propositions_used && data.value_propositions_used.length > 0 && (
         <div className="mb-3">
-          <p className="text-xs font-semibold text-purple-400 mb-1">Propostas de valor usadas:</p>
-          <ul className="text-xs text-gray-400 space-y-1">
+          <p className="text-xs font-semibold text-purple-600 mb-1">Propostas de valor usadas:</p>
+          <ul className="text-xs text-gray-600 space-y-1">
             {data.value_propositions_used.map((v, i) => (
               <li key={i} className="flex items-start gap-1">
-                <span className="text-purple-500">•</span> {v}
+                <span className="text-purple-600">•</span> {v}
               </li>
             ))}
           </ul>
@@ -663,12 +663,12 @@ export default function MeetAnalysisView() {
 
       {/* Missed opportunities */}
       {data.missed_opportunities && data.missed_opportunities.length > 0 && (
-        <div className="mt-3 p-2 bg-red-500/10 rounded-lg border border-red-500/20">
-          <p className="text-xs font-semibold text-red-400 mb-1">Oportunidades perdidas:</p>
-          <ul className="text-xs text-gray-400 space-y-1">
+        <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-200">
+          <p className="text-xs font-semibold text-red-600 mb-1">Oportunidades perdidas:</p>
+          <ul className="text-xs text-gray-600 space-y-1">
             {data.missed_opportunities.map((opp, i) => (
               <li key={i} className="flex items-start gap-1">
-                <span className="text-red-500">•</span> {opp}
+                <span className="text-red-600">•</span> {opp}
               </li>
             ))}
           </ul>
@@ -678,30 +678,30 @@ export default function MeetAnalysisView() {
   )
 
   return (
-    <div className="min-h-screen py-8 px-6">
+    <div className="min-h-screen py-8 px-6 bg-gray-50">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-2xl flex items-center justify-center border border-green-500/30">
-            <Video className="w-8 h-8 text-green-400" />
+          <div className="w-16 h-16 mx-auto mb-4 bg-green-50 rounded-2xl flex items-center justify-center border border-green-200">
+            <Video className="w-8 h-8 text-green-600" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Análise de Google Meet
           </h1>
-          <p className="text-gray-400">
+          <p className="text-gray-600">
             Avalie o desempenho em calls de venda com IA
           </p>
         </div>
 
         {/* Mode Tabs */}
         {!session && (
-          <div className="flex gap-2 mb-6 bg-gray-800/40 p-1.5 rounded-xl border border-gray-700/50">
+          <div className="flex gap-2 mb-6 bg-white p-1.5 rounded-xl border border-gray-200 shadow-sm">
             <button
               onClick={() => setActiveMode('bot')}
               className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
                 activeMode === 'bot'
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
               <Video className="w-4 h-4" />
@@ -711,8 +711,8 @@ export default function MeetAnalysisView() {
               onClick={() => setActiveMode('history')}
               className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
                 activeMode === 'history'
-                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
               <History className="w-4 h-4" />
@@ -724,16 +724,16 @@ export default function MeetAnalysisView() {
 
         {/* History Mode */}
         {!session && activeMode === 'history' && (
-          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30 mb-6">
+          <div className="bg-white rounded-2xl p-6 border border-purple-200 shadow-sm mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <History className="w-5 h-5 text-purple-400" />
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <History className="w-5 h-5 text-purple-600" />
                 Histórico de Avaliações
               </h3>
               <button
                 onClick={loadHistory}
                 disabled={isLoadingHistory}
-                className="px-3 py-1.5 text-sm bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors flex items-center gap-2 border border-purple-500/30"
+                className="px-3 py-1.5 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center gap-2 border border-purple-200"
               >
                 <RefreshCw className={`w-4 h-4 ${isLoadingHistory ? 'animate-spin' : ''}`} />
                 Atualizar
@@ -742,7 +742,7 @@ export default function MeetAnalysisView() {
 
             {isLoadingHistory ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
               </div>
             ) : savedEvaluations.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
@@ -757,7 +757,7 @@ export default function MeetAnalysisView() {
                   return (
                     <div
                       key={saved.id}
-                      className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50 hover:border-purple-500/30 transition-colors cursor-pointer group"
+                      className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-purple-300 transition-colors cursor-pointer group"
                       onClick={() => viewSavedEvaluation(saved)}
                     >
                       <div className="flex items-center justify-between">
@@ -770,7 +770,7 @@ export default function MeetAnalysisView() {
                               {config.label}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-gray-700">
                             {saved.seller_name}
                             {saved.call_objective && (
                               <span className="text-gray-500"> • {saved.call_objective}</span>
@@ -780,7 +780,7 @@ export default function MeetAnalysisView() {
                             {new Date(saved.created_at).toLocaleString('pt-BR')}
                           </p>
                         </div>
-                        <button className="p-2 bg-purple-500/10 rounded-lg text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="p-2 bg-purple-50 rounded-lg text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Eye className="w-5 h-5" />
                         </button>
                       </div>
@@ -794,11 +794,11 @@ export default function MeetAnalysisView() {
 
         {/* Bot Mode - Input Section */}
         {!session && activeMode === 'bot' && (
-          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 mb-6">
+          <div className="bg-white rounded-2xl p-6 border border-green-200 shadow-sm mb-6">
             <div className="space-y-4">
               {/* Meet URL */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Link do Google Meet
                 </label>
                 <div className="flex gap-3">
@@ -808,16 +808,16 @@ export default function MeetAnalysisView() {
                       value={meetUrl}
                       onChange={(e) => handleUrlChange(e.target.value)}
                       placeholder="https://meet.google.com/abc-defg-hij"
-                      className="w-full px-4 py-3.5 bg-gray-800/60 border border-green-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-400/60 focus:bg-gray-800/80 transition-all"
+                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100 transition-all"
                     />
                     {meetingId && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
+                        <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
                           {meetingId}
                         </span>
                         <button
                           onClick={copyMeetingId}
-                          className="text-gray-400 hover:text-green-400 transition-colors"
+                          className="text-gray-400 hover:text-green-600 transition-colors"
                         >
                           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                         </button>
@@ -829,15 +829,15 @@ export default function MeetAnalysisView() {
 
               {/* Call Objective */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Objetivo da Call <span className="text-gray-500 font-normal">(opcional)</span>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Objetivo da Call <span className="text-gray-400 font-normal">(opcional)</span>
                 </label>
                 <input
                   type="text"
                   value={callObjective}
                   onChange={(e) => setCallObjective(e.target.value)}
                   placeholder="Ex: Apresentar proposta comercial, Fazer discovery, Negociar contrato..."
-                  className="w-full px-4 py-3 bg-gray-800/60 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-400/60 focus:bg-gray-800/80 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100 transition-all"
                 />
               </div>
 
@@ -845,7 +845,7 @@ export default function MeetAnalysisView() {
               <button
                 onClick={sendBot}
                 disabled={!meetingId}
-                className="w-full px-6 py-3.5 bg-gradient-to-r from-green-500 to-emerald-400 hover:from-green-400 hover:to-emerald-300 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 hover:shadow-green-500/50"
+                className="w-full px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
               >
                 <Send className="w-5 h-5" />
                 Enviar Bot para a Reunião
@@ -853,30 +853,30 @@ export default function MeetAnalysisView() {
             </div>
 
             {error && (
-              <div className="mt-3 flex items-center gap-2 text-red-400 text-sm">
+              <div className="mt-3 flex items-center gap-2 text-red-600 text-sm">
                 <AlertTriangle className="w-4 h-4" />
                 {error}
               </div>
             )}
 
             {/* Instructions */}
-            <div className="mt-6 p-4 bg-gray-800/40 rounded-xl border border-gray-700/50">
-              <h3 className="text-sm font-semibold text-gray-300 mb-2">Como funciona:</h3>
-              <ol className="text-sm text-gray-400 space-y-1.5">
+            <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Como funciona:</h3>
+              <ol className="text-sm text-gray-600 space-y-1.5">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">1.</span>
+                  <span className="text-green-600 font-bold">1.</span>
                   Cole o link da reunião do Google Meet acima
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">2.</span>
+                  <span className="text-green-600 font-bold">2.</span>
                   Clique em "Enviar Bot" - um participante chamado "VexaBot" pedirá para entrar
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">3.</span>
-                  <strong className="text-yellow-400">Aceite o bot na reunião</strong> quando ele pedir para participar
+                  <span className="text-green-600 font-bold">3.</span>
+                  <strong className="text-yellow-600">Aceite o bot na reunião</strong> quando ele pedir para participar
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold">4.</span>
+                  <span className="text-green-600 font-bold">4.</span>
                   A transcrição aparecerá em tempo real e você poderá avaliar ao final
                 </li>
               </ol>
@@ -888,7 +888,7 @@ export default function MeetAnalysisView() {
         {session && (
           <div className="space-y-6">
             {/* Status Bar */}
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-4 border border-green-500/30">
+            <div className="bg-white rounded-2xl p-4 border border-green-200 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {getStatusDisplay()}
@@ -899,13 +899,13 @@ export default function MeetAnalysisView() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 bg-gray-800/60 px-3 py-1.5 rounded-lg">
+                  <span className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">
                     Meeting: {session.meetingId}
                   </span>
                   {session.status !== 'ended' && session.status !== 'error' && (
                     <button
                       onClick={endSession}
-                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors flex items-center gap-2 border border-red-500/30"
+                      className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors flex items-center gap-2 border border-red-200"
                     >
                       <StopCircle className="w-4 h-4" />
                       Encerrar
@@ -914,7 +914,7 @@ export default function MeetAnalysisView() {
                   {(session.status === 'ended' || session.status === 'error') && (
                     <button
                       onClick={resetSession}
-                      className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors flex items-center gap-2 border border-green-500/30"
+                      className="px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-green-200"
                     >
                       <RefreshCw className="w-4 h-4" />
                       Nova Análise
@@ -925,10 +925,10 @@ export default function MeetAnalysisView() {
             </div>
 
             {/* Transcript */}
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl border border-green-500/30 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-700/50 bg-gray-800/40">
-                <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-green-400" />
+            <div className="bg-white rounded-2xl border border-green-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-green-600" />
                   Transcrição em Tempo Real
                   {session.transcript.length > 0 && (
                     <span className="text-xs text-gray-500">
@@ -940,24 +940,24 @@ export default function MeetAnalysisView() {
 
               <div
                 ref={transcriptRef}
-                className="h-[400px] overflow-y-auto p-4 space-y-4"
+                className="h-[400px] overflow-y-auto p-4 space-y-4 bg-white"
               >
                 {session.transcript.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     {session.status === 'joining' || session.status === 'sending' ? (
                       <>
-                        <Loader2 className="w-8 h-8 animate-spin mb-3" />
+                        <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
                         <p>Aguardando bot entrar na reunião...</p>
                         <p className="text-sm text-gray-400 mt-2">
                           Isso geralmente leva de 10 a 15 segundos
                         </p>
-                        <p className="text-sm text-yellow-400 mt-2">
+                        <p className="text-sm text-yellow-600 mt-2">
                           Lembre-se de aceitar o "VexaBot" quando ele pedir para entrar!
                         </p>
                       </>
                     ) : session.status === 'in_meeting' ? (
                       <>
-                        <Video className="w-8 h-8 mb-3 text-green-400" />
+                        <Video className="w-8 h-8 mb-3 text-green-600" />
                         <p>Bot na reunião. Aguardando transcrição...</p>
                       </>
                     ) : (
@@ -970,12 +970,12 @@ export default function MeetAnalysisView() {
                 ) : (
                   session.transcript.map((segment, idx) => (
                     <div key={idx} className="flex gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/10 flex items-center justify-center border border-green-500/30">
-                        <User className="w-5 h-5 text-green-400" />
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-50 flex items-center justify-center border border-green-200">
+                        <User className="w-5 h-5 text-green-600" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-baseline gap-2 mb-1">
-                          <span className="font-semibold text-green-400 text-sm">
+                          <span className="font-semibold text-green-700 text-sm">
                             {segment.speaker}
                           </span>
                           {segment.timestamp && (
@@ -984,7 +984,7 @@ export default function MeetAnalysisView() {
                             </span>
                           )}
                         </div>
-                        <p className="text-gray-300 text-sm leading-relaxed">
+                        <p className="text-gray-700 text-sm leading-relaxed">
                           {segment.text}
                         </p>
                       </div>
@@ -996,28 +996,28 @@ export default function MeetAnalysisView() {
 
             {/* Evaluation Section - Only when ended with transcript */}
             {session.status === 'ended' && session.transcript.length > 0 && (
-              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/30">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-400" />
+              <div className="bg-white rounded-2xl p-6 border border-blue-200 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
                   Avaliar Desempenho do Vendedor
                 </h3>
 
                 {/* Info Summary */}
                 <div className="flex flex-wrap gap-3 mb-4">
-                  <div className="px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-600/50">
-                    <span className="text-xs text-gray-400">Vendedor:</span>
-                    <span className="text-sm text-white ml-2">{sellerName}</span>
+                  <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                    <span className="text-xs text-gray-500">Vendedor:</span>
+                    <span className="text-sm text-gray-900 ml-2">{sellerName}</span>
                   </div>
                   {callObjective && (
-                    <div className="px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-600/50">
-                      <span className="text-xs text-gray-400">Objetivo:</span>
-                      <span className="text-sm text-white ml-2">{callObjective}</span>
+                    <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                      <span className="text-xs text-gray-500">Objetivo:</span>
+                      <span className="text-sm text-gray-900 ml-2">{callObjective}</span>
                     </div>
                   )}
                 </div>
 
                 {evaluationError && (
-                  <div className="mb-4 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-lg border border-red-500/30">
+                  <div className="mb-4 flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     {evaluationError}
                   </div>
@@ -1027,7 +1027,7 @@ export default function MeetAnalysisView() {
                   <button
                     onClick={evaluateCall}
                     disabled={isEvaluating}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
+                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
                   >
                     {isEvaluating ? (
                       <>
@@ -1048,7 +1048,7 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-4 py-3 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 rounded-xl transition-colors flex items-center gap-2 border border-gray-600/50"
+                    className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors flex items-center gap-2 border border-gray-200"
                   >
                     <Copy className="w-4 h-4" />
                     Copiar
@@ -1059,7 +1059,7 @@ export default function MeetAnalysisView() {
                 {evaluation && (
                   <button
                     onClick={() => setShowEvaluationModal(true)}
-                    className="w-full mt-4 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl transition-colors flex items-center justify-center gap-2 border border-green-500/30"
+                    className="w-full mt-4 px-4 py-3 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl transition-colors flex items-center justify-center gap-2 border border-green-200"
                   >
                     <Award className="w-5 h-5" />
                     Ver Resultado da Avaliação (Nota: {evaluation.overall_score})
@@ -1072,19 +1072,19 @@ export default function MeetAnalysisView() {
 
         {/* Evaluation Modal */}
         {showEvaluationModal && evaluation && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto py-8 px-4">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl w-full max-w-4xl border border-gray-700/50 shadow-2xl">
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center overflow-y-auto py-8 px-4">
+            <div className="bg-white rounded-2xl w-full max-w-4xl border border-gray-200 shadow-2xl">
               {/* Modal Header */}
-              <div className="sticky top-0 bg-gray-900/95 backdrop-blur-sm px-6 py-4 border-b border-gray-700/50 rounded-t-2xl flex items-center justify-between z-10">
+              <div className="sticky top-0 bg-white/95 backdrop-blur-sm px-6 py-4 border-b border-gray-200 rounded-t-2xl flex items-center justify-between z-10">
                 <div className="flex items-center gap-4">
                   <div className={`px-4 py-2 rounded-xl ${getPerformanceConfig(evaluation.performance_level).bgColor}`}>
                     <span className={`text-3xl font-bold ${getPerformanceConfig(evaluation.performance_level).color}`}>
                       {evaluation.overall_score}
                     </span>
-                    <span className="text-gray-400 text-sm ml-1">/100</span>
+                    <span className="text-gray-500 text-sm ml-1">/100</span>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">Avaliação da Call</h2>
+                    <h2 className="text-xl font-bold text-gray-900">Avaliação da Call</h2>
                     <p className={`text-sm ${getPerformanceConfig(evaluation.performance_level).color}`}>
                       {getPerformanceConfig(evaluation.performance_level).label}
                     </p>
@@ -1092,21 +1092,21 @@ export default function MeetAnalysisView() {
                 </div>
                 <button
                   onClick={() => setShowEvaluationModal(false)}
-                  className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <X className="w-6 h-6 text-gray-400" />
+                  <X className="w-6 h-6 text-gray-500" />
                 </button>
               </div>
 
               {/* Modal Content */}
               <div className="p-6 space-y-6">
                 {/* Executive Summary */}
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50">
-                  <h3 className="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-blue-400" />
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-blue-600" />
                     Resumo Executivo
                   </h3>
-                  <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
+                  <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
                     {evaluation.executive_summary}
                   </p>
                 </div>
@@ -1114,15 +1114,15 @@ export default function MeetAnalysisView() {
                 {/* Strengths & Gaps */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {evaluation.top_strengths.length > 0 && (
-                    <div className="bg-green-500/10 rounded-xl p-4 border border-green-500/30">
-                      <h3 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+                    <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                      <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                         <TrendingUp className="w-4 h-4" />
                         Pontos Fortes
                       </h3>
                       <ul className="space-y-2">
                         {evaluation.top_strengths.map((strength, idx) => (
-                          <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                            <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                            <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                             {strength}
                           </li>
                         ))}
@@ -1130,15 +1130,15 @@ export default function MeetAnalysisView() {
                     </div>
                   )}
                   {evaluation.critical_gaps.length > 0 && (
-                    <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/30">
-                      <h3 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+                    <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                      <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
                         <TrendingDown className="w-4 h-4" />
                         Gaps Críticos
                       </h3>
                       <ul className="space-y-2">
                         {evaluation.critical_gaps.map((gap, idx) => (
-                          <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                             {gap}
                           </li>
                         ))}
@@ -1148,19 +1148,19 @@ export default function MeetAnalysisView() {
                 </div>
 
                 {/* SPIN Evaluation */}
-                <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => toggleSection('spin')}
-                    className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                    className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
                   >
-                    <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                      <Target className="w-4 h-4 text-purple-400" />
+                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <Target className="w-4 h-4 text-purple-600" />
                       Avaliação SPIN Detalhada
                     </h3>
-                    {expandedSections.spin ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    {expandedSections.spin ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
                   </button>
                   {expandedSections.spin && (
-                    <div className="p-4 space-y-4">
+                    <div className="p-4 space-y-4 bg-white">
                       {evaluation.spin_evaluation?.S && renderSpinScoreFull('S', 'Situação', evaluation.spin_evaluation.S)}
                       {evaluation.spin_evaluation?.P && renderSpinScoreFull('P', 'Problema', evaluation.spin_evaluation.P)}
                       {evaluation.spin_evaluation?.I && renderSpinScoreFull('I', 'Implicação', evaluation.spin_evaluation.I)}
@@ -1171,35 +1171,35 @@ export default function MeetAnalysisView() {
 
                 {/* Objections Analysis */}
                 {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
-                  <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
                     <button
                       onClick={() => toggleSection('objections')}
-                      className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                      className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
                     >
-                      <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-orange-400" />
+                      <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-orange-600" />
                         Análise de Objeções ({evaluation.objections_analysis.length})
                       </h3>
-                      {expandedSections.objections ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                      {expandedSections.objections ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
                     </button>
                     {expandedSections.objections && (
-                      <div className="p-4 space-y-4">
+                      <div className="p-4 space-y-4 bg-white">
                         {evaluation.objections_analysis.map((obj, idx) => (
-                          <div key={idx} className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50">
+                          <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">
+                              <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded">
                                 {obj.objection_type} • {obj.objection_nature}
                               </span>
                               <span className={`text-lg font-bold ${getScoreColor(obj.score)}`}>
                                 {obj.score}/10
                               </span>
                             </div>
-                            <p className="text-sm text-gray-300 italic mb-2">"{obj.objection_text}"</p>
-                            <p className="text-sm text-gray-400">{obj.detailed_analysis}</p>
+                            <p className="text-sm text-gray-700 italic mb-2">"{obj.objection_text}"</p>
+                            <p className="text-sm text-gray-600">{obj.detailed_analysis}</p>
                             {obj.ideal_response && (
-                              <div className="mt-3 p-3 bg-green-500/10 rounded-lg border border-green-500/30">
-                                <p className="text-xs text-green-400 font-semibold mb-1">Resposta Ideal:</p>
-                                <p className="text-sm text-gray-300">{obj.ideal_response}</p>
+                              <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                                <p className="text-xs text-green-700 font-semibold mb-1">Resposta Ideal:</p>
+                                <p className="text-sm text-gray-700">{obj.ideal_response}</p>
                               </div>
                             )}
                           </div>
@@ -1210,40 +1210,40 @@ export default function MeetAnalysisView() {
                 )}
 
                 {/* Soft Skills */}
-                <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => toggleSection('softSkills')}
-                    className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                    className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
                   >
-                    <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-cyan-400" />
+                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-cyan-600" />
                       Soft Skills
                     </h3>
-                    {expandedSections.softSkills ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    {expandedSections.softSkills ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
                   </button>
                   {expandedSections.softSkills && (
-                    <div className="p-4 space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
-                        <span className="text-sm text-gray-300">Rapport</span>
+                    <div className="p-4 space-y-3 bg-white">
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <span className="text-sm text-gray-700">Rapport</span>
                         <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.rapport_score)}`}>
                           {evaluation.soft_skills_evaluation.rapport_score}/10
                         </span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
-                        <span className="text-sm text-gray-300">Controle da Conversa</span>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <span className="text-sm text-gray-700">Controle da Conversa</span>
                         <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.conversation_control_score)}`}>
                           {evaluation.soft_skills_evaluation.conversation_control_score}/10
                         </span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
-                        <span className="text-sm text-gray-300">Escuta Ativa</span>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <span className="text-sm text-gray-700">Escuta Ativa</span>
                         <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.active_listening_score)}`}>
                           {evaluation.soft_skills_evaluation.active_listening_score}/10
                         </span>
                       </div>
                       {evaluation.soft_skills_evaluation.stakeholder_management_score !== null && (
-                        <div className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg">
-                          <span className="text-sm text-gray-300">Gestão de Stakeholders</span>
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <span className="text-sm text-gray-700">Gestão de Stakeholders</span>
                           <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.stakeholder_management_score)}`}>
                             {evaluation.soft_skills_evaluation.stakeholder_management_score}/10
                           </span>
@@ -1255,35 +1255,35 @@ export default function MeetAnalysisView() {
 
                 {/* Priority Improvements */}
                 {evaluation.priority_improvements.length > 0 && (
-                  <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
                     <button
                       onClick={() => toggleSection('improvements')}
-                      className="w-full px-4 py-3 bg-gray-800/40 flex items-center justify-between hover:bg-gray-800/60 transition-colors"
+                      className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
                     >
-                      <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                        <Lightbulb className="w-4 h-4 text-yellow-400" />
+                      <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-yellow-600" />
                         Melhorias Prioritárias ({evaluation.priority_improvements.length})
                       </h3>
-                      {expandedSections.improvements ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                      {expandedSections.improvements ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
                     </button>
                     {expandedSections.improvements && (
-                      <div className="p-4 space-y-4">
+                      <div className="p-4 space-y-4 bg-white">
                         {evaluation.priority_improvements.map((imp, idx) => (
-                          <div key={idx} className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50">
+                          <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                             <div className="flex items-center gap-2 mb-2">
                               <span className={`text-xs px-2 py-1 rounded ${
-                                imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                'bg-yellow-500/20 text-yellow-400'
+                                imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                                imp.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                'bg-yellow-100 text-yellow-700'
                               }`}>
                                 {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
                               </span>
-                              <span className="text-sm font-semibold text-white">{imp.area}</span>
+                              <span className="text-sm font-semibold text-gray-900">{imp.area}</span>
                             </div>
-                            <p className="text-sm text-gray-400 mb-2">{imp.current_gap}</p>
-                            <p className="text-sm text-gray-300">{imp.action_plan}</p>
+                            <p className="text-sm text-gray-600 mb-2">{imp.current_gap}</p>
+                            <p className="text-sm text-gray-700">{imp.action_plan}</p>
                             {imp.training_suggestion && (
-                              <p className="text-xs text-blue-400 mt-2">💡 {imp.training_suggestion}</p>
+                              <p className="text-xs text-blue-600 mt-2">💡 {imp.training_suggestion}</p>
                             )}
                           </div>
                         ))}
@@ -1294,10 +1294,10 @@ export default function MeetAnalysisView() {
               </div>
 
               {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-gray-900/95 backdrop-blur-sm px-6 py-4 border-t border-gray-700/50 rounded-b-2xl">
+              <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm px-6 py-4 border-t border-gray-200 rounded-b-2xl">
                 <button
                   onClick={() => setShowEvaluationModal(false)}
-                  className="w-full py-3 bg-gray-700/50 hover:bg-gray-700/70 rounded-xl font-semibold text-white transition-colors"
+                  className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-colors border border-gray-200"
                 >
                   Fechar
                 </button>
