@@ -6,8 +6,6 @@ interface CompanyPlanData {
   training_plan: PlanType
   monthly_credits_used: number
   monthly_credits_reset_at: string
-  selection_candidates_used: number
-  selection_plan_expires_at: string | null
 }
 
 /**
@@ -17,7 +15,7 @@ export async function getCompanyPlanData(companyId: string): Promise<CompanyPlan
   try {
     const { data, error } = await supabase
       .from('companies')
-      .select('id, training_plan, monthly_credits_used, monthly_credits_reset_at, selection_candidates_used, selection_plan_expires_at')
+      .select('id, training_plan, monthly_credits_used, monthly_credits_reset_at')
       .eq('id', companyId)
       .single()
 
@@ -73,11 +71,6 @@ export async function canCreateRoleplay(companyId: string): Promise<{
 
   const config = PLAN_CONFIGS[planData.training_plan]
 
-  // Se é plano de processo seletivo, não pode fazer roleplay de treinamento
-  if (config.isSelectionPlan) {
-    return { allowed: false, reason: 'Plano de processo seletivo não permite treinamento' }
-  }
-
   // Verificar se tem acesso a roleplay
   if (!config.hasRoleplay) {
     return { allowed: false, reason: 'Seu plano não inclui simulações de roleplay' }
@@ -93,7 +86,7 @@ export async function canCreateRoleplay(companyId: string): Promise<{
   if (remaining <= 0) {
     return {
       allowed: false,
-      reason: `Limite de ${config.monthlyCredits} simulações/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
+      reason: `Limite de ${config.monthlyCredits} créditos/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
       limit: config.monthlyCredits,
       used: planData.monthly_credits_used,
       remaining: 0
@@ -229,89 +222,6 @@ export async function canAccessConfigHub(companyId: string): Promise<boolean> {
   }
 
   return PLAN_CONFIGS[planData.training_plan].hasConfigHub
-}
-
-/**
- * Verifica se pode criar candidato em processo seletivo
- */
-export async function canCreateSelectionCandidate(companyId: string): Promise<{
-  allowed: boolean
-  reason?: string
-  limit?: number | null
-  used?: number
-  remaining?: number | null
-}> {
-  const planData = await getCompanyPlanData(companyId)
-
-  if (!planData) {
-    return { allowed: false, reason: 'Erro ao verificar plano' }
-  }
-
-  const config = PLAN_CONFIGS[planData.training_plan]
-
-  // Verificar se é plano de processo seletivo
-  if (!config.isSelectionPlan) {
-    return { allowed: false, reason: 'Seu plano não é de processo seletivo' }
-  }
-
-  // Verificar se o plano ainda está válido (30 dias)
-  if (planData.selection_plan_expires_at) {
-    const expiryDate = new Date(planData.selection_plan_expires_at)
-    const now = new Date()
-
-    if (now > expiryDate) {
-      return { allowed: false, reason: 'Plano de processo seletivo expirado' }
-    }
-  }
-
-  // Verificar limite de candidatos
-  if (config.maxSelectionCandidates === null) {
-    return { allowed: true } // Ilimitado
-  }
-
-  const remaining = config.maxSelectionCandidates - (planData.selection_candidates_used || 0)
-
-  if (remaining <= 0) {
-    return {
-      allowed: false,
-      reason: `Limite de ${config.maxSelectionCandidates} candidatos atingido`,
-      limit: config.maxSelectionCandidates,
-      used: planData.selection_candidates_used || 0,
-      remaining: 0
-    }
-  }
-
-  return {
-    allowed: true,
-    limit: config.maxSelectionCandidates,
-    used: planData.selection_candidates_used || 0,
-    remaining
-  }
-}
-
-/**
- * Incrementa o contador de candidatos avaliados
- */
-export async function incrementSelectionCandidateCount(companyId: string): Promise<boolean> {
-  try {
-    const { data: current } = await supabase
-      .from('companies')
-      .select('selection_candidates_used')
-      .eq('id', companyId)
-      .single()
-
-    if (current) {
-      await supabase
-        .from('companies')
-        .update({ selection_candidates_used: (current.selection_candidates_used || 0) + 1 })
-        .eq('id', companyId)
-    }
-
-    return true
-  } catch (error) {
-    console.error('Erro ao incrementar contador de candidatos:', error)
-    return false
-  }
 }
 
 /**

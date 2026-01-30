@@ -16,7 +16,6 @@ interface Company {
   updated_at: string
   employee_limit: number | null
   training_plan?: PlanType
-  selection_plan?: PlanType | null
   locked?: boolean
   monthly_credits_used?: number
   monthly_credits_reset_at?: string
@@ -197,7 +196,6 @@ export default function CompaniesAdmin() {
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [companyToEditPlan, setCompanyToEditPlan] = useState<Company | null>(null)
   const [selectedTrainingPlan, setSelectedTrainingPlan] = useState<PlanType>(PlanType.INDIVIDUAL)
-  const [selectedSelectionPlan, setSelectedSelectionPlan] = useState<PlanType | null>(null)
   const [updatingPlan, setUpdatingPlan] = useState(false)
 
   // Estados para adicionar créditos
@@ -372,7 +370,6 @@ export default function CompaniesAdmin() {
   const handleEditPlanClick = (company: Company) => {
     setCompanyToEditPlan(company)
     setSelectedTrainingPlan(company.training_plan || PlanType.INDIVIDUAL)
-    setSelectedSelectionPlan(company.selection_plan || null)
     setShowPlanModal(true)
   }
 
@@ -384,21 +381,15 @@ export default function CompaniesAdmin() {
       const { error } = await supabase
         .from('companies')
         .update({
-          training_plan: selectedTrainingPlan,
-          selection_plan: selectedSelectionPlan
+          training_plan: selectedTrainingPlan
         })
         .eq('id', companyToEditPlan.id)
 
       if (error) throw error
 
       const trainingName = PLAN_NAMES[selectedTrainingPlan]
-      const selectionName = selectedSelectionPlan ? PLAN_NAMES[selectedSelectionPlan] : null
 
-      const message = selectionName
-        ? `Treinamento: ${trainingName}, Seleção: ${selectionName}`
-        : `Treinamento: ${trainingName}`
-
-      showToast('success', 'Planos atualizados!', message)
+      showToast('success', 'Plano atualizado!', `Plano: ${trainingName}`)
 
       setShowPlanModal(false)
       setCompanyToEditPlan(null)
@@ -1056,14 +1047,6 @@ export default function CompaniesAdmin() {
                           <Package className="w-3 h-3 text-emerald-400" />
                           <span className="text-xs font-medium text-emerald-300">
                             {PLAN_NAMES[company.training_plan]}
-                          </span>
-                        </div>
-                      )}
-                      {company.selection_plan && (
-                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-orange-600/20 to-yellow-600/20 rounded-full">
-                          <Globe className="w-3 h-3 text-orange-400" />
-                          <span className="text-xs font-medium text-orange-300">
-                            {PLAN_NAMES[company.selection_plan]}
                           </span>
                         </div>
                       )}
@@ -1757,7 +1740,7 @@ export default function CompaniesAdmin() {
                         </div>
                         <p className="text-sm text-gray-400 mb-2">Para vendedores individuais</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">20 simulações/mês</span>
+                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">20 créditos/mês</span>
                           <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">1 vendedor</span>
                           <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">✓ Todos os recursos</span>
                         </div>
@@ -1786,9 +1769,9 @@ export default function CompaniesAdmin() {
                         </div>
                         <p className="text-sm text-gray-400 mb-2">Para equipes pequenas e médias</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">400 simulações/mês</span>
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">400 créditos/mês</span>
                           <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">Até 20 vendedores</span>
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">+50 sim = R$250</span>
+                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">+50 créd = R$250</span>
                         </div>
                       </div>
                     </label>
@@ -1815,10 +1798,10 @@ export default function CompaniesAdmin() {
                         </div>
                         <p className="text-sm text-gray-400 mb-2">Para equipes grandes</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">1.000 simulações/mês</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">1.000 créditos/mês</span>
                           <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">20-50 vendedores</span>
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+50 sim = R$250</span>
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+100 sim = R$450</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+50 créd = R$250</span>
+                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+100 créd = R$450</span>
                         </div>
                       </div>
                     </label>
@@ -1845,187 +1828,9 @@ export default function CompaniesAdmin() {
                         </div>
                         <p className="text-sm text-gray-400 mb-2">Para grandes operações - preço negociável</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">Simulações ilimitadas</span>
+                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">Créditos ilimitados</span>
                           <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">+50 vendedores</span>
                           <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">Suporte dedicado</span>
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Planos de Processo Seletivo */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Globe className="w-5 h-5 text-orange-400" />
-                    Plano de Processo Seletivo (Opcional)
-                  </h3>
-
-                  {/* Aviso sobre consumo de créditos */}
-                  <div className="mb-4 bg-yellow-900/20 border border-yellow-500/40 rounded-xl p-3 flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-xs text-yellow-300">
-                      <p className="font-semibold mb-1">⚠️ Importante sobre o Processo Seletivo:</p>
-                      <ul className="space-y-1 ml-3">
-                        <li>• Cada candidato que realizar o roleplay via link consumirá 1 crédito</li>
-                        <li>• Os créditos são limitados pelo plano escolhido (5, 10, 20, 50 ou ilimitado)</li>
-                        <li>• O plano tem validade de 30 dias a partir da ativação</li>
-                        <li>• Após expirar ou esgotar os créditos, será necessário renovar o plano</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Opção de não ter plano de seleção */}
-                  <div className="mb-3">
-                    <label className={`relative flex items-center p-3 rounded-xl cursor-pointer transition-all ${
-                      selectedSelectionPlan === null
-                        ? 'bg-gray-700/50 border-2 border-gray-600'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="selectionPlan"
-                        value=""
-                        checked={selectedSelectionPlan === null}
-                        onChange={() => setSelectedSelectionPlan(null)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <span className="font-medium text-gray-300">Sem plano de processo seletivo</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div className="space-y-2">
-                    {/* PS Starter */}
-                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedSelectionPlan === PlanType.PS_STARTER
-                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="selectionPlan"
-                        value={PlanType.PS_STARTER}
-                        checked={selectedSelectionPlan === PlanType.PS_STARTER}
-                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_STARTER]}</span>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2">5 candidatos - válido por 30 dias</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">5 candidatos</span>
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* PS Scale */}
-                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedSelectionPlan === PlanType.PS_SCALE
-                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="selectionPlan"
-                        value={PlanType.PS_SCALE}
-                        checked={selectedSelectionPlan === PlanType.PS_SCALE}
-                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_SCALE]}</span>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2">10 candidatos - válido por 30 dias</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">10 candidatos</span>
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* PS Growth */}
-                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedSelectionPlan === PlanType.PS_GROWTH
-                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="selectionPlan"
-                        value={PlanType.PS_GROWTH}
-                        checked={selectedSelectionPlan === PlanType.PS_GROWTH}
-                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_GROWTH]}</span>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2">20 candidatos - válido por 30 dias</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">20 candidatos</span>
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* PS Pro */}
-                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedSelectionPlan === PlanType.PS_PRO
-                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="selectionPlan"
-                        value={PlanType.PS_PRO}
-                        checked={selectedSelectionPlan === PlanType.PS_PRO}
-                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_PRO]}</span>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2">50 candidatos - válido por 30 dias</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">50 candidatos</span>
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
-                        </div>
-                      </div>
-                    </label>
-
-                    {/* PS Max */}
-                    <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedSelectionPlan === PlanType.PS_MAX
-                        ? 'bg-gradient-to-r from-orange-600/30 to-yellow-600/30 border-2 border-orange-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="selectionPlan"
-                        value={PlanType.PS_MAX}
-                        checked={selectedSelectionPlan === PlanType.PS_MAX}
-                        onChange={(e) => setSelectedSelectionPlan(e.target.value as PlanType)}
-                        className="sr-only"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.PS_MAX]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-orange-600/50 to-yellow-600/50 text-orange-300 rounded-full">
-                            Ilimitado
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2">Candidatos ilimitados - válido por 30 dias</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">∞ candidatos</span>
-                          <span className="text-xs px-2 py-1 bg-orange-600/20 text-orange-300 rounded">30 dias</span>
                         </div>
                       </div>
                     </label>

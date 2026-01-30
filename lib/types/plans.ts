@@ -1,22 +1,15 @@
 // Tipos de Planos disponíveis
 export enum PlanType {
-  // Planos de Treinamento
-  INDIVIDUAL = 'individual',   // R$129/mês - 20 simulações
-  TEAM = 'team',               // R$1.999/mês - até 20 vendedores - 400 simulações
-  BUSINESS = 'business',       // R$4.999/mês - 20 a 50 vendedores - 1.000 simulações
-  ENTERPRISE = 'enterprise',   // +50 vendedores - preço variável
-
-  // Planos de Processo Seletivo (mantidos)
-  PS_STARTER = 'ps_starter',
-  PS_SCALE = 'ps_scale',
-  PS_GROWTH = 'ps_growth',
-  PS_PRO = 'ps_pro',
-  PS_MAX = 'ps_max'
+  // Planos de Treinamento (créditos são consumidos por features)
+  INDIVIDUAL = 'individual',   // R$129/mês - 20 créditos
+  TEAM = 'team',               // R$1.999/mês - até 20 vendedores - 400 créditos
+  BUSINESS = 'business',       // R$4.999/mês - 20 a 50 vendedores - 1.000 créditos
+  ENTERPRISE = 'enterprise'    // +50 vendedores - créditos ilimitados
 }
 
 // Interface para definir as limitações de cada plano
 export interface PlanLimits {
-  // Limite de créditos/simulações por mês
+  // Limite de créditos por mês (consumidos por features)
   monthlyCredits: number | null; // null = ilimitado ou variável
 
   // Limite de vendedores
@@ -30,10 +23,6 @@ export interface PlanLimits {
     credits: number;
     price: number;
   }[];
-
-  // Limites de processo seletivo (apenas para planos PS_*)
-  maxSelectionCandidates: number | null;
-  isSelectionPlan: boolean;
 
   // Funcionalidades disponíveis (todas liberadas para planos de treinamento)
   hasRoleplay: boolean;
@@ -53,7 +42,7 @@ export interface PlanLimits {
 
 // Configuração dos planos
 export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
-  // Plano Individual - R$129/mês - 20 simulações
+  // Plano Individual - R$129/mês - 20 créditos
   [PlanType.INDIVIDUAL]: {
     monthlyCredits: 20,
     maxSellers: 1,
@@ -61,8 +50,6 @@ export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
     extraCreditsPackages: [
       { credits: 10, price: 50 }
     ],
-    maxSelectionCandidates: null,
-    isSelectionPlan: false,
     hasRoleplay: true,
     hasChatIA: true,
     hasFollowUp: true,
@@ -76,7 +63,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
     supportLevel: 'email'
   },
 
-  // Plano Team - R$1.999/mês - até 20 vendedores - 400 simulações
+  // Plano Team - R$1.999/mês - até 20 vendedores - 400 créditos
   [PlanType.TEAM]: {
     monthlyCredits: 400,
     maxSellers: 20,
@@ -84,8 +71,6 @@ export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
     extraCreditsPackages: [
       { credits: 50, price: 250 }
     ],
-    maxSelectionCandidates: null,
-    isSelectionPlan: false,
     hasRoleplay: true,
     hasChatIA: true,
     hasFollowUp: true,
@@ -99,7 +84,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
     supportLevel: 'priority'
   },
 
-  // Plano Business - R$4.999/mês - 20 a 50 vendedores - 1.000 simulações
+  // Plano Business - R$4.999/mês - 20 a 50 vendedores - 1.000 créditos
   [PlanType.BUSINESS]: {
     monthlyCredits: 1000,
     maxSellers: 50,
@@ -108,8 +93,6 @@ export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
       { credits: 50, price: 250 },
       { credits: 100, price: 450 }
     ],
-    maxSelectionCandidates: null,
-    isSelectionPlan: false,
     hasRoleplay: true,
     hasChatIA: true,
     hasFollowUp: true,
@@ -123,14 +106,12 @@ export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
     supportLevel: 'dedicated'
   },
 
-  // Plano Enterprise - +50 vendedores - preço variável
+  // Plano Enterprise - +50 vendedores - créditos ilimitados
   [PlanType.ENTERPRISE]: {
-    monthlyCredits: null, // Personalizável
+    monthlyCredits: null, // Ilimitado
     maxSellers: null, // Ilimitado
     priceMonthly: null, // Variável
     extraCreditsPackages: [], // Negociado
-    maxSelectionCandidates: null,
-    isSelectionPlan: false,
     hasRoleplay: true,
     hasChatIA: true,
     hasFollowUp: true,
@@ -141,107 +122,6 @@ export const PLAN_CONFIGS: Record<PlanType, PlanLimits> = {
     hasCustomPersonas: true,
     hasCustomObjections: true,
     hasCompanyData: true,
-    supportLevel: 'dedicated'
-  },
-
-  // Planos de Processo Seletivo (mantidos)
-  [PlanType.PS_STARTER]: {
-    monthlyCredits: null,
-    maxSellers: null,
-    priceMonthly: null,
-    extraCreditsPackages: [],
-    maxSelectionCandidates: 5,
-    isSelectionPlan: true,
-    hasRoleplay: true,
-    hasChatIA: false,
-    hasFollowUp: false,
-    hasPDI: false,
-    hasPerformanceAnalytics: true,
-    hasDashboard: true,
-    hasConfigHub: false,
-    hasCustomPersonas: false,
-    hasCustomObjections: false,
-    hasCompanyData: false,
-    supportLevel: 'dedicated'
-  },
-
-  [PlanType.PS_SCALE]: {
-    monthlyCredits: null,
-    maxSellers: null,
-    priceMonthly: null,
-    extraCreditsPackages: [],
-    maxSelectionCandidates: 10,
-    isSelectionPlan: true,
-    hasRoleplay: true,
-    hasChatIA: false,
-    hasFollowUp: false,
-    hasPDI: false,
-    hasPerformanceAnalytics: true,
-    hasDashboard: true,
-    hasConfigHub: false,
-    hasCustomPersonas: false,
-    hasCustomObjections: false,
-    hasCompanyData: false,
-    supportLevel: 'dedicated'
-  },
-
-  [PlanType.PS_GROWTH]: {
-    monthlyCredits: null,
-    maxSellers: null,
-    priceMonthly: null,
-    extraCreditsPackages: [],
-    maxSelectionCandidates: 20,
-    isSelectionPlan: true,
-    hasRoleplay: true,
-    hasChatIA: false,
-    hasFollowUp: false,
-    hasPDI: false,
-    hasPerformanceAnalytics: true,
-    hasDashboard: true,
-    hasConfigHub: false,
-    hasCustomPersonas: false,
-    hasCustomObjections: false,
-    hasCompanyData: false,
-    supportLevel: 'dedicated'
-  },
-
-  [PlanType.PS_PRO]: {
-    monthlyCredits: null,
-    maxSellers: null,
-    priceMonthly: null,
-    extraCreditsPackages: [],
-    maxSelectionCandidates: 50,
-    isSelectionPlan: true,
-    hasRoleplay: true,
-    hasChatIA: false,
-    hasFollowUp: false,
-    hasPDI: false,
-    hasPerformanceAnalytics: true,
-    hasDashboard: true,
-    hasConfigHub: false,
-    hasCustomPersonas: false,
-    hasCustomObjections: false,
-    hasCompanyData: false,
-    supportLevel: 'dedicated'
-  },
-
-  [PlanType.PS_MAX]: {
-    monthlyCredits: null,
-    maxSellers: null,
-    priceMonthly: null,
-    extraCreditsPackages: [],
-    maxSelectionCandidates: null, // Ilimitado
-    isSelectionPlan: true,
-    hasRoleplay: true,
-    hasChatIA: false,
-    hasFollowUp: false,
-    hasPDI: false,
-    hasPerformanceAnalytics: true,
-    hasDashboard: true,
-    hasConfigHub: false,
-    hasCustomPersonas: false,
-    hasCustomObjections: false,
-    hasCompanyData: false,
     supportLevel: 'dedicated'
   }
 };
@@ -251,12 +131,7 @@ export const PLAN_NAMES: Record<PlanType, string> = {
   [PlanType.INDIVIDUAL]: 'Individual',
   [PlanType.TEAM]: 'Team',
   [PlanType.BUSINESS]: 'Business',
-  [PlanType.ENTERPRISE]: 'Enterprise',
-  [PlanType.PS_STARTER]: 'Seleção Starter',
-  [PlanType.PS_SCALE]: 'Seleção Scale',
-  [PlanType.PS_GROWTH]: 'Seleção Growth',
-  [PlanType.PS_PRO]: 'Seleção Pro',
-  [PlanType.PS_MAX]: 'Seleção MAX'
+  [PlanType.ENTERPRISE]: 'Enterprise'
 };
 
 // Cores dos planos para UI
@@ -277,31 +152,6 @@ export const PLAN_COLORS: Record<PlanType, { bg: string; border: string; text: s
     text: 'text-purple-400'
   },
   [PlanType.ENTERPRISE]: {
-    bg: 'bg-gradient-to-r from-amber-500/10 to-orange-500/10',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400'
-  },
-  [PlanType.PS_STARTER]: {
-    bg: 'bg-gray-500/10',
-    border: 'border-gray-500/30',
-    text: 'text-gray-400'
-  },
-  [PlanType.PS_SCALE]: {
-    bg: 'bg-orange-500/10',
-    border: 'border-orange-500/30',
-    text: 'text-orange-400'
-  },
-  [PlanType.PS_GROWTH]: {
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/30',
-    text: 'text-emerald-400'
-  },
-  [PlanType.PS_PRO]: {
-    bg: 'bg-indigo-500/10',
-    border: 'border-indigo-500/30',
-    text: 'text-indigo-400'
-  },
-  [PlanType.PS_MAX]: {
     bg: 'bg-gradient-to-r from-amber-500/10 to-orange-500/10',
     border: 'border-amber-500/30',
     text: 'text-amber-400'
@@ -366,16 +216,6 @@ export function checkSellersLimit(plan: PlanType, currentSellers: number): {
   };
 }
 
-// Função para verificar se é plano de processo seletivo
-export function isSelectionPlan(plan: PlanType): boolean {
-  return PLAN_CONFIGS[plan].isSelectionPlan;
-}
-
-// Função para verificar se é plano de treinamento
-export function isTrainingPlan(plan: PlanType): boolean {
-  return !PLAN_CONFIGS[plan].isSelectionPlan;
-}
-
 // Função para formatar preço em BRL
 export function formatPrice(price: number | null): string {
   if (price === null) return 'Personalizado';
@@ -388,17 +228,12 @@ export function formatPrice(price: number | null): string {
 // Função para obter descrição do plano
 export function getPlanDescription(plan: PlanType): string {
   const config = PLAN_CONFIGS[plan];
-
-  if (config.isSelectionPlan) {
-    return config.maxSelectionCandidates
-      ? `Até ${config.maxSelectionCandidates} candidatos`
-      : 'Candidatos ilimitados';
-  }
-
   const parts: string[] = [];
 
   if (config.monthlyCredits) {
-    parts.push(`${config.monthlyCredits} simulações/mês`);
+    parts.push(`${config.monthlyCredits} créditos/mês`);
+  } else {
+    parts.push('Créditos ilimitados');
   }
 
   if (config.maxSellers === 1) {

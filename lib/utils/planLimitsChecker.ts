@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { PlanType, PLAN_CONFIGS, isTrainingPlan, isSelectionPlan } from '@/lib/types/plans'
+import { PlanType, PLAN_CONFIGS } from '@/lib/types/plans'
 
 // Interface para retorno das verificações
 export interface PlanCheckResult {
@@ -20,32 +20,6 @@ export async function getCompanyTrainingPlan(companyId: string): Promise<PlanTyp
 
   if (error || !data) return null
   return data.training_plan as PlanType
-}
-
-// Buscar o plano de seleção da empresa
-export async function getCompanySelectionPlan(companyId: string): Promise<PlanType | null> {
-  console.log('🔍 Buscando plano de seleção para empresa:', companyId)
-
-  const { data, error } = await supabase
-    .from('companies')
-    .select('selection_plan')
-    .eq('id', companyId)
-    .single()
-
-  console.log('📊 Resultado da busca selection_plan:', { data, error })
-
-  if (error) {
-    console.error('❌ Erro ao buscar selection_plan:', error)
-    return null
-  }
-
-  if (!data) {
-    console.log('⚠️ Nenhum dado retornado')
-    return null
-  }
-
-  console.log('✅ Plano de seleção do banco:', data.selection_plan)
-  return data.selection_plan as PlanType | null
 }
 
 // Verificar se precisa resetar o contador mensal de créditos
@@ -109,7 +83,7 @@ export async function canCreateRoleplay(companyId: string, userId?: string): Pro
   if (remaining <= 0) {
     return {
       allowed: false,
-      reason: `Limite de ${limit} simulações/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
+      reason: `Limite de ${limit} créditos/mês atingido. Créditos renovam no próximo mês ou adquira pacotes extras.`,
       limit,
       currentUsage,
       remaining: 0
@@ -208,96 +182,15 @@ export async function hasAccessToFollowUp(companyId: string): Promise<boolean> {
   return PLAN_CONFIGS[plan].hasFollowUp
 }
 
-// Verificar limite de candidatos para processo seletivo
-export async function canCreateSelectionCandidate(companyId: string): Promise<PlanCheckResult> {
-  const plan = await getCompanySelectionPlan(companyId)
-
-  // Se não tem plano de seleção
-  if (!plan) {
-    return {
-      allowed: false,
-      reason: 'Sua empresa não possui um plano de processo seletivo ativo.'
-    }
-  }
-
-  const config = PLAN_CONFIGS[plan]
-
-  // Verificar se o plano expirou
-  const { data: company } = await supabase
-    .from('companies')
-    .select('selection_plan_expires_at, selection_candidates_count')
-    .eq('id', companyId)
-    .single()
-
-  if (!company) {
-    return { allowed: false, reason: 'Empresa não encontrada' }
-  }
-
-  // Verificar expiração
-  if (company.selection_plan_expires_at) {
-    const expiresAt = new Date(company.selection_plan_expires_at)
-    const now = new Date()
-
-    if (now > expiresAt) {
-      return {
-        allowed: false,
-        reason: 'Plano de processo seletivo expirado. Renove seu plano para continuar.'
-      }
-    }
-  }
-
-  // Planos ilimitados
-  if (!config.maxSelectionCandidates) {
-    return { allowed: true }
-  }
-
-  const currentCount = company.selection_candidates_count || 0
-  const limit = config.maxSelectionCandidates
-
-  if (currentCount >= limit) {
-    return {
-      allowed: false,
-      reason: `Limite de ${limit} candidatos atingido para o plano atual.`,
-      limit,
-      currentUsage: currentCount,
-      remaining: 0
-    }
-  }
-
-  return {
-    allowed: true,
-    limit,
-    currentUsage: currentCount,
-    remaining: limit - currentCount
-  }
-}
-
-// Incrementar contador de candidatos
-export async function incrementSelectionCandidateCount(companyId: string): Promise<void> {
-  const { data: company } = await supabase
-    .from('companies')
-    .select('selection_candidates_count')
-    .eq('id', companyId)
-    .single()
-
-  const currentCount = company?.selection_candidates_count || 0
-
-  await supabase
-    .from('companies')
-    .update({ selection_candidates_count: currentCount + 1 })
-    .eq('id', companyId)
-}
-
 // Obter resumo de uso do plano
 export async function getPlanUsageSummary(companyId: string) {
   const trainingPlan = await getCompanyTrainingPlan(companyId)
-  const selectionPlan = await getCompanySelectionPlan(companyId)
 
   if (!trainingPlan) return null
 
   const { data: company } = await supabase
     .from('companies')
-    .select('monthly_credits_used, selection_candidates_count, monthly_credits_reset_at, selection_plan_expires_at')
+    .select('monthly_credits_used, monthly_credits_reset_at')
     .eq('id', companyId)
     .single()
 
@@ -307,35 +200,24 @@ export async function getPlanUsageSummary(companyId: string) {
     .eq('company_id', companyId)
 
   const trainingConfig = PLAN_CONFIGS[trainingPlan]
-  const selectionConfig = selectionPlan ? PLAN_CONFIGS[selectionPlan] : null
 
   return {
-    training: {
-      plan: trainingPlan,
-      credits: {
-        used: company?.monthly_credits_used || 0,
-        limit: trainingConfig.monthlyCredits,
-        resetDate: company?.monthly_credits_reset_at
-      },
-      sellers: {
-        count: sellersCount || 0,
-        limit: trainingConfig.maxSellers
-      },
-      features: {
-        chatIA: trainingConfig.hasChatIA,
-        pdi: trainingConfig.hasPDI,
-        followUp: trainingConfig.hasFollowUp
-      },
-      extraCreditsPackages: trainingConfig.extraCreditsPackages
+    plan: trainingPlan,
+    credits: {
+      used: company?.monthly_credits_used || 0,
+      limit: trainingConfig.monthlyCredits,
+      resetDate: company?.monthly_credits_reset_at
     },
-    selection: selectionPlan ? {
-      plan: selectionPlan,
-      candidates: {
-        used: company?.selection_candidates_count || 0,
-        limit: selectionConfig?.maxSelectionCandidates,
-        expiresAt: company?.selection_plan_expires_at
-      }
-    } : null
+    sellers: {
+      count: sellersCount || 0,
+      limit: trainingConfig.maxSellers
+    },
+    features: {
+      chatIA: trainingConfig.hasChatIA,
+      pdi: trainingConfig.hasPDI,
+      followUp: trainingConfig.hasFollowUp
+    },
+    extraCreditsPackages: trainingConfig.extraCreditsPackages
   }
 }
 

@@ -68,7 +68,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Hook para verificar limites do plano
   const {
     trainingPlan,
-    selectionPlan,
     planUsage,
     checkChatIAAccess,
     checkPDIAccess,
@@ -88,7 +87,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [hasChatIA, setHasChatIA] = useState(true)
   const [hasPDI, setHasPDI] = useState(true)
   const [hasFollowUp, setHasFollowUp] = useState(true)
-  const [showSelectionPlanModal, setShowSelectionPlanModal] = useState(false)
 
   // Scroll-based navigation
   const mainRef = useRef<HTMLElement>(null)
@@ -556,15 +554,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 title="Roleplay Público"
                 subtitle="Links externos"
                 description="Links públicos para roleplays externos."
-                onClick={() => {
-                  if (selectionPlan) {
-                    handleViewChange('roleplay-links')
-                  } else {
-                    setShowSelectionPlanModal(true)
-                  }
-                }}
+                onClick={() => handleViewChange('roleplay-links')}
                 adminBadge
-                locked={!selectionPlan}
               />
             ) : (
               <div className="hidden md:block" />
@@ -737,59 +728,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         )
       )}
 
-      {/* Modal de Plano de Processo Seletivo */}
-      {showSelectionPlanModal && (
-        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full border border-gray-200 shadow-2xl">
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-yellow-50 rounded-2xl flex items-center justify-center border border-yellow-200">
-                <Lock className="w-10 h-10 text-yellow-500" />
-              </div>
-            </div>
-
-            <h2 className="text-2xl font-bold text-gray-900 text-center mb-4">
-              Recurso Bloqueado
-            </h2>
-
-            <p className="text-gray-600 text-center mb-6 leading-relaxed">
-              Para acessar o <span className="text-green-600 font-semibold">Roleplay Público</span> e criar links para processos seletivos externos, é necessário assinar o <span className="text-green-600 font-semibold">Plano de Processo Seletivo</span>.
-            </p>
-
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-              <p className="text-green-800 font-semibold text-sm mb-2">Com o Plano de Processo Seletivo:</p>
-              <ul className="space-y-1.5 text-gray-700 text-sm">
-                <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">✓</span>
-                  <span>Crie links públicos para candidatos externos</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">✓</span>
-                  <span>Acompanhe resultados em tempo real</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">✓</span>
-                  <span>Avalie competências SPIN dos candidatos</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={() => setShowSelectionPlanModal(false)}
-                className="w-full py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-white transition-all"
-              >
-                Entendi
-              </button>
-              <button
-                onClick={() => setShowSelectionPlanModal(false)}
-                className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-colors"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

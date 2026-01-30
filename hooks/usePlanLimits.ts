@@ -7,7 +7,6 @@ import {
   hasAccessToFollowUp,
   getPlanUsageSummary,
   getCompanyTrainingPlan,
-  getCompanySelectionPlan,
   incrementCreditsUsed,
   getRemainingCredits
 } from '@/lib/utils/planLimitsChecker'
@@ -17,7 +16,6 @@ import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 export function usePlanLimits() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [trainingPlan, setTrainingPlan] = useState<PlanType | null>(null)
-  const [selectionPlan, setSelectionPlan] = useState<PlanType | null>(null)
   const [planUsage, setPlanUsage] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -31,14 +29,8 @@ export function usePlanLimits() {
       if (id) {
         setCompanyId(id)
 
-        // Buscar ambos os planos
-        const [training, selection] = await Promise.all([
-          getCompanyTrainingPlan(id),
-          getCompanySelectionPlan(id)
-        ])
-
+        const training = await getCompanyTrainingPlan(id)
         setTrainingPlan(training)
-        setSelectionPlan(selection)
 
         const usage = await getPlanUsageSummary(id)
         setPlanUsage(usage)
@@ -97,7 +89,6 @@ export function usePlanLimits() {
   return {
     companyId,
     trainingPlan,
-    selectionPlan,
     planUsage,
     loading,
     checkRoleplayLimit,

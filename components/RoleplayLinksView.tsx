@@ -56,29 +56,7 @@ export default function RoleplayLinksView() {
   const [error, setError] = useState<string | null>(null)
 
   // Hook para verificar limites do plano
-  const { trainingPlan, selectionPlan, planUsage } = usePlanLimits()
-
-  // Debug - verificar se o plano está sendo carregado
-  useEffect(() => {
-    console.log('🎯 Plano de treinamento:', trainingPlan)
-    console.log('🎯 Plano de seleção:', selectionPlan)
-    console.log('📊 Uso do plano:', planUsage)
-    console.log('🔗 RoleplayLink:', roleplayLink)
-    console.log('📈 Usage count:', roleplayLink?.usage_count)
-
-    if (selectionPlan) {
-      console.log('✅ Plano de seleção encontrado:', selectionPlan)
-      console.log('🔍 Configuração completa:', PLAN_CONFIGS[selectionPlan])
-      console.log('📌 É plano de seleção?', PLAN_CONFIGS[selectionPlan]?.isSelectionPlan)
-      console.log('👥 Limite de candidatos:', PLAN_CONFIGS[selectionPlan]?.maxSelectionCandidates)
-
-      // Verificar se a condição para mostrar o card está sendo atendida
-      const shouldShowCard = selectionPlan && PLAN_CONFIGS[selectionPlan]?.isSelectionPlan
-      console.log('🎨 Deve mostrar o card de limite?', shouldShowCard)
-    } else {
-      console.log('❌ Nenhum plano de seleção encontrado')
-    }
-  }, [trainingPlan, selectionPlan, planUsage, roleplayLink])
+  const { trainingPlan, planUsage } = usePlanLimits()
 
   // Ver Roleplays
   const [showHistorico, setShowHistorico] = useState(false)
@@ -431,20 +409,6 @@ export default function RoleplayLinksView() {
 
   const toggleActive = async () => {
     if (!roleplayLink) return
-
-    // Verificar se pode ativar baseado no limite do plano
-    if (!roleplayLink.is_active && selectionPlan) {
-      const planConfig = PLAN_CONFIGS[selectionPlan]
-      if (planConfig?.maxSelectionCandidates !== null) {
-        const used = roleplayLink.usage_count || 0
-        const limit = planConfig.maxSelectionCandidates
-
-        if (used >= limit) {
-          alert(`Não é possível ativar o link. O limite de ${limit} candidatos já foi atingido.`)
-          return
-        }
-      }
-    }
 
     setSaving(true)
     try {
@@ -840,25 +804,12 @@ export default function RoleplayLinksView() {
                 </button>
                 <button
                   onClick={toggleActive}
-                  disabled={!!(saving || (
-                    !roleplayLink.is_active &&
-                    selectionPlan &&
-                    PLAN_CONFIGS[selectionPlan]?.maxSelectionCandidates !== null &&
-                    roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates
-                  ))}
+                  disabled={saving}
                   className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
                     roleplayLink.is_active
                       ? 'bg-gradient-to-r from-green-600 to-lime-500 text-white hover:scale-105 glow-green'
                       : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  title={
-                    !roleplayLink.is_active &&
-                    selectionPlan &&
-                    PLAN_CONFIGS[selectionPlan]?.maxSelectionCandidates !== null &&
-                    roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates
-                      ? 'Limite de candidatos atingido'
-                      : ''
-                  }
                 >
                   <Power className="w-5 h-5" />
                   {roleplayLink.is_active ? 'Ativo' : 'Desativado'}
@@ -898,70 +849,6 @@ export default function RoleplayLinksView() {
                 </p>
               </div>
 
-              {/* Card de Limites do Plano */}
-              {selectionPlan && (
-                (() => {
-                  console.log('🎯 Renderizando card de limite para plano:', selectionPlan)
-                  const planConfig = PLAN_CONFIGS[selectionPlan]
-
-                  if (!planConfig) {
-                    console.error('❌ Configuração não encontrada para:', selectionPlan)
-                    return null
-                  }
-
-                  if (!planConfig.isSelectionPlan) {
-                    console.log('⚠️ Não é plano de seleção:', selectionPlan)
-                    return null
-                  }
-
-                  const maxCandidates = planConfig.maxSelectionCandidates
-                  const used = roleplayLink.usage_count || 0
-
-                  return (
-                    <div className="bg-gradient-to-r from-yellow-600/10 to-orange-500/10 rounded-2xl p-5 border border-yellow-500/20">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Target className="w-5 h-5 text-yellow-400" />
-                        <p className="text-sm font-medium text-gray-300">Limite do Plano</p>
-                      </div>
-                      {maxCandidates === null ? (
-                        <div>
-                          <p className="text-2xl font-bold text-white">Ilimitado</p>
-                          <p className="text-xs text-gray-400 mt-1">{used} realizados</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-2xl font-bold text-white">
-                            {used}/{maxCandidates}
-                          </p>
-                          <div className="mt-2">
-                            <div className="w-full bg-black/40 rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full transition-all ${
-                                  (used / maxCandidates) * 100 >= 100 ? 'bg-red-500' :
-                                  (used / maxCandidates) * 100 >= 80 ? 'bg-yellow-500' :
-                                  'bg-green-500'
-                                }`}
-                                style={{ width: `${Math.min((used / maxCandidates) * 100, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          <p className={`text-xs mt-1 ${
-                            Math.max(0, maxCandidates - used) === 0 ? 'text-red-400' :
-                            Math.max(0, maxCandidates - used) <= 2 ? 'text-yellow-400' :
-                            'text-gray-400'
-                          }`}>
-                            {Math.max(0, maxCandidates - used) === 0
-                              ? '⚠️ Limite atingido'
-                              : `${Math.max(0, maxCandidates - used)} ${Math.max(0, maxCandidates - used) === 1 ? 'restante' : 'restantes'}`
-                            }
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()
-              )}
-
               <div className="bg-gradient-to-r from-green-600/10 to-lime-500/10 rounded-2xl p-5 border border-green-500/20">
                 <div className="flex items-center gap-3 mb-2">
                   <BarChart3 className="w-5 h-5 text-green-400" />
@@ -972,22 +859,6 @@ export default function RoleplayLinksView() {
                 </p>
               </div>
             </div>
-
-            {/* Aviso de limite atingido */}
-            {selectionPlan && PLAN_CONFIGS[selectionPlan]?.isSelectionPlan &&
-             PLAN_CONFIGS[selectionPlan].maxSelectionCandidates !== null &&
-             roleplayLink.usage_count >= PLAN_CONFIGS[selectionPlan].maxSelectionCandidates && (
-              <div className="mt-4 bg-red-900/20 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-red-400 font-semibold mb-1">Limite de Candidatos Atingido</h4>
-                  <p className="text-red-300/80 text-sm">
-                    Você atingiu o limite de {PLAN_CONFIGS[selectionPlan].maxSelectionCandidates} candidatos do seu plano.
-                    Para avaliar mais candidatos, considere fazer upgrade do plano.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Conteúdo Condicional */}
