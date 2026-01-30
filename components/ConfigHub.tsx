@@ -5004,9 +5004,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
 
                   {/* Data de Reset */}
-                  {usageData.resetDate && (
+                  {usageData.monthlyCredits !== null && (
                     <div className="text-center text-xs text-gray-500">
-                      Próximo reset: {new Date(usageData.resetDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      Próximo reset: {(() => {
+                        const now = new Date()
+                        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+                        return nextMonth.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                      })()}
                     </div>
                   )}
                 </div>
