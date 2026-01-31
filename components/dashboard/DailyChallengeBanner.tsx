@@ -299,7 +299,7 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
           {/* Content */}
           <div className="text-left">
             <h3 className="text-base font-bold text-gray-900">{config.title}</h3>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               {/* Difficulty Stars */}
               <div className="flex items-center gap-0.5">
                 {[...Array(5)].map((_, i) => (
@@ -314,12 +314,9 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
                 ))}
               </div>
               <span className="text-gray-300">•</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-700">
-                🎯 {formatTargetWeakness(config.target_weakness)}
-              </span>
-              <span className="text-gray-300">•</span>
-              <span className="text-xs text-gray-500">
-                Alcançar {config.success_criteria.spin_min_score}+ em {formatSpinLetter(config.success_criteria.spin_letter_target)}
+              {/* Clear Goal Badge */}
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
+                🎯 Meta: {config.success_criteria.spin_min_score}+ em {formatSpinLetter(config.success_criteria.spin_letter_target)} ({config.success_criteria.spin_letter_target})
               </span>
             </div>
           </div>
@@ -338,9 +335,27 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
       {/* Expanded content */}
       {isExpanded && (
         <>
-          {/* Description */}
+          {/* Challenge Objective - Clear Focus */}
           <div className="px-6 pb-4">
-            <p className="text-sm text-gray-600">{config.description}</p>
+            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                  <span className="text-white font-bold text-lg">{config.success_criteria.spin_letter_target}</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-amber-900 mb-1">
+                    🎯 Objetivo: Alcançar {config.success_criteria.spin_min_score}+ em {formatSpinLetter(config.success_criteria.spin_letter_target)}
+                  </h4>
+                  <p className="text-sm text-amber-800">{config.description}</p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-amber-700">
+                    <span className="font-medium">Foco:</span>
+                    <span className="px-2 py-0.5 bg-amber-200/50 rounded font-semibold">
+                      Perguntas de {formatSpinLetter(config.success_criteria.spin_letter_target)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Roleplay Configuration */}

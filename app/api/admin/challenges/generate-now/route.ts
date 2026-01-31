@@ -329,6 +329,14 @@ REGRAS IMPORTANTES:
 2. Se as objeções existentes NÃO são relevantes para o desafio, crie novas objeções com formas de quebrá-las
 3. A explicação (ai_explanation) deve ser em português, empática, motivacional e explicar claramente POR QUE o vendedor precisa desse treino
 4. Retorne APENAS JSON válido, sem markdown ou texto adicional
+
+⚠️ REGRA CRÍTICA PARA METAS:
+- O spin_min_score DEVE ser calculado assim: score_atual + 1.5 (mínimo de 7.0, máximo de 10.0)
+- Se o vendedor tem score atual de 6.8, a meta deve ser 8.3 (arredondado para 8.5)
+- Se o vendedor tem score atual de 4.0, a meta deve ser 7.0 (mínimo)
+- Se o vendedor tem score atual de 9.0, a meta deve ser 10.0 (máximo)
+- Um DESAFIO deve ser DESAFIADOR - nunca coloque uma meta abaixo do score atual!
+
 5. CADA REBUTTAL DEVE SER DETALHADA seguindo este formato:
    "[Técnica]: [Contexto do por que funciona]. Exemplo: '[Frase exata que o vendedor pode usar]'"
    - Mínimo de 50 palavras por rebuttal
@@ -441,6 +449,7 @@ Retorne um JSON com esta estrutura:
 VENDEDOR: ${userName}
 FRAQUEZA PRINCIPAL A TRABALHAR: ${topWeakness!.target.toUpperCase()}
 - Score atual: ${topWeakness!.currentScore.toFixed(1)}
+- META MÍNIMA CALCULADA: ${Math.min(10, Math.max(7.0, topWeakness!.currentScore + 1.5)).toFixed(1)} (score atual + 1.5, mín 7.0, máx 10.0)
 - Severidade: ${topWeakness!.severity}
 ${topWeakness!.pattern ? `- Padrão detectado: ${topWeakness!.pattern}` : ''}
 ${isHighDifficulty && websiteAnalysis ? `\nDADOS DO SITE DA EMPRESA PARA USAR:\n${websiteAnalysis}\n` : ''}
@@ -504,11 +513,11 @@ Retorne um JSON com esta estrutura:
   }]`},
 
   "success_criteria": {
-    "spin_letter_target": "S|P|I|N",
-    "spin_min_score": 6.0,
+    "spin_letter_target": "${topWeakness!.target.toUpperCase()}",
+    "spin_min_score": ${Math.min(10, Math.max(7.0, topWeakness!.currentScore + 1.5)).toFixed(1)},
     "primary_indicator": "nome_do_indicador",
-    "primary_min_score": 6.5,
-    "objection_handling_min": 6.0
+    "primary_min_score": ${Math.min(10, Math.max(7.0, topWeakness!.currentScore + 1.5)).toFixed(1)},
+    "objection_handling_min": 7.0
   },
 
   "coaching_tips": [
@@ -554,6 +563,25 @@ Retorne um JSON com esta estrutura:
             totalErrors++
             console.log(`    ❌ ${userName}: erro ao processar resposta da IA`)
             continue
+          }
+
+          // POST-PROCESSING: Garantir que a meta seja desafiadora
+          if (!isAdvancedChallenge && topWeakness && challengeConfig.success_criteria) {
+            const currentScore = topWeakness.currentScore
+            const calculatedTarget = Math.min(10, Math.max(7.0, currentScore + 1.5))
+            const aiTarget = challengeConfig.success_criteria.spin_min_score || 6.0
+
+            // Se a IA colocou uma meta muito baixa, ajustar
+            if (aiTarget < calculatedTarget) {
+              console.log(`      🔧 Ajustando meta: ${aiTarget} → ${calculatedTarget.toFixed(1)} (score atual: ${currentScore.toFixed(1)})`)
+              challengeConfig.success_criteria.spin_min_score = parseFloat(calculatedTarget.toFixed(1))
+              challengeConfig.success_criteria.primary_min_score = parseFloat(calculatedTarget.toFixed(1))
+            }
+
+            // Garantir que objection_handling_min seja pelo menos 7.0
+            if ((challengeConfig.success_criteria.objection_handling_min || 0) < 7.0) {
+              challengeConfig.success_criteria.objection_handling_min = 7.0
+            }
           }
 
           // Create new persona if AI suggested one
