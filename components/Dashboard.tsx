@@ -535,17 +535,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <FeatureCard
               icon={Clock}
               title="Histórico"
-              subtitle="Sessões anteriores"
-              description="Revise sessões com transcrições e análises."
+              subtitle="Todas as sessões"
+              description="Simulações, Follow-ups e análises de Meet."
               onClick={() => handleViewChange('historico')}
-            />
-
-            <FeatureCard
-              icon={History}
-              title="Histórico Follow-ups"
-              subtitle="Feedback"
-              description="Revise e marque resultados dos follow-ups."
-              onClick={() => handleViewChange('followup-history')}
             />
 
             <FeatureCard
