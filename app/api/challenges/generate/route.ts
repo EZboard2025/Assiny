@@ -405,22 +405,28 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Get today's challenge
+    // Get the most recent pending challenge for today
+    // (now we allow multiple challenges per day)
     const today = new Date().toISOString().split('T')[0]
-    const { data: challenge, error } = await supabaseAdmin
+    const { data: challenges, error } = await supabaseAdmin
       .from('daily_challenges')
       .select('*')
       .eq('user_id', userId)
       .eq('challenge_date', today)
-      .single()
+      .in('status', ['pending', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(1)
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw error
     }
 
+    // Return the most recent pending/in_progress challenge, or null if none
+    const challenge = challenges && challenges.length > 0 ? challenges[0] : null
+
     return NextResponse.json({
       success: true,
-      challenge: challenge || null
+      challenge
     })
 
   } catch (error) {

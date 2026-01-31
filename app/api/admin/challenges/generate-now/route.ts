@@ -110,28 +110,14 @@ export async function POST(req: NextRequest) {
     let totalSkipped = 0
     let totalErrors = 0
     let totalCreditsUsed = 0
-    let totalDeleted = 0
 
     console.log(`\n${'='.repeat(60)}`)
     console.log(`🎯 GERAÇÃO MANUAL DE DESAFIOS - ${new Date().toLocaleString('pt-BR')}`)
     console.log(`${'='.repeat(60)}\n`)
 
-    // 1. Delete only PENDING challenges for today (preserve completed and in_progress)
-    const { data: deletedChallenges, error: deleteError } = await supabaseAdmin
-      .from('daily_challenges')
-      .delete()
-      .eq('challenge_date', today)
-      .eq('status', 'pending')
-      .select('id')
+    // Nota: Não deletamos mais desafios existentes - permitimos múltiplos por dia
 
-    if (deleteError) {
-      console.error('Erro ao deletar desafios existentes:', deleteError)
-    } else {
-      totalDeleted = deletedChallenges?.length || 0
-      console.log(`🗑️ ${totalDeleted} desafios existentes deletados`)
-    }
-
-    // 2. Get all companies with daily challenges enabled
+    // 1. Get all companies with daily challenges enabled
     const { data: companies, error: companiesError } = await supabaseAdmin
       .from('companies')
       .select('id, name, subdomain, daily_challenges_enabled, training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits, website_url')
@@ -146,7 +132,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Nenhuma empresa com desafios diários habilitados',
-        deleted: totalDeleted,
         results: [],
         summary: { generated: 0, skipped: 0, errors: 0, creditsUsed: 0 }
       })
@@ -202,27 +187,7 @@ export async function POST(req: NextRequest) {
         const userId = employee.user_id
         const userName = employee.name || employee.email
 
-        // Check if user already has a non-pending challenge for today (completed or in_progress)
-        const { data: existingChallenge } = await supabaseAdmin
-          .from('daily_challenges')
-          .select('id, status')
-          .eq('user_id', userId)
-          .eq('challenge_date', today)
-          .single()
-
-        if (existingChallenge) {
-          results.push({
-            userId,
-            userName,
-            companyId: company.id,
-            companyName: company.name,
-            status: 'skipped',
-            reason: `Desafio já existe (${existingChallenge.status})`
-          })
-          totalSkipped++
-          console.log(`    ⏭️ ${userName}: já possui desafio ${existingChallenge.status}`)
-          continue
-        }
+        // Nota: Não verificamos mais se já existe desafio - permitimos múltiplos por dia
 
         // Check credits before generating
         if (baseLimit !== null) {
@@ -805,7 +770,6 @@ Dificuldade: ${difficultyLevel}/5
     console.log(`\n${'='.repeat(60)}`)
     console.log(`📊 RESUMO DA GERAÇÃO MANUAL`)
     console.log(`${'='.repeat(60)}`)
-    console.log(`🗑️ Deletados: ${totalDeleted}`)
     console.log(`✅ Gerados: ${totalGenerated}`)
     console.log(`⏭️ Pulados: ${totalSkipped}`)
     console.log(`❌ Erros: ${totalErrors}`)
@@ -819,7 +783,6 @@ Dificuldade: ${difficultyLevel}/5
         key: 'last_manual_challenge_generation',
         value: {
           timestamp: new Date().toISOString(),
-          deleted: totalDeleted,
           generated: totalGenerated,
           skipped: totalSkipped,
           errors: totalErrors,
@@ -830,7 +793,6 @@ Dificuldade: ${difficultyLevel}/5
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      deleted: totalDeleted,
       summary: {
         generated: totalGenerated,
         skipped: totalSkipped,
