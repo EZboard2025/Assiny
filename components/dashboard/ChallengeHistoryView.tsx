@@ -160,8 +160,9 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
   })
 
   const canDoChallenge = (challenge: Challenge) => {
-    const today = new Date().toISOString().split('T')[0]
-    return (challenge.status === 'pending' || challenge.status === 'in_progress') && challenge.challenge_date === today
+    // Permitir fazer qualquer desafio que ainda não foi concluído
+    // Novos desafios chegam todo dia às 10h, mas os antigos podem ser feitos a qualquer momento
+    return challenge.status === 'pending' || challenge.status === 'in_progress'
   }
 
   if (loading) {

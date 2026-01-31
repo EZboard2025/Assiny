@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Target, Trophy, Clock, ChevronDown, ChevronRight, ChevronUp, Rocket, Lightbulb, History, User, MessageSquare, Brain, Sparkles, Quote } from 'lucide-react'
+import { Target, Trophy, Clock, ChevronDown, ChevronRight, ChevronUp, Rocket, Lightbulb, User, MessageSquare, Brain, Sparkles, Quote } from 'lucide-react'
 
 interface ChallengeConfig {
   title: string
@@ -49,7 +49,6 @@ interface Props {
   userId: string
   companyId: string
   onStartChallenge: (challenge: DailyChallenge) => void
-  onViewHistory?: () => void
 }
 
 interface PersonaData {
@@ -89,7 +88,7 @@ const formatSpinLetter = (letter: string): string => {
   return letterMap[letter] || letter
 }
 
-export default function DailyChallengeBanner({ userId, companyId, onStartChallenge, onViewHistory }: Props) {
+export default function DailyChallengeBanner({ userId, companyId, onStartChallenge }: Props) {
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -209,15 +208,6 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
                 </p>
               </div>
             </div>
-            {onViewHistory && (
-              <button
-                onClick={onViewHistory}
-                className="flex items-center gap-2 px-4 py-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all"
-              >
-                <History className="w-4 h-4" />
-                Histórico
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -257,15 +247,6 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
                 )}
               </div>
             </div>
-            {onViewHistory && (
-              <button
-                onClick={onViewHistory}
-                className="flex items-center gap-2 px-4 py-2.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl text-sm font-medium transition-all"
-              >
-                <History className="w-4 h-4" />
-                Ver Histórico
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -492,22 +473,7 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
       )}
 
       {/* Actions - Always visible */}
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {onViewHistory && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                onViewHistory()
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200/50 rounded-lg text-sm font-medium transition-all"
-            >
-              <History className="w-4 h-4" />
-              Histórico
-            </button>
-          )}
-        </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end">
         <button
           type="button"
           onClick={(e) => {

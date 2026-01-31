@@ -5,14 +5,19 @@ import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, Alert
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 import FollowUpHistoryView from './FollowUpHistoryView'
 import MeetHistoryContent from './MeetHistoryContent'
+import ChallengeHistoryContent from './ChallengeHistoryContent'
 
-export default function HistoricoView() {
+interface HistoricoViewProps {
+  onStartChallenge?: (challenge: any) => void
+}
+
+export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) {
   const [sessions, setSessions] = useState<RoleplaySession[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<'resumo' | 'spin' | 'transcricao'>('resumo')
-  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet'>('simulacoes')
+  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'desafios'>('simulacoes')
 
   useEffect(() => {
     setMounted(true)
@@ -313,6 +318,17 @@ export default function HistoricoView() {
                 <Video className="w-4 h-4" />
                 Google Meet
               </button>
+              <button
+                onClick={() => setHistoryType('desafios')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  historyType === 'desafios'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Target className="w-4 h-4" />
+                Desafios
+              </button>
             </div>
           </div>
         </div>
@@ -322,6 +338,8 @@ export default function HistoricoView() {
           <FollowUpHistoryView />
         ) : historyType === 'meet' ? (
           <MeetHistoryContent />
+        ) : historyType === 'desafios' ? (
+          <ChallengeHistoryContent onStartChallenge={onStartChallenge} />
         ) : loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-10 h-10 border-4 border-green-100 border-t-green-500 rounded-full animate-spin"></div>

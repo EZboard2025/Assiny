@@ -369,7 +369,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'historico') {
-      return <HistoricoView />
+      return <HistoricoView onStartChallenge={handleStartChallenge} />
     }
 
     if (currentView === 'perfil') {
@@ -453,7 +453,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 userId={userId}
                 companyId={companyId}
                 onStartChallenge={handleStartChallenge}
-                onViewHistory={() => handleViewChange('challenge-history')}
               />
             </div>
           )}
@@ -485,11 +484,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               subtitle="Treinamento ativo"
               description="Simule conversas reais de vendas com feedback SPIN."
               onClick={() => handleViewChange('roleplay')}
-              secondaryAction={{
-                label: 'Histórico Desafios',
-                onClick: () => handleViewChange('challenge-history'),
-                icon: History
-              }}
             />
 
             <FeatureCard
