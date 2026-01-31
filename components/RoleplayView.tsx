@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone, Shuffle, EyeOff, Eye } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone, Shuffle, EyeOff, Eye, Trophy } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
@@ -2309,6 +2309,157 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </div>
                   )
                 })()}
+
+                {/* Seção de Feedback do Desafio - só aparece quando challenge_performance existe */}
+                {evaluation.challenge_performance && (
+                  <div className="mb-6 space-y-4">
+                    {/* Card de Resultado do Desafio */}
+                    <div className={`rounded-xl border p-5 ${
+                      evaluation.challenge_performance.goal_achieved
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-orange-500/10 border-orange-500/30'
+                    }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            evaluation.challenge_performance.goal_achieved
+                              ? 'bg-green-500/20'
+                              : 'bg-orange-500/20'
+                          }`}>
+                            {evaluation.challenge_performance.goal_achieved ? (
+                              <Trophy className="w-5 h-5 text-green-400" />
+                            ) : (
+                              <Target className="w-5 h-5 text-orange-400" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className={`font-semibold ${
+                              evaluation.challenge_performance.goal_achieved ? 'text-green-400' : 'text-orange-400'
+                            }`}>
+                              {evaluation.challenge_performance.goal_achieved ? 'Meta Alcançada!' : 'Continue Praticando'}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                              Foco: {evaluation.challenge_performance.target_letter?.toUpperCase()} - {
+                                evaluation.challenge_performance.target_letter === 'S' ? 'Situação' :
+                                evaluation.challenge_performance.target_letter === 'P' ? 'Problema' :
+                                evaluation.challenge_performance.target_letter === 'I' ? 'Implicação' :
+                                'Necessidade'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-2xl font-bold ${
+                            evaluation.challenge_performance.goal_achieved ? 'text-green-400' : 'text-orange-400'
+                          }`}>
+                            {evaluation.challenge_performance.achieved_score?.toFixed(1) || 'N/A'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Meta: {evaluation.challenge_performance.target_score?.toFixed(1) || 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Feedback do desafio */}
+                      {evaluation.challenge_performance.challenge_feedback && (
+                        <p className="text-sm text-gray-300 border-t border-gray-700/50 pt-3 mt-3">
+                          {evaluation.challenge_performance.challenge_feedback}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Grid de Dicas de Coaching */}
+                    {(evaluation.challenge_performance.coaching_tips_applied?.length > 0 ||
+                      evaluation.challenge_performance.coaching_tips_missed?.length > 0) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Dicas Aplicadas */}
+                        {evaluation.challenge_performance.coaching_tips_applied?.length > 0 && (
+                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                            <h4 className="flex items-center gap-2 text-sm font-medium text-green-400 mb-3">
+                              <CheckCircle className="w-4 h-4" />
+                              Dicas Aplicadas
+                            </h4>
+                            <ul className="space-y-2">
+                              {evaluation.challenge_performance.coaching_tips_applied.map((tip: string, i: number) => (
+                                <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                  <span className="text-green-400 mt-0.5">✓</span>
+                                  {tip}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Dicas Não Aplicadas */}
+                        {evaluation.challenge_performance.coaching_tips_missed?.length > 0 && (
+                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                            <h4 className="flex items-center gap-2 text-sm font-medium text-orange-400 mb-3">
+                              <AlertTriangle className="w-4 h-4" />
+                              Dicas a Praticar
+                            </h4>
+                            <ul className="space-y-2">
+                              {evaluation.challenge_performance.coaching_tips_missed.map((tip: string, i: number) => (
+                                <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                  <span className="text-orange-400 mt-0.5">○</span>
+                                  {tip}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Momentos-Chave */}
+                    {evaluation.challenge_performance.key_moments?.length > 0 && (
+                      <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-purple-400 mb-3">
+                          <Lightbulb className="w-4 h-4" />
+                          Momentos-Chave para Melhoria
+                        </h4>
+                        <div className="space-y-3">
+                          {evaluation.challenge_performance.key_moments.map((moment: any, i: number) => (
+                            <div key={i} className="bg-gray-800/50 rounded-lg p-3 border-l-2 border-purple-500/50">
+                              <p className="text-sm text-gray-300 mb-2">{moment.moment}</p>
+                              {moment.what_happened && (
+                                <p className="text-xs text-gray-500 mb-1">
+                                  <span className="text-gray-400">O que aconteceu:</span> {moment.what_happened}
+                                </p>
+                              )}
+                              {moment.what_should_have_done && (
+                                <p className="text-xs text-gray-500 mb-1">
+                                  <span className="text-gray-400">O que fazer:</span> {moment.what_should_have_done}
+                                </p>
+                              )}
+                              {moment.suggested_phrase && (
+                                <p className="text-xs italic text-purple-300/80 bg-purple-500/10 rounded px-2 py-1 mt-2">
+                                  &ldquo;{moment.suggested_phrase}&rdquo;
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Análise Profunda da Letra Alvo */}
+                    {evaluation.challenge_performance.target_letter_deep_analysis && (
+                      <details className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                          <span className="text-sm font-medium text-gray-300">
+                            Análise Detalhada: {evaluation.challenge_performance.target_letter?.toUpperCase()}
+                          </span>
+                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                        </summary>
+                        <div className="px-4 pb-4">
+                          <p className="text-sm text-gray-400 whitespace-pre-line leading-relaxed">
+                            {evaluation.challenge_performance.target_letter_deep_analysis}
+                          </p>
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )}
 
                 {/* Tabs de navegação */}
                 <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 mb-6">

@@ -93,7 +93,6 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showTips, setShowTips] = useState(false)
   const [disabled, setDisabled] = useState(false)
   const [personaName, setPersonaName] = useState<string>('')
   const [objectionNames, setObjectionNames] = useState<string[]>([])
@@ -451,41 +450,27 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
             </div>
           )}
 
-          {/* Coaching Tips */}
+          {/* Coaching Tips - Always visible when expanded */}
           {config.coaching_tips && config.coaching_tips.length > 0 && (
             <div className="px-6 pb-4">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowTips(!showTips)
-                }}
-                className="w-full flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800 transition-colors mb-2"
-              >
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 mb-3">
                 <div className="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center">
                   <Lightbulb className="w-3.5 h-3.5 text-emerald-600" />
                 </div>
                 Dicas de Coaching
-                {showTips ? (
-                  <ChevronDown className="w-4 h-4 ml-auto text-emerald-500" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 ml-auto text-emerald-500" />
-                )}
-              </button>
-              {showTips && (
-                <div className="bg-emerald-50/50 rounded-xl border border-emerald-100 p-4">
-                  <ul className="space-y-3">
-                    {config.coaching_tips.map((tip, index) => (
-                      <li key={index} className="flex items-start gap-3">
-                        <span className="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
-                          {index + 1}
-                        </span>
-                        <span className="text-sm text-gray-700 leading-relaxed pt-0.5">{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              </div>
+              <div className="bg-emerald-50/50 rounded-xl border border-emerald-100 p-4">
+                <ul className="space-y-3">
+                  {config.coaching_tips.map((tip, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <span className="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm text-gray-700 leading-relaxed pt-0.5">{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
         </>

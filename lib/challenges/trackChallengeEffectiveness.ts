@@ -41,19 +41,34 @@ export async function trackChallengeCompletion(result: ChallengeResult): Promise
     let resultScore = 0
     const evaluation = result.evaluation
 
-    if (targetWeakness.startsWith('spin_')) {
+    // If the evaluation has challenge_performance (from N8N challenge-aware evaluation),
+    // use the achieved_score directly as it's the most accurate score for the challenge
+    if (evaluation?.challenge_performance?.achieved_score !== undefined) {
+      resultScore = evaluation.challenge_performance.achieved_score
+      console.log('📊 Using challenge_performance.achieved_score:', resultScore)
+    } else if (targetWeakness.startsWith('spin_')) {
+      // Fallback to extracting from regular SPIN evaluation
       const spinLetter = targetWeakness.replace('spin_', '').toUpperCase()
       resultScore = evaluation?.spin_evaluation?.[spinLetter]?.final_score ?? 0
+      console.log('📊 Using spin_evaluation fallback:', spinLetter, resultScore)
     } else if (targetWeakness === 'objection_handling') {
       const objections = evaluation?.objections_analysis
       if (Array.isArray(objections) && objections.length > 0) {
         resultScore = objections.reduce((sum: number, o: any) => sum + (o.score || 0), 0) / objections.length
       }
+      console.log('📊 Using objection_handling fallback:', resultScore)
     }
 
-    // Determine success
-    const minScore = successCriteria?.spin_min_score || 6.0
-    const success = resultScore >= minScore
+    // Determine success - use challenge_performance.goal_achieved if available
+    let success: boolean
+    if (evaluation?.challenge_performance?.goal_achieved !== undefined) {
+      success = evaluation.challenge_performance.goal_achieved
+      console.log('📊 Using challenge_performance.goal_achieved:', success)
+    } else {
+      const minScore = successCriteria?.spin_min_score || 6.0
+      success = resultScore >= minScore
+      console.log('📊 Using score comparison fallback:', resultScore, '>=', minScore, '=', success)
+    }
 
     // Update challenge
     const { error: updateError } = await supabaseAdmin

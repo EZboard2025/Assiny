@@ -665,7 +665,7 @@ Retorne um JSON com esta estrutura:
           }
 
           // Use AI explanation as the reasoning (more user-friendly)
-          const aiReasoning = challengeConfig.ai_explanation || `
+          const aiReasoning = challengeConfig.ai_explanation || (topWeakness ? `
 Analisamos sua performance recente e identificamos uma oportunidade de melhoria em ${topWeakness.target.toUpperCase()}.
 
 Seu score atual nessa área é ${topWeakness.currentScore.toFixed(1)}, o que indica que há espaço para evolução. ${topWeakness.pattern ? `Detectamos um padrão: ${topWeakness.pattern}.` : ''}
@@ -673,7 +673,13 @@ Seu score atual nessa área é ${topWeakness.currentScore.toFixed(1)}, o que ind
 Este desafio foi criado especificamente para ajudá-lo a desenvolver essa habilidade através de uma simulação prática com cenários realistas.
 
 Dificuldade: ${difficultyLevel}/5
-          `.trim()
+          `.trim() : `
+Este é um desafio avançado projetado para vendedores experientes.
+
+Você não possui fraquezas críticas detectadas, então criamos um cenário desafiador para manter suas habilidades afiadas e explorar situações mais complexas.
+
+Dificuldade: ${difficultyLevel}/5
+          `.trim())
 
           // Remove internal fields before saving
           delete challengeConfig.ai_explanation
