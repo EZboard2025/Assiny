@@ -85,67 +85,56 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black relative overflow-hidden">
-      {/* Subtle Grid Background */}
-      <div className="absolute inset-0 opacity-[0.08]">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `
-            linear-gradient(rgba(34, 197, 94, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(34, 197, 94, 0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '80px 80px'
-        }}></div>
-      </div>
-
-      {/* Subtle Gradient Orbs (sem animação) */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-green-500/5 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-gray-50 relative overflow-hidden">
+      {/* Subtle decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-100 rounded-full opacity-50 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green-50 rounded-full opacity-50 blur-3xl"></div>
       </div>
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
         <div className={`w-full max-w-md ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          {/* Card de Login - Estilo do Perfil */}
-          <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 border border-emerald-500/30 shadow-2xl">
+          {/* Card de Login */}
+          <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-xl">
             {/* Logo e Título */}
             <div className="text-center mb-8">
-              {/* Logo com efeito sutil */}
-              <div className="flex items-center justify-center mb-4">
-                <div className="relative w-[350px] h-[120px] overflow-hidden">
+              {/* Logo */}
+              <div className="flex items-center justify-center mb-6">
+                <div className="relative w-[280px] h-[80px]">
                   <Image
-                    src="/images/ramppy-logo.png"
+                    src="/images/logo-preta.png"
                     alt="Ramppy Logo"
                     fill
-                    className="object-contain object-center scale-[2.2] drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+                    className="object-contain"
                     priority
                   />
                 </div>
               </div>
 
-              <h1 className="text-3xl font-bold mb-3">
-                <span className="bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500 bg-clip-text text-transparent">
-                  {companyLoading ? 'Carregando...' : currentCompany ? `Bem-vindo à ${currentCompany.name}!` : 'Bem-vindo!'}
-                </span>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                {companyLoading ? 'Carregando...' : currentCompany ? `Bem-vindo à ${currentCompany.name}!` : 'Bem-vindo!'}
               </h1>
-              <p className="text-gray-400 flex items-center justify-center gap-2">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+              <p className="text-gray-500 flex items-center justify-center gap-2">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                 Faça login para continuar
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email
                 </label>
                 <div className="relative group">
-                  <Mail className="w-5 h-5 text-emerald-400 absolute left-4 top-3.5 group-focus-within:text-emerald-300 transition-colors z-10" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-green-600" />
+                  </div>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="relative w-full pl-12 pr-4 py-3.5 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/60 focus:bg-gray-800/80 transition-all"
+                    className="w-full pl-16 pr-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                     placeholder="seu@email.com"
                     autoFocus
                   />
@@ -153,22 +142,24 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Senha
                 </label>
                 <div className="relative group">
-                  <Lock className="w-5 h-5 text-emerald-400 absolute left-4 top-3.5 group-focus-within:text-emerald-300 transition-colors z-10" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-green-600" />
+                  </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="relative w-full pl-12 pr-14 py-3.5 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/60 focus:bg-gray-800/80 transition-all"
+                    className="w-full pl-16 pr-14 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-3.5 text-gray-400 hover:text-emerald-400 transition-colors z-10"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-600 transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff className="w-5 h-5" />
@@ -180,13 +171,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </div>
 
               <div className="text-right">
-                <a href="#" className="text-emerald-400 hover:text-emerald-300 text-sm font-semibold transition-colors">
+                <a href="#" className="text-green-600 hover:text-green-700 text-sm font-medium transition-colors">
                   Esqueceu sua senha?
                 </a>
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm backdrop-blur-sm">
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
                   {error}
                 </div>
               )}
@@ -194,7 +185,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02]"
+                className="w-full py-4 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
               >
                 {loading ? (
                   <>
@@ -209,7 +200,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-xs text-gray-500 mt-8">
+          <p className="text-center text-xs text-gray-400 mt-6">
             © 2025 Ramppy. Todos os direitos reservados.
           </p>
         </div>
