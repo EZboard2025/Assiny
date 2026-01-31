@@ -148,13 +148,57 @@ export async function trackChallengeCompletion(result: ChallengeResult): Promise
 
 /**
  * Calculates the next difficulty level based on recent performance
+ * Good sellers get harder challenges!
  */
 export async function calculateNextDifficulty(
   userId: string,
   targetWeakness: string
 ): Promise<number> {
   try {
-    // Get last 5 challenges for this weakness
+    // Get user's overall performance to determine base difficulty
+    const { data: performanceSummary } = await supabaseAdmin
+      .from('user_performance_summaries')
+      .select('overall_average, spin_s_average, spin_p_average, spin_i_average, spin_n_average')
+      .eq('user_id', userId)
+      .single()
+
+    // Calculate user's average SPIN score
+    let userAvgScore = 5.0 // Default if no data
+    if (performanceSummary) {
+      const scores = [
+        performanceSummary.spin_s_average,
+        performanceSummary.spin_p_average,
+        performanceSummary.spin_i_average,
+        performanceSummary.spin_n_average
+      ].filter(s => s !== null && s !== undefined)
+
+      if (scores.length > 0) {
+        userAvgScore = scores.reduce((a, b) => a + b, 0) / scores.length
+      } else if (performanceSummary.overall_average) {
+        userAvgScore = performanceSummary.overall_average
+      }
+    }
+
+    // Determine BASE difficulty based on user's overall performance
+    // Good sellers (avg >= 6.5) start at level 4
+    // Average sellers (avg 5-6.5) start at level 3
+    // Struggling sellers (avg < 5) start at level 2
+    let baseDifficulty: number
+    if (userAvgScore >= 7.0) {
+      baseDifficulty = 5 // Excellent seller - hardest challenges
+    } else if (userAvgScore >= 6.0) {
+      baseDifficulty = 4 // Good seller - hard challenges
+    } else if (userAvgScore >= 5.0) {
+      baseDifficulty = 3 // Average - medium challenges
+    } else if (userAvgScore >= 4.0) {
+      baseDifficulty = 2 // Below average - easier challenges
+    } else {
+      baseDifficulty = 1 // Struggling - easiest challenges
+    }
+
+    console.log(`📊 User avg score: ${userAvgScore.toFixed(1)} → Base difficulty: ${baseDifficulty}`)
+
+    // Get last 5 challenges to see if we need to adjust
     const { data: recentChallenges } = await supabaseAdmin
       .from('daily_challenges')
       .select('difficulty_level, success')
@@ -164,32 +208,24 @@ export async function calculateNextDifficulty(
       .limit(5)
 
     if (!recentChallenges || recentChallenges.length === 0) {
-      // First challenge - start at level 1 for critical, 3 for moderate
-      const { data: effectiveness } = await supabaseAdmin
-        .from('challenge_effectiveness')
-        .select('baseline_score')
-        .eq('user_id', userId)
-        .eq('target_weakness', targetWeakness)
-        .single()
-
-      if (effectiveness && effectiveness.baseline_score < 4.5) {
-        return 1 // Critical weakness - start easy
-      }
-      return 3 // Moderate weakness - start medium
+      // No challenge history - use base difficulty from performance
+      return baseDifficulty
     }
 
     // Calculate success rate
     const successCount = recentChallenges.filter(c => c.success).length
     const successRate = successCount / recentChallenges.length
-    const currentLevel = recentChallenges[0].difficulty_level || 3
+    const currentLevel = recentChallenges[0].difficulty_level || baseDifficulty
 
-    // Adjust difficulty
+    // Adjust difficulty based on recent challenge results
+    let adjustedLevel = currentLevel
+
     if (successRate >= 0.8) {
       // Very successful - increase difficulty
-      return Math.min(currentLevel + 1, 5)
-    } else if (successRate <= 0.3) {
-      // Struggling - decrease difficulty
-      return Math.max(currentLevel - 1, 1)
+      adjustedLevel = Math.min(currentLevel + 1, 5)
+    } else if (successRate <= 0.2) {
+      // Really struggling - decrease difficulty
+      adjustedLevel = Math.max(currentLevel - 1, 1)
     }
 
     // Check for consecutive wins/losses
@@ -207,12 +243,18 @@ export async function calculateNextDifficulty(
     }
 
     if (consecutiveWins >= 3) {
-      return Math.min(currentLevel + 1, 5)
+      adjustedLevel = Math.min(currentLevel + 1, 5)
     } else if (consecutiveLosses >= 3) {
-      return Math.max(currentLevel - 1, 1)
+      adjustedLevel = Math.max(currentLevel - 1, 1)
     }
 
-    return currentLevel // Keep same difficulty
+    // Never go below the base difficulty for good sellers
+    // This prevents good sellers from getting easy challenges
+    const finalLevel = Math.max(adjustedLevel, Math.min(baseDifficulty, 3))
+
+    console.log(`📊 Challenge history: ${successCount}/${recentChallenges.length} success → Level: ${finalLevel}`)
+
+    return finalLevel
   } catch (error) {
     console.error('Error calculating difficulty:', error)
     return 3 // Default to medium

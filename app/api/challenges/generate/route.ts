@@ -140,8 +140,27 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Get top weakness to target
-    const topWeakness = getTopWeakness(userData.weaknesses)
+    // Fetch last 2 challenges to avoid repetition
+    const { data: lastChallenges } = await supabaseAdmin
+      .from('daily_challenges')
+      .select('challenge_config')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(2)
+
+    const recentTargets = (lastChallenges || [])
+      .map(c => c.challenge_config?.target_weakness?.toLowerCase())
+      .filter(Boolean)
+
+    console.log(`📋 Últimos alvos a evitar: ${recentTargets.length > 0 ? recentTargets.join(', ') : 'nenhum'}`)
+
+    // Filter out weaknesses that match the last 2 challenges
+    const filteredWeaknesses = userData.weaknesses.filter(
+      w => !recentTargets.includes(w.target.toLowerCase())
+    )
+
+    // Get top weakness to target (use filtered list, fallback to full list if all filtered)
+    const topWeakness = getTopWeakness(filteredWeaknesses.length > 0 ? filteredWeaknesses : userData.weaknesses)
 
     if (!topWeakness) {
       return NextResponse.json({
@@ -222,6 +241,7 @@ REGRAS PARA SELEÇÃO:
 4. Se a fraqueza for em Implicação (I), escolha persona analítica/cética
 5. Se a fraqueza for em Situação (S), escolha persona que exige muitas perguntas de contexto
 6. Se a fraqueza for em CTA, escolha persona indecisa que precisa de direcionamento claro
+7. ⚠️ TODOS OS TEXTOS DEVEM SER EM PORTUGUÊS BRASILEIRO - incluindo title, description, coaching_tips, pattern_detected. NUNCA escreva em inglês!
 
 IMPORTANTE: Retorne APENAS JSON válido, sem markdown ou texto adicional.`
 
@@ -231,6 +251,7 @@ FRAQUEZA PRINCIPAL A TRABALHAR: ${topWeakness.target.toUpperCase()}
 - Score atual: ${topWeakness.currentScore.toFixed(1)}
 - Severidade: ${topWeakness.severity}
 - Padrão detectado: ${topWeakness.pattern || 'Não identificado'}
+${recentTargets.length > 0 ? `\n⚠️ NOTA: Os últimos 2 desafios já focaram em: ${recentTargets.join(', ').toUpperCase()}\nEste alvo (${topWeakness.target.toUpperCase()}) foi escolhido para variar o treinamento.` : ''}
 
 Crie um desafio de roleplay personalizado que vai FORÇAR o vendedor a praticar especificamente esta fraqueza.
 
@@ -260,7 +281,7 @@ Retorne um JSON com esta estrutura EXATA:
     "Dica específica 3 com exemplo de frase"
   ],
   "analysis_summary": {
-    "pattern_detected": "descrição do padrão identificado",
+    "pattern_detected": "Dificuldade em personalizar proposta; Baixa clareza nos benefícios (EM PORTUGUÊS!)",
     "roleplay_evidence": { "avg_score": X.X, "sessions_count": N },
     "meet_evidence": { "avg_score": X.X, "calls_count": N }
   }

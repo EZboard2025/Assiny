@@ -243,8 +243,28 @@ export async function POST(req: NextRequest) {
             continue
           }
 
+          // Fetch last 2 challenges to avoid repetition
+          const { data: lastChallenges } = await supabaseAdmin
+            .from('daily_challenges')
+            .select('challenge_config')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(2)
+
+          const recentTargets = (lastChallenges || [])
+            .map(c => c.challenge_config?.target_weakness?.toLowerCase())
+            .filter(Boolean)
+
+          console.log(`    📋 Últimos alvos: ${recentTargets.length > 0 ? recentTargets.join(', ') : 'nenhum'}`)
+
+          // Filter out weaknesses that match the last 2 challenges
+          const filteredWeaknesses = userData.weaknesses.filter(
+            w => !recentTargets.includes(w.target.toLowerCase())
+          )
+
           // Check if weaknesses were detected - if not, create advanced challenge
-          const topWeakness = getTopWeakness(userData.weaknesses)
+          // Use filtered weaknesses to avoid repetition
+          const topWeakness = getTopWeakness(filteredWeaknesses.length > 0 ? filteredWeaknesses : userData.weaknesses)
           const isAdvancedChallenge = userData.weaknesses.length === 0 || !topWeakness
 
           // Fetch personas and objections
@@ -317,6 +337,7 @@ REGRAS IMPORTANTES:
 2. Se as objeções existentes NÃO são relevantes para o desafio, crie novas objeções com formas de quebrá-las
 3. A explicação (ai_explanation) deve ser em português, empática, motivacional e explicar claramente POR QUE o vendedor precisa desse treino
 4. Retorne APENAS JSON válido, sem markdown ou texto adicional
+5. ⚠️ TODOS OS TEXTOS DEVEM SER EM PORTUGUÊS BRASILEIRO - incluindo title, description, coaching_tips, ai_explanation, pattern_detected e analysis_summary. NUNCA escreva em inglês!
 
 ⚠️ REGRA CRÍTICA PARA METAS:
 - O spin_min_score DEVE ser calculado assim: score_atual + 1.5 (mínimo de 7.0, máximo de 10.0)
@@ -349,6 +370,7 @@ ${isHighDifficulty ? `
 
 VENDEDOR: ${userName}
 TIPO DE DESAFIO: AVANÇADO (Sem fraquezas críticas detectadas!)
+${recentTargets.length > 0 ? `\n⚠️ ALVOS A EVITAR (já usados nos últimos 2 desafios): ${recentTargets.join(', ').toUpperCase()}\nEscolha uma letra SPIN ou skill DIFERENTE dessas!\n` : ''}
 ${websiteAnalysis ? `\nDADOS DO SITE DA EMPRESA PARA USAR:\n${websiteAnalysis}\n` : ''}
 
 Este vendedor está com boa performance geral. Crie um desafio AVANÇADO para:
@@ -440,6 +462,7 @@ FRAQUEZA PRINCIPAL A TRABALHAR: ${topWeakness!.target.toUpperCase()}
 - META MÍNIMA CALCULADA: ${Math.min(10, Math.max(7.0, topWeakness!.currentScore + 1.5)).toFixed(1)} (score atual + 1.5, mín 7.0, máx 10.0)
 - Severidade: ${topWeakness!.severity}
 ${topWeakness!.pattern ? `- Padrão detectado: ${topWeakness!.pattern}` : ''}
+${recentTargets.length > 0 ? `\n⚠️ NOTA: Os últimos 2 desafios já focaram em: ${recentTargets.join(', ').toUpperCase()}\nEste alvo (${topWeakness!.target.toUpperCase()}) foi escolhido para variar o treinamento.` : ''}
 ${isHighDifficulty && websiteAnalysis ? `\nDADOS DO SITE DA EMPRESA PARA USAR:\n${websiteAnalysis}\n` : ''}
 ${isHighDifficulty ? `
 ⚠️ DESAFIO DE DIFICULDADE ${difficultyLevel}/5 - OBRIGATÓRIO:
@@ -515,7 +538,7 @@ Retorne um JSON com esta estrutura:
   ],
 
   "analysis_summary": {
-    "pattern_detected": "descrição do padrão identificado",
+    "pattern_detected": "Dificuldade em personalizar proposta; Baixa clareza nos benefícios (EM PORTUGUÊS!)",
     "roleplay_evidence": { "avg_score": 5.0, "sessions_count": 3 },
     "meet_evidence": { "avg_score": 5.0, "calls_count": 2 }
   }
