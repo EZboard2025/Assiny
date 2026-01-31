@@ -77,15 +77,42 @@ const formatTargetWeakness = (weakness: string): string => {
   return weaknessMap[weakness.toLowerCase()] || weakness.replace(/_/g, ' ')
 }
 
-// Helper function to format SPIN letter
+// Helper function to extract just the SPIN letter (S, P, I, or N)
+const extractSpinLetter = (input: string): string => {
+  if (!input) return ''
+  // Handle "SPIN_S", "spin_s", "S", "s" formats
+  const upper = input.toUpperCase()
+  if (upper.startsWith('SPIN_')) {
+    return upper.replace('SPIN_', '')
+  }
+  // Already a single letter
+  if (['S', 'P', 'I', 'N'].includes(upper)) {
+    return upper
+  }
+  return input
+}
+
+// Helper function to format SPIN letter to full name
 const formatSpinLetter = (letter: string): string => {
+  const extracted = extractSpinLetter(letter)
   const letterMap: Record<string, string> = {
     'S': 'Situação',
     'P': 'Problema',
     'I': 'Implicação',
     'N': 'Necessidade',
   }
-  return letterMap[letter] || letter
+  return letterMap[extracted] || letter
+}
+
+// Helper function to clean up text containing SPIN_X patterns
+const cleanSpinText = (text: string): string => {
+  if (!text) return ''
+  return text
+    .replace(/SPIN_S/gi, 'Situação (S)')
+    .replace(/SPIN_P/gi, 'Problema (P)')
+    .replace(/SPIN_I/gi, 'Implicação (I)')
+    .replace(/SPIN_N/gi, 'Necessidade (N)')
+    .replace(/spin selling/gi, 'SPIN Selling')
 }
 
 export default function DailyChallengeBanner({ userId, companyId, onStartChallenge }: Props) {
@@ -232,7 +259,7 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
                     Sucesso
                   </span>
                 </h3>
-                <p className="text-sm text-gray-600 mt-0.5">{challenge.challenge_config.title}</p>
+                <p className="text-sm text-gray-600 mt-0.5">{cleanSpinText(challenge.challenge_config.title)}</p>
                 {challenge.result_score !== undefined && (
                   <div className="flex items-center gap-3 mt-2">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold bg-green-50 text-green-700">
@@ -279,7 +306,7 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
 
           {/* Content */}
           <div className="text-left">
-            <h3 className="text-base font-bold text-gray-900">{config.title}</h3>
+            <h3 className="text-base font-bold text-gray-900">{cleanSpinText(config.title)}</h3>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {/* Difficulty Stars */}
               <div className="flex items-center gap-0.5">
@@ -297,7 +324,7 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
               <span className="text-gray-300">•</span>
               {/* Clear Goal Badge */}
               <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
-                🎯 Meta: {config.success_criteria.spin_min_score}+ em {formatSpinLetter(config.success_criteria.spin_letter_target)} ({config.success_criteria.spin_letter_target})
+                🎯 Meta: {config.success_criteria.spin_min_score}+ em {formatSpinLetter(config.success_criteria.spin_letter_target)} ({extractSpinLetter(config.success_criteria.spin_letter_target)})
               </span>
             </div>
           </div>
@@ -321,13 +348,13 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
             <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <span className="text-white font-bold text-lg">{config.success_criteria.spin_letter_target}</span>
+                  <span className="text-white font-bold text-lg">{extractSpinLetter(config.success_criteria.spin_letter_target)}</span>
                 </div>
                 <div className="flex-1">
                   <h4 className="text-sm font-bold text-amber-900 mb-1">
                     🎯 Objetivo: Alcançar {config.success_criteria.spin_min_score}+ em {formatSpinLetter(config.success_criteria.spin_letter_target)}
                   </h4>
-                  <p className="text-sm text-amber-800">{config.description}</p>
+                  <p className="text-sm text-amber-800">{cleanSpinText(config.description)}</p>
                   <div className="mt-2 flex items-center gap-2 text-xs text-amber-700">
                     <span className="font-medium">Foco:</span>
                     <span className="px-2 py-0.5 bg-amber-200/50 rounded font-semibold">
@@ -462,7 +489,7 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
                       <span className="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
                         {index + 1}
                       </span>
-                      <span className="text-sm text-gray-700 leading-relaxed pt-0.5">{tip}</span>
+                      <span className="text-sm text-gray-700 leading-relaxed pt-0.5">{cleanSpinText(tip)}</span>
                     </li>
                   ))}
                 </ul>

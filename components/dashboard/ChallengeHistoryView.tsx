@@ -153,6 +153,41 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
     return labels[target] || target.replace('spin_', 'SPIN ').replace(/_/g, ' ')
   }
 
+  // Extract just the SPIN letter (S, P, I, or N) from various formats
+  const extractSpinLetter = (input: string): string => {
+    if (!input) return ''
+    const upper = input.toUpperCase()
+    if (upper.startsWith('SPIN_')) {
+      return upper.replace('SPIN_', '')
+    }
+    if (['S', 'P', 'I', 'N'].includes(upper)) {
+      return upper
+    }
+    return input
+  }
+
+  const formatSpinLetter = (letter: string): string => {
+    const extracted = extractSpinLetter(letter)
+    const labels: Record<string, string> = {
+      'S': 'Situação',
+      'P': 'Problema',
+      'I': 'Implicação',
+      'N': 'Necessidade',
+    }
+    return labels[extracted] || letter
+  }
+
+  // Clean up text containing SPIN_X patterns
+  const cleanSpinText = (text: string): string => {
+    if (!text) return ''
+    return text
+      .replace(/SPIN_S/gi, 'Situação (S)')
+      .replace(/SPIN_P/gi, 'Problema (P)')
+      .replace(/SPIN_I/gi, 'Implicação (I)')
+      .replace(/SPIN_N/gi, 'Necessidade (N)')
+      .replace(/spin selling/gi, 'SPIN Selling')
+  }
+
   const filteredChallenges = challenges.filter(c => {
     if (filter === 'all') return true
     if (filter === 'pending') return c.status === 'pending' || c.status === 'in_progress'
@@ -203,9 +238,9 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-3xl">🎯</span>
-                  <h1 className="text-2xl font-bold text-gray-900">{config.title}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{cleanSpinText(config.title)}</h1>
                 </div>
-                <p className="text-gray-600">{config.description}</p>
+                <p className="text-gray-600">{cleanSpinText(config.description)}</p>
               </div>
               {getStatusBadge(selectedChallenge.status)}
             </div>
@@ -292,7 +327,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
                   <div className="grid grid-cols-4 gap-3">
                     {['S', 'P', 'I', 'N'].map((letter) => {
                       const score = evaluation.spin_evaluation[letter]?.final_score
-                      const isTarget = config.success_criteria.spin_letter_target === letter
+                      const isTarget = extractSpinLetter(config.success_criteria.spin_letter_target) === letter
                       return (
                         <div
                           key={letter}
@@ -380,7 +415,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
               <p className="text-sm text-gray-500 mb-2">Critérios de Sucesso</p>
               <div className="flex flex-wrap gap-2">
                 <span className="px-3 py-1 bg-purple-100 text-purple-700 text-sm rounded-full">
-                  {config.success_criteria.spin_letter_target} ≥ {config.success_criteria.spin_min_score}
+                  {formatSpinLetter(config.success_criteria.spin_letter_target)} ({extractSpinLetter(config.success_criteria.spin_letter_target)}) ≥ {config.success_criteria.spin_min_score}
                 </span>
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full">
                   Objeções ≥ {config.success_criteria.objection_handling_min}
@@ -395,7 +430,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
                   {config.coaching_tips.map((tip, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
                       <span className="text-purple-500 font-bold">{i + 1}.</span>
-                      <span>{tip}</span>
+                      <span>{cleanSpinText(tip)}</span>
                     </li>
                   ))}
                 </ul>
@@ -533,7 +568,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-gray-900 truncate">
-                          {challenge.challenge_config.title}
+                          {cleanSpinText(challenge.challenge_config.title)}
                         </h3>
                         {getStatusBadge(challenge.status)}
                       </div>

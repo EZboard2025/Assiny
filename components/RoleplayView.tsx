@@ -65,6 +65,43 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
       }
     </style>
   `;
+
+  // Helper function to extract just the SPIN letter (S, P, I, or N) from various formats
+  const extractSpinLetter = (input: string): string => {
+    if (!input) return ''
+    const upper = input.toUpperCase()
+    if (upper.startsWith('SPIN_')) {
+      return upper.replace('SPIN_', '')
+    }
+    if (['S', 'P', 'I', 'N'].includes(upper)) {
+      return upper
+    }
+    return input
+  }
+
+  // Helper function to format SPIN letter to full name
+  const formatSpinLetter = (letter: string): string => {
+    const extracted = extractSpinLetter(letter)
+    const labels: Record<string, string> = {
+      'S': 'Situação',
+      'P': 'Problema',
+      'I': 'Implicação',
+      'N': 'Necessidade',
+    }
+    return labels[extracted] || letter
+  }
+
+  // Clean up text containing SPIN_X patterns
+  const cleanSpinText = (text: string): string => {
+    if (!text) return ''
+    return text
+      .replace(/SPIN_S/gi, 'Situação (S)')
+      .replace(/SPIN_P/gi, 'Problema (P)')
+      .replace(/SPIN_I/gi, 'Implicação (I)')
+      .replace(/SPIN_N/gi, 'Necessidade (N)')
+      .replace(/spin selling/gi, 'SPIN Selling')
+  }
+
   const [isSimulating, setIsSimulating] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [roleplayLimitReached, setRoleplayLimitReached] = useState(false)
@@ -1651,14 +1688,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <div className="text-2xl">🎯</div>
                   <div className="text-left">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-gray-900">{challengeConfig.title}</h3>
+                      <h3 className="text-base font-bold text-gray-900">{cleanSpinText(challengeConfig.title)}</h3>
                       <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
                         Desafio Diário
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                       <Target className="w-3 h-3 text-purple-500" />
-                      <span>Meta: {challengeConfig.success_criteria.spin_letter_target} ≥ {challengeConfig.success_criteria.spin_min_score}</span>
+                      <span>Meta: {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)} ({extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}) ≥ {challengeConfig.success_criteria.spin_min_score}</span>
                     </div>
                   </div>
                 </div>
@@ -1676,7 +1713,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               {isChallengeExpanded && (
                 <div className="px-4 pb-4 border-t border-purple-100">
                   <div className="pt-4 pl-11">
-                    <p className="text-gray-600 text-sm mb-4">{challengeConfig.description}</p>
+                    <p className="text-gray-600 text-sm mb-4">{cleanSpinText(challengeConfig.description)}</p>
 
                     {/* Dicas de Coaching */}
                     {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
@@ -1689,7 +1726,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           {challengeConfig.coaching_tips.map((tip, index) => (
                             <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
                               <span className="text-purple-400 mt-0.5">•</span>
-                              <span>{tip}</span>
+                              <span>{cleanSpinText(tip)}</span>
                             </li>
                           ))}
                         </ul>
@@ -2383,7 +2420,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                               {evaluation.challenge_performance.coaching_tips_applied.map((tip: string, i: number) => (
                                 <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
                                   <span className="text-green-400 mt-0.5">✓</span>
-                                  {tip}
+                                  {cleanSpinText(tip)}
                                 </li>
                               ))}
                             </ul>
@@ -2401,7 +2438,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                               {evaluation.challenge_performance.coaching_tips_missed.map((tip: string, i: number) => (
                                 <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
                                   <span className="text-orange-400 mt-0.5">○</span>
-                                  {tip}
+                                  {cleanSpinText(tip)}
                                 </li>
                               ))}
                             </ul>

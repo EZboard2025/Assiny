@@ -116,11 +116,12 @@ export async function POST(req: NextRequest) {
     console.log(`🎯 GERAÇÃO MANUAL DE DESAFIOS - ${new Date().toLocaleString('pt-BR')}`)
     console.log(`${'='.repeat(60)}\n`)
 
-    // 1. Delete all existing challenges for today
+    // 1. Delete only PENDING challenges for today (preserve completed and in_progress)
     const { data: deletedChallenges, error: deleteError } = await supabaseAdmin
       .from('daily_challenges')
       .delete()
       .eq('challenge_date', today)
+      .eq('status', 'pending')
       .select('id')
 
     if (deleteError) {
@@ -200,6 +201,28 @@ export async function POST(req: NextRequest) {
       for (const employee of employees) {
         const userId = employee.user_id
         const userName = employee.name || employee.email
+
+        // Check if user already has a non-pending challenge for today (completed or in_progress)
+        const { data: existingChallenge } = await supabaseAdmin
+          .from('daily_challenges')
+          .select('id, status')
+          .eq('user_id', userId)
+          .eq('challenge_date', today)
+          .single()
+
+        if (existingChallenge) {
+          results.push({
+            userId,
+            userName,
+            companyId: company.id,
+            companyName: company.name,
+            status: 'skipped',
+            reason: `Desafio já existe (${existingChallenge.status})`
+          })
+          totalSkipped++
+          console.log(`    ⏭️ ${userName}: já possui desafio ${existingChallenge.status}`)
+          continue
+        }
 
         // Check credits before generating
         if (baseLimit !== null) {

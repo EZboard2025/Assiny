@@ -169,14 +169,39 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
     return labels[target] || target.replace('spin_', '').toUpperCase()
   }
 
+  // Extract just the SPIN letter (S, P, I, or N) from various formats
+  const extractSpinLetter = (input: string): string => {
+    if (!input) return ''
+    const upper = input.toUpperCase()
+    if (upper.startsWith('SPIN_')) {
+      return upper.replace('SPIN_', '')
+    }
+    if (['S', 'P', 'I', 'N'].includes(upper)) {
+      return upper
+    }
+    return input
+  }
+
   const getSpinLetterLabel = (letter: string) => {
+    const extracted = extractSpinLetter(letter)
     const labels: Record<string, string> = {
       'S': 'Situação',
       'P': 'Problema',
       'I': 'Implicação',
       'N': 'Necessidade',
     }
-    return labels[letter] || letter
+    return labels[extracted] || letter
+  }
+
+  // Clean up text containing SPIN_X patterns
+  const cleanSpinText = (text: string): string => {
+    if (!text) return ''
+    return text
+      .replace(/SPIN_S/gi, 'Situação (S)')
+      .replace(/SPIN_P/gi, 'Problema (P)')
+      .replace(/SPIN_I/gi, 'Implicação (I)')
+      .replace(/SPIN_N/gi, 'Necessidade (N)')
+      .replace(/spin selling/gi, 'SPIN Selling')
   }
 
   const getScoreColor = (score: number) => {
@@ -276,7 +301,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900 mb-0.5 truncate">
-                        {config.title}
+                        {cleanSpinText(config.title)}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span>{formatDate(challenge.challenge_date)}</span>
@@ -309,10 +334,10 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-2xl">🎯</span>
-                    <h2 className="text-xl font-bold text-gray-900">{selectedChallenge.challenge_config.title}</h2>
+                    <h2 className="text-xl font-bold text-gray-900">{cleanSpinText(selectedChallenge.challenge_config.title)}</h2>
                     {getStatusBadge(selectedChallenge)}
                   </div>
-                  <p className="text-gray-600 text-sm">{selectedChallenge.challenge_config.description}</p>
+                  <p className="text-gray-600 text-sm">{cleanSpinText(selectedChallenge.challenge_config.description)}</p>
                 </div>
                 {canDoChallenge(selectedChallenge) && onStartChallenge && (
                   <button
@@ -414,7 +439,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                     <div className="grid grid-cols-4 gap-2">
                       {['S', 'P', 'I', 'N'].map((letter) => {
                         const score = selectedChallenge.evaluation.spin_evaluation[letter]?.final_score
-                        const isTarget = selectedChallenge.challenge_config.success_criteria.spin_letter_target === letter
+                        const isTarget = extractSpinLetter(selectedChallenge.challenge_config.success_criteria.spin_letter_target) === letter
                         return (
                           <div
                             key={letter}
@@ -506,7 +531,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                         <span className="w-6 h-6 bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {i + 1}
                         </span>
-                        <span className="pt-0.5">{tip}</span>
+                        <span className="pt-0.5">{cleanSpinText(tip)}</span>
                       </li>
                     ))}
                   </ul>
