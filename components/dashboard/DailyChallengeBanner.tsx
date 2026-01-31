@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Target, Trophy, Clock, ChevronDown, ChevronRight, Rocket, Lightbulb, History, User, MessageSquare, Brain, Sparkles, Quote } from 'lucide-react'
 
 interface ChallengeConfig {
   title: string
@@ -35,7 +36,7 @@ interface DailyChallenge {
   user_id: string
   company_id: string
   challenge_date: string
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped'
+  status: 'pending' | 'in_progress' | 'completed'
   difficulty_level: number
   challenge_config: ChallengeConfig
   ai_reasoning: string
@@ -51,13 +52,27 @@ interface Props {
   onViewHistory?: () => void
 }
 
+interface PersonaData {
+  id: string
+  job_title?: string
+  cargo?: string
+  company_type?: string
+  tipo_empresa_faturamento?: string
+}
+
+interface ObjectionData {
+  id: string
+  name: string
+}
+
 export default function DailyChallengeBanner({ userId, companyId, onStartChallenge, onViewHistory }: Props) {
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null)
   const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTips, setShowTips] = useState(false)
   const [disabled, setDisabled] = useState(false)
+  const [personaName, setPersonaName] = useState<string>('')
+  const [objectionNames, setObjectionNames] = useState<string[]>([])
 
   useEffect(() => {
     fetchTodaysChallenge()
@@ -74,59 +89,48 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
         return
       }
 
+      if (data.error) {
+        setError(data.error)
+        return
+      }
+
       setChallenge(data.challenge)
+
+      // Fetch persona and objections names if challenge exists
+      if (data.challenge?.challenge_config?.roleplay_config) {
+        const config = data.challenge.challenge_config.roleplay_config
+
+        // Fetch persona
+        if (config.persona_id) {
+          const { data: persona } = await supabase
+            .from('personas')
+            .select('job_title, cargo, company_type, tipo_empresa_faturamento')
+            .eq('id', config.persona_id)
+            .single()
+
+          if (persona) {
+            const title = persona.job_title || persona.cargo || 'Persona'
+            const company = persona.company_type || persona.tipo_empresa_faturamento || ''
+            setPersonaName(company ? `${title} - ${company}` : title)
+          }
+        }
+
+        // Fetch objections
+        if (config.objection_ids && config.objection_ids.length > 0) {
+          const { data: objections } = await supabase
+            .from('objections')
+            .select('name')
+            .in('id', config.objection_ids)
+
+          if (objections) {
+            setObjectionNames(objections.map(o => o.name))
+          }
+        }
+      }
     } catch (err) {
       console.error('Error fetching challenge:', err)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const generateChallenge = async () => {
-    try {
-      setGenerating(true)
-      setError(null)
-
-      const response = await fetch('/api/challenges/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, companyId })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.message || data.error || 'Erro ao gerar desafio')
-        return
-      }
-
-      if (data.noChallenge) {
-        setError(data.message)
-        return
-      }
-
-      setChallenge(data.challenge)
-    } catch (err) {
-      console.error('Error generating challenge:', err)
-      setError('Erro ao gerar desafio')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const skipChallenge = async () => {
-    if (!challenge) return
-
-    try {
-      await fetch('/api/challenges/complete', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeId: challenge.id, status: 'skipped' })
-      })
-
-      setChallenge({ ...challenge, status: 'skipped' })
-    } catch (err) {
-      console.error('Error skipping challenge:', err)
     }
   }
 
@@ -152,56 +156,44 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
   // Loading state
   if (loading) {
     return (
-      <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-xl p-6 animate-pulse">
-        <div className="h-6 bg-purple-500/20 rounded w-1/3 mb-4"></div>
-        <div className="h-4 bg-purple-500/20 rounded w-2/3"></div>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gray-200 rounded-xl"></div>
+          <div className="flex-1">
+            <div className="h-5 bg-gray-200 rounded w-1/3 mb-2"></div>
+            <div className="h-4 bg-gray-100 rounded w-2/3"></div>
+          </div>
+        </div>
       </div>
     )
   }
 
-  // No challenge yet - show generate button
+  // No challenge for today - show informative message
   if (!challenge) {
     return (
-      <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30 rounded-xl p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <span className="text-2xl">🎯</span>
-              Desafio Diário
-            </h3>
-            <p className="text-gray-400 text-sm mt-1">
-              {error || 'Gere um desafio personalizado baseado em suas fraquezas'}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                <Target className="w-6 h-6 text-gray-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Desafio Diário</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {error || 'Nenhum desafio disponível hoje. Novos desafios são gerados diariamente às 10h.'}
+                </p>
+              </div>
+            </div>
             {onViewHistory && (
               <button
                 onClick={onViewHistory}
-                className="px-4 py-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all"
               >
-                Ver Histórico
+                <History className="w-4 h-4" />
+                Histórico
               </button>
             )}
-            <button
-              onClick={generateChallenge}
-              disabled={generating}
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {generating ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <span>✨</span>
-                  Gerar Desafio
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>
@@ -211,65 +203,45 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
   // Challenge completed
   if (challenge.status === 'completed') {
     return (
-      <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-xl p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <span className="text-2xl">✅</span>
-              Desafio Concluído!
-            </h3>
-            <p className="text-gray-300 text-sm mt-1">{challenge.challenge_config.title}</p>
-            {challenge.result_score !== undefined && (
-              <div className="flex items-center gap-4 mt-2">
-                <span className="text-green-400 font-medium">
-                  Score: {challenge.result_score.toFixed(1)}
-                </span>
-                {challenge.improvement_from_baseline !== undefined && challenge.improvement_from_baseline > 0 && (
-                  <span className="text-emerald-400 text-sm">
-                    +{challenge.improvement_from_baseline.toFixed(1)} de melhoria
+      <div className="bg-white rounded-2xl border border-green-200 shadow-sm overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+        <div className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/20">
+                <Trophy className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  Desafio Concluído!
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                    Sucesso
                   </span>
+                </h3>
+                <p className="text-sm text-gray-600 mt-0.5">{challenge.challenge_config.title}</p>
+                {challenge.result_score !== undefined && (
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold bg-green-50 text-green-700">
+                      Score: {challenge.result_score.toFixed(1)}
+                    </span>
+                    {challenge.improvement_from_baseline !== undefined && challenge.improvement_from_baseline > 0 && (
+                      <span className="inline-flex items-center text-sm text-emerald-600 font-medium">
+                        ↑ +{challenge.improvement_from_baseline.toFixed(1)} de melhoria
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
+            </div>
             {onViewHistory && (
               <button
                 onClick={onViewHistory}
-                className="px-4 py-2 text-green-400 hover:text-green-300 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl text-sm font-medium transition-all"
               >
+                <History className="w-4 h-4" />
                 Ver Histórico
               </button>
             )}
-            <div className="text-green-400 text-4xl">🏆</div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Challenge skipped
-  if (challenge.status === 'skipped') {
-    return (
-      <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/30 rounded-xl p-6 opacity-75">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-400 flex items-center gap-2">
-              <span className="text-2xl">⏭️</span>
-              Desafio Pulado
-            </h3>
-            <p className="text-gray-500 text-sm mt-1">{challenge.challenge_config.title}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {onViewHistory && (
-              <button
-                onClick={onViewHistory}
-                className="px-4 py-2 text-gray-400 hover:text-gray-300 text-sm font-medium transition-colors"
-              >
-                Ver Histórico
-              </button>
-            )}
-            <p className="text-gray-500 text-sm">Volte amanhã para um novo desafio!</p>
           </div>
         </div>
       </div>
@@ -278,102 +250,209 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
 
   // Active challenge
   const config = challenge.challenge_config
-  const difficultyStars = '⭐'.repeat(challenge.difficulty_level)
-  const emptyStars = '☆'.repeat(5 - challenge.difficulty_level)
 
   return (
-    <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border border-purple-500/40 rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="p-6 pb-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">🎯</span>
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Gradient top bar */}
+      <div className="h-1.5 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500"></div>
+
+      {/* Main content */}
+      <div className="p-6">
+        <div className="flex items-start gap-4">
+          {/* Icon */}
+          <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0">
+            <Target className="w-7 h-7 text-white" />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-bold text-white">{config.title}</h3>
+                <h3 className="text-lg font-bold text-gray-900">{config.title}</h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-yellow-400 text-sm" title={`Dificuldade: ${challenge.difficulty_level}/5`}>
-                    {difficultyStars}{emptyStars}
-                  </span>
-                  <span className="text-gray-500 text-sm">|</span>
-                  <span className="text-purple-400 text-sm font-medium">
-                    {config.target_weakness.replace('spin_', 'SPIN ').replace('followup_', 'Follow-up: ').toUpperCase()}
+                  {/* Difficulty Stars */}
+                  <div className="flex items-center gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <svg
+                        key={i}
+                        className={`w-4 h-4 ${i < challenge.difficulty_level ? 'text-amber-400' : 'text-gray-200'}`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <span className="text-gray-300">•</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-700">
+                    {config.target_weakness.replace('spin_', 'SPIN ').toUpperCase()}
                   </span>
                 </div>
               </div>
             </div>
-            <p className="text-gray-300 text-sm">{config.description}</p>
+
+            <p className="text-sm text-gray-600 mt-2">{config.description}</p>
           </div>
+        </div>
+
+        {/* Roleplay Configuration */}
+        <div className="mt-5 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+          <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Brain className="w-4 h-4 text-purple-600" />
+            Configuração do Roleplay
+          </h4>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Persona */}
+            <div className="flex items-start gap-2">
+              <User className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-xs text-gray-500 block">Persona</span>
+                <span className="text-sm font-medium text-gray-900">{personaName || 'Carregando...'}</span>
+              </div>
+            </div>
+
+            {/* Temperament */}
+            <div className="flex items-start gap-2">
+              <Brain className="w-4 h-4 text-pink-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-xs text-gray-500 block">Temperamento</span>
+                <span className="text-sm font-medium text-gray-900">{config.roleplay_config.temperament}</span>
+              </div>
+            </div>
+
+            {/* Age */}
+            <div className="flex items-start gap-2">
+              <Clock className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-xs text-gray-500 block">Faixa Etária</span>
+                <span className="text-sm font-medium text-gray-900">{config.roleplay_config.age_range} anos</span>
+              </div>
+            </div>
+
+            {/* Goal */}
+            <div className="flex items-start gap-2">
+              <Target className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-xs text-gray-500 block">Meta SPIN</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {config.success_criteria.spin_letter_target} ≥ {config.success_criteria.spin_min_score}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Objections */}
+          {objectionNames.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-purple-100">
+              <div className="flex items-start gap-2">
+                <MessageSquare className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-xs text-gray-500 block mb-1">Objeções que você vai enfrentar</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {objectionNames.map((name, i) => (
+                      <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-orange-100 text-orange-700">
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Success Criteria */}
-      <div className="px-6 py-3 bg-black/20">
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">Meta:</span>
-            <span className="text-purple-300 font-medium">
-              {config.success_criteria.spin_letter_target} ≥ {config.success_criteria.spin_min_score}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">Temperamento:</span>
-            <span className="text-pink-300 font-medium">{config.roleplay_config.temperament}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">Idade:</span>
-            <span className="text-blue-300 font-medium">{config.roleplay_config.age_range}</span>
+      {/* AI Reasoning - Always visible with beautiful design */}
+      {challenge.ai_reasoning && (
+        <div className="px-6 pb-4">
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border border-indigo-100">
+            {/* Decorative elements */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-100/50 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-indigo-100/50 to-transparent rounded-full translate-y-1/2 -translate-x-1/2"></div>
+
+            {/* Header */}
+            <div className="relative px-4 pt-4 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-sm">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <h4 className="text-sm font-semibold text-indigo-900">Por que esse desafio foi criado para você?</h4>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="relative px-4 pb-4">
+              <div className="flex gap-3">
+                <Quote className="w-5 h-5 text-indigo-300 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{challenge.ai_reasoning}</p>
+                  {config.analysis_summary?.pattern_detected && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-100 text-indigo-700">
+                        🔍 {config.analysis_summary.pattern_detected}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Coaching Tips - Expandable */}
+      {/* Coaching Tips - Collapsible with better design */}
       {config.coaching_tips && config.coaching_tips.length > 0 && (
-        <div className="px-6 py-3 border-t border-purple-500/20">
+        <div className="px-6 pb-4">
           <button
             onClick={() => setShowTips(!showTips)}
-            className="flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 transition-colors w-full"
+            className="w-full flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800 transition-colors mb-2"
           >
-            <span>💡</span>
-            <span className="font-medium">Dicas de Coaching</span>
-            <span className={`transition-transform ${showTips ? 'rotate-180' : ''}`}>▼</span>
+            <div className="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <Lightbulb className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+            Dicas de Coaching
+            {showTips ? (
+              <ChevronDown className="w-4 h-4 ml-auto text-emerald-500" />
+            ) : (
+              <ChevronRight className="w-4 h-4 ml-auto text-emerald-500" />
+            )}
           </button>
           {showTips && (
-            <ul className="mt-3 space-y-2">
-              {config.coaching_tips.map((tip, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm text-gray-300">
-                  <span className="text-purple-400 mt-0.5">•</span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="bg-emerald-50/50 rounded-xl border border-emerald-100 p-4">
+              <ul className="space-y-3">
+                {config.coaching_tips.map((tip, index) => (
+                  <li key={index} className="flex items-start gap-3">
+                    <span className="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm text-gray-700 leading-relaxed pt-0.5">{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
 
       {/* Actions */}
-      <div className="p-6 pt-4 bg-black/10 flex items-center justify-between gap-4">
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button
-            onClick={skipChallenge}
-            className="px-4 py-2 text-gray-400 hover:text-gray-300 text-sm transition-colors"
-          >
-            Pular desafio
-          </button>
           {onViewHistory && (
             <button
               onClick={onViewHistory}
-              className="px-4 py-2 text-purple-400 hover:text-purple-300 text-sm transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200/50 rounded-lg text-sm font-medium transition-all"
             >
-              Ver Histórico
+              <History className="w-4 h-4" />
+              Histórico
             </button>
           )}
         </div>
         <button
           onClick={startChallenge}
-          className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all transform hover:scale-105 flex items-center gap-2 shadow-lg shadow-purple-500/25"
+          className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02]"
         >
-          <span>🚀</span>
+          <Rocket className="w-4 h-4" />
           Iniciar Desafio
         </button>
       </div>

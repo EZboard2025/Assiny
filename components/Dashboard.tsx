@@ -304,6 +304,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (currentView === 'chat' && newView !== 'chat' && chatRef.current) {
       await chatRef.current.requestLeave()
     }
+    // Clear active challenge when navigating to roleplay via menu (not via handleStartChallenge)
+    if (newView === 'roleplay') {
+      setActiveChallenge(null)
+    }
     setCurrentView(newView as typeof currentView)
   }
 

@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest) {
       )
     }
 
-    const validStatuses = ['pending', 'in_progress', 'completed', 'skipped']
+    const validStatuses = ['pending', 'in_progress', 'completed']
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
         { error: 'Status inválido' },
@@ -104,9 +104,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updateData: any = { status }
-    if (status === 'skipped') {
-      updateData.completed_at = new Date().toISOString()
-    }
 
     const { data: challenge, error } = await supabaseAdmin
       .from('daily_challenges')

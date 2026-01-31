@@ -2082,38 +2082,73 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     ) : objections.length === 0 ? (
                       <div className="text-gray-500 text-sm py-4 text-center">Nenhuma objeção cadastrada.</div>
                     ) : (
-                      <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
                         {objections.map((objection) => (
-                          <label
-                            key={objection.id}
-                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-                              hiddenMode
-                                ? 'bg-gray-100 border border-gray-200'
-                                : selectedObjections.includes(objection.id)
-                                  ? 'bg-green-50 border border-green-500'
-                                  : 'bg-white border border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
+                          <div key={objection.id} className="space-y-1">
                             <div
-                              onClick={(e) => { e.preventDefault(); toggleObjection(objection.id) }}
-                              className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all ${
+                              className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
                                 hiddenMode
-                                  ? 'bg-gray-300 border-gray-300'
+                                  ? 'bg-gray-100 border border-gray-200'
                                   : selectedObjections.includes(objection.id)
-                                    ? 'bg-green-500 border-green-500'
-                                    : 'border-gray-300'
+                                    ? 'bg-green-50 border border-green-500'
+                                    : 'bg-white border border-gray-200 hover:border-gray-300'
                               }`}
                             >
-                              {!hiddenMode && selectedObjections.includes(objection.id) && (
-                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
+                              <div
+                                onClick={(e) => { e.preventDefault(); toggleObjection(objection.id) }}
+                                className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all ${
+                                  hiddenMode
+                                    ? 'bg-gray-300 border-gray-300'
+                                    : selectedObjections.includes(objection.id)
+                                      ? 'bg-green-500 border-green-500'
+                                      : 'border-gray-300'
+                                }`}
+                              >
+                                {!hiddenMode && selectedObjections.includes(objection.id) && (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span
+                                onClick={() => toggleObjection(objection.id)}
+                                className="text-xs text-gray-700 flex-1 cursor-pointer"
+                              >
+                                {hiddenMode ? '••••••••••••' : objection.name}
+                              </span>
+                              {!hiddenMode && objection.rebuttals && objection.rebuttals.length > 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setExpandedObjectionId(expandedObjectionId === objection.id ? null : objection.id)
+                                  }}
+                                  className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                                  title="Ver formas de quebrar"
+                                >
+                                  {expandedObjectionId === objection.id ? (
+                                    <ChevronUp className="w-3 h-3 text-gray-500" />
+                                  ) : (
+                                    <ChevronDown className="w-3 h-3 text-gray-500" />
+                                  )}
+                                </button>
                               )}
                             </div>
-                            <span className="text-xs text-gray-700 truncate">
-                              {hiddenMode ? '••••••••••••' : objection.name}
-                            </span>
-                          </label>
+                            {/* Rebuttals expandidas */}
+                            {!hiddenMode && expandedObjectionId === objection.id && objection.rebuttals && objection.rebuttals.length > 0 && (
+                              <div className="ml-6 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                                <p className="text-[10px] font-medium text-blue-700 mb-1">Formas de quebrar:</p>
+                                <ul className="space-y-1">
+                                  {objection.rebuttals.map((rebuttal, idx) => (
+                                    <li key={idx} className="text-[10px] text-blue-600 flex items-start gap-1">
+                                      <span className="text-blue-400 flex-shrink-0">{idx + 1}.</span>
+                                      <span>{rebuttal}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Target, Trophy, Clock, SkipForward, ChevronRight, Star, TrendingUp, CheckCircle, XCircle, Play, Calendar, ArrowLeft } from 'lucide-react'
+import { Target, Trophy, Clock, ChevronRight, Star, TrendingUp, CheckCircle, XCircle, Play, Calendar, ArrowLeft } from 'lucide-react'
 
 interface ChallengeConfig {
   title: string
@@ -33,7 +33,7 @@ interface ChallengeConfig {
 interface Challenge {
   id: string
   challenge_date: string
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped'
+  status: 'pending' | 'in_progress' | 'completed'
   difficulty_level: number
   challenge_config: ChallengeConfig
   ai_reasoning: string
@@ -50,7 +50,6 @@ interface Challenge {
 interface Stats {
   total: number
   completed: number
-  skipped: number
   pending: number
   successRate: number
   avgImprovement: number
@@ -67,7 +66,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null)
-  const [filter, setFilter] = useState<'all' | 'completed' | 'pending' | 'skipped'>('all')
+  const [filter, setFilter] = useState<'all' | 'completed' | 'pending'>('all')
 
   useEffect(() => {
     fetchHistory()
@@ -108,13 +107,6 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
             Concluído
           </span>
         )
-      case 'skipped':
-        return (
-          <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs font-medium rounded-full flex items-center gap-1">
-            <SkipForward className="w-3 h-3" />
-            Pulado
-          </span>
-        )
       case 'in_progress':
         return (
           <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full flex items-center gap-1">
@@ -143,6 +135,22 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
         ))}
       </div>
     )
+  }
+
+  const getTargetWeaknessLabel = (target: string) => {
+    const labels: Record<string, string> = {
+      'advanced_skill': 'Avançado',
+      'spin_s': 'SPIN S',
+      'spin_p': 'SPIN P',
+      'spin_i': 'SPIN I',
+      'spin_n': 'SPIN N',
+      'objection_handling': 'Objeções',
+      'closing': 'Fechamento',
+      'rapport': 'Rapport',
+      'discovery': 'Discovery',
+      'negotiation': 'Negociação'
+    }
+    return labels[target] || target.replace('spin_', 'SPIN ').replace(/_/g, ' ')
   }
 
   const filteredChallenges = challenges.filter(c => {
@@ -213,7 +221,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
               <div className="flex items-center gap-2">
                 <span className="text-gray-500">Foco:</span>
                 <span className="text-purple-600 font-medium">
-                  {config.target_weakness.replace('spin_', 'SPIN ').replace('_', ' ').toUpperCase()}
+                  {getTargetWeaknessLabel(config.target_weakness)}
                 </span>
               </div>
             </div>
@@ -471,8 +479,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
           {[
             { key: 'all', label: 'Todos' },
             { key: 'completed', label: 'Concluídos' },
-            { key: 'pending', label: 'Pendentes' },
-            { key: 'skipped', label: 'Pulados' }
+            { key: 'pending', label: 'Pendentes' }
           ].map((tab) => (
             <button
               key={tab.key}
@@ -515,10 +522,6 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
                             <Target className="w-6 h-6 text-orange-600" />
                           </div>
                         )
-                      ) : challenge.status === 'skipped' ? (
-                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                          <SkipForward className="w-6 h-6 text-gray-400" />
-                        </div>
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
                           <Target className="w-6 h-6 text-purple-600" />
@@ -536,7 +539,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span>{formatDate(challenge.challenge_date)}</span>
                         <span className="text-purple-600 font-medium">
-                          {challenge.challenge_config.target_weakness.replace('spin_', '').toUpperCase()}
+                          {getTargetWeaknessLabel(challenge.challenge_config.target_weakness)}
                         </span>
                         {getDifficultyStars(challenge.difficulty_level)}
                       </div>

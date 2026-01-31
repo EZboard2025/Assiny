@@ -422,6 +422,7 @@ function ConfigurationInterface({
     extraCredits: number
     resetDate: string | null
     challengesEnabled: boolean
+    websiteUrl: string | null
     breakdown: UsageBreakdown
   }
   const [usageData, setUsageData] = useState<UsageData | null>(null)
@@ -1244,7 +1245,7 @@ function ConfigurationInterface({
       // Buscar dados de créditos da empresa
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
-        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits, daily_challenges_enabled')
+        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits, daily_challenges_enabled, website_url')
         .eq('id', userCompanyId)
         .single()
 
@@ -1341,6 +1342,7 @@ function ConfigurationInterface({
         extraCredits: companyData.extra_monthly_credits || 0,
         resetDate: companyData.monthly_credits_reset_at,
         challengesEnabled: companyData.daily_challenges_enabled !== false,
+        websiteUrl: companyData.website_url || null,
         breakdown: {
           roleplay: roleplayCount || 0,
           publicRoleplay: publicRoleplayCount || 0,
@@ -5215,6 +5217,69 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     />
                   </button>
                 </div>
+
+                {/* Input URL do Site da Empresa */}
+                {usageData?.challengesEnabled !== false && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Link2 className="w-4 h-4 text-gray-500" />
+                      <label className="text-sm font-medium text-gray-700">
+                        URL do Site da Empresa
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      A IA usará o site para gerar personas e objeções mais realistas nos desafios avançados (4+ estrelas).
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={usageData?.websiteUrl || ''}
+                        onChange={(e) => {
+                          if (usageData) {
+                            setUsageData({ ...usageData, websiteUrl: e.target.value })
+                          }
+                        }}
+                        placeholder="https://www.suaempresa.com.br"
+                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!userCompanyId || !usageData?.websiteUrl) return
+                          try {
+                            // Normalize URL - add https:// if missing
+                            let normalizedUrl = usageData.websiteUrl.trim()
+                            if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+                              normalizedUrl = `https://${normalizedUrl}`
+                            }
+
+                            const { supabase } = await import('@/lib/supabase')
+                            await supabase
+                              .from('companies')
+                              .update({ website_url: normalizedUrl })
+                              .eq('id', userCompanyId)
+
+                            // Update local state with normalized URL
+                            setUsageData({ ...usageData, websiteUrl: normalizedUrl })
+                            showToast('success', 'URL salva', 'O site da empresa foi salvo com sucesso.')
+                          } catch (error) {
+                            console.error('Erro ao salvar URL:', error)
+                            showToast('error', 'Erro', 'Não foi possível salvar a URL.')
+                          }
+                        }}
+                        disabled={!usageData?.websiteUrl}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                    {usageData?.websiteUrl && (
+                      <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        URL configurada - será usada nos desafios avançados
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

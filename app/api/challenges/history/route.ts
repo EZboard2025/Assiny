@@ -73,7 +73,6 @@ export async function GET(req: NextRequest) {
     const stats = {
       total: challenges?.length || 0,
       completed: challenges?.filter(c => c.status === 'completed').length || 0,
-      skipped: challenges?.filter(c => c.status === 'skipped').length || 0,
       pending: challenges?.filter(c => c.status === 'pending' || c.status === 'in_progress').length || 0,
       successRate: 0,
       avgImprovement: 0
