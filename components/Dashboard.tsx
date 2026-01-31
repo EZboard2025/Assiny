@@ -485,6 +485,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               subtitle="Treinamento ativo"
               description="Simule conversas reais de vendas com feedback SPIN."
               onClick={() => handleViewChange('roleplay')}
+              secondaryAction={{
+                label: 'Histórico Desafios',
+                onClick: () => handleViewChange('challenge-history'),
+                icon: History
+              }}
             />
 
             <FeatureCard
