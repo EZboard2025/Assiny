@@ -1632,19 +1632,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </p>
             </div>
 
-            {/* Contador de Créditos à direita */}
-            {planUsage && (
-              <div className={`flex items-center gap-2 ${
-                planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                  ? 'text-red-500'
-                  : 'text-green-500'
-              }`}>
-                <Zap className="w-6 h-6" />
-                <span className="text-2xl font-bold">
-                  {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Challenge Banner - quando inciando de um desafio (colapsável) */}
