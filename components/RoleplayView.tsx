@@ -5,6 +5,8 @@ import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, M
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
+import { generateAvatarWithAI, generateAvatarUrl, preloadImage } from '@/lib/utils/generateAvatar'
+import { updatePersona } from '@/lib/config'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanLimitWarning } from '@/components/PlanLimitWarning'
 
@@ -65,6 +67,13 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
   const [selectedObjective, setSelectedObjective] = useState('')
   const [hiddenMode, setHiddenMode] = useState(false) // Modo oculto - esconde seleções
+
+  // Estados para avatar da persona
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
+
+  // Estado para modal de aviso ao encerrar
+  const [showEndSessionWarning, setShowEndSessionWarning] = useState(false)
 
   // Dados do banco
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
@@ -211,6 +220,54 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       videoRef.current.srcObject = webcamStream
     }
   }, [isCameraOn, webcamStream])
+
+  // Efeito para gerar avatar APENAS quando a simulação iniciar
+  useEffect(() => {
+    // Só gera quando a simulação começa
+    if (!isSimulating || !selectedPersona || hiddenMode) {
+      return
+    }
+
+    const persona = personas.find(p => p.id === selectedPersona)
+    if (!persona) return
+
+    // Já tem avatar? Não regenera
+    if (avatarUrl) return
+
+    // Gera novo avatar usando DALL-E 3
+    const generateAvatar = async () => {
+      setIsLoadingAvatar(true)
+
+      try {
+        // Tenta gerar com DALL-E 3
+        const aiUrl = await generateAvatarWithAI(persona, age, temperament)
+
+        if (aiUrl) {
+          setAvatarUrl(aiUrl)
+        } else {
+          // Fallback para Pravatar se DALL-E falhar
+          console.warn('DALL-E falhou, usando fallback Pravatar')
+          const fallbackUrl = generateAvatarUrl(persona, age, temperament)
+          await preloadImage(fallbackUrl)
+          setAvatarUrl(fallbackUrl)
+        }
+      } catch (error) {
+        console.error('Erro ao gerar avatar:', error)
+        setAvatarUrl(null)
+      } finally {
+        setIsLoadingAvatar(false)
+      }
+    }
+
+    generateAvatar()
+  }, [isSimulating]) // Só dispara quando simulação inicia
+
+  // Limpa avatar quando sair da simulação
+  useEffect(() => {
+    if (!isSimulating) {
+      setAvatarUrl(null)
+    }
+  }, [isSimulating])
 
   // Helper functions for evaluation modal (matching HistoricoView design)
   const getScoreColor = (score: number) => {
@@ -833,6 +890,82 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     }
   }
 
+  // Função para encerrar sessão SEM avaliação (quando usuário encerra manualmente)
+  const handleEndSessionWithoutEvaluation = async () => {
+    console.log('🛑 Encerrando simulação SEM avaliação (encerramento manual)...')
+
+    // Parar webcam
+    stopWebcam()
+
+    // Parar gravação se estiver ativa
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+        }
+        mediaRecorderRef.current = null;
+      } catch (e) {
+        console.log('Erro ao parar gravação:', e);
+      }
+    }
+
+    // Limpar timer
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
+    // Fechar stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    // Parar áudio se estiver tocando
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // Limpar visualizador de áudio
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      await audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    setIsPlayingAudio(false);
+    setAudioVolume(0);
+
+    // Resetar estados
+    setIsSimulating(false);
+    setIsRecording(false);
+    setClientName('Cliente');
+    setRoleplayConfig(null);
+    sessionStorage.removeItem('roleplayClientName');
+    sessionStorage.removeItem('roleplayConfig');
+    setIsProcessingTranscription(false);
+    setCurrentTranscription('');
+    setLastUserMessage('');
+    setShowFinalizingMessage(false);
+
+    // Marcar sessão como cancelada (sem avaliação)
+    if (sessionId) {
+      try {
+        await endRoleplaySession(sessionId, 'cancelled');
+        console.log('📝 Sessão marcada como cancelada (sem avaliação)');
+      } catch (error) {
+        console.error('Erro ao marcar sessão como cancelada:', error);
+      }
+    }
+
+    // NÃO inicia avaliação - sessão encerrada manualmente
+    console.log('⚠️ Avaliação pulada - encerramento manual pelo usuário');
+  }
 
   const handleSendMessage = async (messageToSend?: string) => {
     console.log('🔍 handleSendMessage chamada com:', messageToSend)
@@ -1421,20 +1554,31 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           <div className="flex-1 flex overflow-hidden">
             {/* Área dos vídeos */}
             <div className={`flex-1 flex items-center justify-center gap-4 p-6 transition-all ${showChatSidebar ? 'pr-0' : ''}`}>
-              {/* Ícone do Cliente Virtual */}
+              {/* Avatar do Cliente Virtual (gerado por IA) */}
               <div className="flex-1 max-w-[600px] aspect-video bg-gray-800 rounded-xl flex items-center justify-center relative overflow-hidden">
-                <img
-                  src="/icone-call.png"
-                  alt="Cliente Virtual"
-                  className="w-full h-full object-cover"
-                />
+                {isLoadingAvatar ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-700">
+                    <Loader2 className="w-16 h-16 text-green-400 animate-spin mb-4" />
+                    <span className="text-gray-300 text-sm font-medium">Gerando avatar com IA...</span>
+                    <span className="text-gray-500 text-xs mt-1">Aguarde ~10 segundos</span>
+                  </div>
+                ) : (
+                  <img
+                    src={avatarUrl || '/icone-call.png'}
+                    alt="Cliente Virtual"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = '/icone-call.png'
+                    }}
+                  />
+                )}
                 {isPlayingAudio && (
                   <div className="absolute bottom-4 left-4 flex items-center gap-2 text-green-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
                     <Volume2 size={16} className="animate-pulse" />
                     <span>Falando...</span>
                   </div>
                 )}
-                {isLoading && !isPlayingAudio && (
+                {isLoading && !isPlayingAudio && !isLoadingAvatar && (
                   <div className="absolute bottom-4 left-4 flex items-center gap-2 text-gray-400 text-sm bg-black/50 px-3 py-1.5 rounded-full">
                     <Loader2 size={16} className="animate-spin" />
                     <span>Processando...</span>
@@ -1528,13 +1672,65 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
             {/* Botão Encerrar */}
             <button
-              onClick={handleEndSession}
+              onClick={() => setShowEndSessionWarning(true)}
               className="p-4 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
               title="Encerrar chamada"
             >
               <PhoneOff size={24} />
             </button>
           </div>
+
+          {/* Modal de Aviso ao Encerrar */}
+          {showEndSessionWarning && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+              <div className="bg-gray-800 rounded-2xl p-6 max-w-md mx-4 border border-red-500/50 shadow-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-red-500/20 rounded-full">
+                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">Encerrar Roleplay?</h3>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                    <p className="text-red-400 text-sm font-medium mb-2">
+                      ⚠️ Atenção: Você NÃO receberá avaliação!
+                    </p>
+                    <p className="text-gray-300 text-sm">
+                      Ao encerrar manualmente, a sessão será cancelada e você não receberá feedback sobre sua performance.
+                    </p>
+                  </div>
+
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                    <p className="text-green-400 text-sm font-medium mb-2">
+                      ✓ Para receber avaliação:
+                    </p>
+                    <p className="text-gray-300 text-sm">
+                      Continue o roleplay até concluir uma <strong>call to action</strong> (agendamento, venda, próximo passo). A sessão finalizará automaticamente e você receberá sua avaliação completa.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowEndSessionWarning(false)}
+                    className="flex-1 py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors"
+                  >
+                    Continuar Roleplay
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEndSessionWarning(false)
+                      handleEndSessionWithoutEvaluation()
+                    }}
+                    className="flex-1 py-3 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded-xl font-medium transition-colors"
+                  >
+                    Encerrar sem Avaliação
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       )}
@@ -1640,27 +1836,48 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <div className="flex flex-col">
                   {/* Botões Aleatório e Oculto */}
                   <div className="flex gap-2 mb-4">
-                    <button
-                      onClick={handleRandomSelection}
-                      disabled={dataLoading || personas.length === 0 || objections.length === 0 || objectives.length === 0}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all hover:scale-105 shadow-sm"
-                      title="Selecionar configuração aleatória"
-                    >
-                      <Shuffle className="w-4 h-4" />
-                      Aleatório
-                    </button>
-                    <button
-                      onClick={() => setHiddenMode(!hiddenMode)}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all hover:scale-105 shadow-sm ${
-                        hiddenMode
-                          ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                      }`}
-                      title={hiddenMode ? 'Mostrar seleções' : 'Ocultar seleções'}
-                    >
-                      {hiddenMode ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                      {hiddenMode ? 'Mostrar' : 'Ocultar'}
-                    </button>
+                    {/* Botão Aleatório com Tooltip */}
+                    <div className="relative group">
+                      <button
+                        onClick={handleRandomSelection}
+                        disabled={dataLoading || personas.length === 0 || objections.length === 0 || objectives.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all hover:scale-105 shadow-sm"
+                      >
+                        <Shuffle className="w-4 h-4" />
+                        Aleatório
+                      </button>
+                      <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-white/70 backdrop-blur-md border border-gray-200 text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <p className="font-semibold text-green-600 mb-1">Modo Aleatório</p>
+                        <p className="text-gray-800 leading-relaxed">
+                          Seleciona automaticamente uma persona, objeções e objetivo de forma aleatória para treinar situações variadas e inesperadas.
+                        </p>
+                        <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white/70 border-l border-t border-gray-200 rotate-45"></div>
+                      </div>
+                    </div>
+
+                    {/* Botão Ocultar com Tooltip */}
+                    <div className="relative group">
+                      <button
+                        onClick={() => setHiddenMode(!hiddenMode)}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all hover:scale-105 shadow-sm ${
+                          hiddenMode
+                            ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                        }`}
+                      >
+                        {hiddenMode ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        {hiddenMode ? 'Mostrar' : 'Ocultar'}
+                      </button>
+                      <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-white/70 backdrop-blur-md border border-gray-200 text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <p className="font-semibold text-green-600 mb-1">Modo Oculto</p>
+                        <p className="text-gray-800 leading-relaxed">
+                          {hiddenMode
+                            ? 'Clique para revelar as seleções de persona, objeções e objetivo durante a simulação.'
+                            : 'Esconde as seleções durante o roleplay para simular uma ligação real onde você não sabe quem está do outro lado.'}
+                        </p>
+                        <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white/70 border-l border-t border-gray-200 rotate-45"></div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-col items-center justify-center flex-1">
