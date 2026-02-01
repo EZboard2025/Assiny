@@ -25,14 +25,13 @@ export async function POST(request: NextRequest) {
       ? (body.job_title || body.cargo || 'business professional')
       : (body.profession || body.profissao || 'professional')
 
-    // Monta prompt para webcam view (sem UI elements)
-    const prompt = `Webcam photograph of a ${body.age} year old brazilian man who works as ${role}.
-Person centered in frame, head and upper body visible, looking directly at camera with friendly expression.
-Wearing navy blue business suit, white shirt, dark tie.
-Home office background with bookshelf or neutral blurred background, natural indoor lighting from window.
-Real photograph captured by webcam, natural skin texture, authentic appearance.
-NO icons, NO buttons, NO UI elements, NO text overlays, NO video call interface - just the person.
-Clean image, 16:9 aspect ratio, photorealistic.`
+    // Monta prompt para retrato profissional simples (sem UI)
+    const prompt = `Professional portrait photograph of a ${body.age} year old brazilian man who works as ${role}.
+Head and shoulders portrait, person looking directly at viewer with confident friendly expression.
+Wearing professional business attire, navy suit with white shirt.
+Simple home office background, slightly blurred, soft natural lighting.
+High quality portrait photo, natural skin texture, photorealistic.
+Just the person against the background, nothing else in the image.`
 
     console.log('Generating avatar with prompt:', prompt)
 

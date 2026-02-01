@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Target, Trophy, Star, TrendingUp, Calendar, CheckCircle, XCircle, ChevronDown, Play, Lightbulb, AlertTriangle } from 'lucide-react'
+import { Target, Trophy, TrendingUp, Calendar, CheckCircle, XCircle, ChevronDown, Play, Lightbulb, AlertTriangle, Bot, Clock } from 'lucide-react'
 
 interface ChallengeConfig {
   title: string
@@ -117,52 +117,41 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
   const getStatusBadge = (challenge: Challenge) => {
     if (challenge.status === 'completed') {
       return challenge.success ? (
-        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
-          <CheckCircle className="w-3 h-3" />
+        <span className="px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-lg border border-green-100 flex items-center gap-1.5">
+          <CheckCircle className="w-3.5 h-3.5" />
           Sucesso
         </span>
       ) : (
-        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full flex items-center gap-1">
-          <XCircle className="w-3 h-3" />
+        <span className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-lg border border-gray-200 flex items-center gap-1.5">
+          <XCircle className="w-3.5 h-3.5" />
           Não atingiu
         </span>
       )
     }
-    // Pending or in_progress - show as "Não feito"
     return (
-      <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full flex items-center gap-1">
-        <Play className="w-3 h-3" />
-        Não feito
+      <span className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-lg border border-gray-200 flex items-center gap-1.5">
+        <Clock className="w-3.5 h-3.5" />
+        Pendente
       </span>
     )
   }
 
-  const getDifficultyStars = (level: number) => {
+  // Barras de dificuldade ao invés de estrelas
+  const getDifficultyBars = (level: number) => {
     return (
       <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((i) => (
-          <Star
+          <div
             key={i}
-            className={`w-3 h-3 ${i <= level ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
+            className={`w-2 h-3 rounded-sm ${
+              i <= level ? 'bg-green-500' : 'bg-gray-200'
+            }`}
           />
         ))}
       </div>
     )
   }
 
-  const getTargetWeaknessLabel = (target: string) => {
-    const labels: Record<string, string> = {
-      'advanced_skill': 'Avançado',
-      'spin_s': 'Situação (S)',
-      'spin_p': 'Problema (P)',
-      'spin_i': 'Implicação (I)',
-      'spin_n': 'Necessidade (N)',
-      'objection_handling': 'Objeções',
-    }
-    return labels[target] || target.replace('spin_', '').toUpperCase()
-  }
-
-  // Extract just the SPIN letter (S, P, I, or N) from various formats
   const extractSpinLetter = (input: string): string => {
     if (!input) return ''
     const upper = input.toUpperCase()
@@ -186,7 +175,6 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
     return labels[extracted] || letter
   }
 
-  // Clean up text containing SPIN_X patterns
   const cleanSpinText = (text: string): string => {
     if (!text) return ''
     return text
@@ -198,28 +186,19 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600'
-    if (score >= 6) return 'text-yellow-600'
-    if (score >= 4) return 'text-orange-600'
-    return 'text-red-600'
-  }
-
-  const getScoreBg = (score: number) => {
-    if (score >= 8) return 'bg-green-50'
-    if (score >= 6) return 'bg-blue-50'
-    if (score >= 4) return 'bg-yellow-50'
-    return 'bg-red-50'
+    if (score >= 7) return 'text-green-600'
+    if (score >= 5) return 'text-yellow-600'
+    return 'text-gray-500'
   }
 
   const canDoChallenge = (challenge: Challenge) => {
-    // Permitir fazer qualquer desafio que ainda não foi concluído
     return challenge.status === 'pending' || challenge.status === 'in_progress'
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-10 h-10 border-4 border-purple-100 border-t-purple-500 rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-gray-100 border-t-green-500 rounded-full animate-spin"></div>
       </div>
     )
   }
@@ -227,8 +206,8 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
   if (challenges.length === 0) {
     return (
       <div className="text-center py-20">
-        <div className="w-20 h-20 bg-purple-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-          <Target className="w-10 h-10 text-purple-400" />
+        <div className="w-16 h-16 bg-gray-50 rounded-xl mx-auto mb-4 flex items-center justify-center border border-gray-200">
+          <Target className="w-8 h-8 text-gray-400" />
         </div>
         <p className="text-gray-900 font-semibold text-lg mb-2">Nenhum desafio encontrado</p>
         <p className="text-gray-500 text-sm">Seus desafios diários aparecerão aqui</p>
@@ -242,21 +221,21 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
       <div className="lg:col-span-4 xl:col-span-3">
         {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className="bg-white rounded-xl p-3 border border-gray-200">
-              <p className="text-xs text-gray-500">Concluídos</p>
-              <p className="text-xl font-bold text-green-600">{stats.completed}</p>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-white rounded-xl p-4 border border-gray-200">
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Concluídos</p>
+              <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
             </div>
-            <div className="bg-white rounded-xl p-3 border border-gray-200">
-              <p className="text-xs text-gray-500">Taxa Sucesso</p>
-              <p className="text-xl font-bold text-purple-600">{stats.successRate.toFixed(0)}%</p>
+            <div className="bg-white rounded-xl p-4 border border-gray-200">
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Taxa Sucesso</p>
+              <p className="text-2xl font-bold text-green-600">{stats.successRate.toFixed(0)}%</p>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
               {challenges.length} Desafios
             </h2>
           </div>
@@ -269,43 +248,33 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   onClick={() => setSelectedChallenge(challenge)}
                   className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
                     selectedChallenge?.id === challenge.id
-                      ? 'bg-purple-50 border-l-4 border-l-purple-500'
+                      ? 'bg-green-50 border-l-4 border-l-green-500'
                       : 'hover:bg-gray-50 border-l-4 border-l-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Icon/Score */}
+                    {/* Score ou Play */}
                     {challenge.status === 'completed' && challenge.result_score != null ? (
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${getScoreBg(challenge.result_score)}`}>
+                      <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center flex-shrink-0">
                         <span className={`text-lg font-bold ${getScoreColor(challenge.result_score)}`}>
                           {challenge.result_score.toFixed(1)}
                         </span>
                       </div>
                     ) : (
-                      <div className="relative w-12 h-12 flex-shrink-0 group/icon">
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-400 rounded-xl opacity-60 group-hover/icon:opacity-100 animate-pulse"></div>
-                        <div className="relative w-full h-full rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                          <Play className="w-5 h-5 text-white" />
-                        </div>
+                      <div className="w-12 h-12 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center flex-shrink-0">
+                        <Play className="w-5 h-5 text-green-600" />
                       </div>
                     )}
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium text-gray-900 truncate">
-                          {cleanSpinText(config.title)}
-                        </span>
-                        {challenge.status !== 'completed' && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-md uppercase tracking-wide">
-                            Fazer
-                          </span>
-                        )}
+                      <div className="text-sm font-medium text-gray-900 truncate mb-1">
+                        {cleanSpinText(config.title)}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span>{formatDate(challenge.challenge_date)}</span>
                         <span className="text-gray-300">|</span>
-                        {getDifficultyStars(challenge.difficulty_level)}
+                        {getDifficultyBars(challenge.difficulty_level)}
                       </div>
                     </div>
                   </div>
@@ -319,29 +288,33 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
       {/* Detalhes do desafio */}
       <div className="lg:col-span-8 xl:col-span-9">
         {!selectedChallenge ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
-            <div className="w-16 h-16 bg-purple-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-              <Target className="w-8 h-8 text-purple-400" />
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <div className="w-14 h-14 bg-gray-50 rounded-xl mx-auto mb-4 flex items-center justify-center border border-gray-200">
+              <Target className="w-7 h-7 text-gray-400" />
             </div>
             <p className="text-gray-500">Selecione um desafio para ver os detalhes</p>
           </div>
         ) : (
           <div className="space-y-4">
             {/* Header */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">🎯</span>
-                    <h2 className="text-xl font-bold text-gray-900">{cleanSpinText(selectedChallenge.challenge_config.title)}</h2>
+                    <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                      <Target className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="text-lg font-bold text-gray-900">{cleanSpinText(selectedChallenge.challenge_config.title)}</h2>
+                    </div>
                     {getStatusBadge(selectedChallenge)}
                   </div>
-                  <p className="text-gray-600 text-sm">{cleanSpinText(selectedChallenge.challenge_config.description)}</p>
+                  <p className="text-gray-600 text-sm ml-[52px]">{cleanSpinText(selectedChallenge.challenge_config.description)}</p>
                 </div>
                 {canDoChallenge(selectedChallenge) && onStartChallenge && (
                   <button
                     onClick={() => onStartChallenge(selectedChallenge)}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium rounded-lg hover:from-purple-500 hover:to-pink-500 transition-all flex items-center gap-1"
+                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1.5 ml-4"
                   >
                     <Play className="w-4 h-4" />
                     Fazer
@@ -350,10 +323,10 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
               </div>
 
               {/* Meta e Info */}
-              <div className="flex flex-wrap gap-3 text-sm">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
-                  <Target className="w-4 h-4 text-amber-600" />
-                  <span className="text-amber-800 font-medium">
+              <div className="flex flex-wrap gap-3 text-sm ml-[52px]">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-100 rounded-lg">
+                  <Target className="w-4 h-4 text-green-600" />
+                  <span className="text-green-700 font-medium">
                     Meta: {selectedChallenge.challenge_config.success_criteria.spin_min_score}+ em {getSpinLetterLabel(selectedChallenge.challenge_config.success_criteria.spin_letter_target)}
                   </span>
                 </div>
@@ -362,16 +335,16 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   <span className="text-gray-600">{formatDate(selectedChallenge.challenge_date)}</span>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg">
-                  {getDifficultyStars(selectedChallenge.difficulty_level)}
+                  {getDifficultyBars(selectedChallenge.difficulty_level)}
                 </div>
               </div>
             </div>
 
             {/* Resultado (se completo) */}
             {selectedChallenge.status === 'completed' && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-yellow-500" />
+                  <Trophy className="w-4 h-4 text-green-600" />
                   Resultado do Desafio
                 </h3>
 
@@ -379,10 +352,10 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   {/* Score */}
                   <div className={`rounded-xl p-4 border ${
                     (selectedChallenge.result_score || 0) >= selectedChallenge.challenge_config.success_criteria.spin_min_score
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-red-50 border-red-200'
+                      ? 'bg-green-50 border-green-100'
+                      : 'bg-gray-50 border-gray-200'
                   }`}>
-                    <p className="text-xs text-gray-600 mb-1">Score Final</p>
+                    <p className="text-xs text-gray-600 mb-1 uppercase tracking-wider font-medium">Score Final</p>
                     <p className={`text-3xl font-bold ${getScoreColor(selectedChallenge.result_score || 0)}`}>
                       {selectedChallenge.result_score?.toFixed(1) || 'N/A'}
                     </p>
@@ -394,10 +367,10 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   {/* Status */}
                   <div className={`rounded-xl p-4 border ${
                     selectedChallenge.success
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-orange-50 border-orange-200'
+                      ? 'bg-green-50 border-green-100'
+                      : 'bg-gray-50 border-gray-200'
                   }`}>
-                    <p className="text-xs text-gray-600 mb-1">Status</p>
+                    <p className="text-xs text-gray-600 mb-1 uppercase tracking-wider font-medium">Status</p>
                     <div className="flex items-center gap-2">
                       {selectedChallenge.success ? (
                         <>
@@ -406,16 +379,16 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                         </>
                       ) : (
                         <>
-                          <XCircle className="w-6 h-6 text-orange-500" />
-                          <span className="text-lg font-bold text-orange-600">Não atingiu</span>
+                          <XCircle className="w-6 h-6 text-gray-400" />
+                          <span className="text-lg font-bold text-gray-600">Não atingiu</span>
                         </>
                       )}
                     </div>
                   </div>
 
                   {/* Melhoria */}
-                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                    <p className="text-xs text-gray-600 mb-1">Melhoria</p>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <p className="text-xs text-gray-600 mb-1 uppercase tracking-wider font-medium">Melhoria</p>
                     <div className="flex items-center gap-2">
                       {selectedChallenge.improvement_from_baseline != null ? (
                         <>
@@ -432,9 +405,9 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                         </>
                       ) : (
                         <>
-                          <Star className="w-6 h-6 text-blue-500" />
+                          <Target className="w-6 h-6 text-gray-400" />
                           <div>
-                            <span className="text-lg font-bold text-blue-600">Referência</span>
+                            <span className="text-lg font-bold text-gray-600">Referência</span>
                             <p className="text-xs text-gray-500">Primeira medição</p>
                           </div>
                         </>
@@ -456,11 +429,11 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                             key={letter}
                             className={`rounded-xl p-3 text-center ${
                               isTarget
-                                ? 'bg-purple-100 border-2 border-purple-300'
+                                ? 'bg-green-50 border-2 border-green-200'
                                 : 'bg-gray-50 border border-gray-200'
                             }`}
                           >
-                            <p className={`text-xs font-medium mb-1 ${isTarget ? 'text-purple-600' : 'text-gray-500'}`}>
+                            <p className={`text-xs font-medium mb-1 ${isTarget ? 'text-green-600' : 'text-gray-500'}`}>
                               {getSpinLetterLabel(letter)}
                               {isTarget && ' (Meta)'}
                             </p>
@@ -488,14 +461,14 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                 {(selectedChallenge.evaluation?.top_strengths?.length > 0 || selectedChallenge.evaluation?.critical_gaps?.length > 0) && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     {selectedChallenge.evaluation?.top_strengths?.length > 0 && (
-                      <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                      <div className="bg-green-50/50 rounded-xl p-4 border border-green-100">
                         <div className="flex items-center gap-2 mb-3">
                           <CheckCircle className="w-4 h-4 text-green-600" />
-                          <h4 className="text-sm font-semibold text-green-700">Pontos Fortes</h4>
+                          <h4 className="text-sm font-semibold text-gray-900">Pontos Fortes</h4>
                         </div>
                         <ul className="space-y-1.5">
                           {selectedChallenge.evaluation.top_strengths.slice(0, 3).map((strength: string, i: number) => (
-                            <li key={i} className="text-sm text-green-800 flex items-start gap-2">
+                            <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
                               <span className="text-green-500 mt-1">•</span>
                               {strength}
                             </li>
@@ -505,15 +478,15 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                     )}
 
                     {selectedChallenge.evaluation?.critical_gaps?.length > 0 && (
-                      <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                      <div className="bg-orange-50/50 rounded-xl p-4 border border-orange-100">
                         <div className="flex items-center gap-2 mb-3">
-                          <AlertTriangle className="w-4 h-4 text-red-600" />
-                          <h4 className="text-sm font-semibold text-red-700">A Melhorar</h4>
+                          <AlertTriangle className="w-4 h-4 text-orange-500" />
+                          <h4 className="text-sm font-semibold text-gray-900">A Melhorar</h4>
                         </div>
                         <ul className="space-y-1.5">
                           {selectedChallenge.evaluation.critical_gaps.slice(0, 3).map((gap: string, i: number) => (
-                            <li key={i} className="text-sm text-red-800 flex items-start gap-2">
-                              <span className="text-red-500 mt-1">•</span>
+                            <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                              <span className="text-orange-500 mt-1">•</span>
                               {gap}
                             </li>
                           ))}
@@ -527,10 +500,10 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
 
             {/* Dicas de Coaching */}
             {selectedChallenge.challenge_config.coaching_tips?.length > 0 && (
-              <details className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
+              <details className="bg-white rounded-xl border border-gray-200 overflow-hidden group">
                 <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-2">
-                    <Lightbulb className="w-5 h-5 text-amber-500" />
+                    <Lightbulb className="w-5 h-5 text-green-600" />
                     <span className="font-semibold text-gray-900">Dicas de Coaching</span>
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
@@ -539,7 +512,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   <ul className="space-y-2 pt-3">
                     {selectedChallenge.challenge_config.coaching_tips.map((tip, i) => (
                       <li key={i} className="flex items-start gap-3 text-sm text-gray-700">
-                        <span className="w-6 h-6 bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        <span className="w-6 h-6 bg-green-50 text-green-700 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 border border-green-100">
                           {i + 1}
                         </span>
                         <span className="pt-0.5">{cleanSpinText(tip)}</span>
@@ -552,10 +525,10 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
 
             {/* Raciocínio da IA */}
             {selectedChallenge.ai_reasoning && (
-              <details className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
+              <details className="bg-white rounded-xl border border-gray-200 overflow-hidden group">
                 <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🤖</span>
+                    <Bot className="w-5 h-5 text-gray-500" />
                     <span className="font-semibold text-gray-900">Por que este desafio?</span>
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
@@ -570,7 +543,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
 
             {/* CTA para desafios pendentes */}
             {canDoChallenge(selectedChallenge) && onStartChallenge && (
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 p-6">
+              <div className="bg-green-50 rounded-xl border border-green-100 p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Pronto para o desafio?</h3>
@@ -582,7 +555,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   </div>
                   <button
                     onClick={() => onStartChallenge(selectedChallenge)}
-                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:from-purple-500 hover:to-pink-500 transition-all shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 flex items-center gap-2"
+                    className="px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors shadow-lg flex items-center gap-2"
                   >
                     <Play className="w-5 h-5" />
                     Fazer Desafio

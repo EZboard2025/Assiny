@@ -446,25 +446,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
           </div>
 
-          {/* Daily Challenge Banner */}
-          {userId && companyId && (
-            <div className={`mb-8 ${mounted ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: '100ms' }}>
-              <DailyChallengeBanner
-                userId={userId}
-                companyId={companyId}
-                onStartChallenge={handleStartChallenge}
-                onViewHistory={() => {
-                  setCurrentView('historico')
-                  // Set the history type to challenges after a small delay to ensure component mounts
-                  setTimeout(() => {
-                    const event = new CustomEvent('setHistoryType', { detail: 'desafios' })
-                    window.dispatchEvent(event)
-                  }, 100)
-                }}
-              />
-            </div>
-          )}
-
           {/* Section Headers */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-4">
             <div className="col-span-2">
@@ -619,6 +600,20 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           onViewProfile={() => handleViewChange('perfil')}
           onViewHistory={() => handleViewChange('historico')}
           loading={performanceLoading}
+          challengeComponent={userId && companyId ? (
+            <DailyChallengeBanner
+              userId={userId}
+              companyId={companyId}
+              onStartChallenge={handleStartChallenge}
+              onViewHistory={() => {
+                setCurrentView('historico')
+                setTimeout(() => {
+                  const event = new CustomEvent('setHistoryType', { detail: 'desafios' })
+                  window.dispatchEvent(event)
+                }, 100)
+              }}
+            />
+          ) : undefined}
         />
       )}
 

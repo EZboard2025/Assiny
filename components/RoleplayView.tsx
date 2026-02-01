@@ -2147,7 +2147,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all shadow-sm ${
                           isChallengeLocked
                             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                            : 'bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white hover:scale-105'
+                            : 'bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white hover:scale-105'
                         }`}
                         title={isChallengeLocked ? 'Configuração definida pelo desafio' : 'Selecionar configuração aleatória'}
                       >

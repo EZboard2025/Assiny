@@ -1,6 +1,6 @@
 'use client'
 
-import { LucideIcon, ChevronRight, Lock, History } from 'lucide-react'
+import { LucideIcon, Lock, History } from 'lucide-react'
 
 interface SecondaryAction {
   label: string
@@ -35,13 +35,22 @@ export default function FeatureCard({
 }: FeatureCardProps) {
   const SecondaryIcon = secondaryAction?.icon || History
 
+  const handleCardClick = () => {
+    if (!disabled && !locked) {
+      onClick()
+    }
+  }
+
   return (
     <div className="text-left w-full">
-      <div className={`relative bg-white rounded-xl p-5 border border-gray-200 h-full transition-all duration-200 ${
-        disabled || locked
-          ? 'opacity-60'
-          : ''
-      }`}>
+      <div
+        onClick={handleCardClick}
+        className={`relative bg-white rounded-xl p-5 border border-gray-200 h-full transition-all duration-200 ${
+          disabled || locked
+            ? 'opacity-60 cursor-not-allowed'
+            : 'cursor-pointer hover:border-green-300 hover:shadow-md'
+        }`}
+      >
         {/* Locked overlay */}
         {locked && (
           <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center z-10">
@@ -83,38 +92,21 @@ export default function FeatureCard({
           {description}
         </p>
 
-        {/* Actions */}
-        <div className="mt-4 flex items-center justify-between gap-2">
-          {/* Main CTA */}
-          <button
-            onClick={onClick}
-            disabled={disabled || locked}
-            className={`group flex items-center text-sm font-medium transition-colors ${
-              disabled || locked
-                ? 'text-gray-400 cursor-not-allowed'
-                : 'text-green-600 hover:text-green-700'
-            }`}
-          >
-            <span>Acessar</span>
-            <ChevronRight className={`w-4 h-4 ml-1 transition-transform ${
-              disabled || locked ? '' : 'group-hover:translate-x-1'
-            }`} />
-          </button>
-
-          {/* Secondary Action */}
-          {secondaryAction && !locked && !disabled && (
+        {/* Secondary Action */}
+        {secondaryAction && !locked && !disabled && (
+          <div className="mt-4 flex items-center justify-end">
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 secondaryAction.onClick()
               }}
-              className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 font-medium transition-colors"
+              className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium transition-colors"
             >
               <SecondaryIcon className="w-3.5 h-3.5" />
               <span>{secondaryAction.label}</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

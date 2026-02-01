@@ -1,6 +1,7 @@
 'use client'
 
-import { Flame, ChevronRight } from 'lucide-react'
+import { Flame } from 'lucide-react'
+import { ReactNode } from 'react'
 
 interface StatsPanelProps {
   overallAverage: number
@@ -10,6 +11,7 @@ interface StatsPanelProps {
   onViewProfile: () => void
   onViewHistory: () => void
   loading: boolean
+  challengeComponent?: ReactNode
 }
 
 export default function StatsPanel({
@@ -19,7 +21,8 @@ export default function StatsPanel({
   streak,
   onViewProfile,
   onViewHistory,
-  loading
+  loading,
+  challengeComponent
 }: StatsPanelProps) {
 
   // Função para determinar cor baseada no score
@@ -61,6 +64,13 @@ export default function StatsPanel({
 
   return (
     <aside className="fixed right-0 top-0 h-screen w-80 bg-white border-l border-gray-200 z-40 overflow-y-auto py-8 px-6 hidden xl:block">
+      {/* Daily Challenge */}
+      {challengeComponent && (
+        <div className="mb-6">
+          {challengeComponent}
+        </div>
+      )}
+
       {/* Streak Badge */}
       {streak > 0 && (
         <div className="flex items-center gap-2 mb-4">
