@@ -282,7 +282,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                 >
                   <div className="flex items-center gap-3">
                     {/* Icon/Score */}
-                    {challenge.status === 'completed' && challenge.result_score !== undefined ? (
+                    {challenge.status === 'completed' && challenge.result_score != null ? (
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${getScoreBg(challenge.result_score)}`}>
                         <span className={`text-lg font-bold ${getScoreColor(challenge.result_score)}`}>
                           {challenge.result_score.toFixed(1)}
@@ -424,7 +424,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                       <span className={`text-2xl font-bold ${
                         (selectedChallenge.improvement_from_baseline || 0) > 0 ? 'text-green-600' : 'text-gray-500'
                       }`}>
-                        {selectedChallenge.improvement_from_baseline !== undefined
+                        {selectedChallenge.improvement_from_baseline != null
                           ? `${selectedChallenge.improvement_from_baseline > 0 ? '+' : ''}${selectedChallenge.improvement_from_baseline.toFixed(1)}`
                           : 'N/A'}
                       </span>

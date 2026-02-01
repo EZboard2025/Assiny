@@ -49,6 +49,7 @@ interface Props {
   userId: string
   companyId: string
   onStartChallenge: (challenge: DailyChallenge) => void
+  onViewHistory?: () => void
 }
 
 interface PersonaData {
@@ -115,8 +116,9 @@ const cleanSpinText = (text: string): string => {
     .replace(/spin selling/gi, 'SPIN Selling')
 }
 
-export default function DailyChallengeBanner({ userId, companyId, onStartChallenge }: Props) {
+export default function DailyChallengeBanner({ userId, companyId, onStartChallenge, onViewHistory }: Props) {
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null)
+  const [completedChallenge, setCompletedChallenge] = useState<DailyChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [disabled, setDisabled] = useState(false)
@@ -145,6 +147,24 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
       }
 
       setChallenge(data.challenge)
+
+      // Se não há desafio pendente/em progresso, buscar o último completado de hoje
+      if (!data.challenge) {
+        const today = new Date().toISOString().split('T')[0]
+        const { data: completedData } = await supabase
+          .from('daily_challenges')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('status', 'completed')
+          .gte('challenge_date', today)
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (completedData) {
+          setCompletedChallenge(completedData as DailyChallenge)
+        }
+      }
 
       // Fetch persona and objections names if challenge exists
       if (data.challenge?.challenge_config?.roleplay_config) {
@@ -218,6 +238,56 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
     )
   }
 
+  // No pending challenge - check if there's a completed one today
+  if (!challenge && completedChallenge) {
+    return (
+      <div className="bg-white rounded-2xl border border-green-200 shadow-sm overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+        <div className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/20">
+                <Trophy className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  Desafio de Hoje Concluído!
+                  {completedChallenge.success && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      Sucesso
+                    </span>
+                  )}
+                </h3>
+                <p className="text-sm text-gray-600 mt-0.5">{cleanSpinText(completedChallenge.challenge_config.title)}</p>
+                {completedChallenge.result_score != null && (
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold bg-green-50 text-green-700">
+                      Score: {completedChallenge.result_score.toFixed(1)}
+                    </span>
+                    {completedChallenge.improvement_from_baseline != null && completedChallenge.improvement_from_baseline > 0 && (
+                      <span className="inline-flex items-center text-sm text-emerald-600 font-medium">
+                        ↑ +{completedChallenge.improvement_from_baseline.toFixed(1)} de melhoria
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            {onViewHistory && (
+              <button
+                onClick={onViewHistory}
+                className="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-medium rounded-xl transition-colors"
+              >
+                <Trophy className="w-4 h-4" />
+                Ver meus desafios
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // No challenge for today - show informative message
   if (!challenge) {
     return (
@@ -255,17 +325,19 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   Desafio Concluído!
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                    Sucesso
-                  </span>
+                  {challenge.success && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      Sucesso
+                    </span>
+                  )}
                 </h3>
                 <p className="text-sm text-gray-600 mt-0.5">{cleanSpinText(challenge.challenge_config.title)}</p>
-                {challenge.result_score !== undefined && (
+                {challenge.result_score != null && (
                   <div className="flex items-center gap-3 mt-2">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold bg-green-50 text-green-700">
                       Score: {challenge.result_score.toFixed(1)}
                     </span>
-                    {challenge.improvement_from_baseline !== undefined && challenge.improvement_from_baseline > 0 && (
+                    {challenge.improvement_from_baseline != null && challenge.improvement_from_baseline > 0 && (
                       <span className="inline-flex items-center text-sm text-emerald-600 font-medium">
                         ↑ +{challenge.improvement_from_baseline.toFixed(1)} de melhoria
                       </span>
@@ -274,6 +346,15 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
                 )}
               </div>
             </div>
+            {onViewHistory && (
+              <button
+                onClick={onViewHistory}
+                className="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 font-medium rounded-xl transition-colors"
+              >
+                <Trophy className="w-4 h-4" />
+                Ver meus desafios
+              </button>
+            )}
           </div>
         </div>
       </div>

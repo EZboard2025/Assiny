@@ -453,6 +453,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 userId={userId}
                 companyId={companyId}
                 onStartChallenge={handleStartChallenge}
+                onViewHistory={() => {
+                  setCurrentView('historico')
+                  // Set the history type to challenges after a small delay to ensure component mounts
+                  setTimeout(() => {
+                    const event = new CustomEvent('setHistoryType', { detail: 'desafios' })
+                    window.dispatchEvent(event)
+                  }, 100)
+                }}
               />
             </div>
           )}

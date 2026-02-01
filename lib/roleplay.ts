@@ -166,7 +166,7 @@ export async function endRoleplaySession(
 }
 
 /**
- * Buscar sessões do usuário
+ * Buscar sessões do usuário (exclui sessões de desafios)
  */
 export async function getUserRoleplaySessions(
   limit: number = 10
@@ -180,19 +180,38 @@ export async function getUserRoleplaySessions(
       return []
     }
 
-    const { data, error } = await supabase
+    // Buscar IDs de sessões que são de desafios (para excluir)
+    const { data: challengeSessions } = await supabase
+      .from('daily_challenges')
+      .select('roleplay_session_id')
+      .eq('user_id', user.id)
+      .not('roleplay_session_id', 'is', null)
+
+    const challengeSessionIds = (challengeSessions || [])
+      .map(c => c.roleplay_session_id)
+      .filter(Boolean)
+
+    // Buscar sessões excluindo as de desafios
+    let query = supabase
       .from('roleplay_sessions')
       .select('*')
-      .eq('user_id', user.id)  // FILTRAR POR user_id
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit)
+
+    // Se houver sessões de desafio, excluí-las
+    if (challengeSessionIds.length > 0) {
+      query = query.not('id', 'in', `(${challengeSessionIds.join(',')})`)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Erro ao buscar sessões:', error)
       return []
     }
 
-    console.log(`[getUserRoleplaySessions] ${data?.length || 0} sessões encontradas para usuário ${user.id}`)
+    console.log(`[getUserRoleplaySessions] ${data?.length || 0} sessões encontradas (excluindo ${challengeSessionIds.length} de desafios)`)
     return data || []
   } catch (error) {
     console.error('Erro ao buscar sessões:', error)

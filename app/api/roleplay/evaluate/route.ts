@@ -18,12 +18,14 @@ const N8N_WEBHOOK_URL = 'https://ezboard.app.n8n.cloud/webhook/b34f1d38-493b-4ae
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { sessionId } = body
+    const { sessionId, challengeId } = body
 
     if (!sessionId) {
       console.error('❌ sessionId não fornecido no body:', body)
       return NextResponse.json({ error: 'sessionId é obrigatório' }, { status: 400 })
     }
+
+    console.log('🎯 challengeId recebido:', challengeId || 'nenhum')
 
     console.log('📊 Iniciando avaliação da sessão:', sessionId)
 
@@ -128,27 +130,58 @@ OBJEÇÕES TRABALHADAS:`
       client_profile += `\n\nNenhuma objeção específica foi configurada para este roleplay.`
     }
 
-    // Verificar se esta sessão pertence a um desafio (busca reversa)
+    // Verificar se esta sessão pertence a um desafio
+    // Prioriza o challengeId passado diretamente (mais confiável)
+    // Fallback: busca reversa pelo roleplay_session_id (para compatibilidade)
     let challenge_context = null
-    const { data: challengeData, error: challengeError } = await supabase
-      .from('daily_challenges')
-      .select('id, challenge_config, difficulty_level')
-      .eq('roleplay_session_id', sessionId)
-      .single()
+    let challengeData = null
+    let challengeError = null
+
+    if (challengeId) {
+      // Busca direta pelo ID do desafio (mais confiável)
+      console.log('🎯 Buscando desafio pelo challengeId:', challengeId)
+      const result = await supabase
+        .from('daily_challenges')
+        .select('id, challenge_config, difficulty_level')
+        .eq('id', challengeId)
+        .single()
+      challengeData = result.data
+      challengeError = result.error
+    } else {
+      // Fallback: busca reversa (mantido para compatibilidade)
+      console.log('🔍 Buscando desafio pelo roleplay_session_id:', sessionId)
+      const result = await supabase
+        .from('daily_challenges')
+        .select('id, challenge_config, difficulty_level')
+        .eq('roleplay_session_id', sessionId)
+        .single()
+      challengeData = result.data
+      challengeError = result.error
+    }
 
     if (challengeData && !challengeError) {
-      console.log('🎯 Sessão pertence a um desafio:', challengeData.id)
+      console.log('🎯 Desafio encontrado:', challengeData.id)
 
       const challengeConfig = challengeData.challenge_config as any
+
+      // Normalizar target_letter para apenas a letra (S, P, I, N)
+      // Pode vir como "spin_S", "spin_s", "S", ou "s"
+      let rawTargetLetter = challengeConfig.success_criteria?.spin_letter_target || ''
+      const normalizedTargetLetter = rawTargetLetter
+        .replace(/spin_/i, '') // Remove prefixo "spin_"
+        .toUpperCase() // Converte para maiúscula
+        .charAt(0) || null // Pega apenas a primeira letra
+
       challenge_context = {
         is_challenge: true,
-        target_letter: challengeConfig.success_criteria?.spin_letter_target || null,
+        target_letter: normalizedTargetLetter,
         target_score: challengeConfig.success_criteria?.spin_min_score || null,
         target_weakness: challengeConfig.target_weakness || null,
         difficulty_level: challengeData.difficulty_level || 1,
         coaching_tips: challengeConfig.coaching_tips || [],
         challenge_title: challengeConfig.title || 'Desafio Diário'
       }
+      console.log('📊 Target letter normalizado:', rawTargetLetter, '->', normalizedTargetLetter)
       console.log('✅ Contexto do desafio montado:', JSON.stringify(challenge_context, null, 2))
     } else if (challengeError && challengeError.code !== 'PGRST116') {
       // PGRST116 = no rows returned (sessão normal, não é desafio)

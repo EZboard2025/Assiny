@@ -22,6 +22,15 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
   useEffect(() => {
     setMounted(true)
     loadSessions()
+
+    // Listen for history type change event (from Dashboard)
+    const handleSetHistoryType = (e: CustomEvent) => {
+      if (e.detail === 'desafios') {
+        setHistoryType('desafios')
+      }
+    }
+    window.addEventListener('setHistoryType', handleSetHistoryType as EventListener)
+    return () => window.removeEventListener('setHistoryType', handleSetHistoryType as EventListener)
   }, [])
 
   const loadSessions = async () => {
