@@ -396,6 +396,28 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
       }
 
       console.log('PDI salvo no banco com sucesso!')
+
+      // Consumir 1 crédito pela geração do PDI
+      try {
+        const { data: companyCredits } = await supabase
+          .from('companies')
+          .select('monthly_credits_used')
+          .eq('id', companyId)
+          .single()
+
+        const currentUsed = companyCredits?.monthly_credits_used || 0
+
+        await supabase
+          .from('companies')
+          .update({ monthly_credits_used: currentUsed + 1 })
+          .eq('id', companyId)
+
+        console.log(`💳 1 crédito consumido para geração de PDI: ${currentUsed} → ${currentUsed + 1}`)
+      } catch (creditError) {
+        console.error('⚠️ Erro ao consumir crédito do PDI:', creditError)
+        // Não falha a operação principal
+      }
+
       setPdiData(parsedPDI)
 
       // Atualizar data do último PDI e resetar cooldown
