@@ -166,7 +166,7 @@ export async function endRoleplaySession(
 }
 
 /**
- * Buscar sessões do usuário
+ * Buscar sessões do usuário (exclui sessões de desafios)
  */
 export async function getUserRoleplaySessions(
   limit: number = 10
@@ -180,19 +180,38 @@ export async function getUserRoleplaySessions(
       return []
     }
 
-    const { data, error } = await supabase
+    // Buscar IDs de sessões que são de desafios (para excluir)
+    const { data: challengeSessions } = await supabase
+      .from('daily_challenges')
+      .select('roleplay_session_id')
+      .eq('user_id', user.id)
+      .not('roleplay_session_id', 'is', null)
+
+    const challengeSessionIds = (challengeSessions || [])
+      .map(c => c.roleplay_session_id)
+      .filter(Boolean)
+
+    // Buscar sessões excluindo as de desafios
+    let query = supabase
       .from('roleplay_sessions')
       .select('*')
-      .eq('user_id', user.id)  // FILTRAR POR user_id
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit)
+
+    // Se houver sessões de desafio, excluí-las
+    if (challengeSessionIds.length > 0) {
+      query = query.not('id', 'in', `(${challengeSessionIds.join(',')})`)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Erro ao buscar sessões:', error)
       return []
     }
 
-    console.log(`[getUserRoleplaySessions] ${data?.length || 0} sessões encontradas para usuário ${user.id}`)
+    console.log(`[getUserRoleplaySessions] ${data?.length || 0} sessões encontradas (excluindo ${challengeSessionIds.length} de desafios)`)
     return data || []
   } catch (error) {
     console.error('Erro ao buscar sessões:', error)
@@ -248,4 +267,125 @@ export async function deleteRoleplaySession(
     console.error('Erro ao deletar sessão:', error)
     return false
   }
+}
+
+/**
+ * Buscar TODAS as sessões de roleplay do usuário (incluindo desafios)
+ * Para uso no perfil onde queremos métricas consolidadas
+ */
+export async function getAllUserRoleplaySessions(
+  limit: number = 1000
+): Promise<RoleplaySession[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      console.error('Usuário não autenticado')
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('roleplay_sessions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('Erro ao buscar sessões:', error)
+      return []
+    }
+
+    console.log(`[getAllUserRoleplaySessions] ${data?.length || 0} sessões encontradas (incluindo desafios)`)
+    return data || []
+  } catch (error) {
+    console.error('Erro ao buscar sessões:', error)
+    return []
+  }
+}
+
+/**
+ * Interface para Meet Evaluation
+ */
+export interface MeetEvaluation {
+  id: string
+  user_id: string
+  company_id: string
+  meeting_id?: string
+  seller_name?: string
+  call_objective?: string
+  funnel_stage?: string
+  transcript: any
+  evaluation: any
+  overall_score: number
+  performance_level: string
+  spin_s_score: number
+  spin_p_score: number
+  spin_i_score: number
+  spin_n_score: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Buscar avaliações de Google Meet do usuário
+ */
+export async function getUserMeetEvaluations(
+  limit: number = 100
+): Promise<MeetEvaluation[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      console.error('❌ [getUserMeetEvaluations] Usuário não autenticado')
+      return []
+    }
+
+    console.log(`🔍 [getUserMeetEvaluations] Buscando para user_id: ${user.id}`)
+
+    const { data, error } = await supabase
+      .from('meet_evaluations')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('❌ [getUserMeetEvaluations] Erro ao buscar:', error)
+      console.error('❌ Código do erro:', error.code)
+      console.error('❌ Mensagem:', error.message)
+      console.error('❌ Detalhes:', error.details)
+      return []
+    }
+
+    console.log(`✅ [getUserMeetEvaluations] ${data?.length || 0} avaliações de Meet encontradas`)
+    if (data && data.length > 0) {
+      console.log(`📋 [getUserMeetEvaluations] Primeira avaliação:`, {
+        id: data[0].id,
+        overall_score: data[0].overall_score,
+        spin_s_score: data[0].spin_s_score,
+        created_at: data[0].created_at
+      })
+    }
+    return data || []
+  } catch (error) {
+    console.error('❌ [getUserMeetEvaluations] Exceção:', error)
+    return []
+  }
+}
+
+/**
+ * Interface unificada para dados de performance (roleplay, meet, challenge)
+ */
+export interface UnifiedPerformanceData {
+  id: string
+  source: 'roleplay' | 'meet' | 'challenge'
+  overall_score: number
+  spin_s: number
+  spin_p: number
+  spin_i: number
+  spin_n: number
+  created_at: string
+  evaluation?: any
+  challengeTitle?: string
 }

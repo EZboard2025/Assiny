@@ -1,6 +1,12 @@
 'use client'
 
-import { LucideIcon, ChevronRight, Lock } from 'lucide-react'
+import { LucideIcon, ChevronRight, Lock, History } from 'lucide-react'
+
+interface SecondaryAction {
+  label: string
+  onClick: () => void
+  icon?: LucideIcon
+}
 
 interface FeatureCardProps {
   icon: LucideIcon
@@ -12,6 +18,7 @@ interface FeatureCardProps {
   adminBadge?: boolean
   betaBadge?: boolean
   locked?: boolean
+  secondaryAction?: SecondaryAction
 }
 
 export default function FeatureCard({
@@ -23,20 +30,17 @@ export default function FeatureCard({
   disabled = false,
   adminBadge = false,
   betaBadge = false,
-  locked = false
+  locked = false,
+  secondaryAction
 }: FeatureCardProps) {
+  const SecondaryIcon = secondaryAction?.icon || History
+
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled || locked}
-      className={`group text-left w-full transition-all duration-200 ${
-        disabled || locked ? 'cursor-not-allowed' : ''
-      }`}
-    >
+    <div className="text-left w-full">
       <div className={`relative bg-white rounded-xl p-5 border border-gray-200 h-full transition-all duration-200 ${
         disabled || locked
           ? 'opacity-60'
-          : 'hover:border-green-300 hover:shadow-md'
+          : ''
       }`}>
         {/* Locked overlay */}
         {locked && (
@@ -79,18 +83,39 @@ export default function FeatureCard({
           {description}
         </p>
 
-        {/* CTA Link */}
-        <div className={`mt-4 flex items-center text-sm font-medium transition-colors ${
-          disabled || locked
-            ? 'text-gray-400'
-            : 'text-green-600 group-hover:text-green-700'
-        }`}>
-          <span>Acessar</span>
-          <ChevronRight className={`w-4 h-4 ml-1 transition-transform ${
-            disabled || locked ? '' : 'group-hover:translate-x-1'
-          }`} />
+        {/* Actions */}
+        <div className="mt-4 flex items-center justify-between gap-2">
+          {/* Main CTA */}
+          <button
+            onClick={onClick}
+            disabled={disabled || locked}
+            className={`group flex items-center text-sm font-medium transition-colors ${
+              disabled || locked
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-green-600 hover:text-green-700'
+            }`}
+          >
+            <span>Acessar</span>
+            <ChevronRight className={`w-4 h-4 ml-1 transition-transform ${
+              disabled || locked ? '' : 'group-hover:translate-x-1'
+            }`} />
+          </button>
+
+          {/* Secondary Action */}
+          {secondaryAction && !locked && !disabled && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                secondaryAction.onClick()
+              }}
+              className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 font-medium transition-colors"
+            >
+              <SecondaryIcon className="w-3.5 h-3.5" />
+              <span>{secondaryAction.label}</span>
+            </button>
+          )}
         </div>
       </div>
-    </button>
+    </div>
   )
 }

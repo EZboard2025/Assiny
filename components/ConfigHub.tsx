@@ -65,7 +65,7 @@ import {
   getPlanUsageSummary,
   getCompanyTrainingPlan
 } from '@/lib/utils/planLimitsChecker'
-import { PlanType, PLAN_CONFIGS, PLAN_NAMES } from '@/lib/types/plans'
+import { PlanType } from '@/lib/types/plans'
 import { useToast } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 
@@ -127,15 +127,15 @@ function SortableStageCard({
   const isLast = index === totalStages - 1
 
   const getBorderColor = () => {
-    if (isFirst) return 'border-green-400/50' // Verde brilhante no topo
-    if (isLast) return 'border-purple-400/50' // Roxo no final
-    return 'border-green-500/20' // Padrão
+    if (isFirst) return 'border-green-300' // Verde brilhante no topo
+    if (isLast) return 'border-purple-300' // Roxo no final
+    return 'border-gray-200' // Padrão
   }
 
   const getGradient = () => {
-    if (isFirst) return 'from-green-900/30 to-green-800/20' // Topo
-    if (isLast) return 'from-purple-900/30 to-purple-800/20' // Final
-    return 'from-gray-800/50 to-gray-900/30' // Meio
+    if (isFirst) return 'from-green-50 to-white' // Topo
+    if (isLast) return 'from-purple-50 to-white' // Final
+    return 'from-gray-50 to-white' // Meio
   }
 
   const getLabel = () => {
@@ -159,16 +159,16 @@ function SortableStageCard({
 
         {/* Label de posição */}
         <div className={`absolute -top-3 left-4 px-3 py-1 rounded-full text-xs font-bold ${
-          isFirst ? 'bg-green-500/20 text-green-300 border border-green-400/50' :
-          isLast ? 'bg-purple-500/20 text-purple-300 border border-purple-400/50' :
-          'bg-gray-700/80 text-gray-300 border border-gray-600'
+          isFirst ? 'bg-green-100 text-green-700 border border-green-200' :
+          isLast ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+          'bg-gray-100 text-gray-600 border border-gray-200'
         }`}>
           {getLabel()}
         </div>
 
         {/* Efeito de sombra empilhada */}
-        <div className="absolute -bottom-1 left-2 right-2 h-1 bg-gradient-to-b from-gray-900/40 to-transparent rounded-b-xl -z-10" />
-        <div className="absolute -bottom-2 left-4 right-4 h-1 bg-gradient-to-b from-gray-900/20 to-transparent rounded-b-xl -z-20" />
+        <div className="absolute -bottom-1 left-2 right-2 h-1 bg-gradient-to-b from-gray-200/40 to-transparent rounded-b-xl -z-10" />
+        <div className="absolute -bottom-2 left-4 right-4 h-1 bg-gradient-to-b from-gray-200/20 to-transparent rounded-b-xl -z-20" />
 
         {isEditing ? (
           // Modo de edição
@@ -178,33 +178,33 @@ function SortableStageCard({
               value={editStageName}
               onChange={(e) => setEditStageName(e.target.value)}
               placeholder="Nome da fase"
-              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
             />
             <textarea
               value={editStageDescription}
               onChange={(e) => setEditStageDescription(e.target.value)}
               placeholder="Descrição"
               rows={2}
-              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
             />
             <textarea
               value={editStageObjective}
               onChange={(e) => setEditStageObjective(e.target.value)}
               placeholder="Objetivo (como passar para próxima fase)"
               rows={2}
-              className="w-full px-3 py-2 bg-gray-700/50 border border-green-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => onUpdate(stage.id)}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
                 <Check className="w-4 h-4" />
                 Salvar
               </button>
               <button
                 onClick={onCancelEdit}
-                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                className="flex-1 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
@@ -220,8 +220,8 @@ function SortableStageCard({
                 {...listeners}
                 className={`mt-1 p-2 rounded-lg transition-all ${
                   isDragging
-                    ? 'bg-green-500/30 text-green-300'
-                    : 'text-gray-500 hover:text-green-400 hover:bg-green-500/10'
+                    ? 'bg-green-100 text-green-600'
+                    : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
                 } cursor-grab active:cursor-grabbing`}
                 title="⬍ Arraste para reordenar"
               >
@@ -232,28 +232,28 @@ function SortableStageCard({
                 {/* Nome da fase */}
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
-                    isFirst ? 'bg-green-500/20 text-green-300' :
-                    isLast ? 'bg-purple-500/20 text-purple-300' :
-                    'bg-gray-700/50 text-gray-300'
+                    isFirst ? 'bg-green-100 text-green-700' :
+                    isLast ? 'bg-purple-100 text-purple-700' :
+                    'bg-gray-100 text-gray-600'
                   }`}>
                     {index + 1}
                   </div>
-                  <h5 className="text-white font-bold text-lg">{stage.stage_name}</h5>
+                  <h5 className="text-gray-900 font-bold text-lg">{stage.stage_name}</h5>
                 </div>
 
                 {/* Descrição */}
                 {stage.description && (
-                  <p className="text-sm text-gray-300 mb-2 pl-12 leading-relaxed">
+                  <p className="text-sm text-gray-700 mb-2 pl-12 leading-relaxed">
                     {stage.description}
                   </p>
                 )}
 
                 {/* Objetivo */}
                 {stage.objective && (
-                  <div className="pl-12 bg-green-500/10 border-l-2 border-green-400 p-2 rounded-r-lg">
-                    <p className="text-xs text-green-300 flex items-start gap-1.5">
+                  <div className="pl-12 bg-green-50 border-l-2 border-green-500 p-2 rounded-r-lg">
+                    <p className="text-xs text-green-700 flex items-start gap-1.5">
                       <Target className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                      <span><strong className="text-green-200">Objetivo:</strong> {stage.objective}</span>
+                      <span><strong className="text-green-800">Objetivo:</strong> {stage.objective}</span>
                     </p>
                   </div>
                 )}
@@ -263,14 +263,14 @@ function SortableStageCard({
               <div className="flex flex-col gap-1 flex-shrink-0">
                 <button
                   onClick={() => onStartEdit(stage)}
-                  className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
+                  className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                   title="Editar fase"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => onDelete(stage.id)}
-                  className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Excluir fase"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -409,14 +409,20 @@ function ConfigurationInterface({
   // Estados para aba de Usage (consumo de créditos)
   interface UsageBreakdown {
     roleplay: number
+    publicRoleplay: number
     followup: number
     meet: number
+    pdi: number
+    aiGeneration: number
+    dailyChallenges: number
   }
   interface UsageData {
     monthlyCredits: number | null
     creditsUsed: number
     extraCredits: number
     resetDate: string | null
+    challengesEnabled: boolean
+    websiteUrl: string | null
     breakdown: UsageBreakdown
   }
   const [usageData, setUsageData] = useState<UsageData | null>(null)
@@ -805,6 +811,23 @@ function ConfigurationInterface({
 
       setAIPreviewData(result.data)
       setAIConfidence(result.confidence || {})
+
+      // Consumir 0.5 créditos por geração com IA
+      if (userCompanyId) {
+        try {
+          await fetch('/api/company/consume-ai-credit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: userCompanyId,
+              generationType: 'ai-extract'
+            })
+          })
+        } catch (e) {
+          console.error('Erro ao consumir crédito de IA:', e)
+        }
+      }
+
       showToast('success', 'Dados Extraídos', 'Revise os dados antes de aplicar')
 
     } catch (error) {
@@ -887,6 +910,22 @@ function ConfigurationInterface({
         setAIGeneratedObjectives(result.data.objectives)
       }
 
+      // Consumir 0.5 créditos por geração com IA
+      if (userCompanyId) {
+        try {
+          await fetch('/api/company/consume-ai-credit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: userCompanyId,
+              generationType: `ai-generate-${contentType}`
+            })
+          })
+        } catch (e) {
+          console.error('Erro ao consumir crédito de IA:', e)
+        }
+      }
+
       showToast('success', 'Conteúdo Gerado', 'Revise e selecione o que deseja adicionar')
 
     } catch (error) {
@@ -946,6 +985,22 @@ function ConfigurationInterface({
       } else if (contentType === 'objectives' && result.data.objectives) {
         console.log('[AI Refine] Objetivos refinados:', result.data.objectives.length)
         setAIGeneratedObjectives(result.data.objectives)
+      }
+
+      // Consumir 0.5 créditos por refinamento com IA
+      if (userCompanyId) {
+        try {
+          await fetch('/api/company/consume-ai-credit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: userCompanyId,
+              generationType: `ai-refine-${contentType}`
+            })
+          })
+        } catch (e) {
+          console.error('Erro ao consumir crédito de IA:', e)
+        }
       }
 
       showToast('success', 'Conteúdo Refinado', 'Revise as alterações aplicadas')
@@ -1190,7 +1245,7 @@ function ConfigurationInterface({
       // Buscar dados de créditos da empresa
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
-        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits, daily_challenges_enabled, website_url')
         .eq('id', userCompanyId)
         .single()
 
@@ -1203,8 +1258,15 @@ function ConfigurationInterface({
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      // Buscar breakdown de uso por tipo (roleplays deste mês)
+      // Buscar breakdown de uso por tipo (roleplays internos deste mês - roleplay_sessions)
       const { count: roleplayCount } = await supabase
+        .from('roleplay_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', userCompanyId)
+        .gte('created_at', startOfMonth)
+
+      // Buscar roleplays públicos deste mês (roleplays_unicos - links públicos)
+      const { count: publicRoleplayCount } = await supabase
         .from('roleplays_unicos')
         .select('*', { count: 'exact', head: true })
         .eq('company_id', userCompanyId)
@@ -1224,18 +1286,71 @@ function ConfigurationInterface({
         .eq('company_id', userCompanyId)
         .gte('created_at', startOfMonth)
 
+      // Buscar PDIs criados deste mês
+      const { count: pdiCount } = await supabase
+        .from('pdis')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', userCompanyId)
+        .gte('created_at', startOfMonth)
+
+      // Buscar gerações de IA deste mês (0.5 créditos cada)
+      let aiGenerationCount = 0
+      try {
+        const { count } = await supabase
+          .from('ai_generations')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', userCompanyId)
+          .gte('created_at', startOfMonth)
+        aiGenerationCount = count || 0
+      } catch (e) {
+        // Tabela pode não existir ainda
+        console.log('Tabela ai_generations não disponível')
+      }
+
+      // Buscar desafios diários gerados deste mês (1 crédito cada)
+      let dailyChallengesCount = 0
+      try {
+        const { count } = await supabase
+          .from('daily_challenges')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', userCompanyId)
+          .gte('created_at', startOfMonth)
+        dailyChallengesCount = count || 0
+      } catch (e) {
+        // Tabela pode não existir ainda
+        console.log('Tabela daily_challenges não disponível')
+      }
+
       // Obter limite de créditos do plano
+      const { PLAN_CONFIGS } = await import('@/lib/types/plans')
       const planConfig = PLAN_CONFIGS[companyData.training_plan as PlanType]
+
+      // Calcular créditos usados diretamente das tabelas de features
+      // (em vez de usar o contador monthly_credits_used que pode estar desatualizado)
+      const calculatedCreditsUsed =
+        (roleplayCount || 0) * 1 +        // Roleplay interno: 1 crédito
+        (publicRoleplayCount || 0) * 1 +  // Roleplay público: 1 crédito
+        (followupCount || 0) * 1 +        // Follow-up: 1 crédito
+        (meetCount || 0) * 3 +            // Análise de Meet: 3 créditos
+        (pdiCount || 0) * 1 +             // PDI: 1 crédito
+        aiGenerationCount * 0.5 +         // Geração IA: 0.5 créditos
+        dailyChallengesCount * 1          // Desafios Diários: 1 crédito
 
       setUsageData({
         monthlyCredits: planConfig?.monthlyCredits || null,
-        creditsUsed: companyData.monthly_credits_used || 0,
+        creditsUsed: calculatedCreditsUsed,
         extraCredits: companyData.extra_monthly_credits || 0,
         resetDate: companyData.monthly_credits_reset_at,
+        challengesEnabled: companyData.daily_challenges_enabled !== false,
+        websiteUrl: companyData.website_url || null,
         breakdown: {
           roleplay: roleplayCount || 0,
+          publicRoleplay: publicRoleplayCount || 0,
           followup: followupCount || 0,
-          meet: (meetCount || 0) * 3 // Cada análise de Meet custa 3 créditos
+          meet: meetCount || 0,
+          pdi: pdiCount || 0,
+          aiGeneration: aiGenerationCount,
+          dailyChallenges: dailyChallengesCount
         }
       })
     } catch (error) {
@@ -2606,93 +2721,99 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
   return (
     <div className="space-y-6">
-      {/* Tabs - Estilo HistoricoView */}
-      <div className="inline-flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 overflow-x-auto">
-        {/* Funcionários - Apenas para planos Team, Business e Enterprise */}
-        {trainingPlan !== PlanType.INDIVIDUAL && (
+      {/* Tabs - Novo estilo claro */}
+      <div className="bg-white rounded-xl border border-gray-200 p-1.5 shadow-sm">
+        <div className="flex gap-1 overflow-x-auto">
+          {/* Funcionários - Apenas para planos Team, Business e Enterprise */}
+          {trainingPlan !== PlanType.INDIVIDUAL && (
+            <button
+              onClick={() => setActiveTab('employees')}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                activeTab === 'employees'
+                  ? 'bg-green-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Funcionários</span>
+              {pendingRegistrations.length > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  activeTab === 'employees'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-orange-500 text-white'
+                }`}>
+                  {pendingRegistrations.length}
+                </span>
+              )}
+            </button>
+          )}
           <button
-            onClick={() => setActiveTab('employees')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'employees'
-                ? 'bg-green-500/20 text-green-400'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+            onClick={() => setActiveTab('personas')}
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'personas'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span>Funcionários</span>
-            {pendingRegistrations.length > 0 && (
-              <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                {pendingRegistrations.length}
-              </span>
-            )}
+            <UserCircle2 className="w-4 h-4" />
+            <span>Personas</span>
           </button>
-        )}
-        <button
-          onClick={() => setActiveTab('personas')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'personas'
-              ? 'bg-green-500/20 text-green-400'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-          }`}
-        >
-          <UserCircle2 className="w-4 h-4" />
-          <span>Personas</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('objections')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'objections'
-              ? 'bg-green-500/20 text-green-400'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-          }`}
-        >
-          <Target className="w-4 h-4" />
-          <span>Objeções</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('objectives')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'objectives'
-              ? 'bg-green-500/20 text-green-400'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-          }`}
-        >
-          <CheckCircle className="w-4 h-4" />
-          <span>Objetivos</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('files')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'files'
-              ? 'bg-green-500/20 text-green-400'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Dados da Empresa</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('funnel')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'funnel'
-              ? 'bg-green-500/20 text-green-400'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-          }`}
-        >
-          <Target className="w-4 h-4" />
-          <span>Fases do Funil</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('usage')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'usage'
-              ? 'bg-amber-500/20 text-amber-400'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>Uso</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('objections')}
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'objections'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Target className="w-4 h-4" />
+            <span>Objeções</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('objectives')}
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'objectives'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <CheckCircle className="w-4 h-4" />
+            <span>Objetivos</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('files')}
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'files'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Dados da Empresa</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('funnel')}
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'funnel'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+            <span>Fases do Funil</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('usage')}
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'usage'
+                ? 'bg-amber-500 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Uso</span>
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -2700,9 +2821,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Funcionários Tab - Apenas para planos Team, Business e Enterprise */}
         {activeTab === 'employees' && trainingPlan !== PlanType.INDIVIDUAL && (
           <div className="space-y-6">
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800">
-                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Gerenciar Funcionários</h3>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+                <h3 className="text-sm font-semibold text-gray-900">Gerenciar Funcionários</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Adicione e gerencie os membros da sua equipe</p>
               </div>
 
               {/* Lista de funcionários */}
@@ -2710,32 +2832,39 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-left border-b border-gray-800">
-                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo/Role</th>
-                        <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                      <tr className="text-left border-b border-gray-100 bg-gray-50/30">
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nome</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cargo/Role</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {employees.map((emp) => (
-                        <tr key={emp.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                          <td className="px-4 py-3 text-sm text-white">{emp.name}</td>
-                          <td className="px-4 py-3 text-sm text-gray-400">{emp.email}</td>
-                          <td className="px-4 py-3">
+                        <tr key={emp.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                <span className="text-sm font-medium text-green-700">{emp.name?.charAt(0)?.toUpperCase()}</span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900">{emp.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 text-sm text-gray-600">{emp.email}</td>
+                          <td className="px-5 py-3.5">
                             <select
                               value={emp.role || 'Vendedor'}
                               onChange={(e) => handleRoleChange(emp.id, e.target.value)}
-                              className="px-3 py-1.5 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/50"
+                              className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                             >
                               <option value="Admin">Admin</option>
                               <option value="Vendedor">Vendedor</option>
                             </select>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-5 py-3.5">
                             <button
                               onClick={() => handleDeleteEmployee(emp.id, emp.email)}
-                              className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -2748,52 +2877,52 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               )}
 
               {/* Adicionar novo funcionário */}
-              <div className="p-4 border-t border-gray-800">
+              <div className="p-5 border-t border-gray-100 bg-gray-50/30">
               {!addingEmployee ? (
                 <button
                   onClick={() => setAddingEmployee(true)}
-                  className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg font-medium hover:bg-green-500/30 transition-colors flex items-center gap-2"
+                  className="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
                   Adicionar Funcionário
                 </button>
               ) : (
-                <div className="bg-gray-800/50 rounded-lg p-4 space-y-4">
-                  <h4 className="text-sm font-medium text-white mb-4">Novo Funcionário</h4>
+                <div className="bg-white rounded-xl p-5 space-y-4 border border-gray-200 shadow-sm">
+                  <h4 className="text-sm font-semibold text-gray-900">Novo Funcionário</h4>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Nome</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">Nome</label>
                       <input
                         type="text"
                         value={newEmployeeName}
                         onChange={(e) => setNewEmployeeName(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                         placeholder="João Silva"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Email</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">Email</label>
                       <input
                         type="email"
                         value={newEmployeeEmail}
                         onChange={(e) => setNewEmployeeEmail(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                         placeholder="joao@empresa.com"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Senha</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">Senha</label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
                           value={newEmployeePassword}
                           onChange={(e) => setNewEmployeePassword(e.target.value)}
-                          className="w-full px-4 py-2.5 pr-12 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                          className="w-full px-4 py-2.5 pr-12 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                           placeholder="••••••••"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-400 transition-colors"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-600 transition-colors"
                         >
                           {showPassword ? (
                             <EyeOff className="w-5 h-5" />
@@ -2803,19 +2932,19 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         </button>
                       </div>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 pt-2">
                       <button
                         onClick={() => {
                           setAddingEmployee(false)
                           setShowPassword(false)
                         }}
-                        className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+                        className="flex-1 px-5 py-2.5 bg-white border border-gray-200 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                       >
                         Cancelar
                       </button>
                       <button
                         onClick={handleSaveEmployee}
-                        className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform"
+                        className="flex-1 px-5 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors shadow-sm"
                       >
                         Salvar
                       </button>
@@ -2826,21 +2955,21 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             </div>
 
             {/* Link de Convite Fixo */}
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800">
-                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Link de Convite</h3>
-                <p className="text-xs text-gray-500 mt-1">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+                <h3 className="text-sm font-semibold text-gray-900">Link de Convite</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
                   Compartilhe este link para funcionários criarem suas contas
                 </p>
               </div>
 
-              <div className="p-4 space-y-3">
+              <div className="p-5 space-y-3">
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={typeof window !== 'undefined' && userCompanyId ? `${window.location.origin}/cadastro/${userCompanyId}` : 'Carregando...'}
                     readOnly
-                    className="flex-1 px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-300 font-mono"
+                    className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 font-mono"
                   />
                   <button
                     onClick={() => {
@@ -2850,7 +2979,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }
                     }}
                     disabled={!userCompanyId}
-                    className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <Link2 className="w-4 h-4" />
                     Copiar
@@ -2863,25 +2992,25 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             </div>
 
             {/* Solicitações Pendentes */}
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Solicitações Pendentes</h3>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <h3 className="text-sm font-semibold text-gray-900">Solicitações Pendentes</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
                       Aprove ou recuse cadastros de funcionários
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {pendingRegistrations.length > 0 && (
-                      <span className="bg-orange-500/20 text-orange-400 text-xs px-2 py-1 rounded-lg font-medium">
+                      <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded-full font-medium">
                         {pendingRegistrations.length} pendente{pendingRegistrations.length > 1 ? 's' : ''}
                       </span>
                     )}
                     <button
                       onClick={loadPendingRegistrations}
                       disabled={loadingPending}
-                      className="p-2 text-gray-400 hover:text-green-400 bg-gray-800/50 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+                      className="p-2 text-gray-400 hover:text-green-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
                       title="Atualizar"
                     >
                       <RefreshCw className={`w-4 h-4 ${loadingPending ? 'animate-spin' : ''}`} />
@@ -2890,31 +3019,33 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               </div>
 
-              <div className="p-4">
+              <div className="p-5">
                 {loadingPending ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 text-green-400 animate-spin" />
+                    <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
                   </div>
                 ) : pendingRegistrations.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Nenhuma solicitação pendente</p>
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Clock className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <p className="text-sm text-gray-500">Nenhuma solicitação pendente</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {pendingRegistrations.map((registration) => (
                       <div
                         key={registration.id}
-                        className="flex items-center justify-between p-3 bg-gray-800/30 rounded-xl border border-gray-700/50"
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
-                            <UserPlus className="w-5 h-5 text-orange-400" />
+                          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                            <UserPlus className="w-5 h-5 text-orange-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-white">{registration.name}</p>
-                            <p className="text-xs text-gray-400">{registration.email}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-sm font-medium text-gray-900">{registration.name}</p>
+                            <p className="text-xs text-gray-500">{registration.email}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
                               {new Date(registration.created_at).toLocaleDateString('pt-BR', {
                                 day: '2-digit',
                                 month: '2-digit',
@@ -2929,7 +3060,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           <button
                             onClick={() => handleRejectRegistration(registration.id)}
                             disabled={processingRegistration === registration.id}
-                            className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                            className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50 border border-red-100"
                           >
                             {processingRegistration === registration.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -2940,7 +3071,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           <button
                             onClick={() => handleApproveRegistration(registration.id)}
                             disabled={processingRegistration === registration.id}
-                            className="px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                            className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-1 shadow-sm"
                           >
                             {processingRegistration === registration.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -2965,31 +3096,30 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Personas Tab */}
         {activeTab === 'personas' && (
           <div className="space-y-6">
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800">
-                <div className="flex items-center justify-between">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+                <div className="flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Personas {businessType === 'Ambos' ? 'B2B e B2C' : businessType}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">Personas {businessType === 'Ambos' ? 'B2B e B2C' : businessType}</h3>
                     {/* Contador de Personas */}
-                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                    <div className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                       {personas.length}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {/* Botão Gerar com IA */}
                     <button
                       onClick={() => setShowAIGenerateModal('personas')}
-                      className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
+                      className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg text-sm font-semibold text-white shadow-sm hover:shadow-md hover:from-purple-700 hover:to-purple-800 transition-all duration-200"
                     >
-                      <Sparkles className="w-4 h-4 animate-pulse" />
+                      <Sparkles className="w-4 h-4" />
                       Gerar com IA
-                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
                     </button>
                     {/* Filtro por Tipo B2B/B2C */}
                     <select
                       value={filterBusinessType}
                       onChange={(e) => setFilterBusinessType(e.target.value as '' | 'B2B' | 'B2C')}
-                      className="px-3 py-1.5 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/50"
+                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                     >
                       <option value="">B2B e B2C</option>
                       <option value="B2B">Apenas B2B</option>
@@ -3000,7 +3130,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       <select
                         value={filterTag}
                         onChange={(e) => setFilterTag(e.target.value)}
-                        className="px-3 py-1.5 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-green-500/50"
+                        className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                       >
                         <option value="">Todas as etiquetas</option>
                         {tags.map((tag) => (
@@ -3020,10 +3150,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         }
                       }}
                       disabled={personaLimitReached}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                         personaLimitReached
-                          ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
-                          : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
                       }`}
                       title={personaLimitReached ? `Limite de ${planUsage?.training?.personas?.used || 0} personas atingido no plano PRO` : ''}
                     >
@@ -3042,28 +3172,28 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
 
               {/* Aviso de Qualidade */}
-              <div className="mx-4 mt-4 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+              <div className="mx-5 mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-red-300 leading-relaxed">
-                      <span className="font-bold">Atenção:</span> Personas com pontuação abaixo de 7.0 podem comprometer a eficiência e o realismo dos roleplays de vendas.
+                    <p className="text-sm text-amber-800 leading-relaxed">
+                      <span className="font-semibold">Atenção:</span> Personas com pontuação abaixo de 7.0 podem comprometer a eficiência e o realismo dos roleplays de vendas.
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* Seção de Gerenciar Etiquetas */}
-              <div className="p-4 border-t border-gray-800">
+              <div className="p-5 border-t border-gray-100">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                     <TagIcon className="w-4 h-4" />
                     Etiquetas
                   </h4>
                   {!showTagForm && (
                     <button
                       onClick={() => setShowTagForm(true)}
-                      className="px-3 py-1.5 bg-gray-800/80 border border-gray-600 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 hover:border-gray-500 transition-all flex items-center gap-2"
+                      className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2"
                     >
                       <Plus className="w-3 h-3" />
                       Nova Etiqueta
@@ -3073,20 +3203,20 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                 {/* Formulário para adicionar nova etiqueta */}
                 {showTagForm && (
-                  <div className="mb-4 bg-gray-800/50 border border-gray-600 rounded-xl p-4 space-y-4 shadow-lg">
+                  <div className="mb-4 bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-2">Nome da etiqueta</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">Nome da etiqueta</label>
                       <input
                         type="text"
                         value={newTagName}
                         onChange={(e) => setNewTagName(e.target.value)}
                         placeholder="Ex: Leads Quentes, Franquias..."
-                        className="w-full px-4 py-2.5 bg-gray-900/70 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-2">Escolha uma cor</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">Escolha uma cor</label>
                       <div className="grid grid-cols-6 gap-2">
                         {tagColorPalette.map((color) => (
                           <button
@@ -3095,7 +3225,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             onClick={() => setNewTagColor(color)}
                             className={`w-9 h-9 rounded-lg transition-all duration-200 ${
                               newTagColor === color
-                                ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-800 scale-110 shadow-lg'
+                                ? 'ring-2 ring-gray-400 ring-offset-2 ring-offset-white scale-110 shadow-md'
                                 : 'hover:scale-105 opacity-80 hover:opacity-100'
                             }`}
                             style={{
@@ -3128,8 +3258,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         disabled={!newTagName.trim()}
                         className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                           newTagName.trim()
-                            ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02]'
-                            : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                            ? 'bg-green-600 text-white shadow-sm hover:bg-green-700'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         }`}
                       >
                         Criar Etiqueta
@@ -3140,7 +3270,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           setNewTagName('')
                           setNewTagColor('#6B46C1')
                         }}
-                        className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors"
+                        className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
                       >
                         Cancelar
                       </button>
@@ -3150,44 +3280,43 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                 {/* Lista de etiquetas existentes */}
                 {tags.length > 0 && (
-                  <div className="flex flex-wrap gap-3 p-3 bg-gray-800/30 rounded-xl border border-gray-700/50">
+                  <div className="flex flex-wrap gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                     {tags.map((tag) => (
                       <div
                         key={tag.id}
-                        className="group relative inline-flex items-center justify-center px-5 py-2 rounded-lg text-sm font-semibold text-white text-center shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl min-w-[80px]"
+                        className="group relative inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold text-white text-center shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md min-w-[80px]"
                         style={{
                           background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}dd 100%)`,
-                          boxShadow: `0 4px 14px ${tag.color}40`,
                           ...(editingTagId === tag.id && { ringColor: tag.color })
                         }}
                       >
                         {editingTagId === tag.id ? (
-                          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => {
+                          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => {
                             setEditingTagId(null)
                             setEditingTagName('')
                             setEditingTagColor('')
                           }}>
-                            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-96 space-y-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-6 w-96 space-y-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-500/20 rounded-lg">
-                                  <TagIcon className="w-5 h-5 text-purple-400" />
+                                <div className="p-2 bg-green-100 rounded-lg">
+                                  <TagIcon className="w-5 h-5 text-green-600" />
                                 </div>
-                                <h4 className="text-lg font-bold text-white">Editar Etiqueta</h4>
+                                <h4 className="text-lg font-bold text-gray-900">Editar Etiqueta</h4>
                               </div>
 
                               <div>
-                                <label className="block text-xs font-medium text-gray-400 mb-2">Nome</label>
+                                <label className="block text-xs font-medium text-gray-600 mb-2">Nome</label>
                                 <input
                                   type="text"
                                   value={editingTagName}
                                   onChange={(e) => setEditingTagName(e.target.value)}
-                                  className="w-full px-4 py-2.5 bg-gray-800/70 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+                                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                                   autoFocus
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-xs font-medium text-gray-400 mb-2">Cor</label>
+                                <label className="block text-xs font-medium text-gray-600 mb-2">Cor</label>
                                 <div className="grid grid-cols-6 gap-2">
                                   {tagColorPalette.map((color) => (
                                     <button
@@ -3196,7 +3325,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                       onClick={() => setEditingTagColor(color)}
                                       className={`w-10 h-10 rounded-lg transition-all duration-200 ${
                                         editingTagColor === color
-                                          ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-900 scale-110'
+                                          ? 'ring-2 ring-gray-400 ring-offset-2 ring-offset-white scale-110'
                                           : 'hover:scale-105 opacity-80 hover:opacity-100'
                                       }`}
                                       style={{
@@ -3226,7 +3355,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               <div className="flex gap-3 pt-2">
                                 <button
                                   onClick={() => handleUpdateTag(tag.id)}
-                                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 rounded-lg text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] transition-all"
+                                  className="flex-1 px-4 py-2.5 bg-green-600 rounded-lg text-sm font-medium text-white shadow-sm hover:bg-green-700 transition-all"
                                 >
                                   Salvar
                                 </button>
@@ -3236,7 +3365,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     setEditingTagName('')
                                     setEditingTagColor('')
                                   }}
-                                  className="px-4 py-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-all"
+                                  className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all"
                                 >
                                   Cancelar
                                 </button>
@@ -3253,13 +3382,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   setEditingTagName(tag.name)
                                   setEditingTagColor(tag.color)
                                 }}
-                                className="p-1 rounded-full bg-gray-900 text-white/90 hover:bg-gray-800 hover:text-white transition-colors shadow-md"
+                                className="p-1 rounded-full bg-white text-gray-600 hover:bg-gray-100 transition-colors shadow-sm border border-gray-200"
                               >
                                 <Edit2 className="w-2.5 h-2.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteTag(tag.id)}
-                                className="p-1 rounded-full bg-gray-900 text-white/90 hover:bg-red-500 hover:text-white transition-colors shadow-md"
+                                className="p-1 rounded-full bg-white text-gray-600 hover:bg-red-50 hover:text-red-500 transition-colors shadow-sm border border-gray-200"
                               >
                                 <X className="w-2.5 h-2.5" />
                               </button>
@@ -3272,9 +3401,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 )}
 
                 {tags.length === 0 && !showTagForm && (
-                  <div className="flex flex-col items-center justify-center py-6 px-4 bg-gray-800/30 rounded-xl border border-dashed border-gray-700">
-                    <TagIcon className="w-8 h-8 text-gray-600 mb-2" />
-                    <p className="text-gray-400 text-sm text-center">Nenhuma etiqueta criada ainda.</p>
+                  <div className="flex flex-col items-center justify-center py-6 px-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                    <TagIcon className="w-8 h-8 text-gray-400 mb-2" />
+                    <p className="text-gray-600 text-sm text-center">Nenhuma etiqueta criada ainda.</p>
                     <p className="text-gray-500 text-xs text-center mt-1">Crie etiquetas para organizar suas personas.</p>
                   </div>
                 )}
@@ -3302,7 +3431,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                 return true
               }).length > 0 && (
-                <div className="p-4 space-y-3">
+                <div className="p-5 space-y-3">
                   {personas.filter(p => {
                     // Filtrar pelo dropdown B2B/B2C
                     if (filterBusinessType && p.business_type !== filterBusinessType) return false
@@ -3328,11 +3457,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     return (
                     <div
                       key={persona.id}
-                      className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden hover:border-gray-600 transition-colors"
+                      className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-green-300 hover:shadow-sm transition-all"
                     >
                       {/* Header clicável */}
                       <div
-                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-800/30 transition-colors"
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => {
                           const newExpanded = new Set(expandedPersonas)
                           if (isExpanded) {
@@ -3344,11 +3473,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                            <UserCircle2 className="w-4 h-4 text-green-400" />
+                          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                            <UserCircle2 className="w-5 h-5 text-green-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium text-white truncate">
+                            <h4 className="text-sm font-semibold text-gray-900 truncate">
                               {persona.business_type === 'B2B'
                                 ? (persona as PersonaB2B).job_title
                                 : (persona as PersonaB2C).profession}
@@ -3366,8 +3495,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     key={tag.id}
                                     className="px-2.5 py-1 rounded-md text-[10px] font-semibold text-white shadow-sm"
                                     style={{
-                                      background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}cc 100%)`,
-                                      boxShadow: `0 2px 6px ${tag.color}30`
+                                      background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}cc 100%)`
                                     }}
                                   >
                                     {tag.name}
@@ -3375,7 +3503,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                 )
                               })}
                               {personaTags.get(persona.id)!.length > 2 && (
-                                <span className="px-2 py-1 rounded-md text-[10px] font-medium bg-gray-700 text-gray-400">
+                                <span className="px-2 py-1 rounded-md text-[10px] font-medium bg-gray-100 text-gray-500">
                                   +{personaTags.get(persona.id)!.length - 2}
                                 </span>
                               )}
@@ -3383,52 +3511,52 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           )}
                           {/* Score compacto */}
                           {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
-                            <div className={`px-2 py-0.5 rounded text-xs font-bold ${
-                              persona.evaluation_score >= 7 ? 'bg-green-500/20 text-green-400' :
-                              persona.evaluation_score >= 4 ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-red-500/20 text-red-400'
+                            <div className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                              persona.evaluation_score >= 7 ? 'bg-green-100 text-green-700' :
+                              persona.evaluation_score >= 4 ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-100 text-red-700'
                             }`}>
                               {persona.evaluation_score.toFixed(1)}
                             </div>
                           )}
-                          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                         </div>
                       </div>
 
                       {/* Conteúdo expandido */}
                       {isExpanded && (
-                        <div className="px-4 pb-4 pt-2 border-t border-gray-700">
+                        <div className="px-4 pb-4 pt-2 border-t border-gray-100 bg-gray-50/50">
                           {/* Detalhes da persona */}
                           <div className="space-y-3">
                             {/* Conteúdo B2B */}
                             {persona.business_type === 'B2B' && (
                               <div className="space-y-2">
                                 {(persona as PersonaB2B).company_type && (
-                                  <p className="text-xs text-gray-400 leading-relaxed">
-                                    <span className="font-medium text-gray-300">Tipo de Empresa:</span>{' '}
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    <span className="font-semibold text-gray-900">Tipo de Empresa:</span>{' '}
                                     {(persona as PersonaB2B).company_type}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).company_goals && (
-                                  <p className="text-xs text-gray-400 leading-relaxed">
-                                    <span className="font-medium text-gray-300">Busca:</span>{' '}
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    <span className="font-semibold text-gray-900">Busca:</span>{' '}
                                     {(persona as PersonaB2B).company_goals}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).business_challenges && (
-                                  <p className="text-xs text-gray-400 leading-relaxed">
-                                    <span className="font-medium text-gray-300">Desafios:</span>{' '}
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    <span className="font-semibold text-gray-900">Desafios:</span>{' '}
                                     {(persona as PersonaB2B).business_challenges}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).prior_knowledge && (
-                                  <p className="text-xs text-gray-400 leading-relaxed">
-                                    <span className="font-medium text-gray-300">Conhecimento prévio:</span>{' '}
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    <span className="font-semibold text-gray-900">Conhecimento prévio:</span>{' '}
                                     {(persona as PersonaB2B).prior_knowledge}
                                   </p>
                                 )}
                                 {(persona as PersonaB2B).context && (
-                                  <p className="text-xs text-gray-500 italic mt-2 pt-2 border-t border-gray-700">
+                                  <p className="text-xs text-gray-500 italic mt-2 pt-2 border-t border-gray-200">
                                     {(persona as PersonaB2B).context}
                                   </p>
                                 )}
@@ -3439,25 +3567,25 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             {persona.business_type === 'B2C' && (
                               <div className="space-y-2">
                                 {(persona as PersonaB2C).what_seeks && (
-                                  <p className="text-xs text-gray-400 leading-relaxed">
-                                    <span className="font-medium text-gray-300">Busca:</span>{' '}
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    <span className="font-semibold text-gray-900">Busca:</span>{' '}
                                     {(persona as PersonaB2C).what_seeks}
                                   </p>
                                 )}
                                 {(persona as PersonaB2C).main_pains && (
-                                  <p className="text-xs text-gray-400 leading-relaxed">
-                                    <span className="font-medium text-gray-300">Dores:</span>{' '}
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    <span className="font-semibold text-gray-900">Dores:</span>{' '}
                                     {(persona as PersonaB2C).main_pains}
                                   </p>
                                 )}
                                 {(persona as PersonaB2C).prior_knowledge && (
-                                  <p className="text-xs text-gray-400 leading-relaxed">
-                                    <span className="font-medium text-gray-300">Conhecimento prévio:</span>{' '}
+                                  <p className="text-xs text-gray-600 leading-relaxed">
+                                    <span className="font-semibold text-gray-900">Conhecimento prévio:</span>{' '}
                                     {(persona as PersonaB2C).prior_knowledge}
                                   </p>
                                 )}
                                 {(persona as PersonaB2C).context && (
-                                  <p className="text-xs text-gray-500 italic mt-2 pt-2 border-t border-gray-700">
+                                  <p className="text-xs text-gray-500 italic mt-2 pt-2 border-t border-gray-200">
                                     {(persona as PersonaB2C).context}
                                   </p>
                                 )}
@@ -3466,8 +3594,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                             {/* Tags da Persona (todas) */}
                             {persona.id && personaTags.get(persona.id) && personaTags.get(persona.id)!.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-gray-700/50">
-                                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2">Etiquetas</p>
+                              <div className="mt-3 pt-3 border-t border-gray-200">
+                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Etiquetas</p>
                                 <div className="flex flex-wrap gap-2">
                                   {personaTags.get(persona.id)?.map(tagId => {
                                     const tag = tags.find(t => t.id === tagId)
@@ -3475,10 +3603,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     return (
                                       <span
                                         key={tag.id}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-md transition-transform hover:scale-105"
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-sm transition-transform hover:scale-105"
                                         style={{
-                                          background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}dd 100%)`,
-                                          boxShadow: `0 3px 10px ${tag.color}40`
+                                          background: `linear-gradient(135deg, ${tag.color} 0%, ${tag.color}dd 100%)`
                                         }}
                                       >
                                         {tag.name}
@@ -3491,19 +3618,19 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           </div>
 
                           {/* Botões de ação */}
-                          <div className="flex gap-2 flex-shrink-0 items-center mt-3 pt-3 border-t border-gray-700">
+                          <div className="flex gap-2 flex-shrink-0 items-center mt-3 pt-3 border-t border-gray-200">
                             {/* Score da avaliação */}
                             {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
-                              <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${
-                                persona.evaluation_score >= 7 ? 'bg-green-500/20' :
-                                persona.evaluation_score >= 4 ? 'bg-yellow-500/20' :
-                                'bg-red-500/20'
+                              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
+                                persona.evaluation_score >= 7 ? 'bg-green-50 border border-green-200' :
+                                persona.evaluation_score >= 4 ? 'bg-amber-50 border border-amber-200' :
+                                'bg-red-50 border border-red-200'
                               }`}>
-                                <span className="text-xs text-gray-400">Nota:</span>
+                                <span className="text-xs text-gray-500">Nota:</span>
                                 <span className={`text-sm font-bold ${
-                                  persona.evaluation_score >= 7 ? 'text-green-400' :
-                                  persona.evaluation_score >= 4 ? 'text-yellow-400' :
-                                  'text-red-400'
+                                  persona.evaluation_score >= 7 ? 'text-green-700' :
+                                  persona.evaluation_score >= 4 ? 'text-amber-700' :
+                                  'text-red-700'
                                 }`}>{persona.evaluation_score.toFixed(1)}</span>
                               </div>
                             )}
@@ -3514,7 +3641,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                 handleEvaluatePersona(persona)
                               }}
                               disabled={evaluatingPersona || (persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!))}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
                               title={
                                 persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!)
                                   ? 'Edite a persona para poder reavaliá-la'
@@ -3542,7 +3669,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   setSelectedPersonaTags(tags)
                                 }
                               }}
-                              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                               title="Editar persona"
                             >
                               <Settings className="w-4 h-4" />
@@ -3552,7 +3679,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                 e.stopPropagation()
                                 handleDeletePersona(persona.id!)
                               }}
-                              className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                               title="Deletar persona"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -3568,10 +3695,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
               {/* Formulário de Nova/Editar Persona */}
               {showPersonaForm && (
-                <div className="p-4 border-t border-gray-800">
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-4">
+                <div className="p-5 border-t border-gray-100">
+                  <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-white">
+                      <h4 className="text-sm font-semibold text-gray-900">
                         {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType === 'Ambos' ? selectedPersonaType : businessType}
                       </h4>
                       <button
@@ -3581,7 +3708,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           setEditingPersonaId(null)
                           setSelectedPersonaTags([])
                         }}
-                        className="p-1 text-gray-500 hover:text-white rounded transition-colors"
+                        className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
                       >
                       <X className="w-5 h-5" />
                     </button>
@@ -3590,7 +3717,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   {/* Selector de tipo quando businessType é "Ambos" */}
                   {businessType === 'Ambos' && !editingPersonaId && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Tipo de Persona
                       </label>
                       <div className="grid grid-cols-2 gap-3">
@@ -3602,7 +3729,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           className={`px-4 py-3 rounded-xl font-medium transition-all ${
                             selectedPersonaType === 'B2B'
                               ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                              : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                              : 'bg-gray-100/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
                           }`}
                         >
                           B2B
@@ -3615,7 +3742,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           className={`px-4 py-3 rounded-xl font-medium transition-all ${
                             selectedPersonaType === 'B2C'
                               ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
-                              : 'bg-gray-800/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
+                              : 'bg-gray-100/50 border border-green-500/20 text-gray-400 hover:border-green-500/40'
                           }`}
                         >
                           B2C
@@ -3629,75 +3756,75 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <>
                       {/* Formulário B2B */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Cargo *
                         </label>
                         <input
                           type="text"
                           value={(newPersona as PersonaB2B).job_title || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, job_title: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Gerente de Compras, CEO, Diretor de TI"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Tipo de Empresa e Faturamento
                         </label>
                         <input
                           type="text"
                           value={(newPersona as PersonaB2B).company_type || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, company_type: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Startup de tecnologia com faturamento de R$500k/mês"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Contexto (descrição livre)
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2B).context || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Responsável por decisões de compra, equipe de 10 pessoas, busca inovação"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           O que busca para a empresa?
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2B).company_goals || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, company_goals: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Aumentar eficiência, reduzir custos, melhorar processos, escalar o negócio"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Principais desafios/dores do negócio
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2B).business_challenges || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, business_challenges: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Processos manuais demorados, falta de integração, dificuldade em medir resultados"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           O que a persona já sabe sobre a sua empresa e seus serviços?
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2B).prior_knowledge || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
                         />
                       </div>
@@ -3706,62 +3833,62 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <>
                       {/* Formulário B2C */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Profissão *
                         </label>
                         <input
                           type="text"
                           value={(newPersona as PersonaB2C).profession || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, profession: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Professor, Médico, Estudante"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Contexto (descrição livre)
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2C).context || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Mãe de 2 filhos, mora em apartamento, trabalha home office"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           O que busca/valoriza?
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2C).what_seeks || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, what_seeks: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Praticidade, economia de tempo, produtos de qualidade, bom atendimento"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Principais dores/problemas
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2C).main_pains || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, main_pains: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Falta de tempo, dificuldade em encontrar produtos confiáveis, preços altos"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           O que a persona já sabe sobre a sua empresa e seus serviços?
                         </label>
                         <textarea
                           value={(newPersona as PersonaB2C).prior_knowledge || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
                         />
                       </div>
@@ -3775,7 +3902,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   {/* Seletor de Tags */}
                   {tags.length > 0 && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Etiqueta (opcional - apenas uma por persona)
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -3817,7 +3944,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setEditingPersonaId(null)
                         setSelectedPersonaTags([])
                       }}
-                      className="flex-1 px-6 py-3 bg-gray-800/50 border border-green-500/20 rounded-xl font-medium hover:border-green-500/40 transition-all"
+                      className="flex-1 px-6 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl font-medium hover:border-green-500/40 transition-all"
                     >
                       Cancelar
                     </button>
@@ -3838,23 +3965,22 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Objeções Tab */}
         {activeTab === 'objections' && (
           <div className="space-y-6">
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800">
-                <div className="flex items-center justify-between">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+                <div className="flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Principais Objeções</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">Principais Objeções</h3>
                     {/* Contador de Objeções */}
-                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                    <div className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                       {objections.length}
                     </div>
                   </div>
                   <button
                     onClick={() => setShowAIGenerateModal('objections')}
-                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
+                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg text-sm font-semibold text-white shadow-sm hover:shadow-md hover:from-purple-700 hover:to-purple-800 transition-all duration-200"
                   >
-                    <Sparkles className="w-4 h-4 animate-pulse" />
+                    <Sparkles className="w-4 h-4" />
                     Gerar com IA
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
                   </button>
                 </div>
                 <p className="text-gray-500 mt-2 text-xs">
@@ -3863,29 +3989,29 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
 
               {/* Aviso de Qualidade */}
-              <div className="mx-4 mt-4 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+              <div className="mx-5 mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-300 leading-relaxed">
-                    <span className="font-medium">Atenção:</span> Objeções com pontuação abaixo de 7.0 podem comprometer a qualidade do treinamento.
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    <span className="font-semibold">Atenção:</span> Objeções com pontuação abaixo de 7.0 podem comprometer a qualidade do treinamento.
                   </p>
                 </div>
               </div>
 
               {/* Lista de objeções */}
               {objections.length > 0 && (
-                <div className="p-4 space-y-2">
+                <div className="p-5 space-y-3">
                   {objections.map((objection) => (
                     <div
                       key={objection.id}
-                      className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden"
+                      className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-green-300 transition-all"
                     >
                       {/* Header da objeção */}
-                      <div className="flex items-center justify-between px-3 py-2">
+                      <div className="flex items-center justify-between px-4 py-3">
                         <div className="flex items-center gap-2 flex-1">
                           <button
                             onClick={() => toggleObjectionExpanded(objection.id)}
-                            className="text-gray-500 hover:text-white transition-colors"
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
                           >
                             <svg
                               className={`w-4 h-4 transform transition-transform ${expandedObjections.has(objection.id) ? 'rotate-90' : ''}`}
@@ -3911,12 +4037,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                       setTempObjectionName('')
                                     }
                                   }}
-                                  className="flex-1 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-green-500/50"
+                                  className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                   autoFocus
                                 />
                                 <button
                                   onClick={() => handleUpdateObjectionName(objection.id)}
-                                  className="text-green-400 hover:text-green-300 transition-colors"
+                                  className="text-green-600 hover:text-green-700 transition-colors"
                                 >
                                   <Check className="w-4 h-4" />
                                 </button>
@@ -3925,20 +4051,20 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     setEditingObjectionName(null)
                                     setTempObjectionName('')
                                   }}
-                                  className="text-gray-500 hover:text-white transition-colors"
+                                  className="text-gray-400 hover:text-gray-600 transition-colors"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
                               </>
                             ) : (
                               <>
-                                <span className="text-sm text-white">{objection.name}</span>
+                                <span className="text-sm text-gray-900">{objection.name}</span>
                                 <button
                                   onClick={() => {
                                     setEditingObjectionName(objection.id)
                                     setTempObjectionName(objection.name)
                                   }}
-                                  className="text-gray-500 hover:text-white transition-colors"
+                                  className="text-gray-400 hover:text-gray-600 transition-colors"
                                 >
                                   <Edit2 className="w-3 h-3" />
                                 </button>
@@ -3953,9 +4079,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           {/* Score Badge */}
                           {objection.evaluation_score !== null && objection.evaluation_score !== undefined && (
                             <div className={`px-2 py-0.5 rounded text-xs font-bold ${
-                              objection.evaluation_score >= 7 ? 'bg-green-500/20 text-green-400' :
-                              objection.evaluation_score >= 4 ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-red-500/20 text-red-400'
+                              objection.evaluation_score >= 7 ? 'bg-green-100 text-green-700' :
+                              objection.evaluation_score >= 4 ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-100 text-red-700'
                             }`}>
                               {objection.evaluation_score.toFixed(1)}
                             </div>
@@ -3964,7 +4090,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           <button
                             onClick={() => handleEvaluateObjection(objection)}
                             disabled={evaluatingObjection || (objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id))}
-                            className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title={
                               objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id)
                                 ? 'Edite a objeção para poder reavaliar'
@@ -3979,7 +4105,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           </button>
                           <button
                             onClick={() => handleRemoveObjection(objection.id)}
-                            className="p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -3988,12 +4114,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                       {/* Conteúdo expandido */}
                       {expandedObjections.has(objection.id) && (
-                        <div className="border-t border-gray-700 px-3 py-3 space-y-3 bg-gray-900/30">
+                        <div className="border-t border-gray-100 px-3 py-3 space-y-3 bg-gray-50/50">
                           <div>
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Formas de Quebrar</h4>
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Formas de Quebrar</h4>
                               {/* Contador de formas de quebrar */}
-                              <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                              <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
                                 {objection.rebuttals?.length || 0}
                               </div>
                             </div>
@@ -4008,7 +4134,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   return (
                                   <div
                                     key={index}
-                                    className="flex items-start gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2"
+                                    className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
                                   >
                                     <span className="text-gray-500 font-medium text-xs mt-0.5">{index + 1}.</span>
                                     {editingRebuttalId?.objectionId === objection.id && editingRebuttalId?.index === index ? (
@@ -4025,12 +4151,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                               setTempRebuttalText('')
                                             }
                                           }}
-                                          className="flex-1 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded text-white text-xs focus:outline-none focus:border-green-500/50"
+                                          className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded text-white text-xs focus:outline-none focus:border-green-500/50"
                                           autoFocus
                                         />
                                         <button
                                           onClick={() => handleUpdateRebuttal(objection.id, index)}
-                                          className="text-green-400 hover:text-green-300 transition-colors"
+                                          className="text-green-600 hover:text-green-700 transition-colors"
                                         >
                                           <Check className="w-3 h-3" />
                                         </button>
@@ -4039,26 +4165,26 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                             setEditingRebuttalId(null)
                                             setTempRebuttalText('')
                                           }}
-                                          className="text-gray-500 hover:text-white transition-colors"
+                                          className="text-gray-400 hover:text-gray-600 transition-colors"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>
                                       </>
                                     ) : (
                                       <>
-                                        <span className="text-gray-400 text-xs flex-1">{rebuttalText}</span>
+                                        <span className="text-gray-600 text-xs flex-1">{rebuttalText}</span>
                                         <button
                                           onClick={() => {
                                             setEditingRebuttalId({ objectionId: objection.id, index })
                                             setTempRebuttalText(rebuttalText)
                                           }}
-                                          className="text-gray-500 hover:text-white transition-colors"
+                                          className="text-gray-400 hover:text-gray-600 transition-colors"
                                         >
                                           <Edit2 className="w-3 h-3" />
                                         </button>
                                         <button
                                           onClick={() => handleRemoveRebuttal(objection.id, index)}
-                                          className="text-gray-500 hover:text-red-400 transition-colors"
+                                          className="text-gray-400 hover:text-red-500 transition-colors"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>
@@ -4083,12 +4209,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     handleAddRebuttal(objection.id)
                                   }
                                 }}
-                                className="flex-1 px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-xs placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                                className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-white text-xs placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                                 placeholder="Ex: Apresentar cálculo de ROI detalhado..."
                               />
                               <button
                                 onClick={() => handleAddRebuttal(objection.id)}
-                                className="px-3 py-2 rounded-lg text-sm bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+                                className="px-3 py-2 rounded-lg text-sm bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
                               >
                                 <Plus className="w-4 h-4" />
                               </button>
@@ -4102,7 +4228,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               )}
 
               {/* Adicionar nova objeção */}
-              <div className="p-4 border-t border-gray-800 space-y-2">
+              <div className="p-4 border-t border-gray-100 space-y-2">
                 {/* Indicador de limite */}
                 {objectionLimitReached && (
                   <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-2 flex items-center gap-2">
@@ -4136,8 +4262,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     disabled={objectionLimitReached}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       objectionLimitReached
-                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
                     }`}
                     title={objectionLimitReached ? `Limite atingido` : ''}
                   >
@@ -4156,9 +4282,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Objetivos de Roleplay Tab */}
         {activeTab === 'objectives' && (
           <div className="space-y-6">
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Objetivos de Roleplay</h3>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Objetivos de Roleplay</h3>
                 <button
                   onClick={() => setShowAIGenerateModal('objectives')}
                   className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
@@ -4170,8 +4296,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
 
               {/* Formulário de novo objetivo */}
-              <div className="p-4 border-b border-gray-800">
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Adicionar Novo Objetivo</h4>
+              <div className="p-4 border-b border-gray-100">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Adicionar Novo Objetivo</h4>
                 <div className="space-y-3">
                   <input
                     type="text"
@@ -4179,18 +4305,18 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     onChange={(e) => setNewObjectiveName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddObjective()}
                     placeholder="Nome do objetivo (ex: Marcar próxima reunião)"
-                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                   />
                   <textarea
                     value={newObjectiveDescription}
                     onChange={(e) => setNewObjectiveDescription(e.target.value)}
                     placeholder="Descrição do objetivo (opcional)"
                     rows={2}
-                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                   />
                   <button
                     onClick={handleAddObjective}
-                    className="w-full px-3 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
+                    className="w-full px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus className="w-4 h-4" />
                     Adicionar Objetivo
@@ -4204,7 +4330,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   {objectives.map((objective) => (
                     <div
                       key={objective.id}
-                      className="bg-gray-800/50 border border-gray-700 rounded-lg p-3"
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-3"
                     >
                       {editingObjectiveId === objective.id ? (
                         // Modo de edição
@@ -4217,26 +4343,26 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               if (e.key === 'Enter') handleUpdateObjective(objective.id)
                               if (e.key === 'Escape') cancelEditingObjective()
                             }}
-                            className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded text-sm text-white focus:outline-none focus:border-green-500/50"
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-green-500/50"
                             autoFocus
                           />
                           <textarea
                             value={editingObjectiveDescription}
                             onChange={(e) => setEditingObjectiveDescription(e.target.value)}
                             rows={2}
-                            className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded text-sm text-white focus:outline-none focus:border-green-500/50 resize-none"
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-green-500/50 resize-none"
                           />
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleUpdateObjective(objective.id)}
-                              className="flex-1 px-3 py-1.5 bg-green-500/20 text-green-400 rounded text-sm font-medium hover:bg-green-500/30 transition-colors"
+                              className="flex-1 px-3 py-1.5 bg-green-100 text-green-700 rounded text-sm font-medium hover:bg-green-200 transition-colors"
                             >
                               <Check className="w-3 h-3 inline mr-1" />
                               Salvar
                             </button>
                             <button
                               onClick={cancelEditingObjective}
-                              className="flex-1 px-3 py-1.5 bg-gray-700 text-gray-300 rounded text-sm font-medium hover:bg-gray-600 transition-colors"
+                              className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-100 transition-colors"
                             >
                               Cancelar
                             </button>
@@ -4248,7 +4374,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-                              <h4 className="text-sm text-white font-medium">{objective.name}</h4>
+                              <h4 className="text-sm text-gray-900 font-medium">{objective.name}</h4>
                             </div>
                             {objective.description && (
                               <p className="text-xs text-gray-500 ml-6 mt-1">{objective.description}</p>
@@ -4257,14 +4383,14 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           <div className="flex gap-1">
                             <button
                               onClick={() => startEditingObjective(objective)}
-                              className="p-1.5 text-gray-500 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                              className="p-1.5 text-gray-500 hover:text-white hover:bg-gray-100 rounded transition-colors"
                               title="Editar"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteObjective(objective.id)}
-                              className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                               title="Excluir"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -4288,24 +4414,24 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Dados da Empresa Tab */}
         {activeTab === 'files' && (
           <div className="space-y-6">
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800">
-                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Dados da Empresa</h3>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Dados da Empresa</h3>
                 <p className="text-xs text-gray-500 mt-1">
                   Preencha as informações para melhorar o treinamento da IA.
                 </p>
               </div>
 
               {/* Tipo de Empresa */}
-              <div className="p-4 border-b border-gray-800">
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Tipo de Empresa</h4>
+              <div className="p-4 border-b border-gray-100">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Tipo de Empresa</h4>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => handleSetBusinessType('B2C')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       businessType === 'B2C'
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : 'bg-gray-800/50 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'
+                        ? 'bg-green-100 text-green-700 border border-green-500/30'
+                        : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     B2C
@@ -4314,8 +4440,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     onClick={() => handleSetBusinessType('B2B')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       businessType === 'B2B'
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : 'bg-gray-800/50 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'
+                        ? 'bg-green-100 text-green-700 border border-green-500/30'
+                        : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     B2B
@@ -4324,8 +4450,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     onClick={() => handleSetBusinessType('Ambos')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       businessType === 'Ambos'
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : 'bg-gray-800/50 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'
+                        ? 'bg-green-100 text-green-700 border border-green-500/30'
+                        : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     Ambos
@@ -4336,7 +4462,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               {/* Formulário de Dados da Empresa */}
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Informações da Empresa</h4>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Informações da Empresa</h4>
                   <button
                     onClick={() => setShowAIModal(true)}
                     className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
@@ -4349,7 +4475,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="space-y-4">
                   {/* Nome da Empresa */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Nome da empresa
                     </label>
                     <input
@@ -4360,13 +4486,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         setCompanyDataEdited(true)
                       }}
                       placeholder="Ex: Tech Solutions LTDA"
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                     />
                   </div>
 
                   {/* Descrição */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Descrição
                     </label>
                     <textarea
@@ -4377,13 +4503,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="O que a empresa faz em uma frase"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Produtos/Serviços */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Produtos/Serviços
                     </label>
                     <textarea
@@ -4394,13 +4520,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="Ex: Sistema ERP, CRM para vendas"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Função dos Produtos */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Função dos produtos
                     </label>
                     <textarea
@@ -4411,13 +4537,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="O que cada produto faz na prática"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Diferenciais */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Diferenciais
                     </label>
                     <textarea
@@ -4428,13 +4554,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="Diferenciais em relação aos concorrentes"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Concorrentes */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Concorrentes
                     </label>
                     <textarea
@@ -4445,13 +4571,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="Ex: TOTVS, Omie, Bling"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Dados e Métricas */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Provas Sociais
                     </label>
                     <textarea
@@ -4462,13 +4588,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="Depoimentos, cases, prêmios, certificações, clientes conhecidos, métricas..."
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Erros Comuns */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Erros comuns
                     </label>
                     <textarea
@@ -4479,13 +4605,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="Informações que vendedores costumam confundir"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Percepção Desejada */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Percepção desejada
                     </label>
                     <textarea
@@ -4496,13 +4622,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="Como a empresa deseja ser percebida pelos clientes"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
                   {/* Dores que Resolve */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Dores que resolve
                     </label>
                     <textarea
@@ -4513,7 +4639,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }}
                       placeholder="Quais dores a empresa resolve para seus clientes"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
 
@@ -4524,7 +4650,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       <button
                         onClick={handleSaveCompanyData}
                         disabled={savingCompanyData}
-                        className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {savingCompanyData ? (
                           <>
@@ -4543,7 +4669,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <button
                       onClick={handleEvaluateQuality}
                       disabled={evaluatingQuality || (qualityEvaluation && !companyDataEdited)}
-                      className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       title={
                         qualityEvaluation && !companyDataEdited
                           ? 'Edite os dados para poder reavaliar'
@@ -4582,20 +4708,20 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Fases do Funil Tab */}
         {activeTab === 'funnel' && (
           <div className="space-y-6">
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-              <div className="p-4 border-b border-gray-800">
-                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Fases do Funil de Vendas</h3>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Fases do Funil de Vendas</h3>
                 <p className="text-xs text-gray-500 mt-1">
                   Configure as fases do seu processo de vendas.
                 </p>
               </div>
 
               {/* Formulário para adicionar nova fase */}
-              <div className="p-4 border-b border-gray-800">
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Adicionar Nova Fase</h4>
+              <div className="p-4 border-b border-gray-100">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Adicionar Nova Fase</h4>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Nome da Fase *
                     </label>
                     <input
@@ -4603,11 +4729,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       value={newStageName}
                       onChange={(e) => setNewStageName(e.target.value)}
                       placeholder="Ex: Primeiro Contato, Qualificação..."
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Descrição
                     </label>
                     <textarea
@@ -4615,11 +4741,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       onChange={(e) => setNewStageDescription(e.target.value)}
                       placeholder="O que caracteriza essa fase do funil..."
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Objetivo
                     </label>
                     <textarea
@@ -4627,12 +4753,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       onChange={(e) => setNewStageObjective(e.target.value)}
                       placeholder="Como passar para próxima fase"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
                     />
                   </div>
                   <button
                     onClick={handleAddFunnelStage}
-                    className="w-full px-3 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
+                    className="w-full px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus className="w-4 h-4" />
                     Adicionar Fase
@@ -4643,9 +4769,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               {/* Lista de fases */}
               <div className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider">Fases Cadastradas</h4>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Fases Cadastradas</h4>
                   {funnelStages.length > 0 && (
-                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
                       {funnelStages.length}
                     </div>
                   )}
@@ -4701,224 +4827,478 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           </div>
         )}
 
-        {/* Usage Tab - Consumo de Créditos */}
+        {/* Usage Tab */}
         {activeTab === 'usage' && (
           <div className="space-y-6">
-            {loadingUsage ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-white">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-amber-600" />
+                  Uso de Créditos
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Acompanhe o consumo de créditos da sua empresa neste mês.
+                </p>
               </div>
-            ) : usageData ? (
-              <>
-                {/* Card Principal de Créditos */}
-                <div className="bg-gray-900/50 rounded-xl border border-amber-500/30 overflow-hidden">
-                  <div className="p-4 border-b border-gray-800 bg-amber-500/10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                        <Zap className="w-5 h-5 text-amber-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-white">Créditos do Mês</h3>
-                        <p className="text-sm text-gray-400">
-                          Plano {trainingPlan ? PLAN_NAMES[trainingPlan] : 'Carregando...'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="p-6">
-                    {/* Barra de Progresso */}
-                    {usageData.monthlyCredits !== null ? (
-                      <div className="mb-6">
-                        <div className="flex items-end justify-between mb-2">
-                          <div>
-                            <span className="text-4xl font-bold text-white">{usageData.creditsUsed}</span>
-                            <span className="text-gray-400 text-lg ml-1">/ {usageData.monthlyCredits + usageData.extraCredits}</span>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-400">Créditos restantes</p>
-                            <p className="text-2xl font-bold text-green-400">
-                              {Math.max(0, (usageData.monthlyCredits + usageData.extraCredits) - usageData.creditsUsed)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="w-full h-4 bg-gray-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-500 ${
-                              (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) >= 0.9
-                                ? 'bg-red-500'
-                                : (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) >= 0.7
-                                ? 'bg-amber-500'
-                                : 'bg-green-500'
-                            }`}
-                            style={{
-                              width: `${Math.min(100, (usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) * 100)}%`
-                            }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {((usageData.creditsUsed / (usageData.monthlyCredits + usageData.extraCredits)) * 100).toFixed(1)}% utilizado
-                        </p>
-
-                        {/* Info de créditos extras */}
-                        {usageData.extraCredits > 0 && (
-                          <div className="mt-3 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
-                            <p className="text-sm text-green-400">
-                              +{usageData.extraCredits} créditos extras adicionados
-                            </p>
-                          </div>
+              {loadingUsage ? (
+                <div className="p-8 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
+                </div>
+              ) : usageData ? (
+                <div className="p-4 space-y-6">
+                  {/* Resumo Principal */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Créditos Disponíveis */}
+                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Zap className="w-4 h-4 text-amber-600" />
+                        <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Limite Mensal</span>
+                      </div>
+                      <div className="text-2xl font-bold text-amber-900">
+                        {usageData.monthlyCredits === null ? (
+                          <span className="text-lg">Ilimitado</span>
+                        ) : (
+                          <>
+                            {usageData.monthlyCredits + usageData.extraCredits}
+                            {usageData.extraCredits > 0 && (
+                              <span className="text-sm font-normal text-amber-600 ml-1">
+                                (+{usageData.extraCredits} extras)
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
-                    ) : (
-                      <div className="mb-6 text-center py-4">
-                        <p className="text-3xl font-bold text-amber-400">♾️ Ilimitado</p>
-                        <p className="text-sm text-gray-400 mt-1">Plano Enterprise - sem limite de créditos</p>
-                      </div>
-                    )}
+                    </div>
 
-                    {/* Data de Reset */}
-                    {usageData.resetDate && (
-                      <div className="flex items-center gap-2 text-sm text-gray-400 border-t border-gray-800 pt-4">
-                        <Clock className="w-4 h-4" />
-                        <span>
-                          Créditos renovam em:{' '}
-                          <span className="text-white font-medium">
+                    {/* Créditos Usados */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Usados</span>
+                      </div>
+                      <div className="text-2xl font-bold text-blue-900">
+                        {usageData.creditsUsed}
+                      </div>
+                    </div>
+
+                    {/* Créditos Restantes */}
+                    <div className={`bg-gradient-to-br rounded-xl p-4 border ${
+                      usageData.monthlyCredits === null
+                        ? 'from-green-50 to-emerald-50 border-green-200'
+                        : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
+                          ? 'from-red-50 to-rose-50 border-red-200'
+                          : 'from-green-50 to-emerald-50 border-green-200'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className={`w-4 h-4 ${
+                          usageData.monthlyCredits === null
+                            ? 'text-green-600'
+                            : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
+                              ? 'text-red-600'
+                              : 'text-green-600'
+                        }`} />
+                        <span className={`text-xs font-semibold uppercase tracking-wider ${
+                          usageData.monthlyCredits === null
+                            ? 'text-green-700'
+                            : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
+                              ? 'text-red-700'
+                              : 'text-green-700'
+                        }`}>Restantes</span>
+                      </div>
+                      <div className={`text-2xl font-bold ${
+                        usageData.monthlyCredits === null
+                          ? 'text-green-900'
+                          : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
+                            ? 'text-red-900'
+                            : 'text-green-900'
+                      }`}>
+                        {usageData.monthlyCredits === null ? (
+                          <span className="text-lg">Ilimitado</span>
+                        ) : (
+                          Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed)
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gráfico de Donut + Legenda */}
+                  {usageData.monthlyCredits !== null && (
+                    <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                      <div className="flex flex-col md:flex-row items-center gap-8">
+                        {/* Donut Chart */}
+                        <div className="relative w-48 h-48 flex-shrink-0">
+                          <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
                             {(() => {
-                              const resetDate = new Date(usageData.resetDate)
-                              const nextMonth = new Date(resetDate.getFullYear(), resetDate.getMonth() + 1, 1)
-                              return nextMonth.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
+                              const total = usageData.monthlyCredits + usageData.extraCredits
+                              const remaining = Math.max(0, total - usageData.creditsUsed)
+
+                              // Calculate credits used per feature (considering cost multipliers)
+                              const roleplayCredits = usageData.breakdown.roleplay * 1
+                              const publicRoleplayCredits = usageData.breakdown.publicRoleplay * 1
+                              const followupCredits = usageData.breakdown.followup * 1
+                              const meetCredits = usageData.breakdown.meet * 3
+                              const pdiCredits = usageData.breakdown.pdi * 1
+                              const aiGenerationCredits = usageData.breakdown.aiGeneration * 0.5
+
+                              const segments = [
+                                { value: roleplayCredits, color: '#9333ea', label: 'Roleplay' },
+                                { value: publicRoleplayCredits, color: '#ec4899', label: 'Roleplay Público' },
+                                { value: followupCredits, color: '#3b82f6', label: 'Follow-up' },
+                                { value: meetCredits, color: '#22c55e', label: 'Meet' },
+                                { value: pdiCredits, color: '#f59e0b', label: 'PDI' },
+                                { value: aiGenerationCredits, color: '#06b6d4', label: 'IA' },
+                                { value: remaining, color: '#e5e7eb', label: 'Disponível' }
+                              ].filter(s => s.value > 0)
+
+                              const radius = 40
+                              const circumference = 2 * Math.PI * radius
+                              let currentOffset = 0
+
+                              return segments.map((segment, index) => {
+                                const percentage = segment.value / total
+                                const dashLength = percentage * circumference
+                                const dashOffset = -currentOffset
+                                currentOffset += dashLength
+
+                                return (
+                                  <circle
+                                    key={index}
+                                    cx="50"
+                                    cy="50"
+                                    r={radius}
+                                    fill="none"
+                                    stroke={segment.color}
+                                    strokeWidth="16"
+                                    strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                                    strokeDashoffset={dashOffset}
+                                    className="transition-all duration-500"
+                                  />
+                                )
+                              })
                             })()}
-                          </span>
-                        </span>
+                          </svg>
+                          {/* Center text */}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-2xl font-bold text-gray-900">{usageData.creditsUsed}</span>
+                            <span className="text-xs text-gray-500">de {usageData.monthlyCredits + usageData.extraCredits}</span>
+                          </div>
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex-1 grid grid-cols-2 gap-3">
+                          {[
+                            { label: 'Roleplay (Treino)', value: usageData.breakdown.roleplay, credits: usageData.breakdown.roleplay * 1, color: 'bg-purple-500' },
+                            { label: 'Roleplay Público', value: usageData.breakdown.publicRoleplay, credits: usageData.breakdown.publicRoleplay * 1, color: 'bg-pink-500' },
+                            { label: 'Follow-up', value: usageData.breakdown.followup, credits: usageData.breakdown.followup * 1, color: 'bg-blue-500' },
+                            { label: 'Análise de Meet', value: usageData.breakdown.meet, credits: usageData.breakdown.meet * 3, color: 'bg-green-500' },
+                            { label: 'PDI', value: usageData.breakdown.pdi, credits: usageData.breakdown.pdi * 1, color: 'bg-amber-500' },
+                            { label: 'Geração com IA', value: usageData.breakdown.aiGeneration, credits: usageData.breakdown.aiGeneration * 0.5, color: 'bg-cyan-500' },
+                            { label: 'Desafios Diários', value: usageData.breakdown.dailyChallenges, credits: usageData.breakdown.dailyChallenges * 1, color: 'bg-orange-500' },
+                            { label: 'Disponível', value: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), credits: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), color: 'bg-gray-300' }
+                          ].filter(item => item.credits > 0 || item.label === 'Disponível').map((item, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${item.color} flex-shrink-0`} />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-gray-700 truncate">{item.label}</p>
+                                <p className="text-xs text-gray-500">{item.credits} crédito{item.credits !== 1 ? 's' : ''}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Breakdown por Tipo */}
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="p-3 border-b border-gray-100 bg-gray-50">
+                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Detalhamento por Tipo</h4>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {/* Roleplay Interno */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <MessageSquare className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Roleplay (Treino)</p>
+                            <p className="text-xs text-gray-500">1 crédito por sessão</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-purple-600">{usageData.breakdown.roleplay}</p>
+                          <p className="text-xs text-gray-500">sessões</p>
+                        </div>
+                      </div>
+
+                      {/* Roleplay Público */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                            <Link2 className="w-5 h-5 text-pink-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Roleplay Público</p>
+                            <p className="text-xs text-gray-500">1 crédito por candidato</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-pink-600">{usageData.breakdown.publicRoleplay}</p>
+                          <p className="text-xs text-gray-500">candidatos</p>
+                        </div>
+                      </div>
+
+                      {/* Follow-up */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Zap className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Follow-up</p>
+                            <p className="text-xs text-gray-500">1 crédito por análise</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-600">{usageData.breakdown.followup}</p>
+                          <p className="text-xs text-gray-500">análises</p>
+                        </div>
+                      </div>
+
+                      {/* Meet Analysis */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Video className="w-5 h-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Análise de Meet</p>
+                            <p className="text-xs text-gray-500">3 créditos por análise</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-green-600">{usageData.breakdown.meet}</p>
+                          <p className="text-xs text-gray-500">análises</p>
+                        </div>
+                      </div>
+
+                      {/* PDI */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">PDI</p>
+                            <p className="text-xs text-gray-500">1 crédito por geração</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-amber-600">{usageData.breakdown.pdi}</p>
+                          <p className="text-xs text-gray-500">gerados</p>
+                        </div>
+                      </div>
+
+                      {/* Geração com IA */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center">
+                            <Sparkles className="w-5 h-5 text-cyan-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Geração com IA</p>
+                            <p className="text-xs text-gray-500">0.5 crédito por geração</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-cyan-600">{usageData.breakdown.aiGeneration}</p>
+                          <p className="text-xs text-gray-500">gerações</p>
+                        </div>
+                      </div>
+
+                      {/* Desafios Diários */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <Target className="w-5 h-5 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Desafios Diários</p>
+                            <p className="text-xs text-gray-500">1 crédito por desafio</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-orange-600">{usageData.breakdown.dailyChallenges}</p>
+                          <p className="text-xs text-gray-500">desafios</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Data de Reset */}
+                  {usageData.monthlyCredits !== null && (
+                    <div className="text-center text-xs text-gray-500">
+                      Próximo reset: {(() => {
+                        const now = new Date()
+                        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+                        return nextMonth.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                      })()}
+                    </div>
+                  )}
                 </div>
-
-                {/* Breakdown de Uso */}
-                <div className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-                  <div className="p-4 border-b border-gray-800">
-                    <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Detalhamento do Uso</h3>
-                    <p className="text-xs text-gray-500 mt-1">Como seus créditos estão sendo utilizados neste mês</p>
-                  </div>
-
-                  <div className="p-4 space-y-4">
-                    {/* Roleplay */}
-                    <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                          <Zap className="w-5 h-5 text-purple-400" />
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">Roleplay de Vendas</p>
-                          <p className="text-xs text-gray-500">1 crédito por sessão</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-purple-400">{usageData.breakdown.roleplay}</p>
-                        <p className="text-xs text-gray-500">sessões</p>
-                      </div>
-                    </div>
-
-                    {/* Follow-up */}
-                    <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                          <MessageSquare className="w-5 h-5 text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">Análise de Follow-up</p>
-                          <p className="text-xs text-gray-500">1 crédito por análise</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-blue-400">{usageData.breakdown.followup}</p>
-                        <p className="text-xs text-gray-500">análises</p>
-                      </div>
-                    </div>
-
-                    {/* Meet Analysis */}
-                    <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                          <Video className="w-5 h-5 text-green-400" />
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">Análise de Google Meet</p>
-                          <p className="text-xs text-gray-500">3 créditos por análise</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-green-400">{usageData.breakdown.meet / 3}</p>
-                        <p className="text-xs text-gray-500">análises ({usageData.breakdown.meet} créditos)</p>
-                      </div>
-                    </div>
-
-                    {/* Total */}
-                    <div className="flex items-center justify-between p-4 bg-amber-500/10 rounded-xl border border-amber-500/30 mt-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                          <BarChart3 className="w-5 h-5 text-amber-400" />
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">Total Consumido</p>
-                          <p className="text-xs text-gray-500">Neste período</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-amber-400">
-                          {usageData.breakdown.roleplay + usageData.breakdown.followup + usageData.breakdown.meet}
-                        </p>
-                        <p className="text-xs text-gray-500">créditos</p>
-                      </div>
-                    </div>
-                  </div>
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Não foi possível carregar os dados de uso.</p>
                 </div>
+              )}
+            </div>
 
-                {/* Botão de atualizar */}
-                <div className="flex justify-end">
+            {/* Seção de Configurações */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-purple-600" />
+                  Configurações
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Gerencie as configurações de funcionalidades da sua empresa.
+                </p>
+              </div>
+
+              <div className="p-4">
+                {/* Toggle Desafios Diários */}
+                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50/50 to-pink-50/50 rounded-xl border border-purple-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Target className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Desafios Diários</h4>
+                      <p className="text-xs text-gray-500">
+                        IA analisa dados e gera desafios personalizados
+                      </p>
+                    </div>
+                  </div>
                   <button
-                    onClick={loadUsageData}
-                    disabled={loadingUsage}
-                    className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors flex items-center gap-2"
+                    onClick={async () => {
+                      if (!userCompanyId) return
+                      try {
+                        const { supabase } = await import('@/lib/supabase')
+                        const { data: company } = await supabase
+                          .from('companies')
+                          .select('daily_challenges_enabled')
+                          .eq('id', userCompanyId)
+                          .single()
+
+                        const newValue = !(company?.daily_challenges_enabled ?? true)
+
+                        await supabase
+                          .from('companies')
+                          .update({ daily_challenges_enabled: newValue })
+                          .eq('id', userCompanyId)
+
+                        // Force re-render
+                        loadUsageData()
+                      } catch (error) {
+                        console.error('Erro ao atualizar configuração:', error)
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      usageData?.challengesEnabled !== false ? 'bg-purple-600' : 'bg-gray-300'
+                    }`}
                   >
-                    <RefreshCw className={`w-4 h-4 ${loadingUsage ? 'animate-spin' : ''}`} />
-                    Atualizar dados
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        usageData?.challengesEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
                   </button>
                 </div>
-              </>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Não foi possível carregar os dados de uso.</p>
-                <button
-                  onClick={loadUsageData}
-                  className="mt-4 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm font-medium hover:bg-amber-500/30 transition-colors"
-                >
-                  Tentar novamente
-                </button>
+
+                {/* Input URL do Site da Empresa */}
+                {usageData?.challengesEnabled !== false && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Link2 className="w-4 h-4 text-gray-500" />
+                      <label className="text-sm font-medium text-gray-700">
+                        URL do Site da Empresa
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      A IA usará o site para gerar personas e objeções mais realistas nos desafios avançados (4+ estrelas).
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={usageData?.websiteUrl || ''}
+                        onChange={(e) => {
+                          if (usageData) {
+                            setUsageData({ ...usageData, websiteUrl: e.target.value })
+                          }
+                        }}
+                        placeholder="https://www.suaempresa.com.br"
+                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!userCompanyId || !usageData?.websiteUrl) return
+                          try {
+                            // Normalize URL - add https:// if missing
+                            let normalizedUrl = usageData.websiteUrl.trim()
+                            if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+                              normalizedUrl = `https://${normalizedUrl}`
+                            }
+
+                            const { supabase } = await import('@/lib/supabase')
+                            await supabase
+                              .from('companies')
+                              .update({ website_url: normalizedUrl })
+                              .eq('id', userCompanyId)
+
+                            // Update local state with normalized URL
+                            setUsageData({ ...usageData, websiteUrl: normalizedUrl })
+                            showToast('success', 'URL salva', 'O site da empresa foi salvo com sucesso.')
+                          } catch (error) {
+                            console.error('Erro ao salvar URL:', error)
+                            showToast('error', 'Erro', 'Não foi possível salvar a URL.')
+                          }
+                        }}
+                        disabled={!usageData?.websiteUrl}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                    {usageData?.websiteUrl && (
+                      <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        URL configurada - será usada nos desafios avançados
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
 
         {/* Modal de IA Auto-Fill - Tela Cheia (Portal) */}
         {showAIModal && typeof document !== 'undefined' && createPortal(
-          <div className="fixed inset-0 bg-black z-[9999] flex items-center justify-center p-4">
-            <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden">
-              {/* Gradient background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/10 rounded-3xl blur-xl"></div>
-
-              <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+            <div className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden">
+              <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-purple-500/20">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-white">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-xl flex items-center justify-center">
-                      <Sparkles className="w-6 h-6 text-purple-400" />
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-purple-600" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-white">Preencher com IA</h3>
-                      <p className="text-sm text-gray-400">Extraia dados automaticamente do site</p>
+                      <h3 className="text-xl font-bold text-gray-900">Preencher com IA</h3>
+                      <p className="text-sm text-gray-500">Extraia dados automaticamente do site</p>
                     </div>
                   </div>
                   <button
@@ -4928,7 +5308,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       setAIError(null)
                       setAIUrl('')
                     }}
-                    className="w-10 h-10 bg-gray-800/50 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                    className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-200 transition-all"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -4941,7 +5321,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               {!aiPreviewData && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       URL do Site da Empresa
                     </label>
                     <input
@@ -4949,21 +5329,21 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       value={aiUrl}
                       onChange={(e) => setAIUrl(e.target.value)}
                       placeholder="https://www.empresa.com.br"
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                       disabled={aiLoading}
                     />
                   </div>
 
                   {aiError && (
-                    <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3">
-                      <p className="text-sm text-red-300">{aiError}</p>
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                      <p className="text-sm text-red-600">{aiError}</p>
                     </div>
                   )}
 
                   <button
                     onClick={handleAIExtract}
                     disabled={aiLoading || !aiUrl.trim()}
-                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                    className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
                   >
                     {aiLoading ? (
                       <>
@@ -4987,8 +5367,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               {/* Preview dos Dados */}
               {aiPreviewData && (
                 <div className="space-y-4">
-                  <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3 mb-4">
-                    <p className="text-sm text-green-300 flex items-center gap-2">
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
+                    <p className="text-sm text-green-700 flex items-center gap-2">
                       <CheckCircle className="w-4 h-4" />
                       Dados extraídos! Revise antes de aplicar.
                     </p>
@@ -5013,8 +5393,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         }
 
                         return (
-                          <div key={campo} className="bg-gray-900/50 border border-purple-500/20 rounded-xl p-3">
-                            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
+                          <div key={campo} className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                            <label className="text-xs text-gray-500 uppercase tracking-wider mb-1 block font-medium">
                               {fieldLabels[campo] || campo}
                             </label>
                             <textarea
@@ -5024,7 +5404,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                 [campo]: e.target.value
                               })}
                               rows={3}
-                              className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500 resize-y"
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-y"
                               placeholder={!valor ? '(não encontrado)' : undefined}
                             />
                           </div>
@@ -5033,19 +5413,19 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
 
                   {/* Botões de Ação */}
-                  <div className="flex gap-3 pt-4 border-t border-purple-500/20">
+                  <div className="flex gap-3 pt-4 border-t border-gray-200">
                     <button
                       onClick={() => {
                         setAIPreviewData(null)
                         setAIError(null)
                       }}
-                      className="flex-1 px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl font-medium hover:bg-gray-700/50 transition-colors"
+                      className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl font-medium text-gray-700 transition-colors"
                     >
                       Voltar
                     </button>
                     <button
                       onClick={handleApplyAIData}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-medium hover:scale-105 transition-transform flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 shadow-md"
                     >
                       <CheckCircle className="w-5 h-5" />
                       Aplicar Dados
@@ -5062,23 +5442,20 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
         {/* Modal de Geração de Conteúdo com IA - Tela Cheia (Portal) */}
         {showAIGenerateModal && typeof document !== 'undefined' && createPortal(
-          <div className="fixed inset-0 bg-black z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
             <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden">
-              {/* Gradient background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/10 rounded-3xl blur-xl"></div>
-
-              <div className="relative bg-gray-900/90 backdrop-blur-xl rounded-3xl border border-purple-500/30 overflow-hidden">
+              <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-purple-500/20">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-white">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-xl flex items-center justify-center">
-                      <Sparkles className="w-6 h-6 text-purple-400" />
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-purple-600" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-white">
+                      <h3 className="text-xl font-bold text-gray-900">
                         Gerar {showAIGenerateModal === 'objections' ? 'Objeções' : showAIGenerateModal === 'personas' ? 'Personas' : 'Objetivos'} com IA
                       </h3>
-                      <p className="text-sm text-gray-400">Analise o site e gere conteúdo automaticamente</p>
+                      <p className="text-sm text-gray-500">Analise o site e gere conteúdo automaticamente</p>
                     </div>
                   </div>
                   <button
@@ -5092,7 +5469,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       setAIGenerateCustomization('')
                       setShowCustomization(false)
                     }}
-                    className="w-10 h-10 bg-gray-800/50 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                    className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-200 transition-all"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -5104,7 +5481,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   {!aiGeneratedObjections && !aiGeneratedPersonas && !aiGeneratedObjectives && (
                     <div className="max-w-xl mx-auto space-y-6">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           URL do Site da Empresa
                         </label>
                         <input
@@ -5112,7 +5489,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           value={aiGenerateUrl}
                           onChange={(e) => setAIGenerateUrl(e.target.value)}
                           placeholder="https://www.empresa.com.br"
-                          className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-lg"
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-lg"
                           disabled={aiGenerateLoading}
                         />
                       </div>
@@ -5123,7 +5500,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           <button
                             onClick={() => setShowCustomization(true)}
                             disabled={aiGenerateLoading}
-                            className="w-full px-4 py-3 border border-dashed border-purple-500/40 rounded-xl text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/60 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full px-4 py-3 border border-dashed border-purple-300 rounded-xl text-purple-600 hover:bg-purple-50 hover:border-purple-400 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -5133,7 +5510,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         ) : (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <label className="block text-sm font-medium text-gray-300">
+                              <label className="block text-sm font-medium text-gray-700">
                                 Personalizar Geração
                               </label>
                               <button
@@ -5141,7 +5518,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   setShowCustomization(false)
                                   setAIGenerateCustomization('')
                                 }}
-                                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
                               >
                                 Cancelar
                               </button>
@@ -5157,7 +5534,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                   : 'Ex: "Objetivos focados em cold calling", "Foco em negociação"...'
                               }
                               rows={2}
-                              className="w-full px-4 py-3 bg-gray-800/50 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 resize-none"
+                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
                               disabled={aiGenerateLoading}
                               autoFocus
                             />
@@ -5166,15 +5543,15 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       </div>
 
                       {aiGenerateError && (
-                        <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
-                          <p className="text-sm text-red-300">{aiGenerateError}</p>
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                          <p className="text-sm text-red-600">{aiGenerateError}</p>
                         </div>
                       )}
 
                       <button
                         onClick={() => handleAIGenerateContent(showAIGenerateModal)}
                         disabled={aiGenerateLoading || !aiGenerateUrl.trim()}
-                        className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-medium text-lg hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3"
+                        className="w-full px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-md"
                       >
                         {aiGenerateLoading ? (
                           <>
@@ -5301,38 +5678,60 @@ function AIGeneratedObjectionsPreview({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-green-400 flex items-center gap-2">
-        <CheckCircle className="w-4 h-4" />
-        {objections.length} objeções geradas
-      </p>
+    <div className="space-y-5">
+      {/* Header com contagem */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{objections.length} objeções geradas</p>
+            <p className="text-xs text-gray-500">Selecione as que deseja adicionar</p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            if (selected.size === objections.length) {
+              setSelected(new Set())
+            } else {
+              setSelected(new Set(objections.map((_, i) => i)))
+            }
+          }}
+          className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+        >
+          {selected.size === objections.length ? 'Desmarcar todos' : 'Selecionar todos'}
+        </button>
+      </div>
 
-      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+      {/* Lista de objeções */}
+      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
         {objections.map((obj, index) => (
           <div
             key={index}
-            className={`rounded-lg p-3 cursor-pointer transition-colors ${
+            className={`rounded-xl border-2 p-4 cursor-pointer transition-all ${
               selected.has(index)
-                ? 'bg-purple-500/10 ring-1 ring-purple-500/50'
-                : 'bg-gray-800/50 hover:bg-gray-800'
+                ? 'border-purple-500 bg-purple-50/50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
             }`}
             onClick={() => toggleSelect(index)}
           >
-            <div className="flex items-start gap-2.5">
-              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                 selected.has(index)
-                  ? 'bg-purple-500'
-                  : 'border border-gray-600'
+                  ? 'bg-purple-600 shadow-sm'
+                  : 'border-2 border-gray-300'
               }`}>
                 {selected.has(index) && <Check className="w-3 h-3 text-white" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white font-medium mb-2">"{obj.name}"</p>
-                <div className="space-y-1.5 text-xs">
+                <p className="text-sm text-gray-900 font-semibold mb-2">"{obj.name}"</p>
+                <div className="space-y-2">
                   {obj.rebuttals.map((rebuttal, ri) => (
-                    <p key={ri} className="text-gray-300 pl-2 border-l-2 border-green-500/40">
-                      {rebuttal}
-                    </p>
+                    <div key={ri} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 flex-shrink-0" />
+                      <p className="text-xs text-gray-600 leading-relaxed">{rebuttal}</p>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -5341,57 +5740,50 @@ function AIGeneratedObjectionsPreview({
         ))}
       </div>
 
-      {/* Refinamento - Sempre visível e intuitivo */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-fuchsia-500/20 p-[1px] animate-gradient-x bg-[length:200%_200%]">
-        <div className="bg-gray-900/95 rounded-xl p-4">
-          {/* Header com indicador visual */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="relative">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 via-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Refinar com IA</p>
-              <p className="text-[11px] text-gray-400">Descreva ajustes para melhorar as objeções</p>
-            </div>
+      {/* Seção de Refinamento */}
+      <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 border border-purple-100">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center shadow-md">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
-
-          {/* Textarea sempre visível */}
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="✨ Digite suas observações aqui...&#10;Ex: Adicione objeções sobre preço, torne as respostas mais diretas, foque em concorrência..."
-            className="w-full px-3 py-2.5 bg-gray-800/80 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-sm resize-none transition-all"
-            rows={3}
-            disabled={isRefining}
-          />
-
-          {/* Botão de refinar */}
-          <button
-            onClick={() => feedback.trim() && onRefine(feedback)}
-            disabled={!feedback.trim() || isRefining}
-            className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-500 rounded-lg text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
-          >
-            {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
-          </button>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Refinar com IA</p>
+            <p className="text-xs text-gray-500">Descreva ajustes para melhorar as objeções</p>
+          </div>
         </div>
+
+        <textarea
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder="Ex: Adicione objeções sobre preço, torne as respostas mais diretas, foque em concorrência..."
+          className="w-full px-4 py-3 bg-white border border-purple-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 text-sm resize-none transition-all"
+          rows={2}
+          disabled={isRefining}
+        />
+
+        <button
+          onClick={() => feedback.trim() && onRefine(feedback)}
+          disabled={!feedback.trim() || isRefining}
+          className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+        >
+          {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+        </button>
       </div>
 
-      <div className="flex gap-2 pt-3 border-t border-gray-800">
+      {/* Botões de ação */}
+      <div className="flex gap-3 pt-4 border-t border-gray-100">
         <button
           onClick={onBack}
           disabled={isRefining || isApplying}
-          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700 transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
           disabled={selected.size === 0 || isRefining || isApplying}
-          className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+          className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
         >
           {isApplying ? (
             <>
@@ -5401,7 +5793,7 @@ function AIGeneratedObjectionsPreview({
           ) : (
             <>
               <Plus className="w-4 h-4" />
-              Adicionar ({selected.size})
+              Adicionar {selected.size} objeções
             </>
           )}
         </button>
@@ -5440,122 +5832,136 @@ function AIGeneratedPersonasPreview({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-green-400 flex items-center gap-2">
-        <CheckCircle className="w-4 h-4" />
-        {personas.length} personas geradas
-      </p>
+    <div className="space-y-5">
+      {/* Header com contagem */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{personas.length} personas geradas</p>
+            <p className="text-xs text-gray-500">Selecione as que deseja adicionar</p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            if (selected.size === personas.length) {
+              setSelected(new Set())
+            } else {
+              setSelected(new Set(personas.map((_, i) => i)))
+            }
+          }}
+          className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+        >
+          {selected.size === personas.length ? 'Desmarcar todos' : 'Selecionar todos'}
+        </button>
+      </div>
 
-      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+      {/* Lista de personas */}
+      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
         {personas.map((persona, index) => (
           <div
             key={index}
-            className={`rounded-lg p-3 cursor-pointer transition-colors ${
+            className={`rounded-xl border-2 p-4 cursor-pointer transition-all ${
               selected.has(index)
-                ? 'bg-purple-500/10 ring-1 ring-purple-500/50'
-                : 'bg-gray-800/50 hover:bg-gray-800'
+                ? 'border-purple-500 bg-purple-50/50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
             }`}
             onClick={() => toggleSelect(index)}
           >
             {/* Header */}
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
                 selected.has(index)
-                  ? 'bg-purple-500'
-                  : 'border border-gray-600'
+                  ? 'bg-purple-600 shadow-sm'
+                  : 'border-2 border-gray-300'
               }`}>
                 {selected.has(index) && <Check className="w-3 h-3 text-white" />}
               </div>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+              <span className={`px-2 py-1 rounded-md text-xs font-semibold ${
                 persona.tipo?.toUpperCase().includes('B2B')
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'bg-pink-500/20 text-pink-400'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-pink-100 text-pink-700'
               }`}>
                 {persona.tipo}
               </span>
-              <span className="font-medium text-white text-sm">{persona.cargo}</span>
+              <span className="font-semibold text-gray-900 text-sm">{persona.cargo}</span>
             </div>
 
             {/* Campos com ícones */}
-            <div className="grid gap-2 text-xs ml-6">
-              <p className="flex items-start gap-1.5">
-                <Building2 className="w-3 h-3 text-blue-400 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-300">{persona.tipo_empresa_faturamento}</span>
-              </p>
-              <p className="flex items-start gap-1.5">
-                <FileText className="w-3 h-3 text-purple-400 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-300">{persona.contexto}</span>
-              </p>
-              <p className="flex items-start gap-1.5">
-                <Target className="w-3 h-3 text-green-400 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-300">{persona.busca}</span>
-              </p>
-              <p className="flex items-start gap-1.5">
-                <AlertCircle className="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-300">{persona.dores}</span>
-              </p>
+            <div className="grid gap-2.5 text-xs ml-8">
+              <div className="flex items-start gap-2">
+                <Building2 className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600 leading-relaxed">{persona.tipo_empresa_faturamento}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <FileText className="w-3.5 h-3.5 text-purple-500 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600 leading-relaxed">{persona.contexto}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Target className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600 leading-relaxed">{persona.busca}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600 leading-relaxed">{persona.dores}</span>
+              </div>
               {persona.conhecimento_previo && (
-                <p className="flex items-start gap-1.5">
-                  <Eye className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-300">{persona.conhecimento_previo}</span>
-                </p>
+                <div className="flex items-start gap-2">
+                  <Eye className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <span className="text-gray-600 leading-relaxed">{persona.conhecimento_previo}</span>
+                </div>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Refinamento - Sempre visível e intuitivo */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-fuchsia-500/20 p-[1px] animate-gradient-x bg-[length:200%_200%]">
-        <div className="bg-gray-900/95 rounded-xl p-4">
-          {/* Header com indicador visual */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="relative">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 via-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Refinar com IA</p>
-              <p className="text-[11px] text-gray-400">Descreva ajustes para melhorar as personas</p>
-            </div>
+      {/* Seção de Refinamento */}
+      <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 border border-purple-100">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center shadow-md">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
-
-          {/* Textarea sempre visível */}
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="✨ Digite suas observações aqui...&#10;Ex: Adicione personas de startups, foque em empresas menores, inclua mais B2C..."
-            className="w-full px-3 py-2.5 bg-gray-800/80 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-sm resize-none transition-all"
-            rows={3}
-            disabled={isRefining}
-          />
-
-          {/* Botão de refinar */}
-          <button
-            onClick={() => feedback.trim() && onRefine(feedback)}
-            disabled={!feedback.trim() || isRefining}
-            className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-500 rounded-lg text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
-          >
-            {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
-          </button>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Refinar com IA</p>
+            <p className="text-xs text-gray-500">Descreva ajustes para melhorar as personas</p>
+          </div>
         </div>
+
+        <textarea
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder="Ex: Adicione personas de startups, foque em empresas menores, inclua mais B2C..."
+          className="w-full px-4 py-3 bg-white border border-purple-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 text-sm resize-none transition-all"
+          rows={2}
+          disabled={isRefining}
+        />
+
+        <button
+          onClick={() => feedback.trim() && onRefine(feedback)}
+          disabled={!feedback.trim() || isRefining}
+          className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+        >
+          {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+        </button>
       </div>
 
-      <div className="flex gap-2 pt-3 border-t border-gray-800">
+      {/* Botões de ação */}
+      <div className="flex gap-3 pt-4 border-t border-gray-100">
         <button
           onClick={onBack}
           disabled={isRefining || isApplying}
-          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700 transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
           disabled={selected.size === 0 || isRefining || isApplying}
-          className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+          className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
         >
           {isApplying ? (
             <>
@@ -5565,7 +5971,7 @@ function AIGeneratedPersonasPreview({
           ) : (
             <>
               <Plus className="w-4 h-4" />
-              Adicionar ({selected.size})
+              Adicionar {selected.size} personas
             </>
           )}
         </button>
@@ -5604,91 +6010,105 @@ function AIGeneratedObjectivesPreview({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-green-400 flex items-center gap-2">
-        <CheckCircle className="w-4 h-4" />
-        {objectives.length} objetivos gerados
-      </p>
+    <div className="space-y-5">
+      {/* Header com contagem */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{objectives.length} objetivos gerados</p>
+            <p className="text-xs text-gray-500">Selecione os que deseja adicionar</p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            if (selected.size === objectives.length) {
+              setSelected(new Set())
+            } else {
+              setSelected(new Set(objectives.map((_, i) => i)))
+            }
+          }}
+          className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+        >
+          {selected.size === objectives.length ? 'Desmarcar todos' : 'Selecionar todos'}
+        </button>
+      </div>
 
-      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+      {/* Lista de objetivos */}
+      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
         {objectives.map((obj, index) => (
           <div
             key={index}
-            className={`rounded-lg p-3 cursor-pointer transition-colors ${
+            className={`rounded-xl border-2 p-4 cursor-pointer transition-all ${
               selected.has(index)
-                ? 'bg-purple-500/10 ring-1 ring-purple-500/50'
-                : 'bg-gray-800/50 hover:bg-gray-800'
+                ? 'border-purple-500 bg-purple-50/50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
             }`}
             onClick={() => toggleSelect(index)}
           >
-            <div className="flex items-start gap-2.5">
-              <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                 selected.has(index)
-                  ? 'bg-purple-500'
-                  : 'border border-gray-600'
+                  ? 'bg-purple-600 shadow-sm'
+                  : 'border-2 border-gray-300'
               }`}>
                 {selected.has(index) && <Check className="w-3 h-3 text-white" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white font-medium">{obj.name}</p>
-                <p className="text-xs text-gray-300 mt-0.5">{obj.description}</p>
+                <p className="text-sm text-gray-900 font-semibold">{obj.name}</p>
+                <p className="text-xs text-gray-600 mt-1 leading-relaxed">{obj.description}</p>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Refinamento - Sempre visível e intuitivo */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-fuchsia-500/20 p-[1px] animate-gradient-x bg-[length:200%_200%]">
-        <div className="bg-gray-900/95 rounded-xl p-4">
-          {/* Header com indicador visual */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="relative">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 via-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Refinar com IA</p>
-              <p className="text-[11px] text-gray-400">Descreva ajustes para melhorar os objetivos</p>
-            </div>
+      {/* Seção de Refinamento */}
+      <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 border border-purple-100">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center shadow-md">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
-
-          {/* Textarea sempre visível */}
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="✨ Digite suas observações aqui...&#10;Ex: Adicione objetivos de fechamento, foque em qualificação, inclua negociação..."
-            className="w-full px-3 py-2.5 bg-gray-800/80 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-sm resize-none transition-all"
-            rows={3}
-            disabled={isRefining}
-          />
-
-          {/* Botão de refinar */}
-          <button
-            onClick={() => feedback.trim() && onRefine(feedback)}
-            disabled={!feedback.trim() || isRefining}
-            className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600 hover:from-purple-500 hover:via-violet-500 hover:to-fuchsia-500 rounded-lg text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
-          >
-            {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
-          </button>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Refinar com IA</p>
+            <p className="text-xs text-gray-500">Descreva ajustes para melhorar os objetivos</p>
+          </div>
         </div>
+
+        <textarea
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder="Ex: Adicione objetivos de fechamento, foque em qualificação, inclua negociação..."
+          className="w-full px-4 py-3 bg-white border border-purple-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 text-sm resize-none transition-all"
+          rows={2}
+          disabled={isRefining}
+        />
+
+        <button
+          onClick={() => feedback.trim() && onRefine(feedback)}
+          disabled={!feedback.trim() || isRefining}
+          className="w-full mt-3 py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+        >
+          {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {isRefining ? 'Refinando...' : 'Aplicar Refinamento'}
+        </button>
       </div>
 
-      <div className="flex gap-2 pt-3 border-t border-gray-800">
+      {/* Botões de ação */}
+      <div className="flex gap-3 pt-4 border-t border-gray-100">
         <button
           onClick={onBack}
           disabled={isRefining || isApplying}
-          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700 transition-colors disabled:opacity-50"
         >
           Voltar
         </button>
         <button
           onClick={() => onApply(Array.from(selected))}
           disabled={selected.size === 0 || isRefining || isApplying}
-          className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+          className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
         >
           {isApplying ? (
             <>
@@ -5698,7 +6118,7 @@ function AIGeneratedObjectivesPreview({
           ) : (
             <>
               <Plus className="w-4 h-4" />
-              Adicionar ({selected.size})
+              Adicionar {selected.size} objetivos
             </>
           )}
         </button>
@@ -5803,34 +6223,37 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-start justify-center pt-12 px-4 pb-4">
-      <div className={`relative max-w-5xl w-full max-h-[calc(100vh-80px)] flex flex-col transition-transform duration-300 ${
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-start justify-center pt-8 px-4 pb-4">
+      <div className={`relative max-w-5xl w-full max-h-[calc(100vh-64px)] flex flex-col transition-transform duration-300 ${
         showPersonaEvaluationModal || showCompanyEvaluationModal || showAIModal ? 'sm:-translate-x-[250px]' :
         showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
       }`}>
-        <div className="bg-gray-900 rounded-2xl border border-gray-800 shadow-2xl flex flex-col max-h-full overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-2xl flex flex-col max-h-full overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 bg-gradient-to-r from-green-50 to-white">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <Settings className="w-5 h-5 text-green-400" />
+              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                <Settings className="w-5 h-5 text-green-600" />
               </div>
-              <h2 className="text-xl font-bold text-white">Hub de Configuração</h2>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Hub de Configuração</h2>
+                <p className="text-xs text-gray-500">Gerencie sua empresa e equipe</p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6 overflow-y-auto flex-1 min-h-0">
+          <div className="p-6 overflow-y-auto flex-1 min-h-0 bg-gray-50">
             {loading ? (
               // Loading state
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-green-400 animate-spin" />
+                <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
               </div>
             ) : userRole?.toLowerCase() === 'admin' ? (
               // Configuration Interface - Admin only
@@ -5854,14 +6277,14 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               />
             ) : (
               // Access denied - Not admin
-              <div className="max-w-md mx-auto py-8 text-center">
-                <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock className="w-10 h-10 text-red-400" />
+              <div className="max-w-md mx-auto py-12 text-center">
+                <div className="w-20 h-20 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
+                  <Lock className="w-10 h-10 text-red-500" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2 text-white">
+                <h3 className="text-xl font-semibold mb-2 text-gray-900">
                   Acesso Negado
                 </h3>
-                <p className="text-gray-400">
+                <p className="text-gray-500">
                   Apenas administradores podem acessar as configurações.
                 </p>
               </div>
@@ -5905,7 +6328,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               </div>
               <button
                 onClick={() => setShowPersonaEvaluationModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-gray-700 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5927,7 +6350,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 </div>
 
                 {/* Barra de progresso */}
-                <div className="w-full bg-gray-800 rounded-full h-2">
+                <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-green-600 to-green-400 h-2 rounded-full transition-all"
                     style={{ width: `${(personaEvaluation.score_geral / 10) * 100}%` }}
@@ -5955,12 +6378,12 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                     return (
                       <div key={campo}>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-300">
+                          <span className="text-xs text-gray-700">
                             {fieldNames[campo] || campo}
                           </span>
                           <span className="text-xs font-bold text-green-400">{scoreValue}/10</span>
                         </div>
-                        <div className="w-full bg-gray-800 rounded-full h-1.5">
+                        <div className="w-full bg-gray-100 rounded-full h-1.5">
                           <div
                             className={`h-1.5 rounded-full transition-all ${
                               scoreValue >= 9 ? 'bg-green-500' :
@@ -5986,7 +6409,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                   </h3>
                   <ul className="space-y-1.5">
                     {personaEvaluation.destaques_positivos.map((destaque, idx) => (
-                      <li key={idx} className="text-xs text-gray-300 flex items-start gap-1.5">
+                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
                         <span className="text-green-400 mt-0.5">•</span>
                         <span>{destaque}</span>
                       </li>
@@ -6011,15 +6434,15 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                       const statusValue = typeof statusData === 'object' ? ((statusData as any).status || 'insuficiente') : statusData;
 
                       return (
-                        <div key={etapa} className="bg-gray-800/50 rounded-lg p-2">
+                        <div key={etapa} className="bg-gray-100/50 rounded-lg p-2">
                           <div className="flex flex-col gap-1">
                             <span className="text-[10px] font-medium text-gray-400 uppercase">
                               {etapa.replace(/_/g, ' ')}
                             </span>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold text-center ${
-                              statusValue === 'pronto' ? 'bg-green-500/20 text-green-400' :
-                              statusValue === 'precisa_ajuste' ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-red-500/20 text-red-400'
+                              statusValue === 'pronto' ? 'bg-green-100 text-green-700' :
+                              statusValue === 'precisa_ajuste' ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-100 text-red-700'
                             }`}>
                               {statusValue === 'pronto' ? '✓ Pronto' :
                                statusValue === 'precisa_ajuste' ? '⚠ Ajustar' :
@@ -6073,7 +6496,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                   </h3>
                   <ul className="space-y-1.5">
                     {personaEvaluation.sugestoes_melhora_prioritarias.map((sugestao, idx) => (
-                      <li key={idx} className="text-xs text-gray-300 flex items-start gap-1.5">
+                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
                         <span className="text-blue-400 mt-0.5 font-bold text-[10px]">{idx + 1}.</span>
                         <span className="leading-tight">{sugestao}</span>
                       </li>
@@ -6107,7 +6530,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               {/* Próxima Ação */}
               <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-500/30 rounded-xl p-3">
                 <h3 className="text-sm font-bold text-white mb-1.5">🎯 Próxima Ação</h3>
-                <p className="text-xs text-gray-300 leading-tight">
+                <p className="text-xs text-gray-700 leading-tight">
                   {(() => {
                     const actionMap: Record<string, string> = {
                       'usar_imediatamente': '✅ Usar imediatamente no treinamento',
@@ -6132,7 +6555,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
             <h3 className="font-bold text-white text-sm">Avaliação da Objeção</h3>
             <button
               onClick={() => setShowObjectionEvaluationModal(false)}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-gray-400 hover:text-gray-700 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -6159,13 +6582,13 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
             {/* Como Melhorar */}
             {objectionEvaluation.como_melhorar?.length > 0 && (
-              <div className="bg-gray-800/50 border border-green-500/20 rounded-lg p-3">
+              <div className="bg-gray-100/50 border border-green-500/20 rounded-lg p-3">
                 <h4 className="font-semibold text-green-400 mb-2 text-xs">
                   💡 Como Melhorar
                 </h4>
                 <ul className="space-y-1.5">
                   {objectionEvaluation.como_melhorar.map((sugestao: string, idx: number) => (
-                    <li key={idx} className="text-xs text-gray-300 flex items-start">
+                    <li key={idx} className="text-xs text-gray-700 flex items-start">
                       <span className="text-green-400 mr-1.5 font-bold">{idx + 1}.</span>
                       <span className="flex-1 leading-relaxed">{sugestao}</span>
                     </li>
@@ -6196,7 +6619,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
             <h3 className="text-xl font-bold text-white">Avaliação dos Dados</h3>
             <button
               onClick={() => setShowCompanyEvaluationModal(false)}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-gray-400 hover:text-gray-700 transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
@@ -6212,12 +6635,12 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               </span>
             </div>
             <div className={`px-4 py-2 rounded-lg font-semibold text-center text-sm ${
-              qualityEvaluation.classificacao === 'Excelente' ? 'bg-green-500/20 text-green-400' :
-              qualityEvaluation.classificacao === 'Ótimo' ? 'bg-green-500/20 text-green-400' :
+              qualityEvaluation.classificacao === 'Excelente' ? 'bg-green-100 text-green-700' :
+              qualityEvaluation.classificacao === 'Ótimo' ? 'bg-green-100 text-green-700' :
               qualityEvaluation.classificacao === 'Bom' ? 'bg-blue-500/20 text-blue-400' :
-              qualityEvaluation.classificacao === 'Aceitável' ? 'bg-yellow-500/20 text-yellow-400' :
+              qualityEvaluation.classificacao === 'Aceitável' ? 'bg-amber-100 text-amber-700' :
               qualityEvaluation.classificacao === 'Ruim' ? 'bg-orange-500/20 text-orange-400' :
-              'bg-red-500/20 text-red-400'
+              'bg-red-100 text-red-700'
             }`}>
               {qualityEvaluation.classificacao}
             </div>
@@ -6231,7 +6654,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 {qualityEvaluation.capacidade_roleplay}%
               </span>
             </div>
-            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all"
                 style={{ width: `${qualityEvaluation.capacidade_roleplay}%` }}
@@ -6242,7 +6665,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
           {/* Resumo */}
           <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-4 mb-4">
             <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Resumo</h4>
-            <p className="text-sm text-gray-300 leading-relaxed">{qualityEvaluation.resumo}</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{qualityEvaluation.resumo}</p>
           </div>
 
           {/* Pontos Fortes */}
@@ -6254,7 +6677,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
               </h4>
               <ul className="space-y-2">
                 {qualityEvaluation.pontos_fortes.map((ponto, index) => (
-                  <li key={index} className="text-xs text-gray-300 flex items-start gap-2">
+                  <li key={index} className="text-xs text-gray-700 flex items-start gap-2">
                     <span className="text-green-400 mt-0.5">✓</span>
                     <span>{ponto}</span>
                   </li>
@@ -6276,7 +6699,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                     <div className="text-xs font-semibold text-orange-400 mb-1">
                       {gap.campo}
                     </div>
-                    <div className="text-xs text-gray-300 mb-2">{gap.problema}</div>
+                    <div className="text-xs text-gray-700 mb-2">{gap.problema}</div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Impacto: {gap.impacto}</span>
                     </div>
@@ -6310,13 +6733,13 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
           {/* Próxima Ação */}
           <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-4">
             <h4 className="text-xs text-blue-400 uppercase tracking-wider mb-2">Próxima Ação</h4>
-            <p className="text-sm text-gray-300">{qualityEvaluation.proxima_acao}</p>
+            <p className="text-sm text-gray-700">{qualityEvaluation.proxima_acao}</p>
           </div>
 
           {/* Recomendação de Uso */}
           <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
             <h4 className="text-xs text-green-400 uppercase tracking-wider mb-2">Recomendação de Uso</h4>
-            <p className="text-sm text-gray-300">{qualityEvaluation.recomendacao_uso}</p>
+            <p className="text-sm text-gray-700">{qualityEvaluation.recomendacao_uso}</p>
           </div>
         </div>
       </div>

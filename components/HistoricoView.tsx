@@ -1,19 +1,36 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, History, CheckCircle } from 'lucide-react'
+import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, History, CheckCircle, Video, Users } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
+import FollowUpHistoryView from './FollowUpHistoryView'
+import MeetHistoryContent from './MeetHistoryContent'
+import ChallengeHistoryContent from './ChallengeHistoryContent'
 
-export default function HistoricoView() {
+interface HistoricoViewProps {
+  onStartChallenge?: (challenge: any) => void
+}
+
+export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) {
   const [sessions, setSessions] = useState<RoleplaySession[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<'resumo' | 'spin' | 'transcricao'>('resumo')
+  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'desafios'>('simulacoes')
 
   useEffect(() => {
     setMounted(true)
     loadSessions()
+
+    // Listen for history type change event (from Dashboard)
+    const handleSetHistoryType = (e: CustomEvent) => {
+      if (e.detail === 'desafios') {
+        setHistoryType('desafios')
+      }
+    }
+    window.addEventListener('setHistoryType', handleSetHistoryType as EventListener)
+    return () => window.removeEventListener('setHistoryType', handleSetHistoryType as EventListener)
   }, [])
 
   const loadSessions = async () => {
@@ -264,18 +281,75 @@ export default function HistoricoView() {
       <div className="max-w-7xl mx-auto">
         {/* Header Card - Design Profissional */}
         <div className={`bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
-              <History className="w-6 h-6 text-green-600" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                <History className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Histórico</h1>
+                <p className="text-gray-500 text-sm">Analise suas sessões e acompanhe sua evolução</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Histórico de Sessões</h1>
-              <p className="text-gray-500 text-sm">Analise suas sessões de roleplay e acompanhe sua evolução</p>
+
+            {/* Tabs for history type */}
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+              <button
+                onClick={() => setHistoryType('simulacoes')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  historyType === 'simulacoes'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Simulações
+              </button>
+              <button
+                onClick={() => setHistoryType('followups')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  historyType === 'followups'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <MessageCircle className="w-4 h-4" />
+                Follow-ups
+              </button>
+              <button
+                onClick={() => setHistoryType('meet')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  historyType === 'meet'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Video className="w-4 h-4" />
+                Google Meet
+              </button>
+              <button
+                onClick={() => setHistoryType('desafios')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  historyType === 'desafios'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Target className="w-4 h-4" />
+                Desafios
+              </button>
             </div>
           </div>
         </div>
 
-        {loading ? (
+        {/* Render content based on selected history type */}
+        {historyType === 'followups' ? (
+          <FollowUpHistoryView />
+        ) : historyType === 'meet' ? (
+          <MeetHistoryContent />
+        ) : historyType === 'desafios' ? (
+          <ChallengeHistoryContent onStartChallenge={onStartChallenge} />
+        ) : loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-10 h-10 border-4 border-green-100 border-t-green-500 rounded-full animate-spin"></div>
           </div>

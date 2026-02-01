@@ -14,29 +14,19 @@ import {
   RefreshCw,
   AlertTriangle,
   Copy,
-  Check,
-  BarChart3,
-  ChevronDown,
-  ChevronUp,
-  Target,
-  TrendingUp,
-  TrendingDown,
-  MessageSquare,
-  Award,
-  AlertCircle,
-  Lightbulb,
-  X,
-  History,
-  Eye
+  Check
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
-// Vexa API - uses Next.js API routes as proxy (works in both dev and production)
-const VEXA_API_URL = '/api/vexa'
-
-// LocalStorage key for persisting session
-const MEET_SESSION_STORAGE_KEY = 'meet_analysis_session'
+// Vexa API config - production uses relative path via Nginx proxy
+const isDevelopment = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.port === '3000' ||
+  window.location.hostname.startsWith('192.168.')
+)
+const VEXA_API_URL = isDevelopment
+  ? 'http://localhost:8056'  // Development
+  : '/vexa-api'              // Production (proxied via Nginx)
+const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'error'
 
@@ -54,74 +44,6 @@ interface MeetingSession {
   transcript: TranscriptSegment[]
 }
 
-interface SavedEvaluation {
-  id: string
-  seller_name: string
-  call_objective: string | null
-  overall_score: number
-  performance_level: string
-  created_at: string
-  evaluation: MeetEvaluation
-}
-
-interface MeetEvaluation {
-  call_metadata: {
-    call_type: string
-    duration_estimated: string
-    participants_identified: string[]
-    call_outcome: string
-    transcription_quality: string
-  }
-  objections_analysis: Array<{
-    objection_id: string
-    objection_type: string
-    objection_nature: string
-    objection_text: string
-    score: number
-    detailed_analysis: string
-    critical_errors: string[] | null
-    ideal_response: string | null
-  }>
-  spin_evaluation: {
-    S: { final_score: number; technical_feedback: string; key_questions_asked: string[]; missed_opportunities: string[] }
-    P: { final_score: number; technical_feedback: string; problems_identified: string[]; missed_opportunities: string[] }
-    I: { final_score: number; technical_feedback: string; implications_raised: string[]; missed_opportunities: string[] }
-    N: { final_score: number; technical_feedback: string; value_propositions_used: string[]; missed_opportunities: string[] }
-  }
-  soft_skills_evaluation: {
-    rapport_score: number
-    rapport_feedback: string
-    conversation_control_score: number
-    control_feedback: string
-    active_listening_score: number
-    listening_feedback: string
-    stakeholder_management_score: number | null
-    stakeholder_feedback: string | null
-  }
-  overall_score: number
-  performance_level: string
-  executive_summary: string
-  top_strengths: string[]
-  critical_gaps: string[]
-  key_moments: Array<{
-    timestamp_approx: string
-    moment_type: string
-    description: string
-    impact: string
-  }>
-  priority_improvements: Array<{
-    area: string
-    current_gap: string
-    action_plan: string
-    priority: string
-    training_suggestion: string
-  }>
-  comparison_with_best_practices: {
-    aligned_with: string[]
-    deviated_from: string[]
-  }
-}
-
 // Consolidate consecutive messages from the same speaker
 const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment[] => {
   if (segments.length === 0) return []
@@ -130,12 +52,15 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
   let current: TranscriptSegment | null = null
 
   for (const segment of segments) {
+    // Normalize speaker names for comparison (case-insensitive, trimmed)
     const currentSpeaker = current?.speaker?.trim().toLowerCase() || ''
     const segmentSpeaker = segment.speaker?.trim().toLowerCase() || ''
 
     if (current && currentSpeaker === segmentSpeaker) {
+      // Same speaker - append text
       current.text = (current.text + ' ' + segment.text).trim()
     } else {
+      // Different speaker - save current and start new
       if (current) {
         consolidated.push(current)
       }
@@ -143,33 +68,13 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
     }
   }
 
+  // Don't forget the last one
   if (current) {
     consolidated.push(current)
   }
 
   console.log(`Consolidation: ${segments.length} segments -> ${consolidated.length} messages`)
   return consolidated
-}
-
-// Performance level colors and labels
-const getPerformanceConfig = (level: string) => {
-  const configs: Record<string, { color: string; bgColor: string; label: string }> = {
-    poor: { color: 'text-red-600', bgColor: 'bg-red-50', label: 'Reprovado' },
-    needs_improvement: { color: 'text-orange-600', bgColor: 'bg-orange-50', label: 'Precisa Melhorar' },
-    good: { color: 'text-yellow-600', bgColor: 'bg-yellow-50', label: 'Bom' },
-    very_good: { color: 'text-green-600', bgColor: 'bg-green-50', label: 'Muito Bom' },
-    excellent: { color: 'text-green-600', bgColor: 'bg-green-50', label: 'Excelente' },
-    legendary: { color: 'text-purple-600', bgColor: 'bg-purple-50', label: 'Lendário' }
-  }
-  return configs[level] || configs.good
-}
-
-// Score color helper
-const getScoreColor = (score: number) => {
-  if (score >= 8) return 'text-green-600'
-  if (score >= 6) return 'text-yellow-600'
-  if (score >= 4) return 'text-orange-600'
-  return 'text-red-600'
 }
 
 export default function MeetAnalysisView() {
@@ -181,163 +86,11 @@ export default function MeetAnalysisView() {
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // User info (auto-fetched)
-  const [sellerName, setSellerName] = useState('')
-  const [userId, setUserId] = useState<string | null>(null)
-  const [companyId, setCompanyId] = useState<string | null>(null)
-
-  // Call context
-  const [callObjective, setCallObjective] = useState('')
-
-  // Mode: 'bot' | 'history'
-  const [activeMode, setActiveMode] = useState<'bot' | 'history'>('bot')
-
-  // History
-  const [savedEvaluations, setSavedEvaluations] = useState<SavedEvaluation[]>([])
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
-  const [selectedEvaluation, setSelectedEvaluation] = useState<SavedEvaluation | null>(null)
-
-  // Evaluation states
-  const [isEvaluating, setIsEvaluating] = useState(false)
-  const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
-  const [evaluationError, setEvaluationError] = useState('')
-  const [showEvaluationModal, setShowEvaluationModal] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    spin: true,
-    objections: false,
-    softSkills: false,
-    improvements: false,
-    moments: false
-  })
-
-  // Fetch user info on mount
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          setUserId(user.id)
-          // Get user name from employees table
-          const { data: employee } = await supabase
-            .from('employees')
-            .select('name')
-            .eq('id', user.id)
-            .single()
-          if (employee?.name) {
-            setSellerName(employee.name)
-          } else {
-            // Fallback to email
-            setSellerName(user.email?.split('@')[0] || 'Vendedor')
-          }
-        }
-        // Get company ID
-        const compId = await getCompanyId()
-        setCompanyId(compId)
-      } catch (err) {
-        console.error('Error fetching user info:', err)
-      }
-    }
-    fetchUserInfo()
-  }, [])
-
-  // Restore session from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedSession = localStorage.getItem(MEET_SESSION_STORAGE_KEY)
-      if (savedSession) {
-        const parsed = JSON.parse(savedSession)
-        // Restore the session with proper date parsing
-        const restoredSession: MeetingSession = {
-          ...parsed,
-          startTime: parsed.startTime ? new Date(parsed.startTime) : undefined
-        }
-
-        // Only restore if session is still active (not ended or error)
-        if (restoredSession.status !== 'ended' && restoredSession.status !== 'error') {
-          console.log('🔄 Restoring Meet session from localStorage:', restoredSession.meetingId)
-          setSession(restoredSession)
-          setMeetingId(restoredSession.meetingId)
-          setMeetUrl(`https://meet.google.com/${restoredSession.meetingId}`)
-
-          // Restore call objective if saved
-          if (parsed.callObjective) {
-            setCallObjective(parsed.callObjective)
-          }
-
-          // Restart polling for active sessions
-          if (['joining', 'in_meeting', 'transcribing', 'sending'].includes(restoredSession.status)) {
-            console.log('▶️ Restarting polling for active session')
-            startPolling(restoredSession.meetingId)
-          }
-        } else {
-          // Clear ended/error sessions from storage
-          localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
-        }
-      }
-    } catch (err) {
-      console.error('Error restoring session from localStorage:', err)
-      localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
-    }
-  }, [])
-
-  // Save session to localStorage when it changes
-  useEffect(() => {
-    if (session) {
-      // Save active sessions to localStorage
-      if (session.status !== 'ended' && session.status !== 'error') {
-        const sessionToSave = {
-          ...session,
-          startTime: session.startTime?.toISOString(),
-          callObjective: callObjective // Also save the call objective
-        }
-        localStorage.setItem(MEET_SESSION_STORAGE_KEY, JSON.stringify(sessionToSave))
-        console.log('💾 Session saved to localStorage:', session.meetingId)
-      } else {
-        // Clear storage when session ends or errors
-        localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
-        console.log('🗑️ Session cleared from localStorage')
-      }
-    }
-  }, [session, callObjective])
-
-  // Load evaluation history
-  const loadHistory = async () => {
-    if (!userId) return
-
-    setIsLoadingHistory(true)
-    try {
-      const { data, error } = await supabase
-        .from('meet_evaluations')
-        .select('id, seller_name, call_objective, overall_score, performance_level, created_at, evaluation')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(20)
-
-      if (error) throw error
-      setSavedEvaluations(data || [])
-    } catch (err) {
-      console.error('Error loading history:', err)
-    } finally {
-      setIsLoadingHistory(false)
-    }
-  }
-
-  // Load history when switching to history tab
-  useEffect(() => {
-    if (activeMode === 'history' && userId) {
-      loadHistory()
-    }
-  }, [activeMode, userId])
-
-  // View saved evaluation
-  const viewSavedEvaluation = (saved: SavedEvaluation) => {
-    setSelectedEvaluation(saved)
-    setEvaluation(saved.evaluation)
-    setShowEvaluationModal(true)
-  }
-
   // Extract meeting ID from Google Meet URL
   const extractMeetingId = (url: string): string | null => {
+    // Patterns:
+    // https://meet.google.com/abc-defg-hij
+    // meet.google.com/abc-defg-hij
     const patterns = [
       /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i,
       /^([a-z]{3}-[a-z]{4}-[a-z]{3})$/i
@@ -372,19 +125,18 @@ export default function MeetAnalysisView() {
       transcript: []
     })
     setError('')
-    setEvaluation(null)
-    setEvaluationError('')
 
     try {
       const response = await fetch(`${VEXA_API_URL}/bots`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-API-Key': VEXA_API_KEY
         },
         body: JSON.stringify({
           platform: 'google_meet',
           native_meeting_id: meetingId,
-          language: 'pt'
+          language: 'pt'  // Forçar transcrição em português
         })
       })
 
@@ -401,6 +153,7 @@ export default function MeetAnalysisView() {
         startTime: new Date()
       } : null)
 
+      // Start polling for status and transcripts using meeting ID
       startPolling(meetingId)
 
     } catch (err: any) {
@@ -418,15 +171,21 @@ export default function MeetAnalysisView() {
 
     const poll = async () => {
       try {
-        const statusRes = await fetch(`${VEXA_API_URL}/bots/status`)
+        // Get all bots status using /bots/status endpoint
+        const statusRes = await fetch(`${VEXA_API_URL}/bots/status`, {
+          headers: { 'X-API-Key': VEXA_API_KEY }
+        })
 
         if (statusRes.ok) {
           const statusData = await statusRes.json()
+          console.log('All bots status:', statusData)
 
+          // Find our bot by native_meeting_id
           const ourBot = statusData.running_bots?.find(
             (bot: any) => bot.native_meeting_id === nativeMeetingId
           )
 
+          // Update session status based on bot status
           setSession(prev => {
             if (!prev) return null
 
@@ -440,8 +199,10 @@ export default function MeetAnalysisView() {
                 newStatus = 'ended'
               }
             } else if (prev.status === 'joining') {
+              // Bot might still be starting up
               newStatus = 'joining'
             } else if (prev.status === 'in_meeting' || prev.status === 'transcribing') {
+              // Bot was running but now not in list - might have ended
               newStatus = 'ended'
             }
 
@@ -449,13 +210,17 @@ export default function MeetAnalysisView() {
           })
         }
 
+        // Get transcripts
         const transcriptRes = await fetch(
-          `${VEXA_API_URL}/transcripts/google_meet/${nativeMeetingId}`
+          `${VEXA_API_URL}/transcripts/google_meet/${nativeMeetingId}`,
+          { headers: { 'X-API-Key': VEXA_API_KEY } }
         )
 
         if (transcriptRes.ok) {
           const transcriptData = await transcriptRes.json()
+          console.log('Transcript data:', transcriptData)
 
+          // Handle different response formats
           let segments = []
           if (transcriptData.segments && Array.isArray(transcriptData.segments)) {
             segments = transcriptData.segments
@@ -466,12 +231,14 @@ export default function MeetAnalysisView() {
           }
 
           if (segments.length > 0) {
+            // Map raw segments to our format
             const mappedSegments = segments.map((seg: any) => ({
               speaker: seg.speaker || seg.speaker_id || 'Participante',
               text: seg.text || seg.content || '',
               timestamp: seg.start_time || seg.timestamp || ''
             }))
 
+            // Consolidate consecutive messages from the same speaker
             const consolidatedTranscript = consolidateTranscript(mappedSegments)
 
             setSession(prev => {
@@ -490,7 +257,10 @@ export default function MeetAnalysisView() {
       }
     }
 
+    // Initial poll
     poll()
+
+    // Poll every 2 seconds
     pollIntervalRef.current = setInterval(poll, 2000)
   }
 
@@ -508,8 +278,10 @@ export default function MeetAnalysisView() {
 
     if (session?.meetingId) {
       try {
+        // Use correct endpoint: DELETE /bots/{platform}/{native_meeting_id}
         await fetch(`${VEXA_API_URL}/bots/google_meet/${session.meetingId}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: { 'X-API-Key': VEXA_API_KEY }
         })
       } catch (err) {
         console.error('Error stopping bot:', err)
@@ -526,12 +298,6 @@ export default function MeetAnalysisView() {
     setMeetUrl('')
     setMeetingId('')
     setError('')
-    setEvaluation(null)
-    setEvaluationError('')
-    setCallObjective('')
-    // Clear localStorage
-    localStorage.removeItem(MEET_SESSION_STORAGE_KEY)
-    // Note: sellerName is not reset because it's auto-fetched from user profile
   }
 
   // Copy meeting ID
@@ -539,78 +305,6 @@ export default function MeetAnalysisView() {
     navigator.clipboard.writeText(meetingId)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
-
-  // Evaluate call
-  const evaluateCall = async () => {
-    if (!session?.transcript || session.transcript.length === 0) {
-      setEvaluationError('Nenhuma transcrição disponível para avaliar')
-      return
-    }
-
-    if (!userId || !companyId) {
-      setEvaluationError('Usuário não autenticado')
-      return
-    }
-
-    setIsEvaluating(true)
-    setEvaluationError('')
-
-    try {
-      // Fetch company objections from ConfigHub
-      const { data: objectionsData } = await supabase
-        .from('objections')
-        .select('name, rebuttals')
-        .eq('company_id', companyId)
-
-      // Format objections for the AI
-      let objectionsText = ''
-      if (objectionsData && objectionsData.length > 0) {
-        objectionsText = objectionsData.map(obj => {
-          const rebuttals = obj.rebuttals && Array.isArray(obj.rebuttals)
-            ? obj.rebuttals.join('; ')
-            : ''
-          return `- Objeção: "${obj.name}" | Formas de quebrar: ${rebuttals || 'Não configurado'}`
-        }).join('\n')
-      }
-
-      const response = await fetch('/api/meet/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: session.transcript,
-          sellerName: sellerName.trim(),
-          callObjective: callObjective.trim() || null,
-          objections: objectionsText || null,
-          meetingId: session.meetingId,
-          userId,
-          companyId
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Falha ao avaliar call')
-      }
-
-      const data = await response.json()
-      setEvaluation(data.evaluation)
-      setShowEvaluationModal(true)
-
-    } catch (err: any) {
-      console.error('Evaluation error:', err)
-      setEvaluationError(err.message || 'Erro ao avaliar call')
-    } finally {
-      setIsEvaluating(false)
-    }
-  }
-
-  // Toggle section expansion
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }))
   }
 
   // Scroll to bottom of transcript
@@ -650,98 +344,6 @@ export default function MeetAnalysisView() {
     )
   }
 
-  // Render SPIN score card - Full version
-  const renderSpinScoreFull = (
-    letter: string,
-    label: string,
-    data: {
-      final_score: number
-      technical_feedback: string
-      key_questions_asked?: string[]
-      problems_identified?: string[]
-      implications_raised?: string[]
-      value_propositions_used?: string[]
-      missed_opportunities: string[]
-    }
-  ) => (
-    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-lg">{letter}</span>
-          <span className="text-sm text-gray-600">{label}</span>
-        </div>
-        <span className={`text-2xl font-bold ${getScoreColor(data?.final_score ?? 0)}`}>
-          {typeof data?.final_score === 'number' ? data.final_score.toFixed(1) : 'N/A'}
-        </span>
-      </div>
-      <p className="text-sm text-gray-700 mb-3 leading-relaxed">{data.technical_feedback}</p>
-
-      {/* Questions/Items identified */}
-      {data.key_questions_asked && data.key_questions_asked.length > 0 && (
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-green-600 mb-1">Perguntas feitas:</p>
-          <ul className="text-xs text-gray-600 space-y-1">
-            {data.key_questions_asked.map((q, i) => (
-              <li key={i} className="flex items-start gap-1">
-                <span className="text-green-600">•</span> {q}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {data.problems_identified && data.problems_identified.length > 0 && (
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-blue-600 mb-1">Problemas identificados:</p>
-          <ul className="text-xs text-gray-600 space-y-1">
-            {data.problems_identified.map((p, i) => (
-              <li key={i} className="flex items-start gap-1">
-                <span className="text-blue-600">•</span> {p}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {data.implications_raised && data.implications_raised.length > 0 && (
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-orange-600 mb-1">Implicações levantadas:</p>
-          <ul className="text-xs text-gray-600 space-y-1">
-            {data.implications_raised.map((imp, i) => (
-              <li key={i} className="flex items-start gap-1">
-                <span className="text-orange-600">•</span> {imp}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {data.value_propositions_used && data.value_propositions_used.length > 0 && (
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-purple-600 mb-1">Propostas de valor usadas:</p>
-          <ul className="text-xs text-gray-600 space-y-1">
-            {data.value_propositions_used.map((v, i) => (
-              <li key={i} className="flex items-start gap-1">
-                <span className="text-purple-600">•</span> {v}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Missed opportunities */}
-      {data.missed_opportunities && data.missed_opportunities.length > 0 && (
-        <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-200">
-          <p className="text-xs font-semibold text-red-600 mb-1">Oportunidades perdidas:</p>
-          <ul className="text-xs text-gray-600 space-y-1">
-            {data.missed_opportunities.map((opp, i) => (
-              <li key={i} className="flex items-start gap-1">
-                <span className="text-red-600">•</span> {opp}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-6">
       <div className="max-w-4xl mx-auto">
@@ -758,7 +360,7 @@ export default function MeetAnalysisView() {
           </p>
         </div>
 
-        {/* Mode Tabs */}
+        {/* Input Section */}
         {!session && (
           <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
             <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -787,18 +389,15 @@ export default function MeetAnalysisView() {
                   </div>
                 )}
               </div>
-
-              {/* Send Button */}
               <button
                 onClick={sendBot}
                 disabled={!meetingId}
                 className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
               >
                 <Send className="w-5 h-5" />
-                Enviar Bot para a Reunião
+                Enviar Bot
               </button>
             </div>
-
             {error && (
               <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
                 <AlertTriangle className="w-4 h-4" />
@@ -941,7 +540,7 @@ export default function MeetAnalysisView() {
               </div>
             </div>
 
-            {/* Evaluation Section - Only when ended with transcript */}
+            {/* Actions when ended */}
             {session.status === 'ended' && session.transcript.length > 0 && (
               <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Sessão Encerrada</h3>
@@ -949,23 +548,6 @@ export default function MeetAnalysisView() {
                   A transcrição foi capturada com sucesso. Você pode:
                 </p>
                 <div className="flex gap-3">
-                  <button
-                    onClick={evaluateCall}
-                    disabled={isEvaluating}
-                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-                  >
-                    {isEvaluating ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Avaliando... (pode levar até 30s)
-                      </>
-                    ) : (
-                      <>
-                        <BarChart3 className="w-5 h-5" />
-                        Avaliar Call com IA
-                      </>
-                    )}
-                  </button>
                   <button
                     onClick={() => {
                       const text = session.transcript
@@ -986,255 +568,8 @@ export default function MeetAnalysisView() {
                     Nova Análise
                   </button>
                 </div>
-
-                {/* Show evaluation result button if already evaluated */}
-                {evaluation && (
-                  <button
-                    onClick={() => setShowEvaluationModal(true)}
-                    className="w-full mt-4 px-4 py-3 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl transition-colors flex items-center justify-center gap-2 border border-green-200"
-                  >
-                    <Award className="w-5 h-5" />
-                    Ver Resultado da Avaliação (Nota: {evaluation.overall_score})
-                  </button>
-                )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Evaluation Modal */}
-        {showEvaluationModal && evaluation && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center overflow-y-auto py-8 px-4">
-            <div className="bg-white rounded-2xl w-full max-w-4xl border border-gray-200 shadow-2xl">
-              {/* Modal Header */}
-              <div className="sticky top-0 bg-white/95 backdrop-blur-sm px-6 py-4 border-b border-gray-200 rounded-t-2xl flex items-center justify-between z-10">
-                <div className="flex items-center gap-4">
-                  <div className={`px-4 py-2 rounded-xl ${getPerformanceConfig(evaluation.performance_level).bgColor}`}>
-                    <span className={`text-3xl font-bold ${getPerformanceConfig(evaluation.performance_level).color}`}>
-                      {evaluation.overall_score}
-                    </span>
-                    <span className="text-gray-500 text-sm ml-1">/100</span>
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">Avaliação da Call</h2>
-                    <p className={`text-sm ${getPerformanceConfig(evaluation.performance_level).color}`}>
-                      {getPerformanceConfig(evaluation.performance_level).label}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowEvaluationModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-6 h-6 text-gray-500" />
-                </button>
-              </div>
-
-              {/* Modal Content */}
-              <div className="p-6 space-y-6">
-                {/* Executive Summary */}
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-blue-600" />
-                    Resumo Executivo
-                  </h3>
-                  <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                    {evaluation.executive_summary}
-                  </p>
-                </div>
-
-                {/* Strengths & Gaps */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {evaluation.top_strengths.length > 0 && (
-                    <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                      <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" />
-                        Pontos Fortes
-                      </h3>
-                      <ul className="space-y-2">
-                        {evaluation.top_strengths.map((strength, idx) => (
-                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
-                            <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                            {strength}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {evaluation.critical_gaps.length > 0 && (
-                    <div className="bg-red-50 rounded-xl p-4 border border-red-200">
-                      <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
-                        <TrendingDown className="w-4 h-4" />
-                        Gaps Críticos
-                      </h3>
-                      <ul className="space-y-2">
-                        {evaluation.critical_gaps.map((gap, idx) => (
-                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                            {gap}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* SPIN Evaluation */}
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => toggleSection('spin')}
-                    className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
-                  >
-                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <Target className="w-4 h-4 text-purple-600" />
-                      Avaliação SPIN Detalhada
-                    </h3>
-                    {expandedSections.spin ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                  </button>
-                  {expandedSections.spin && (
-                    <div className="p-4 space-y-4 bg-white">
-                      {evaluation.spin_evaluation?.S && renderSpinScoreFull('S', 'Situação', evaluation.spin_evaluation.S)}
-                      {evaluation.spin_evaluation?.P && renderSpinScoreFull('P', 'Problema', evaluation.spin_evaluation.P)}
-                      {evaluation.spin_evaluation?.I && renderSpinScoreFull('I', 'Implicação', evaluation.spin_evaluation.I)}
-                      {evaluation.spin_evaluation?.N && renderSpinScoreFull('N', 'Necessidade', evaluation.spin_evaluation.N)}
-                    </div>
-                  )}
-                </div>
-
-                {/* Objections Analysis */}
-                {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => toggleSection('objections')}
-                      className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
-                    >
-                      <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-orange-600" />
-                        Análise de Objeções ({evaluation.objections_analysis.length})
-                      </h3>
-                      {expandedSections.objections ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                    </button>
-                    {expandedSections.objections && (
-                      <div className="p-4 space-y-4 bg-white">
-                        {evaluation.objections_analysis.map((obj, idx) => (
-                          <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded">
-                                {obj.objection_type} • {obj.objection_nature}
-                              </span>
-                              <span className={`text-lg font-bold ${getScoreColor(obj.score)}`}>
-                                {obj.score}/10
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-700 italic mb-2">"{obj.objection_text}"</p>
-                            <p className="text-sm text-gray-600">{obj.detailed_analysis}</p>
-                            {obj.ideal_response && (
-                              <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                                <p className="text-xs text-green-700 font-semibold mb-1">Resposta Ideal:</p>
-                                <p className="text-sm text-gray-700">{obj.ideal_response}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Soft Skills */}
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => toggleSection('softSkills')}
-                    className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
-                  >
-                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-cyan-600" />
-                      Soft Skills
-                    </h3>
-                    {expandedSections.softSkills ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                  </button>
-                  {expandedSections.softSkills && (
-                    <div className="p-4 space-y-3 bg-white">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <span className="text-sm text-gray-700">Rapport</span>
-                        <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.rapport_score)}`}>
-                          {evaluation.soft_skills_evaluation.rapport_score}/10
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <span className="text-sm text-gray-700">Controle da Conversa</span>
-                        <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.conversation_control_score)}`}>
-                          {evaluation.soft_skills_evaluation.conversation_control_score}/10
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <span className="text-sm text-gray-700">Escuta Ativa</span>
-                        <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.active_listening_score)}`}>
-                          {evaluation.soft_skills_evaluation.active_listening_score}/10
-                        </span>
-                      </div>
-                      {evaluation.soft_skills_evaluation.stakeholder_management_score !== null && (
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <span className="text-sm text-gray-700">Gestão de Stakeholders</span>
-                          <span className={`font-bold ${getScoreColor(evaluation.soft_skills_evaluation.stakeholder_management_score)}`}>
-                            {evaluation.soft_skills_evaluation.stakeholder_management_score}/10
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Priority Improvements */}
-                {evaluation.priority_improvements.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => toggleSection('improvements')}
-                      className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
-                    >
-                      <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <Lightbulb className="w-4 h-4 text-yellow-600" />
-                        Melhorias Prioritárias ({evaluation.priority_improvements.length})
-                      </h3>
-                      {expandedSections.improvements ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                    </button>
-                    {expandedSections.improvements && (
-                      <div className="p-4 space-y-4 bg-white">
-                        {evaluation.priority_improvements.map((imp, idx) => (
-                          <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`text-xs px-2 py-1 rounded ${
-                                imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
-                                imp.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
-                              </span>
-                              <span className="text-sm font-semibold text-gray-900">{imp.area}</span>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">{imp.current_gap}</p>
-                            <p className="text-sm text-gray-700">{imp.action_plan}</p>
-                            {imp.training_suggestion && (
-                              <p className="text-xs text-blue-600 mt-2">💡 {imp.training_suggestion}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm px-6 py-4 border-t border-gray-200 rounded-b-2xl">
-                <button
-                  onClick={() => setShowEvaluationModal(false)}
-                  className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold text-gray-700 transition-colors border border-gray-200"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </div>

@@ -18,6 +18,8 @@ import StatsPanel from './dashboard/StatsPanel'
 import TopBanner from './dashboard/TopBanner'
 import FeatureCard from './dashboard/FeatureCard'
 import StreakIndicator from './dashboard/StreakIndicator'
+import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
+import ChallengeHistoryView from './dashboard/ChallengeHistoryView'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
 import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
@@ -45,12 +47,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis' | 'challenge-history'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [activeChallenge, setActiveChallenge] = useState<any | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
   const chatRef = useRef<ChatInterfaceHandle>(null)
 
@@ -301,7 +304,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (currentView === 'chat' && newView !== 'chat' && chatRef.current) {
       await chatRef.current.requestLeave()
     }
+    // Clear active challenge when navigating to roleplay via menu (not via handleStartChallenge)
+    if (newView === 'roleplay') {
+      setActiveChallenge(null)
+    }
     setCurrentView(newView as typeof currentView)
+  }
+
+  const handleStartChallenge = (challenge: any) => {
+    setActiveChallenge(challenge)
+    setCurrentView('roleplay')
   }
 
   const renderContent = () => {
@@ -326,7 +338,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'roleplay') {
-      return <RoleplayView onNavigateToHistory={() => handleViewChange('historico')} />
+      return (
+        <RoleplayView
+          onNavigateToHistory={() => handleViewChange('historico')}
+          challengeConfig={activeChallenge?.challenge_config}
+          challengeId={activeChallenge?.id}
+          onChallengeComplete={() => setActiveChallenge(null)}
+        />
+      )
     }
 
     if (currentView === 'pdi') {
@@ -350,11 +369,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'historico') {
-      return <HistoricoView />
+      return <HistoricoView onStartChallenge={handleStartChallenge} />
     }
 
     if (currentView === 'perfil') {
-      return <PerfilView key={Date.now()} onViewChange={handleViewChange} />
+      return <PerfilView onViewChange={handleViewChange} />
     }
 
     if (currentView === 'roleplay-links') {
@@ -371,6 +390,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'meet-analysis') {
       return <MeetAnalysisView />
+    }
+
+    if (currentView === 'challenge-history') {
+      return (
+        <ChallengeHistoryView
+          userId={userId || ''}
+          onStartChallenge={handleStartChallenge}
+          onBack={() => handleViewChange('home')}
+        />
+      )
     }
 
     // Home view
@@ -416,6 +445,25 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div>
           </div>
+
+          {/* Daily Challenge Banner */}
+          {userId && companyId && (
+            <div className={`mb-8 ${mounted ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: '100ms' }}>
+              <DailyChallengeBanner
+                userId={userId}
+                companyId={companyId}
+                onStartChallenge={handleStartChallenge}
+                onViewHistory={() => {
+                  setCurrentView('historico')
+                  // Set the history type to challenges after a small delay to ensure component mounts
+                  setTimeout(() => {
+                    const event = new CustomEvent('setHistoryType', { detail: 'desafios' })
+                    window.dispatchEvent(event)
+                  }, 100)
+                }}
+              />
+            </div>
+          )}
 
           {/* Section Headers */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-4">
@@ -489,17 +537,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <FeatureCard
               icon={Clock}
               title="Histórico"
-              subtitle="Sessões anteriores"
-              description="Revise sessões com transcrições e análises."
+              subtitle="Todas as sessões"
+              description="Simulações, Follow-ups e análises de Meet."
               onClick={() => handleViewChange('historico')}
-            />
-
-            <FeatureCard
-              icon={History}
-              title="Histórico Follow-ups"
-              subtitle="Feedback"
-              description="Revise e marque resultados dos follow-ups."
-              onClick={() => handleViewChange('followup-history')}
             />
 
             <FeatureCard

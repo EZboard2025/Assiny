@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { evaluateChallengePerformance } from '@/lib/challenges/evaluateChallengePerformance'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,12 +18,14 @@ const N8N_WEBHOOK_URL = 'https://ezboard.app.n8n.cloud/webhook/b34f1d38-493b-4ae
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { sessionId } = body
+    const { sessionId, challengeId } = body
 
     if (!sessionId) {
       console.error('❌ sessionId não fornecido no body:', body)
       return NextResponse.json({ error: 'sessionId é obrigatório' }, { status: 400 })
     }
+
+    console.log('🎯 challengeId recebido:', challengeId || 'nenhum')
 
     console.log('📊 Iniciando avaliação da sessão:', sessionId)
 
@@ -127,10 +130,71 @@ OBJEÇÕES TRABALHADAS:`
       client_profile += `\n\nNenhuma objeção específica foi configurada para este roleplay.`
     }
 
+    // Verificar se esta sessão pertence a um desafio
+    // Prioriza o challengeId passado diretamente (mais confiável)
+    // Fallback: busca reversa pelo roleplay_session_id (para compatibilidade)
+    let challenge_context = null
+    let challengeData = null
+    let challengeError = null
+
+    if (challengeId) {
+      // Busca direta pelo ID do desafio (mais confiável)
+      console.log('🎯 Buscando desafio pelo challengeId:', challengeId)
+      const result = await supabase
+        .from('daily_challenges')
+        .select('id, challenge_config, difficulty_level')
+        .eq('id', challengeId)
+        .single()
+      challengeData = result.data
+      challengeError = result.error
+    } else {
+      // Fallback: busca reversa (mantido para compatibilidade)
+      console.log('🔍 Buscando desafio pelo roleplay_session_id:', sessionId)
+      const result = await supabase
+        .from('daily_challenges')
+        .select('id, challenge_config, difficulty_level')
+        .eq('roleplay_session_id', sessionId)
+        .single()
+      challengeData = result.data
+      challengeError = result.error
+    }
+
+    if (challengeData && !challengeError) {
+      console.log('🎯 Desafio encontrado:', challengeData.id)
+
+      const challengeConfig = challengeData.challenge_config as any
+
+      // Normalizar target_letter para apenas a letra (S, P, I, N)
+      // Pode vir como "spin_S", "spin_s", "S", ou "s"
+      let rawTargetLetter = challengeConfig.success_criteria?.spin_letter_target || ''
+      const normalizedTargetLetter = rawTargetLetter
+        .replace(/spin_/i, '') // Remove prefixo "spin_"
+        .toUpperCase() // Converte para maiúscula
+        .charAt(0) || null // Pega apenas a primeira letra
+
+      challenge_context = {
+        is_challenge: true,
+        target_letter: normalizedTargetLetter,
+        target_score: challengeConfig.success_criteria?.spin_min_score || null,
+        target_weakness: challengeConfig.target_weakness || null,
+        difficulty_level: challengeData.difficulty_level || 1,
+        coaching_tips: challengeConfig.coaching_tips || [],
+        challenge_title: challengeConfig.title || 'Desafio Diário'
+      }
+      console.log('📊 Target letter normalizado:', rawTargetLetter, '->', normalizedTargetLetter)
+      console.log('✅ Contexto do desafio montado:', JSON.stringify(challenge_context, null, 2))
+    } else if (challengeError && challengeError.code !== 'PGRST116') {
+      // PGRST116 = no rows returned (sessão normal, não é desafio)
+      console.warn('⚠️ Erro ao buscar desafio:', challengeError)
+    }
+
     console.log('📤 Enviando para N8N...')
     console.log('Contexto:', JSON.stringify(context, null, 2))
     console.log('Perfil do Cliente:\n', client_profile)
     console.log('Transcrição:', transcription.substring(0, 200) + '...')
+    if (challenge_context) {
+      console.log('🎯 Challenge Context:', JSON.stringify(challenge_context, null, 2))
+    }
 
     // Enviar para N8N
     const n8nPayload = {
@@ -140,7 +204,8 @@ OBJEÇÕES TRABALHADAS:`
       companyId: companyId, // ID da empresa para contexto do agente
       objetivo: config.objective?.name
         ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
-        : 'Não especificado'
+        : 'Não especificado',
+      challenge_context: challenge_context // null para roleplays normais, objeto para desafios
     }
 
     console.log('📡 Enviando payload para N8N:', JSON.stringify(n8nPayload, null, 2))
@@ -181,6 +246,28 @@ OBJEÇÕES TRABALHADAS:`
     }
 
     console.log('✅ Avaliação pronta - Score:', evaluation.overall_score, '| Level:', evaluation.performance_level)
+
+    // Se é um desafio, avaliar performance específica do desafio usando agente no código
+    if (challenge_context) {
+      console.log('🎯 Avaliando performance específica do desafio...')
+      try {
+        const challengePerformance = await evaluateChallengePerformance(
+          transcription,
+          evaluation,
+          challenge_context
+        )
+        // Adicionar challenge_performance à avaliação
+        evaluation.challenge_performance = challengePerformance
+        console.log('✅ Challenge performance adicionado:', {
+          goal_achieved: challengePerformance.goal_achieved,
+          achieved_score: challengePerformance.achieved_score,
+          target_score: challengePerformance.target_score
+        })
+      } catch (challengeError) {
+        console.error('⚠️ Erro ao avaliar desafio (continuando sem challenge_performance):', challengeError)
+        // Não falha a avaliação principal se o desafio falhar
+      }
+    }
 
     // Salvar avaliação no Supabase
     const { error: updateError } = await supabase

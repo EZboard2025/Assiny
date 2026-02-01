@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone, Shuffle, EyeOff, Eye } from 'lucide-react'
+import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone, Shuffle, EyeOff, Eye, Trophy } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
@@ -10,11 +10,35 @@ import { updatePersona } from '@/lib/config'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanLimitWarning } from '@/components/PlanLimitWarning'
 
-interface RoleplayViewProps {
-  onNavigateToHistory?: () => void
+interface ChallengeConfig {
+  title: string
+  description: string
+  target_weakness: string
+  roleplay_config: {
+    persona_id: string
+    objection_ids: string[]
+    age_range: string
+    temperament: string
+    objective_id?: string
+  }
+  success_criteria: {
+    spin_letter_target: string
+    spin_min_score: number
+    primary_indicator: string
+    primary_min_score: number
+    objection_handling_min: number
+  }
+  coaching_tips: string[]
 }
 
-export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps = {}) {
+interface RoleplayViewProps {
+  onNavigateToHistory?: () => void
+  challengeConfig?: ChallengeConfig
+  challengeId?: string
+  onChallengeComplete?: () => void
+}
+
+export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete }: RoleplayViewProps = {}) {
   // Hook para verificar limites do plano
   const {
     checkRoleplayLimit,
@@ -43,6 +67,43 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       }
     </style>
   `;
+
+  // Helper function to extract just the SPIN letter (S, P, I, or N) from various formats
+  const extractSpinLetter = (input: string): string => {
+    if (!input) return ''
+    const upper = input.toUpperCase()
+    if (upper.startsWith('SPIN_')) {
+      return upper.replace('SPIN_', '')
+    }
+    if (['S', 'P', 'I', 'N'].includes(upper)) {
+      return upper
+    }
+    return input
+  }
+
+  // Helper function to format SPIN letter to full name
+  const formatSpinLetter = (letter: string): string => {
+    const extracted = extractSpinLetter(letter)
+    const labels: Record<string, string> = {
+      'S': 'Situação',
+      'P': 'Problema',
+      'I': 'Implicação',
+      'N': 'Necessidade',
+    }
+    return labels[extracted] || letter
+  }
+
+  // Clean up text containing SPIN_X patterns
+  const cleanSpinText = (text: string): string => {
+    if (!text) return ''
+    return text
+      .replace(/SPIN_S/gi, 'Situação (S)')
+      .replace(/SPIN_P/gi, 'Problema (P)')
+      .replace(/SPIN_I/gi, 'Implicação (I)')
+      .replace(/SPIN_N/gi, 'Necessidade (N)')
+      .replace(/spin selling/gi, 'SPIN Selling')
+  }
+
   const [isSimulating, setIsSimulating] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [roleplayLimitReached, setRoleplayLimitReached] = useState(false)
@@ -59,6 +120,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [isCameraOn, setIsCameraOn] = useState(true)
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
   const [showChatSidebar, setShowChatSidebar] = useState(false)
+  const [showChallengeTips, setShowChallengeTips] = useState(true) // Mostrar dicas do desafio por padrão
+  const [isChallengeTipsMinimized, setIsChallengeTipsMinimized] = useState(false) // Painel de dicas minimizado
 
   // Configurações do roleplay
   const [age, setAge] = useState(30)
@@ -74,6 +137,9 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
 
   // Estado para modal de aviso ao encerrar
   const [showEndSessionWarning, setShowEndSessionWarning] = useState(false)
+
+  // Quando há um desafio ativo, as configurações ficam travadas
+  const isChallengeLocked = !!challengeConfig
 
   // Dados do banco
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
@@ -109,6 +175,7 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   const [clientName, setClientName] = useState<string>('Cliente') // Nome do cliente virtual
   const [roleplayConfig, setRoleplayConfig] = useState<any>(null) // Armazena toda a configuração do roleplay
   const [dataLoading, setDataLoading] = useState(true) // Loading state para dados iniciais
+  const [isChallengeExpanded, setIsChallengeExpanded] = useState(false) // Estado para expandir/colapsar card do desafio
 
   useEffect(() => {
     setMounted(true)
@@ -118,8 +185,8 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
   // Verificar limite de créditos mensais
   useEffect(() => {
     if (planUsage && trainingPlan) {
-      const used = planUsage?.credits?.used || 0
-      const limit = planUsage?.credits?.limit
+      const used = planUsage.training?.credits?.used || 0
+      const limit = planUsage.training?.credits?.limit
 
       if (limit !== null && used >= limit) {
         setRoleplayLimitReached(true)
@@ -172,6 +239,39 @@ export default function RoleplayView({ onNavigateToHistory }: RoleplayViewProps 
       // Selecionar primeiro objetivo se existir
       if (objectivesData.length > 0) {
         setSelectedObjective(objectivesData[0].id)
+      }
+
+      // Apply challenge configuration if present
+      if (challengeConfig) {
+        console.log('🎯 Aplicando configuração do desafio:', challengeConfig)
+
+        // Set persona
+        if (challengeConfig.roleplay_config.persona_id) {
+          setSelectedPersona(challengeConfig.roleplay_config.persona_id)
+        }
+
+        // Set objections
+        if (challengeConfig.roleplay_config.objection_ids?.length > 0) {
+          setSelectedObjections(challengeConfig.roleplay_config.objection_ids)
+        }
+
+        // Set objective
+        if (challengeConfig.roleplay_config.objective_id) {
+          setSelectedObjective(challengeConfig.roleplay_config.objective_id)
+        }
+
+        // Set temperament
+        if (challengeConfig.roleplay_config.temperament) {
+          setTemperament(challengeConfig.roleplay_config.temperament)
+        }
+
+        // Set age from range (e.g., "35-44" -> 40)
+        if (challengeConfig.roleplay_config.age_range) {
+          const [minAge, maxAge] = challengeConfig.roleplay_config.age_range.split('-').map(Number)
+          if (!isNaN(minAge) && !isNaN(maxAge)) {
+            setAge(Math.floor((minAge + maxAge) / 2))
+          }
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -826,7 +926,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         // Obter mensagens
         const messages = await getRoleplaySession(sessionId);
 
-        // Enviar para avaliação
+        // Enviar para avaliação (incluir challengeId se for um desafio)
         const evaluationResponse = await fetch('/api/roleplay/evaluate', {
           method: 'POST',
           headers: {
@@ -835,7 +935,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           body: JSON.stringify({
             sessionId,
             messages: messages?.messages || [],
-            config: messages?.config || {}
+            config: messages?.config || {},
+            challengeId: challengeId || null // Passar diretamente o ID do desafio
           }),
         });
 
@@ -874,6 +975,28 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               console.log('✅ Resumo de performance atualizado')
             } catch (error) {
               console.error('Erro ao atualizar resumo de performance:', error)
+            }
+
+            // Complete challenge if this is a challenge roleplay
+            if (challengeId && sessionId) {
+              try {
+                const completeResponse = await fetch('/api/challenges/complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    challengeId,
+                    roleplaySessionId: sessionId
+                  })
+                })
+                const completeResult = await completeResponse.json()
+                console.log('🎯 Desafio completado:', completeResult)
+
+                if (onChallengeComplete) {
+                  onChallengeComplete()
+                }
+              } catch (error) {
+                console.error('Erro ao completar desafio:', error)
+              }
             }
           }
         } else {
@@ -1541,6 +1664,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800">
             <span className="text-white/60 text-sm">Roleplay em andamento</span>
             <div className="flex items-center gap-3">
+              {/* Botão de Dicas do Desafio - Expande/Minimiza */}
+              {challengeConfig && (
+                <button
+                  onClick={() => setIsChallengeTipsMinimized(!isChallengeTipsMinimized)}
+                  className={`p-2 rounded-lg transition-colors ${!isChallengeTipsMinimized ? 'bg-purple-600/20 text-purple-400' : 'hover:bg-gray-800 text-white/70'}`}
+                  title={isChallengeTipsMinimized ? "Expandir Dicas do Desafio" : "Minimizar Dicas do Desafio"}
+                >
+                  <Lightbulb size={20} />
+                </button>
+              )}
               <button
                 onClick={() => setShowChatSidebar(!showChatSidebar)}
                 className={`p-2 rounded-lg transition-colors ${showChatSidebar ? 'bg-green-600/20 text-green-400' : 'hover:bg-gray-800 text-white/70'}`}
@@ -1552,6 +1685,102 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           </div>
 
           <div className="flex-1 flex overflow-hidden">
+            {/* Painel de Dicas do Desafio - Flutuante na esquerda */}
+            {challengeConfig && showChallengeTips && (
+              <div className={`${isChallengeTipsMinimized ? 'w-16' : 'w-72'} bg-gray-900/95 border-r border-gray-800 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
+                <div className="p-3 border-b border-gray-800 flex items-center justify-between">
+                  {!isChallengeTipsMinimized ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                          <Target size={16} className="text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-white font-medium text-sm">Desafio Ativo</h3>
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-sm">
+                              🔥 <span className="bg-white/20 px-1 rounded text-[10px]">{extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}</span> ≥ <span className="text-sm font-black">{challengeConfig.success_criteria.spin_min_score}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsChallengeTipsMinimized(true)}
+                        className="p-1 hover:bg-gray-800 rounded text-gray-500 hover:text-gray-300"
+                        title="Minimizar"
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setIsChallengeTipsMinimized(false)}
+                      className="w-full flex flex-col items-center gap-2 py-1"
+                      title="Expandir dicas do desafio"
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                        <Target size={16} className="text-white" />
+                      </div>
+                      <ChevronUp size={14} className="text-gray-500" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Conteúdo expandido */}
+                {!isChallengeTipsMinimized && (
+                  <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                    {/* Título e Descrição */}
+                    <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-700/30">
+                      <h4 className="text-purple-300 font-medium text-sm mb-1">{cleanSpinText(challengeConfig.title)}</h4>
+                      <p className="text-gray-400 text-xs">{cleanSpinText(challengeConfig.description)}</p>
+                    </div>
+
+                    {/* Dicas de Coaching */}
+                    {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Lightbulb size={14} className="text-amber-400" />
+                          <span className="text-amber-400 text-xs font-semibold uppercase tracking-wider">Dicas</span>
+                        </div>
+                        <div className="space-y-2">
+                          {challengeConfig.coaching_tips.map((tip, index) => (
+                            <div key={index} className="bg-gray-800/50 rounded-lg p-2.5 border-l-2 border-amber-500/50">
+                              <p className="text-gray-300 text-xs leading-relaxed">{cleanSpinText(tip)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Foco SPIN */}
+                    <div className="bg-gray-800/30 rounded-lg p-3">
+                      <p className="text-gray-400 text-xs mb-2">Foque em perguntas de:</p>
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold rounded-lg">
+                          {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
+                        </span>
+                        <span className="text-white text-sm font-medium">
+                          {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Versão minimizada - mostrar meta e letra */}
+                {isChallengeTipsMinimized && (
+                  <div className="flex-1 flex flex-col items-center py-4 gap-3">
+                    <span className="px-2 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold rounded-lg">
+                      {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
+                    </span>
+                    <span className="text-xs text-gray-400 font-semibold">
+                      ≥{challengeConfig.success_criteria.spin_min_score}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Área dos vídeos */}
             <div className={`flex-1 flex items-center justify-center gap-4 p-6 transition-all ${showChatSidebar ? 'pr-0' : ''}`}>
               {/* Avatar do Cliente Virtual (gerado por IA) */}
@@ -1748,20 +1977,81 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </p>
             </div>
 
-            {/* Contador de Créditos à direita */}
-            {planUsage && (
-              <div className={`flex items-center gap-2 ${
-                planUsage.training?.credits?.limit !== null && planUsage.training?.credits?.used >= planUsage.training?.credits?.limit
-                  ? 'text-red-500'
-                  : 'text-green-500'
-              }`}>
-                <Zap className="w-6 h-6" />
-                <span className="text-2xl font-bold">
-                  {planUsage.training?.credits?.used || 0}/{planUsage.training?.credits?.limit === null ? '∞' : planUsage.training?.credits?.limit || 0}
-                </span>
-              </div>
-            )}
           </div>
+
+          {/* Challenge Banner - quando inciando de um desafio (colapsável) */}
+          {challengeConfig && (
+            <div className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 overflow-hidden">
+              {/* Header - sempre visível, clicável para expandir */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsChallengeExpanded(!isChallengeExpanded)
+                }}
+                className="w-full p-4 flex items-center justify-between hover:bg-purple-50/50 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">🎯</div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-gray-900">{cleanSpinText(challengeConfig.title)}</h3>
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                        Desafio Diário
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="relative group">
+                        <div className="absolute inset-0 bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 rounded-lg blur-sm opacity-50 group-hover:opacity-70 transition-opacity animate-pulse"></div>
+                        <span className="relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-md shadow-orange-500/20">
+                          <span>🔥</span>
+                          <span className="bg-white/20 px-1 py-0.5 rounded text-[10px] font-bold">{extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}</span>
+                          <span>≥</span>
+                          <span className="text-base font-black">{challengeConfig.success_criteria.spin_min_score}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-purple-600">
+                  <span className="text-xs">{isChallengeExpanded ? 'Ocultar' : 'Ver detalhes'}</span>
+                  {isChallengeExpanded ? (
+                    <ChevronUp className="w-5 h-5" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5" />
+                  )}
+                </div>
+              </button>
+
+              {/* Conteúdo expandido */}
+              {isChallengeExpanded && (
+                <div className="px-4 pb-4 border-t border-purple-100">
+                  <div className="pt-4 pl-11">
+                    <p className="text-gray-600 text-sm mb-4">{cleanSpinText(challengeConfig.description)}</p>
+
+                    {/* Dicas de Coaching */}
+                    {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
+                      <div className="bg-white/50 rounded-lg p-4 border border-purple-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Lightbulb className="w-4 h-4 text-amber-500" />
+                          <span className="text-sm font-semibold text-gray-700">Dicas para este desafio:</span>
+                        </div>
+                        <ul className="space-y-1">
+                          {challengeConfig.coaching_tips.map((tip, index) => (
+                            <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
+                              <span className="text-purple-400 mt-0.5">•</span>
+                              <span>{cleanSpinText(tip)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Painel de Configuração */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
@@ -1829,6 +2119,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 </div>
               ) : (
               <>
+              {/* Aviso de configuração travada pelo desafio */}
+              {isChallengeLocked && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Lock className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-purple-900">Configuração do Desafio</p>
+                    <p className="text-xs text-purple-600">Persona, idade, temperamento e objeções foram definidos pelo desafio e não podem ser alterados.</p>
+                  </div>
+                </div>
+              )}
+
               {/* Layout em 2 linhas */}
               {/* Linha 1: Iniciar Simulação + Perfil do Cliente */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1840,19 +2143,26 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     <div className="relative group">
                       <button
                         onClick={handleRandomSelection}
-                        disabled={dataLoading || personas.length === 0 || objections.length === 0 || objectives.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all hover:scale-105 shadow-sm"
+                        disabled={isChallengeLocked || dataLoading || personas.length === 0 || objections.length === 0 || objectives.length === 0}
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all shadow-sm ${
+                          isChallengeLocked
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white hover:scale-105'
+                        }`}
+                        title={isChallengeLocked ? 'Configuração definida pelo desafio' : 'Selecionar configuração aleatória'}
                       >
-                        <Shuffle className="w-4 h-4" />
-                        Aleatório
+                        {isChallengeLocked ? <Lock className="w-4 h-4" /> : <Shuffle className="w-4 h-4" />}
+                        {isChallengeLocked ? 'Travado' : 'Aleatório'}
                       </button>
-                      <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-white/70 backdrop-blur-md border border-gray-200 text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                        <p className="font-semibold text-green-600 mb-1">Modo Aleatório</p>
-                        <p className="text-gray-800 leading-relaxed">
-                          Seleciona automaticamente uma persona, objeções e objetivo de forma aleatória para treinar situações variadas e inesperadas.
-                        </p>
-                        <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white/70 border-l border-t border-gray-200 rotate-45"></div>
-                      </div>
+                      {!isChallengeLocked && (
+                        <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-white/70 backdrop-blur-md border border-gray-200 text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                          <p className="font-semibold text-green-600 mb-1">Modo Aleatório</p>
+                          <p className="text-gray-800 leading-relaxed">
+                            Seleciona automaticamente uma persona, objeções e objetivo de forma aleatória para treinar situações variadas e inesperadas.
+                          </p>
+                          <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white/70 border-l border-t border-gray-200 rotate-45"></div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Botão Ocultar com Tooltip */}
@@ -1864,6 +2174,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                             ? 'bg-gray-700 hover:bg-gray-600 text-white'
                             : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                         }`}
+                        title={hiddenMode ? 'Mostrar seleções' : 'Ocultar seleções'}
                       >
                         {hiddenMode ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         {hiddenMode ? 'Mostrar' : 'Ocultar'}
@@ -1911,10 +2222,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Perfil do Cliente</h3>
 
                   {/* Idade do Cliente */}
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium text-gray-700">Idade do Cliente</label>
-                      <span className={`text-lg font-bold ${hiddenMode ? 'text-gray-400' : 'text-green-600'}`}>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700">Idade do Cliente</label>
+                        {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                      </div>
+                      <span className={`text-lg font-bold ${hiddenMode ? 'text-gray-400' : isChallengeLocked ? 'text-purple-600' : 'text-green-600'}`}>
                         {hiddenMode ? '?? anos' : `${age} anos`}
                       </span>
                     </div>
@@ -1923,11 +2237,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       min="18"
                       max="60"
                       value={hiddenMode ? 39 : age}
-                      onChange={(e) => setAge(Number(e.target.value))}
-                      className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                      onChange={(e) => !isChallengeLocked && setAge(Number(e.target.value))}
+                      disabled={isChallengeLocked}
+                      className={`w-full h-2 rounded-lg appearance-none ${
                         hiddenMode
-                          ? 'bg-gray-300 accent-gray-400 pointer-events-none'
-                          : 'bg-gray-200 accent-green-500'
+                          ? 'bg-gray-300 accent-gray-400 pointer-events-none cursor-not-allowed'
+                          : isChallengeLocked
+                            ? 'bg-purple-200 accent-purple-500 cursor-not-allowed'
+                            : 'bg-gray-200 accent-green-500 cursor-pointer'
                       }`}
                     />
                     <div className={`flex justify-between text-xs mt-2 ${hiddenMode ? 'text-gray-300' : 'text-gray-400'}`}>
@@ -1978,19 +2295,27 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
 
                   {/* Temperamento */}
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                    <label className="text-sm font-medium text-gray-700 mb-3 block">Temperamento</label>
+                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <label className="text-sm font-medium text-gray-700">Temperamento</label>
+                      {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                    </div>
                     <div className={`flex flex-wrap gap-2 ${hiddenMode ? 'blur-sm select-none pointer-events-none' : ''}`}>
                       {temperaments.map((temp) => (
                         <button
                           key={temp}
-                          onClick={() => setTemperament(temp)}
+                          onClick={() => !isChallengeLocked && setTemperament(temp)}
+                          disabled={isChallengeLocked}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                             hiddenMode
                               ? 'bg-gray-300 text-gray-500 border border-gray-300'
-                              : temperament === temp
-                                ? 'bg-green-500 text-white border border-green-500'
-                                : 'bg-white text-gray-600 border border-gray-300 hover:border-gray-400'
+                              : isChallengeLocked
+                                ? temperament === temp
+                                  ? 'bg-purple-500 text-white border border-purple-500 cursor-not-allowed'
+                                  : 'bg-purple-100 text-purple-400 border border-purple-200 cursor-not-allowed'
+                                : temperament === temp
+                                  ? 'bg-green-500 text-white border border-green-500'
+                                  : 'bg-white text-gray-600 border border-gray-300 hover:border-gray-400'
                           }`}
                         >
                           {temp}
@@ -2053,10 +2378,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                 {/* Coluna 1 - Persona */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Persona</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Persona</h3>
+                    {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                  </div>
 
                   {/* Persona */}
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
@@ -2080,20 +2408,24 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                   {groupPersonas.map((persona) => (
                                     <div
                                       key={persona.id}
-                                      onClick={() => setSelectedPersona(persona.id!)}
-                                      className={`cursor-pointer rounded-lg p-2 border transition-all ${
-                                        hiddenMode
-                                          ? 'bg-gray-100 border-gray-200'
-                                          : selectedPersona === persona.id
-                                            ? 'bg-green-50 border-green-500'
-                                            : 'bg-white border-gray-200 hover:border-gray-300'
+                                      onClick={() => !isChallengeLocked && setSelectedPersona(persona.id!)}
+                                      className={`rounded-lg p-2 border transition-all ${
+                                        isChallengeLocked
+                                          ? selectedPersona === persona.id
+                                            ? 'bg-purple-100 border-purple-500 cursor-not-allowed'
+                                            : 'bg-purple-50/50 border-purple-100 cursor-not-allowed opacity-50'
+                                          : hiddenMode
+                                            ? 'bg-gray-100 border-gray-200 cursor-pointer'
+                                            : selectedPersona === persona.id
+                                              ? 'bg-green-50 border-green-500 cursor-pointer'
+                                              : 'bg-white border-gray-200 hover:border-gray-300 cursor-pointer'
                                       }`}
                                     >
                                       <div className="flex items-center gap-2">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                          hiddenMode ? 'bg-gray-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                          hiddenMode ? 'bg-gray-200' : isChallengeLocked && selectedPersona === persona.id ? 'bg-purple-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
                                         }`}>
-                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : isChallengeLocked && selectedPersona === persona.id ? 'text-purple-600' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-medium text-gray-900 truncate">
@@ -2103,7 +2435,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                             {hiddenMode ? '••••••••' : (persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks))}
                                           </p>
                                         </div>
-                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className={`w-4 h-4 flex-shrink-0 ${isChallengeLocked ? 'text-purple-500' : 'text-green-500'}`} />}
                                       </div>
                                     </div>
                                   ))}
@@ -2119,20 +2451,24 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                   {noTagPersonas.map((persona) => (
                                     <div
                                       key={persona.id}
-                                      onClick={() => setSelectedPersona(persona.id!)}
-                                      className={`cursor-pointer rounded-lg p-2 border transition-all ${
-                                        hiddenMode
-                                          ? 'bg-gray-100 border-gray-200'
-                                          : selectedPersona === persona.id
-                                            ? 'bg-green-50 border-green-500'
-                                            : 'bg-white border-gray-200 hover:border-gray-300'
+                                      onClick={() => !isChallengeLocked && setSelectedPersona(persona.id!)}
+                                      className={`rounded-lg p-2 border transition-all ${
+                                        isChallengeLocked
+                                          ? selectedPersona === persona.id
+                                            ? 'bg-purple-100 border-purple-500 cursor-not-allowed'
+                                            : 'bg-purple-50/50 border-purple-100 cursor-not-allowed opacity-50'
+                                          : hiddenMode
+                                            ? 'bg-gray-100 border-gray-200 cursor-pointer'
+                                            : selectedPersona === persona.id
+                                              ? 'bg-green-50 border-green-500 cursor-pointer'
+                                              : 'bg-white border-gray-200 hover:border-gray-300 cursor-pointer'
                                       }`}
                                     >
                                       <div className="flex items-center gap-2">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                          hiddenMode ? 'bg-gray-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                          hiddenMode ? 'bg-gray-200' : isChallengeLocked && selectedPersona === persona.id ? 'bg-purple-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
                                         }`}>
-                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : isChallengeLocked && selectedPersona === persona.id ? 'text-purple-600' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-medium text-gray-900 truncate">
@@ -2142,7 +2478,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                             {hiddenMode ? '••••••••' : (persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks))}
                                           </p>
                                         </div>
-                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className={`w-4 h-4 flex-shrink-0 ${isChallengeLocked ? 'text-purple-500' : 'text-green-500'}`} />}
                                       </div>
                                     </div>
                                   ))}
@@ -2158,13 +2494,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Coluna 2 - Objeções */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Objeções</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Objeções</h3>
+                    {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                  </div>
 
                   {/* Objeções */}
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-medium text-gray-700">Selecione as objeções</span>
-                      {!dataLoading && <span className={`text-xs font-medium ${hiddenMode ? 'text-gray-400' : 'text-green-600'}`}>{hiddenMode ? '? selecionadas' : `${selectedObjections.length} selecionadas`}</span>}
+                      {!dataLoading && <span className={`text-xs font-medium ${hiddenMode ? 'text-gray-400' : isChallengeLocked ? 'text-purple-600' : 'text-green-600'}`}>{hiddenMode ? '? selecionadas' : `${selectedObjections.length} selecionadas`}</span>}
                     </div>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
@@ -2173,48 +2512,94 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     ) : objections.length === 0 ? (
                       <div className="text-gray-500 text-sm py-4 text-center">Nenhuma objeção cadastrada.</div>
                     ) : (
-                      <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
                         {objections.map((objection) => (
-                          <label
-                            key={objection.id}
-                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-                              hiddenMode
-                                ? 'bg-gray-100 border border-gray-200'
-                                : selectedObjections.includes(objection.id)
-                                  ? 'bg-green-50 border border-green-500'
-                                  : 'bg-white border border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
+                          <div key={objection.id} className="space-y-1">
                             <div
-                              onClick={(e) => { e.preventDefault(); toggleObjection(objection.id) }}
-                              className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all ${
-                                hiddenMode
-                                  ? 'bg-gray-300 border-gray-300'
-                                  : selectedObjections.includes(objection.id)
-                                    ? 'bg-green-500 border-green-500'
-                                    : 'border-gray-300'
+                              className={`flex items-center gap-2 p-2 rounded-lg transition-all ${
+                                isChallengeLocked
+                                  ? selectedObjections.includes(objection.id)
+                                    ? 'bg-purple-100 border border-purple-500 cursor-not-allowed'
+                                    : 'bg-purple-50/50 border border-purple-100 cursor-not-allowed opacity-50'
+                                  : hiddenMode
+                                    ? 'bg-gray-100 border border-gray-200 cursor-pointer'
+                                    : selectedObjections.includes(objection.id)
+                                      ? 'bg-green-50 border border-green-500 cursor-pointer'
+                                      : 'bg-white border border-gray-200 hover:border-gray-300 cursor-pointer'
                               }`}
                             >
-                              {!hiddenMode && selectedObjections.includes(objection.id) && (
-                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
+                              <div
+                                onClick={(e) => { e.preventDefault(); !isChallengeLocked && toggleObjection(objection.id) }}
+                                className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                  isChallengeLocked
+                                    ? selectedObjections.includes(objection.id)
+                                      ? 'bg-purple-500 border-purple-500 cursor-not-allowed'
+                                      : 'border-purple-300 cursor-not-allowed'
+                                    : hiddenMode
+                                      ? 'bg-gray-300 border-gray-300 cursor-pointer'
+                                      : selectedObjections.includes(objection.id)
+                                        ? 'bg-green-500 border-green-500 cursor-pointer'
+                                        : 'border-gray-300 cursor-pointer'
+                                }`}
+                              >
+                                {!hiddenMode && selectedObjections.includes(objection.id) && (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span
+                                onClick={() => !isChallengeLocked && toggleObjection(objection.id)}
+                                className={`text-xs text-gray-700 flex-1 ${isChallengeLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                              >
+                                {hiddenMode ? '••••••••••••' : objection.name}
+                              </span>
+                              {!hiddenMode && objection.rebuttals && objection.rebuttals.length > 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setExpandedObjectionId(expandedObjectionId === objection.id ? null : objection.id)
+                                  }}
+                                  className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                                  title="Ver formas de quebrar"
+                                >
+                                  {expandedObjectionId === objection.id ? (
+                                    <ChevronUp className="w-3 h-3 text-gray-500" />
+                                  ) : (
+                                    <ChevronDown className="w-3 h-3 text-gray-500" />
+                                  )}
+                                </button>
                               )}
                             </div>
-                            <span className="text-xs text-gray-700 truncate">
-                              {hiddenMode ? '••••••••••••' : objection.name}
-                            </span>
-                          </label>
+                            {/* Rebuttals expandidas */}
+                            {!hiddenMode && expandedObjectionId === objection.id && objection.rebuttals && objection.rebuttals.length > 0 && (
+                              <div className="ml-6 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                                <p className="text-[10px] font-medium text-blue-700 mb-1">Formas de quebrar:</p>
+                                <ul className="space-y-1">
+                                  {objection.rebuttals.map((rebuttal, idx) => (
+                                    <li key={idx} className="text-[10px] text-blue-600 flex items-start gap-1">
+                                      <span className="text-blue-400 flex-shrink-0">{idx + 1}.</span>
+                                      <span>{rebuttal}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
                   </div>
 
                   {/* Objetivo do Roleplay */}
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                    <span className="text-sm font-medium text-gray-700 mb-3 block">
-                      Objetivo do Roleplay <span className="text-red-500">*</span>
-                    </span>
+                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-sm font-medium text-gray-700">
+                        Objetivo do Roleplay <span className="text-red-500">*</span>
+                      </span>
+                      {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                    </div>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
@@ -2224,11 +2609,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     ) : (
                       <select
                         value={selectedObjective}
-                        onChange={(e) => setSelectedObjective(e.target.value)}
-                        className={`w-full p-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
-                          hiddenMode
-                            ? 'bg-gray-400 text-gray-600'
-                            : 'bg-green-600 text-white hover:bg-green-500'
+                        onChange={(e) => !isChallengeLocked && setSelectedObjective(e.target.value)}
+                        disabled={isChallengeLocked}
+                        className={`w-full p-2.5 rounded-lg text-sm font-medium transition-colors ${
+                          isChallengeLocked
+                            ? 'bg-purple-500 text-white cursor-not-allowed'
+                            : hiddenMode
+                              ? 'bg-gray-400 text-gray-600 cursor-pointer'
+                              : 'bg-green-600 text-white hover:bg-green-500 cursor-pointer'
                         }`}
                       >
                         {hiddenMode ? (
@@ -2357,6 +2745,157 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </div>
                   )
                 })()}
+
+                {/* Seção de Feedback do Desafio - só aparece quando challenge_performance existe */}
+                {evaluation.challenge_performance && (
+                  <div className="mb-6 space-y-4">
+                    {/* Card de Resultado do Desafio */}
+                    <div className={`rounded-xl border p-5 ${
+                      evaluation.challenge_performance.goal_achieved
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-orange-500/10 border-orange-500/30'
+                    }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            evaluation.challenge_performance.goal_achieved
+                              ? 'bg-green-500/20'
+                              : 'bg-orange-500/20'
+                          }`}>
+                            {evaluation.challenge_performance.goal_achieved ? (
+                              <Trophy className="w-5 h-5 text-green-400" />
+                            ) : (
+                              <Target className="w-5 h-5 text-orange-400" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className={`font-semibold ${
+                              evaluation.challenge_performance.goal_achieved ? 'text-green-400' : 'text-orange-400'
+                            }`}>
+                              {evaluation.challenge_performance.goal_achieved ? 'Meta Alcançada!' : 'Continue Praticando'}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                              Foco: {evaluation.challenge_performance.target_letter?.toUpperCase()} - {
+                                evaluation.challenge_performance.target_letter === 'S' ? 'Situação' :
+                                evaluation.challenge_performance.target_letter === 'P' ? 'Problema' :
+                                evaluation.challenge_performance.target_letter === 'I' ? 'Implicação' :
+                                'Necessidade'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-2xl font-bold ${
+                            evaluation.challenge_performance.goal_achieved ? 'text-green-400' : 'text-orange-400'
+                          }`}>
+                            {evaluation.challenge_performance.achieved_score?.toFixed(1) || 'N/A'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Meta: {evaluation.challenge_performance.target_score?.toFixed(1) || 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Feedback do desafio */}
+                      {evaluation.challenge_performance.challenge_feedback && (
+                        <p className="text-sm text-gray-300 border-t border-gray-700/50 pt-3 mt-3">
+                          {evaluation.challenge_performance.challenge_feedback}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Grid de Dicas de Coaching */}
+                    {(evaluation.challenge_performance.coaching_tips_applied?.length > 0 ||
+                      evaluation.challenge_performance.coaching_tips_missed?.length > 0) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Dicas Aplicadas */}
+                        {evaluation.challenge_performance.coaching_tips_applied?.length > 0 && (
+                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                            <h4 className="flex items-center gap-2 text-sm font-medium text-green-400 mb-3">
+                              <CheckCircle className="w-4 h-4" />
+                              Dicas Aplicadas
+                            </h4>
+                            <ul className="space-y-2">
+                              {evaluation.challenge_performance.coaching_tips_applied.map((tip: string, i: number) => (
+                                <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                  <span className="text-green-400 mt-0.5">✓</span>
+                                  {cleanSpinText(tip)}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Dicas Não Aplicadas */}
+                        {evaluation.challenge_performance.coaching_tips_missed?.length > 0 && (
+                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                            <h4 className="flex items-center gap-2 text-sm font-medium text-orange-400 mb-3">
+                              <AlertTriangle className="w-4 h-4" />
+                              Dicas a Praticar
+                            </h4>
+                            <ul className="space-y-2">
+                              {evaluation.challenge_performance.coaching_tips_missed.map((tip: string, i: number) => (
+                                <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                  <span className="text-orange-400 mt-0.5">○</span>
+                                  {cleanSpinText(tip)}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Momentos-Chave */}
+                    {evaluation.challenge_performance.key_moments?.length > 0 && (
+                      <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-purple-400 mb-3">
+                          <Lightbulb className="w-4 h-4" />
+                          Momentos-Chave para Melhoria
+                        </h4>
+                        <div className="space-y-3">
+                          {evaluation.challenge_performance.key_moments.map((moment: any, i: number) => (
+                            <div key={i} className="bg-gray-800/50 rounded-lg p-3 border-l-2 border-purple-500/50">
+                              <p className="text-sm text-gray-300 mb-2">{moment.moment}</p>
+                              {moment.what_happened && (
+                                <p className="text-xs text-gray-500 mb-1">
+                                  <span className="text-gray-400">O que aconteceu:</span> {moment.what_happened}
+                                </p>
+                              )}
+                              {moment.what_should_have_done && (
+                                <p className="text-xs text-gray-500 mb-1">
+                                  <span className="text-gray-400">O que fazer:</span> {moment.what_should_have_done}
+                                </p>
+                              )}
+                              {moment.suggested_phrase && (
+                                <p className="text-xs italic text-purple-300/80 bg-purple-500/10 rounded px-2 py-1 mt-2">
+                                  &ldquo;{moment.suggested_phrase}&rdquo;
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Análise Profunda da Letra Alvo */}
+                    {evaluation.challenge_performance.target_letter_deep_analysis && (
+                      <details className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                          <span className="text-sm font-medium text-gray-300">
+                            Análise Detalhada: {evaluation.challenge_performance.target_letter?.toUpperCase()}
+                          </span>
+                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                        </summary>
+                        <div className="px-4 pb-4">
+                          <p className="text-sm text-gray-400 whitespace-pre-line leading-relaxed">
+                            {evaluation.challenge_performance.target_letter_deep_analysis}
+                          </p>
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )}
 
                 {/* Tabs de navegação */}
                 <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 mb-6">
