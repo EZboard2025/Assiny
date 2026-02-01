@@ -1,41 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X, User, FileText, Lightbulb, AlertTriangle, Video, VideoOff, UserCircle2, Volume2 } from 'lucide-react'
 import Image from 'next/image'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
-
-// Keyframes CSS globais para animação das estrelas
-const globalStyles = `
-  @keyframes twinkle {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
-  }
-  @keyframes float {
-    from {
-      transform: translateY(0px) translateX(0px);
-    }
-    to {
-      transform: translateY(-150vh) translateX(var(--float-x));
-    }
-  }
-
-  /* Custom scrollbar */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(31, 41, 55, 0.5);
-    border-radius: 10px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(34, 197, 94, 0.5);
-    border-radius: 10px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(34, 197, 94, 0.7);
-  }
-`
+import { generateAvatarWithAI, generateAvatarUrl, preloadImage, type PersonaBase } from '@/lib/utils/generateAvatar'
 
 interface CompanyConfig {
   company: {
@@ -63,30 +32,6 @@ export default function RoleplayPublico() {
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Função pseudo-aleatória determinística baseada em seed
-  const seededRandom = (seed: number) => {
-    const x = Math.sin(seed * 10000) * 10000
-    return x - Math.floor(x)
-  }
-
-  // Gerar estrelas de forma determinística (evita hydration mismatch)
-  const stars = useMemo(() => {
-    return [...Array(100)].map((_, i) => {
-      const seed = i + 1
-      return {
-        id: i,
-        top: seededRandom(seed) * 100,
-        left: seededRandom(seed * 2) * 100,
-        opacity: seededRandom(seed * 3) * 0.7 + 0.3,
-        duration: seededRandom(seed * 4) * 20 + 15,
-        delay: seededRandom(seed * 5) * 5,
-        floatX: (seededRandom(seed * 6) > 0.5 ? 1 : -1) * seededRandom(seed * 7) * 100,
-        twinkleDuration: seededRandom(seed * 8) * 2 + 1,
-        twinkleDelay: seededRandom(seed * 9) * 3
-      }
-    })
-  }, [])
-
   // Formulário inicial
   const [participantName, setParticipantName] = useState('')
   const [selectedAge, setSelectedAge] = useState('')
@@ -94,7 +39,7 @@ export default function RoleplayPublico() {
   const [selectedPersona, setSelectedPersona] = useState('')
   const [selectedObjections, setSelectedObjections] = useState<string[]>([])
   const [selectedObjective, setSelectedObjective] = useState('')
-  const [linkId, setLinkId] = useState<string | null>(null) // ID do roleplay_link
+  const [linkId, setLinkId] = useState<string | null>(null)
 
   // Sessão de roleplay
   const [sessionStarted, setSessionStarted] = useState(false)
@@ -114,13 +59,82 @@ export default function RoleplayPublico() {
   const audioChunksRef = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  // Webcam states and refs
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isCameraOn, setIsCameraOn] = useState(false)
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
+
+  // Avatar states
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
+
   useEffect(() => {
     loadCompanyConfig()
   }, [])
 
+  // Connect webcam stream to video element
+  useEffect(() => {
+    if (isCameraOn && webcamStream && videoRef.current) {
+      videoRef.current.srcObject = webcamStream
+    }
+  }, [isCameraOn, webcamStream, sessionStarted])
+
+  // Cleanup webcam on unmount
+  useEffect(() => {
+    return () => {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [webcamStream])
+
+  // Generate avatar when session starts
+  useEffect(() => {
+    if (!sessionStarted || !companyConfig || avatarUrl) return
+
+    const selectedPersonaData = companyConfig.personas.find(
+      p => p.id === companyConfig.roleplayLink.config.persona_id
+    )
+    if (!selectedPersonaData) return
+
+    const generateAvatar = async () => {
+      setIsLoadingAvatar(true)
+      try {
+        const persona: PersonaBase = {
+          id: selectedPersonaData.id,
+          business_type: selectedPersonaData.business_type || 'B2C',
+          job_title: selectedPersonaData.job_title,
+          cargo: selectedPersonaData.cargo,
+          profession: selectedPersonaData.profession,
+          profissao: selectedPersonaData.profissao,
+        }
+
+        const ageString = companyConfig.roleplayLink.config.age || '30-40'
+        const [minAge, maxAge] = ageString.split('-').map(Number)
+        const age = Math.floor((minAge + maxAge) / 2) || 35
+        const temperament = companyConfig.roleplayLink.config.temperament || 'Neutro'
+
+        const aiUrl = await generateAvatarWithAI(persona, age, temperament)
+        if (aiUrl) {
+          setAvatarUrl(aiUrl)
+        } else {
+          const fallbackUrl = generateAvatarUrl(persona, age, temperament)
+          await preloadImage(fallbackUrl)
+          setAvatarUrl(fallbackUrl)
+        }
+      } catch (error) {
+        console.error('Error generating avatar:', error)
+        setAvatarUrl(null)
+      } finally {
+        setIsLoadingAvatar(false)
+      }
+    }
+
+    generateAvatar()
+  }, [sessionStarted, companyConfig, avatarUrl])
+
   const loadCompanyConfig = async () => {
     try {
-      // Buscar linkCode da URL
       const urlParams = new URLSearchParams(window.location.search)
       const linkCode = urlParams.get('link')
 
@@ -128,16 +142,9 @@ export default function RoleplayPublico() {
         throw new Error('Link de roleplay não fornecido na URL')
       }
 
-      // IMPORTANTE: SEMPRE buscar do servidor para garantir dados atualizados
-      // (Desabilitado cache temporariamente para debug)
       const cachedConfigKey = `roleplay_config_${linkCode}`
-
-      // Limpar cache antigo
       localStorage.removeItem(cachedConfigKey)
 
-      console.log('🌐 Buscando configuração do servidor (cache desabilitado)')
-
-      // Se não tiver cache, buscar da API
       const response = await fetch(`/api/public/roleplay/config?link=${linkCode}`)
       if (!response.ok) {
         const error = await response.json()
@@ -146,14 +153,9 @@ export default function RoleplayPublico() {
 
       const data = await response.json()
       setCompanyConfig(data)
-
-      // Salvar linkId para usar no startRoleplay
       setLinkId(data.roleplayLink.id)
-
-      // Salvar no localStorage
       localStorage.setItem(cachedConfigKey, JSON.stringify(data))
 
-      // Usar configuração pré-definida pelo gestor
       if (data.roleplayLink?.config) {
         const config = data.roleplayLink.config
         setSelectedAge(config.age)
@@ -162,7 +164,6 @@ export default function RoleplayPublico() {
         setSelectedObjections(config.objection_ids || [])
         setSelectedObjective(config.objective_id || (data.objectives?.length > 0 ? data.objectives[0].id : ''))
       } else if (data.objectives?.length > 0) {
-        // Se não tiver config pré-definido, selecionar primeiro objetivo
         setSelectedObjective(data.objectives[0].id)
       }
     } catch (error: any) {
@@ -212,7 +213,6 @@ export default function RoleplayPublico() {
     setIsProcessing(true)
 
     try {
-      // Transcrever áudio
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
       formData.append('sessionId', sessionId!)
@@ -227,27 +227,15 @@ export default function RoleplayPublico() {
       }
 
       const transcriptionData = await transcribeResponse.json()
-
-      // Validar a transcrição no frontend também
       const processed = processWhisperTranscription(transcriptionData.text)
 
       if (!processed.isValid) {
-        console.warn('⚠️ Transcrição inválida no roleplay público:', transcriptionData.text)
         setError('Não consegui entender. Por favor, fale novamente de forma mais clara.')
         return
       }
 
-      if (processed.hasRepetition) {
-        console.warn('⚠️ Repetições corrigidas no roleplay público:', {
-          original: transcriptionData.text,
-          cleaned: processed.text
-        })
-      }
-
-      // Adicionar mensagem do vendedor com texto processado
       setMessages(prev => [...prev, { role: 'seller', text: processed.text }])
 
-      // Enviar para o chat com texto processado
       const chatResponse = await fetch('/api/public/roleplay/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,24 +251,13 @@ export default function RoleplayPublico() {
       }
 
       const { response, messages: updatedMessages } = await chatResponse.json()
-
-      // Atualizar mensagens
       setMessages(updatedMessages)
 
-      // Verificar se a mensagem contém a frase de finalização
       const isFinalizationMessage = response.includes('Roleplay finalizado, aperte em finalizar sessão')
-
-      // Reproduzir resposta em áudio
       await playAudioResponse(response)
 
-      // Se for mensagem de finalização, chamar automaticamente endRoleplay
       if (isFinalizationMessage) {
-        console.log('🎯 Detectada mensagem de finalização do roleplay!')
-        console.log('⏳ Aguardando 2 segundos antes de finalizar...')
-
-        // Mostrar mensagem de finalização automática
         setShowAutoFinalizingMessage(true)
-
         setTimeout(() => {
           endRoleplay()
         }, 2000)
@@ -325,71 +302,92 @@ export default function RoleplayPublico() {
     }
   }
 
-  const endRoleplay = async () => {
-    console.log('🛑 Finalizando roleplay...')
-    console.log('📋 Session ID:', sessionId)
+  // Webcam management functions
+  const startWebcam = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      })
+      setWebcamStream(mediaStream)
+      setIsCameraOn(true)
+    } catch (err) {
+      console.error('Erro ao acessar camera:', err)
+      setIsCameraOn(false)
+    }
+  }
 
+  const stopWebcam = () => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop())
+      setWebcamStream(null)
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsCameraOn(false)
+  }
+
+  const toggleCamera = async () => {
+    if (isCameraOn) {
+      stopWebcam()
+    } else {
+      await startWebcam()
+    }
+  }
+
+  const endRoleplay = async () => {
     if (!sessionId) {
-      console.error('❌ Session ID não encontrado!')
       alert('Erro: Sessão não encontrada')
       return
     }
 
-    // Prevenir cliques múltiplos
-    if (isEvaluating) {
-      console.log('⚠️ Avaliação já está em andamento')
-      return
-    }
+    if (isEvaluating) return
 
     setIsEvaluating(true)
 
     try {
-      console.log('📤 Enviando requisição para /api/public/roleplay/end')
       const response = await fetch('/api/public/roleplay/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId })
       })
 
-      console.log('📥 Resposta recebida:', response.status, response.statusText)
-
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('❌ Erro na resposta:', errorData)
         throw new Error(errorData.error || 'Erro ao finalizar roleplay')
       }
 
       const data = await response.json()
-      console.log('✅ Dados recebidos:', data)
-
       const { evaluation } = data
 
-      // Parse evaluation se necessário
       let parsedEvaluation = evaluation
       if (parsedEvaluation && typeof parsedEvaluation === 'object' && 'output' in parsedEvaluation) {
-        console.log('🔄 Parseando evaluation.output...')
         try {
           parsedEvaluation = JSON.parse(parsedEvaluation.output)
         } catch (e) {
-          console.error('❌ Erro ao fazer parse da avaliação:', e)
+          console.error('Erro ao fazer parse da avaliação:', e)
         }
       }
 
-      console.log('📊 Evaluation final:', parsedEvaluation)
       setEvaluation(parsedEvaluation)
-      setShowAutoFinalizingMessage(false) // Esconder mensagem de finalização
+      setShowAutoFinalizingMessage(false)
       setShowEvaluationModal(true)
-      console.log('✅ Modal de avaliação deve aparecer agora')
     } catch (error) {
-      console.error('❌ Erro ao finalizar roleplay:', error)
+      console.error('Erro ao finalizar roleplay:', error)
       alert('Erro ao finalizar roleplay: ' + (error as Error).message)
-      setShowAutoFinalizingMessage(false) // Esconder mensagem em caso de erro
+      setShowAutoFinalizingMessage(false)
     } finally {
       setIsEvaluating(false)
     }
   }
 
   const closeEvaluationAndReset = () => {
+    // Stop webcam and cleanup
+    stopWebcam()
+    setAvatarUrl(null)
+
+    // Reset session state
     setShowEvaluationModal(false)
     setEvaluation(null)
     setSessionStarted(false)
@@ -417,19 +415,13 @@ export default function RoleplayPublico() {
 
     setIsProcessing(true)
     try {
-      // Debug: verificar valores antes de enviar
-      console.log('🔍 Debug - valores selecionados:')
-      console.log('  selectedAge:', selectedAge)
-      console.log('  selectedTemperament:', selectedTemperament)
-      console.log('  selectedPersona:', selectedPersona)
-      console.log('  selectedObjections:', selectedObjections)
-      console.log('  selectedObjective:', selectedObjective)
-      console.log('  companyConfig?.roleplayLink?.config:', companyConfig?.roleplayLink?.config)
+      // Start webcam immediately
+      await startWebcam()
 
       const requestData = {
         participantName,
         companyId: companyConfig?.company.id,
-        linkId: linkId, // Passar o ID do link para associar à sessão
+        linkId: linkId,
         config: {
           age: selectedAge,
           temperament: selectedTemperament,
@@ -438,8 +430,6 @@ export default function RoleplayPublico() {
           objectiveId: selectedObjective
         }
       }
-
-      console.log('🚀 Iniciando roleplay com dados:', requestData)
 
       const response = await fetch('/api/public/roleplay/start', {
         method: 'POST',
@@ -455,16 +445,15 @@ export default function RoleplayPublico() {
       setSessionId(data.sessionId)
       setThreadId(data.threadId)
 
-      // Se tiver primeira mensagem do cliente, adicionar ao chat e reproduzir áudio
       if (data.firstMessage) {
         setMessages([{ role: 'client', text: data.firstMessage }])
-
-        // Reproduzir áudio da primeira mensagem
         await playAudioResponse(data.firstMessage)
       }
 
       setSessionStarted(true)
     } catch (error) {
+      // If session start fails, stop webcam
+      stopWebcam()
       console.error('Erro ao iniciar roleplay:', error)
       alert('Erro ao iniciar roleplay')
     } finally {
@@ -472,151 +461,83 @@ export default function RoleplayPublico() {
     }
   }
 
+  // Helper function for score colors
+  const getScoreColor = (score: number) => {
+    if (score >= 7) return 'text-green-600'
+    if (score >= 5) return 'text-yellow-600'
+    return 'text-red-600'
+  }
+
+  const getScoreBg = (score: number) => {
+    if (score >= 7) return 'bg-green-50 border-green-200'
+    if (score >= 5) return 'bg-yellow-50 border-yellow-200'
+    return 'bg-red-50 border-red-200'
+  }
+
+  // Loading State
   if (loading) {
     return (
-      <>
-        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
-        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center">
-          {/* Fundo preto */}
-          <div className="absolute inset-0 bg-black"></div>
-
-          {/* Estrelas */}
-          <div className="absolute inset-0 overflow-hidden">
-            {stars.map((star) => (
-              <div
-                key={star.id}
-                className="absolute w-1 h-1 bg-white rounded-full"
-                style={{
-                  top: `${star.top}%`,
-                  left: `${star.left}%`,
-                  opacity: star.opacity,
-                  ['--float-x' as any]: `${star.floatX}px`,
-                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
-                }}
-              />
-            ))}
-          </div>
-
-          <Loader2 className="w-12 h-12 text-green-400 animate-spin relative z-10" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-green-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Carregando...</p>
         </div>
-      </>
+      </div>
     )
   }
 
+  // Error State
   if (error) {
     return (
-      <>
-        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
-        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-          {/* Fundo preto */}
-          <div className="absolute inset-0 bg-black"></div>
-
-          {/* Estrelas */}
-          <div className="absolute inset-0 overflow-hidden">
-            {stars.map((star) => (
-              <div
-                key={star.id}
-                className="absolute w-1 h-1 bg-white rounded-full"
-                style={{
-                  top: `${star.top}%`,
-                  left: `${star.left}%`,
-                  opacity: star.opacity,
-                  ['--float-x' as any]: `${star.floatX}px`,
-                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
-                }}
-              />
-            ))}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 border border-red-200 max-w-md w-full shadow-lg">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-50 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
-
-          <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
-            <AlertCircle className="w-12 h-12 text-red-400 mb-4 mx-auto" />
-            <h2 className="text-xl font-bold text-white text-center mb-2">Erro</h2>
-            <p className="text-gray-300 text-center">{error}</p>
-          </div>
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Erro</h2>
+          <p className="text-gray-600 text-center">{error}</p>
         </div>
-      </>
+      </div>
     )
   }
 
-  // Verificar se o roleplay está ativo
+  // Inactive State
   if (!companyConfig?.roleplayLink?.is_active) {
     return (
-      <>
-        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
-        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-          {/* Fundo preto */}
-          <div className="absolute inset-0 bg-black"></div>
-
-          {/* Estrelas */}
-          <div className="absolute inset-0 overflow-hidden">
-            {stars.map((star) => (
-              <div
-                key={star.id}
-                className="absolute w-1 h-1 bg-white rounded-full"
-                style={{
-                  top: `${star.top}%`,
-                  left: `${star.left}%`,
-                  opacity: star.opacity,
-                  ['--float-x' as any]: `${star.floatX}px`,
-                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
-                }}
-              />
-            ))}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 border border-yellow-200 max-w-md w-full shadow-lg">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-yellow-50 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-yellow-500" />
           </div>
-
-          <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
-            <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
-            <h2 className="text-xl font-bold text-white text-center mb-2">Roleplay Desativado</h2>
-            <p className="text-gray-300 text-center">
-              O roleplay público desta empresa está temporariamente desativado.
-            </p>
-          </div>
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Simulação Desativada</h2>
+          <p className="text-gray-600 text-center">
+            O roleplay público desta empresa está temporariamente desativado.
+          </p>
         </div>
-      </>
+      </div>
     )
   }
 
-  // Verificar se a configuração está completa
+  // Incomplete Config State
   if (!companyConfig?.roleplayLink?.config?.persona_id ||
       !companyConfig?.roleplayLink?.config?.objection_ids?.length) {
     return (
-      <>
-        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
-        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-          {/* Fundo preto */}
-          <div className="absolute inset-0 bg-black"></div>
-
-          {/* Estrelas */}
-          <div className="absolute inset-0 overflow-hidden">
-            {stars.map((star) => (
-              <div
-                key={star.id}
-                className="absolute w-1 h-1 bg-white rounded-full"
-                style={{
-                  top: `${star.top}%`,
-                  left: `${star.left}%`,
-                  opacity: star.opacity,
-                  ['--float-x' as any]: `${star.floatX}px`,
-                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
-                }}
-              />
-            ))}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 border border-yellow-200 max-w-md w-full shadow-lg">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-yellow-50 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-yellow-500" />
           </div>
-
-          <div className="bg-gray-900/60 backdrop-blur-md border border-green-500/30 rounded-xl p-6 max-w-md w-full shadow-2xl shadow-green-900/50 relative z-10">
-            <AlertCircle className="w-12 h-12 text-yellow-400 mb-4 mx-auto" />
-            <h2 className="text-xl font-bold text-white text-center mb-2">Configuração Incompleta</h2>
-            <p className="text-gray-300 text-center">
-              O roleplay ainda não foi configurado pelo administrador.
-            </p>
-          </div>
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Configuração Incompleta</h2>
+          <p className="text-gray-600 text-center">
+            O roleplay ainda não foi configurado pelo administrador.
+          </p>
         </div>
-      </>
+      </div>
     )
   }
 
+  // Pre-Session Screen
   if (!sessionStarted) {
-    // Buscar detalhes da persona, objeções e objetivo selecionados
     const selectedPersonaData = companyConfig?.personas.find(
       p => p.id === companyConfig.roleplayLink.config.persona_id
     )
@@ -628,69 +549,55 @@ export default function RoleplayPublico() {
     )
 
     return (
-      <>
-        <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
-        <div className="min-h-screen relative overflow-hidden bg-black flex items-center justify-center p-4">
-          {/* Fundo preto */}
-          <div className="absolute inset-0 bg-black"></div>
-
-          {/* Estrelas animadas */}
-          <div className="absolute inset-0 overflow-hidden">
-            {stars.map((star) => (
-              <div
-                key={star.id}
-                className="absolute w-1 h-1 bg-white rounded-full"
-                style={{
-                  top: `${star.top}%`,
-                  left: `${star.left}%`,
-                  opacity: star.opacity,
-                  ['--float-x' as any]: `${star.floatX}px`,
-                  animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
-                }}
-              />
-            ))}
-          </div>
-
-
-        <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-5 max-w-lg w-full border border-green-500/30 shadow-2xl shadow-green-900/50 relative z-10">
-          <div className="text-center mb-4">
-            {/* Logo Ramppy */}
-            <div className="w-52 h-52 mx-auto -mb-4 relative">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-lg w-full border border-gray-200 shadow-xl">
+          {/* Logo */}
+          <div className="flex items-center justify-center mb-6">
+            <div className="relative w-[440px] h-[160px]">
               <Image
-                src="/images/ramppy-logo.png"
+                src="/images/logo-preta.png"
                 alt="Ramppy Logo"
-                width={208}
-                height={208}
-                className="drop-shadow-[0_0_50px_rgba(34,197,94,0.9)]"
+                fill
+                className="object-contain"
+                priority
               />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-1">
-              Roleplay de Vendas - <span className="text-green-400 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]">{companyConfig?.company.name}</span>
+          </div>
+
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Simulação de Vendas
             </h1>
-            <p className="text-sm text-gray-300">
-              Pratique suas habilidades de vendas com nosso simulador inteligente
+            <p className="text-gray-500 flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              {companyConfig?.company.name}
             </p>
           </div>
 
-          <div className="space-y-4">
-            {/* Informações do Roleplay Configurado */}
-            <div className="bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl p-4 max-h-[180px] overflow-y-auto custom-scrollbar">
-              <h3 className="text-sm font-semibold text-green-400 mb-2">
-                Cenário do Roleplay
+          <div className="space-y-5">
+            {/* Scenario Box */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 max-h-[220px] overflow-y-auto">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <div className="w-6 h-6 bg-green-50 rounded-lg flex items-center justify-center">
+                  <Users className="w-3.5 h-3.5 text-green-600" />
+                </div>
+                Cenário da Simulação
               </h3>
-              <div className="space-y-2 text-sm text-gray-200">
-                {/* Cliente (Idade + Temperamento) */}
-                <div>
-                  <p className="text-gray-400 font-semibold mb-1">Cliente:</p>
-                  <p className="text-green-400 font-semibold">
+
+              <div className="space-y-3 text-sm">
+                {/* Client */}
+                <div className="flex items-start gap-3">
+                  <span className="text-gray-500 font-medium min-w-[70px]">Cliente:</span>
+                  <span className="text-gray-900 font-semibold">
                     {companyConfig.roleplayLink.config.age} anos, {companyConfig.roleplayLink.config.temperament.toLowerCase()}
-                  </p>
+                  </span>
                 </div>
 
                 {/* Persona */}
-                <div>
-                  <p className="text-gray-400 font-semibold mb-1">Persona:</p>
-                  <p className="text-green-400 font-semibold">
+                <div className="flex items-start gap-3">
+                  <span className="text-gray-500 font-medium min-w-[70px]">Persona:</span>
+                  <span className="text-gray-900 font-semibold">
                     {selectedPersonaData ? (
                       selectedPersonaData.job_title ||
                       selectedPersonaData.cargo ||
@@ -698,35 +605,41 @@ export default function RoleplayPublico() {
                       selectedPersonaData.profissao ||
                       'Cliente'
                     ) : (
-                      <span className="text-yellow-400 text-xs">Não configurada</span>
+                      <span className="text-yellow-600 text-xs">Não configurada</span>
                     )}
-                  </p>
+                  </span>
                 </div>
 
-                {/* Objeções */}
+                {/* Objections */}
                 {selectedObjectionsData && selectedObjectionsData.length > 0 && (
                   <div>
-                    <p className="text-gray-400 font-semibold mb-1">Objeções ({selectedObjectionsData.length}):</p>
-                    <div className="bg-gray-900/50 rounded-lg p-3 space-y-2">
+                    <p className="text-gray-500 font-medium mb-2">Objeções ({selectedObjectionsData.length}):</p>
+                    <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-1.5">
                       {selectedObjectionsData.map((objection: any, index: number) => (
-                        <div key={index} className="text-xs">
-                          <p className="text-green-400 font-semibold">{index + 1}. {objection.name}</p>
+                        <div key={index} className="text-xs flex items-start gap-2">
+                          <span className="text-green-600 font-bold">{index + 1}.</span>
+                          <span className="text-gray-700">{objection.name}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Objetivo */}
+                {/* Objective */}
                 {selectedObjectiveData && (
                   <div>
-                    <p className="text-gray-400 font-semibold mb-1">🎯 Objetivo do Roleplay:</p>
-                    <div className="bg-gradient-to-r from-green-900/30 to-green-800/10 border border-green-500/30 rounded-lg p-3">
-                      <p className="text-green-400 font-semibold text-sm">
+                    <p className="text-gray-500 font-medium mb-2 flex items-center gap-1.5">
+                      <span className="w-4 h-4 bg-green-50 rounded flex items-center justify-center">
+                        <CheckCircle className="w-2.5 h-2.5 text-green-600" />
+                      </span>
+                      Objetivo:
+                    </p>
+                    <div className="bg-green-50 border border-green-100 rounded-lg p-3">
+                      <p className="text-green-800 font-semibold text-sm">
                         {selectedObjectiveData.name}
                       </p>
                       {selectedObjectiveData.description && (
-                        <p className="text-gray-300 text-xs mt-2 leading-relaxed">
+                        <p className="text-green-700 text-xs mt-1.5 leading-relaxed">
                           {selectedObjectiveData.description}
                         </p>
                       )}
@@ -736,26 +649,31 @@ export default function RoleplayPublico() {
               </div>
             </div>
 
-            {/* Nome */}
+            {/* Name Input */}
             <div>
-              <label className="block text-sm font-semibold text-gray-200 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Seu Nome Completo
               </label>
-              <input
-                type="text"
-                value={participantName}
-                onChange={(e) => setParticipantName(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800/50 backdrop-blur-sm border border-green-500/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500/60 focus:bg-gray-800/70 transition-all"
-                placeholder="Digite seu nome completo para começar"
-                autoFocus
-              />
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                  <User className="w-5 h-5 text-green-600" />
+                </div>
+                <input
+                  type="text"
+                  value={participantName}
+                  onChange={(e) => setParticipantName(e.target.value)}
+                  className="w-full pl-16 pr-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
+                  placeholder="Digite seu nome completo para começar"
+                  autoFocus
+                />
+              </div>
             </div>
 
-            {/* Botão Iniciar */}
+            {/* Start Button */}
             <button
               onClick={startRoleplay}
               disabled={isProcessing || !participantName.trim()}
-              className="w-full py-3.5 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              className="w-full py-4 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
             >
               {isProcessing ? (
                 <>
@@ -765,204 +683,240 @@ export default function RoleplayPublico() {
               ) : (
                 <>
                   <Mic className="w-5 h-5" />
-                  Iniciar Roleplay
+                  Iniciar Simulação
                 </>
               )}
             </button>
           </div>
         </div>
       </div>
-      </>
     )
   }
 
-  // Interface de Roleplay
+  // Active Roleplay Interface - Video Call Style
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
-      <div className="min-h-screen relative overflow-hidden bg-black p-4">
-        {/* Fundo preto */}
-        <div className="absolute inset-0 bg-black"></div>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+              <Users className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Simulação em Andamento</h2>
+              <p className="text-gray-500 text-sm">Olá {participantName}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-gray-600">Conectado</span>
+          </div>
+        </div>
+      </div>
 
-        {/* Estrelas animadas */}
-        <div className="absolute inset-0 overflow-hidden">
-          {stars.map((star) => (
-            <div
-              key={star.id}
-              className="absolute w-1 h-1 bg-white rounded-full"
-              style={{
-                top: `${star.top}%`,
-                left: `${star.left}%`,
-                opacity: star.opacity,
-                ['--float-x' as any]: `${star.floatX}px`,
-                animation: `twinkle ${star.twinkleDuration}s ease-in-out ${star.twinkleDelay}s infinite, float ${star.duration}s linear ${star.delay}s infinite`
+      {/* Video Panels Area */}
+      <div className="flex-1 flex items-center justify-center gap-6 p-6">
+        {/* Client Avatar Panel */}
+        <div className="flex-1 max-w-[600px] aspect-video bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden relative">
+          {isLoadingAvatar ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
+              <Loader2 className="w-16 h-16 text-green-500 animate-spin mb-4" />
+              <span className="text-gray-600 text-sm font-medium">Gerando avatar com IA...</span>
+              <span className="text-gray-400 text-xs mt-1">Aguarde ~10 segundos</span>
+            </div>
+          ) : (
+            <img
+              src={avatarUrl || '/icone-call.png'}
+              alt="Cliente Virtual"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = '/icone-call.png'
               }}
             />
-          ))}
-        </div>
+          )}
 
-      <div className="max-w-4xl mx-auto relative z-10">
-        <div className="bg-gray-900/60 backdrop-blur-md rounded-3xl p-8 border border-green-500/30 shadow-2xl shadow-green-900/50">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Roleplay em Andamento
-            </h2>
-            <p className="text-gray-300">
-              Olá {participantName}, converse com o cliente virtual
-            </p>
-          </div>
-
-          {/* Área de mensagens */}
-          <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl p-6 min-h-[400px] max-h-[600px] overflow-y-auto mb-6 border border-green-500/20">
-            {messages.length === 0 ? (
-              <p className="text-gray-400 text-center">
-                Clique no microfone para começar a conversa
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${msg.role === 'seller' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[70%] p-4 rounded-xl ${
-                        msg.role === 'seller'
-                          ? 'bg-gradient-to-r from-green-600 to-green-500 border border-green-400/30 shadow-lg shadow-green-500/20'
-                          : 'bg-gray-800/60 border border-green-500/30'
-                      }`}
-                    >
-                      <p className={`text-xs font-semibold mb-1 ${msg.role === 'seller' ? 'text-white/90' : 'text-green-400'}`}>
-                        {msg.role === 'seller' ? 'Você' : 'Cliente'}
-                      </p>
-                      <p className="text-white">{msg.text}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Controles */}
-          <div className="flex justify-center gap-4">
-            {!isRecording ? (
-              <button
-                onClick={startRecording}
-                disabled={isProcessing || isPlayingAudio}
-                className="p-4 bg-gradient-to-r from-green-600 to-green-500 hover:scale-110 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 shadow-xl shadow-green-500/50"
-              >
-                <Mic className="w-6 h-6 text-white" />
-                {isProcessing && <Loader2 className="w-5 h-5 text-white animate-spin" />}
-              </button>
-            ) : (
-              <button
-                onClick={stopRecording}
-                className="px-6 py-4 bg-red-500 hover:bg-red-600 rounded-full transition-all animate-pulse flex items-center gap-2 shadow-xl shadow-red-500/50"
-              >
-                <Square className="w-6 h-6 text-white" />
-                <span className="text-white font-bold">Finalizar Fala</span>
-              </button>
-            )}
-
-            <button
-              onClick={endRoleplay}
-              disabled={isProcessing || isEvaluating}
-              className="px-6 py-3 bg-gray-800/50 hover:bg-gray-800/70 backdrop-blur-sm border border-green-500/30 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isEvaluating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Avaliando...
-                </>
-              ) : (
-                'Finalizar Roleplay'
-              )}
-            </button>
-          </div>
-
-          {/* Indicadores de estado */}
+          {/* Speaking Indicator */}
           {isPlayingAudio && (
-            <div className="text-center mt-4">
-              <p className="text-green-400 font-semibold animate-pulse">
-                🔊 Cliente está falando...
-              </p>
+            <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-full shadow-lg">
+              <Volume2 size={18} className="animate-pulse" />
+              <span className="text-sm font-medium">Falando...</span>
             </div>
           )}
 
-          {/* Mensagem de finalização automática */}
-          {showAutoFinalizingMessage && (
-            <div className="text-center mt-4">
-              <div className="inline-block bg-yellow-500/20 border border-yellow-500/50 rounded-lg px-6 py-3 animate-pulse">
-                <p className="text-yellow-400 font-bold text-sm flex items-center gap-2 justify-center">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Finalizando roleplay automaticamente...
-                </p>
-              </div>
+          {/* Processing Indicator */}
+          {isProcessing && !isPlayingAudio && !isLoadingAvatar && (
+            <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-gray-800/80 text-white px-4 py-2 rounded-full">
+              <Loader2 size={18} className="animate-spin" />
+              <span className="text-sm">Processando...</span>
             </div>
           )}
+
+          {/* Panel Label */}
+          <div className="absolute top-4 left-4 bg-black/30 text-white px-3 py-1 rounded-lg text-xs font-medium">
+            Cliente Virtual
+          </div>
         </div>
 
-        {/* Modal de Avaliação */}
+        {/* User Webcam Panel */}
+        <div className="flex-1 max-w-[600px] aspect-video bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden relative">
+          {isCameraOn ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover scale-x-[-1]"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+              <UserCircle2 className="w-24 h-24 text-gray-300" />
+            </div>
+          )}
+
+          {/* Recording Indicator */}
+          {isRecording && (
+            <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full shadow-lg">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+              <span className="text-sm font-medium">Gravando...</span>
+            </div>
+          )}
+
+          {/* Panel Label */}
+          <div className="absolute top-4 left-4 bg-black/30 text-white px-3 py-1 rounded-lg text-xs font-medium">
+            Você
+          </div>
+        </div>
+      </div>
+
+      {/* Controls Bar */}
+      <div className="bg-white border-t border-gray-200 px-6 py-4">
+        <div className="max-w-2xl mx-auto flex items-center justify-center gap-4">
+          {/* Camera Toggle */}
+          <button
+            onClick={toggleCamera}
+            className={`p-4 rounded-full transition-all shadow-md ${
+              isCameraOn
+                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                : 'bg-red-50 text-red-500 hover:bg-red-100 border border-red-200'
+            }`}
+            title={isCameraOn ? 'Desligar câmera' : 'Ligar câmera'}
+          >
+            {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
+          </button>
+
+          {/* Microphone Button */}
+          {!isRecording ? (
+            <button
+              onClick={startRecording}
+              disabled={isProcessing || isPlayingAudio}
+              className="p-5 bg-green-500 hover:bg-green-600 text-white rounded-full transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Iniciar gravação"
+            >
+              <Mic className="w-7 h-7" />
+            </button>
+          ) : (
+            <button
+              onClick={stopRecording}
+              className="px-6 py-4 bg-red-500 hover:bg-red-600 text-white rounded-full transition-all shadow-lg flex items-center gap-2"
+            >
+              <Square className="w-5 h-5" />
+              <span className="font-medium">Finalizar Fala</span>
+            </button>
+          )}
+
+        </div>
+
+        {/* Status Messages */}
+        {isPlayingAudio && (
+          <div className="flex justify-center mt-4">
+            <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-xl">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <p className="text-green-700 font-medium text-sm">Cliente está falando...</p>
+            </div>
+          </div>
+        )}
+
+        {showAutoFinalizingMessage && (
+          <div className="flex justify-center mt-4">
+            <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <Loader2 className="w-4 h-4 text-yellow-600 animate-spin" />
+              <p className="text-yellow-700 font-medium text-sm">Finalizando simulação automaticamente...</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Evaluation Modal */}
         {showEvaluationModal && evaluation && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] overflow-hidden flex items-center justify-center p-4">
-            <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto">
-              {/* Close Button */}
-              <button
-                onClick={closeEvaluationAndReset}
-                className="absolute -top-4 -right-4 z-10 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors border border-green-500/30"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-gray-200 relative">
+                <button
+                  onClick={closeEvaluationAndReset}
+                  className="absolute top-4 right-4 w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
 
-              {/* Header */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-t-3xl border-t border-x border-green-500/30 p-5">
-                <h2 className="text-2xl font-bold text-center text-white mb-4">🎯 RESULTADO DA AVALIAÇÃO</h2>
+                <h2 className="text-xl font-bold text-gray-900 text-center mb-4">Resultado da Avaliação</h2>
 
-                {/* Score Geral */}
-                <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                  <div className="text-center">
-                    <div className="text-5xl font-bold text-green-400 mb-2">
-                      {((evaluation.overall_score || 0) / 10).toFixed(1)}/10
-                    </div>
+                {/* Score */}
+                <div className="flex justify-center">
+                  <div className={`w-24 h-24 rounded-2xl border-2 flex flex-col items-center justify-center ${getScoreBg((evaluation.overall_score || 0) / 10)}`}>
+                    <span className={`text-3xl font-bold ${getScoreColor((evaluation.overall_score || 0) / 10)}`}>
+                      {((evaluation.overall_score || 0) / 10).toFixed(1)}
+                    </span>
+                    <span className="text-xs text-gray-500">/10</span>
                   </div>
                 </div>
               </div>
 
-              {/* Content */}
-              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-b-3xl border-b border-x border-green-500/30 p-5 space-y-4">
-                {/* Resumo Executivo */}
+              {/* Modal Content */}
+              <div className="p-6 space-y-4">
+                {/* Executive Summary */}
                 {evaluation.executive_summary && (
-                  <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                    <h3 className="text-base font-bold text-green-400 mb-2">📋 Resumo Executivo</h3>
-                    <p className="text-sm text-gray-300 leading-relaxed">{evaluation.executive_summary}</p>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-green-600" />
+                      Resumo Executivo
+                    </h3>
+                    <p className="text-sm text-gray-600 leading-relaxed">{evaluation.executive_summary}</p>
                   </div>
                 )}
 
-                {/* SPIN Scores */}
+                {/* SPIN Metrics */}
                 {evaluation.spin_evaluation && (
-                  <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                    <h3 className="text-base font-bold text-green-400 mb-3">📊 Métricas SPIN</h3>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Métricas SPIN</h3>
                     <div className="grid grid-cols-4 gap-3">
-                      {['S', 'P', 'I', 'N'].map((key) => (
-                        <div key={key} className="text-center bg-gray-900/50 rounded-lg p-3 border border-green-500/10">
-                          <div className="text-xs text-gray-400 mb-1">{key}</div>
-                          <div className="text-2xl font-bold text-white">
-                            {evaluation.spin_evaluation[key]?.final_score?.toFixed(1) || '0.0'}
+                      {['S', 'P', 'I', 'N'].map((key) => {
+                        const score = evaluation.spin_evaluation[key]?.final_score || 0
+                        return (
+                          <div key={key} className={`text-center p-3 rounded-xl border ${getScoreBg(score)}`}>
+                            <div className="text-xs font-medium text-gray-500 mb-1">{key}</div>
+                            <div className={`text-xl font-bold ${getScoreColor(score)}`}>
+                              {score.toFixed(1)}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Pontos Fortes */}
+                {/* Strengths */}
                 {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
-                  <div className="bg-gray-800/40 rounded-xl p-4 border border-green-500/20">
-                    <h3 className="text-base font-bold text-green-400 mb-2">✅ Pontos Fortes</h3>
+                  <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                    <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Pontos Fortes
+                    </h3>
                     <ul className="space-y-2">
                       {evaluation.top_strengths.map((strength: string, index: number) => (
-                        <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                          <span className="text-green-400 mt-0.5">•</span>
+                        <li key={index} className="text-sm text-green-800 flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full mt-1.5 flex-shrink-0"></span>
                           <span>{strength}</span>
                         </li>
                       ))}
@@ -970,14 +924,17 @@ export default function RoleplayPublico() {
                   </div>
                 )}
 
-                {/* Gaps Críticos */}
+                {/* Critical Gaps */}
                 {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                  <div className="bg-gray-800/40 rounded-xl p-4 border border-red-500/20">
-                    <h3 className="text-base font-bold text-red-400 mb-2">⚠️ Gaps Críticos</h3>
+                  <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                    <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Gaps Críticos
+                    </h3>
                     <ul className="space-y-2">
                       {evaluation.critical_gaps.map((gap: string, index: number) => (
-                        <li key={index} className="text-sm text-gray-300 flex items-start gap-2">
-                          <span className="text-red-400 mt-0.5">•</span>
+                        <li key={index} className="text-sm text-red-800 flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full mt-1.5 flex-shrink-0"></span>
                           <span>{gap}</span>
                         </li>
                       ))}
@@ -985,32 +942,34 @@ export default function RoleplayPublico() {
                   </div>
                 )}
 
-                {/* Melhorias Prioritárias */}
+                {/* Priority Improvements */}
                 {evaluation.priority_improvements && evaluation.priority_improvements.length > 0 && (
-                  <div className="bg-gray-800/40 rounded-xl p-4 border border-yellow-500/20">
-                    <h3 className="text-base font-bold text-yellow-400 mb-3">🎯 Melhorias Prioritárias</h3>
+                  <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-100">
+                    <h3 className="text-sm font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4" />
+                      Melhorias Prioritárias
+                    </h3>
                     <div className="space-y-3">
                       {evaluation.priority_improvements.map((improvement: any, index: number) => (
-                        <div key={index} className="bg-gray-900/50 rounded-lg p-3 border border-yellow-500/10">
+                        <div key={index} className="bg-white rounded-lg p-3 border border-yellow-200">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs uppercase font-bold text-yellow-400">
+                            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">
                               {improvement.priority}
                             </span>
-                            <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-300">{improvement.area}</span>
+                            <span className="text-xs text-gray-500">{improvement.area}</span>
                           </div>
-                          <p className="text-sm text-gray-400 mb-2">{improvement.current_gap}</p>
-                          <p className="text-sm text-gray-300">{improvement.action_plan}</p>
+                          <p className="text-sm text-gray-600 mb-1">{improvement.current_gap}</p>
+                          <p className="text-sm text-gray-800">{improvement.action_plan}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Botão Fechar */}
+                {/* Close Button */}
                 <button
                   onClick={closeEvaluationAndReset}
-                  className="w-full py-3 bg-gradient-to-r from-green-600 to-green-500 rounded-xl font-bold text-white hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/50 transition-all"
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all"
                 >
                   Fechar e Voltar
                 </button>
@@ -1018,8 +977,6 @@ export default function RoleplayPublico() {
             </div>
           </div>
         )}
-      </div>
     </div>
-    </>
   )
 }
