@@ -267,10 +267,9 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           })
         }
 
-        // Processar estatísticas por persona e objeção (apenas roleplays regulares, não desafios)
-        const regularSessions = completedSessions.filter(s => !challengeSessionMap.has(s.id))
-        processPersonaStats(regularSessions)
-        processObjectionStats(regularSessions)
+        // Processar estatísticas por persona e objeção (incluindo desafios)
+        processPersonaStats(completedSessions)
+        processObjectionStats(completedSessions)
 
         if (isMounted) setLoading(false)
       } catch (error) {
@@ -550,52 +549,107 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
     return evaluation
   }
 
-  const generateSummary = () => {
+  const generateSummary = async () => {
+    // ===== UNIFICAR TODAS AS FONTES DE DADOS =====
+    interface UnifiedEval {
+      id: string
+      source: 'roleplay' | 'meet' | 'challenge'
+      sourceLabel: string
+      created_at: string
+      evaluation: any
+      overall_score: number | null
+      spin_s: number | null
+      spin_p: number | null
+      spin_i: number | null
+      spin_n: number | null
+    }
+
+    const unifiedEvaluations: UnifiedEval[] = []
+
+    // Buscar IDs de sessões que são desafios
+    const { supabase } = await import('@/lib/supabase')
+    const { data: challengeData } = await supabase
+      .from('daily_challenges')
+      .select('roleplay_session_id')
+      .eq('status', 'completed')
+      .not('roleplay_session_id', 'is', null)
+
+    const challengeSessionIds = new Set((challengeData || []).map((c: any) => c.roleplay_session_id))
+
+    // 1. Processar roleplay sessions (incluindo desafios)
     const completedSessions = sessions.filter(s => s.status === 'completed' && (s as any).evaluation)
 
-    if (completedSessions.length === 0) {
-      alert('Nenhuma sessão avaliada para gerar resumo')
+    completedSessions.forEach(session => {
+      const evaluation = getProcessedEvaluation(session)
+      if (!evaluation) return
+
+      const isChallenge = challengeSessionIds.has(session.id)
+
+      unifiedEvaluations.push({
+        id: session.id,
+        source: isChallenge ? 'challenge' : 'roleplay',
+        sourceLabel: isChallenge ? '🎯' : '🎭',
+        created_at: session.created_at,
+        evaluation,
+        overall_score: evaluation.overall_score ?? null,
+        spin_s: evaluation.spin_evaluation?.S?.final_score ?? null,
+        spin_p: evaluation.spin_evaluation?.P?.final_score ?? null,
+        spin_i: evaluation.spin_evaluation?.I?.final_score ?? null,
+        spin_n: evaluation.spin_evaluation?.N?.final_score ?? null
+      })
+    })
+
+    // 2. Processar meet evaluations
+    meetEvaluations.forEach(meet => {
+      const evaluation = meet.evaluation && typeof meet.evaluation === 'object' && 'output' in meet.evaluation
+        ? (() => { try { return JSON.parse(meet.evaluation.output) } catch { return meet.evaluation } })()
+        : meet.evaluation
+
+      unifiedEvaluations.push({
+        id: meet.id,
+        source: 'meet',
+        sourceLabel: '📹',
+        created_at: meet.created_at,
+        evaluation,
+        overall_score: meet.overall_score ?? null,
+        spin_s: meet.spin_s_score ?? null,
+        spin_p: meet.spin_p_score ?? null,
+        spin_i: meet.spin_i_score ?? null,
+        spin_n: meet.spin_n_score ?? null
+      })
+    })
+
+    // Ordenar por data
+    unifiedEvaluations.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+    console.log(`📊 generateSummary: ${unifiedEvaluations.length} avaliações unificadas`)
+
+    if (unifiedEvaluations.length === 0) {
+      alert('Nenhuma avaliação encontrada para gerar resumo')
       return
     }
 
-    // Processar todas as avaliações
-    const allEvaluations = completedSessions.map(s => getProcessedEvaluation(s)).filter(e => e !== null)
-
-    // Calcular médias gerais (usando todas as sessões)
-    // Usar overall_score REAL da avaliação (não média SPIN)
+    // ===== CALCULAR MÉDIAS GERAIS =====
     let totalScore = 0
     let countScore = 0
-
-    allEvaluations.forEach(e => {
-      if (e?.overall_score !== undefined) {
-        let scoreValue = e.overall_score
-
-        // Converter de 0-100 para 0-10 se necessário
-        if (scoreValue > 10) {
-          scoreValue = scoreValue / 10
-        }
-
-        totalScore += scoreValue
-        countScore++
-      }
-    })
-
-    const avgScore = countScore > 0 ? totalScore / countScore : 0
-
-    // Médias SPIN (usando todas as sessões)
     const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
     const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
 
-    allEvaluations.forEach(e => {
-      if (e?.spin_evaluation) {
-        const spin = e.spin_evaluation
-        if (spin.S?.final_score !== undefined) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
-        if (spin.P?.final_score !== undefined) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
-        if (spin.I?.final_score !== undefined) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
-        if (spin.N?.final_score !== undefined) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
+    unifiedEvaluations.forEach(e => {
+      if (e.overall_score != null && !isNaN(Number(e.overall_score))) {
+        let scoreValue = Number(e.overall_score)
+        if (scoreValue > 10) scoreValue = scoreValue / 10
+        totalScore += scoreValue
+        countScore++
       }
+
+      if (e.spin_s != null && !isNaN(Number(e.spin_s))) { spinTotals.S += Number(e.spin_s); spinCounts.S++ }
+      if (e.spin_p != null && !isNaN(Number(e.spin_p))) { spinTotals.P += Number(e.spin_p); spinCounts.P++ }
+      if (e.spin_i != null && !isNaN(Number(e.spin_i))) { spinTotals.I += Number(e.spin_i); spinCounts.I++ }
+      if (e.spin_n != null && !isNaN(Number(e.spin_n))) { spinTotals.N += Number(e.spin_n); spinCounts.N++ }
     })
 
+    const avgScore = countScore > 0 ? totalScore / countScore : 0
     const spinAveragesSummary = {
       S: spinCounts.S > 0 ? spinTotals.S / spinCounts.S : 0,
       P: spinCounts.P > 0 ? spinTotals.P / spinCounts.P : 0,
@@ -603,71 +657,87 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
       N: spinCounts.N > 0 ? spinTotals.N / spinCounts.N : 0
     }
 
-    // Para pontos fortes, gaps e melhorias, usar apenas os últimos 5 roleplays
-    const last5Sessions = completedSessions.slice(-5) // Pegar os 5 mais recentes
-    const last5Evaluations = last5Sessions.map((s, index) => ({
-      evaluation: getProcessedEvaluation(s),
-      sessionNumber: completedSessions.length - 4 + index // Número da sessão (ex: #3, #4, #5, #6, #7)
-    })).filter(item => item.evaluation !== null)
+    // ===== ÚLTIMAS 5 AVALIAÇÕES (INDEPENDENTE DA FONTE) =====
+    const last5 = unifiedEvaluations.slice(-5)
+    console.log(`📋 Últimas 5 avaliações:`, last5.map(e => `${e.sourceLabel} ${e.created_at.split('T')[0]}`))
 
-    // Coletar pontos fortes e gaps dos últimos 5 roleplays com número da sessão
-    const allStrengths: Array<{ text: string, session: number }> = []
-    const allGaps: Array<{ text: string, session: number }> = []
+    // Coletar pontos fortes e gaps das últimas 5 avaliações
+    const allStrengths: Array<{ text: string, sourceLabel: string }> = []
+    const allGaps: Array<{ text: string, sourceLabel: string }> = []
     const allImprovements: any[] = []
 
-    last5Evaluations.forEach(({ evaluation: e, sessionNumber }) => {
-      if (e.top_strengths) {
-        e.top_strengths.forEach((strength: string) => {
-          allStrengths.push({ text: strength, session: sessionNumber })
+    last5.forEach(e => {
+      const eval_data = e.evaluation
+      if (eval_data?.top_strengths) {
+        eval_data.top_strengths.forEach((strength: string) => {
+          allStrengths.push({ text: strength, sourceLabel: e.sourceLabel })
         })
       }
-      if (e.critical_gaps) {
-        e.critical_gaps.forEach((gap: string) => {
-          allGaps.push({ text: gap, session: sessionNumber })
+      if (eval_data?.critical_gaps) {
+        eval_data.critical_gaps.forEach((gap: string) => {
+          allGaps.push({ text: gap, sourceLabel: e.sourceLabel })
         })
       }
-      if (e.priority_improvements) {
-        e.priority_improvements.forEach((imp: any) => {
-          allImprovements.push({ ...imp, session: sessionNumber })
+      if (eval_data?.priority_improvements) {
+        eval_data.priority_improvements.forEach((imp: any) => {
+          allImprovements.push({ ...imp, sourceLabel: e.sourceLabel })
         })
       }
     })
 
-    // Agrupar por texto e coletar sessões onde apareceu
-    const strengthMap: { [key: string]: number[] } = {}
-    const gapMap: { [key: string]: number[] } = {}
+    // Agrupar por texto e coletar fontes onde apareceu
+    const strengthMap: { [key: string]: string[] } = {}
+    const gapMap: { [key: string]: string[] } = {}
 
-    allStrengths.forEach(({ text, session }) => {
+    allStrengths.forEach(({ text, sourceLabel }) => {
       if (!strengthMap[text]) strengthMap[text] = []
-      if (!strengthMap[text].includes(session)) strengthMap[text].push(session)
+      strengthMap[text].push(sourceLabel)
     })
 
-    allGaps.forEach(({ text, session }) => {
+    allGaps.forEach(({ text, sourceLabel }) => {
       if (!gapMap[text]) gapMap[text] = []
-      if (!gapMap[text].includes(session)) gapMap[text].push(session)
+      gapMap[text].push(sourceLabel)
     })
 
-    // Top 5 pontos fortes e gaps mais frequentes com sessões
+    // Top 5 pontos fortes e gaps mais frequentes
     const topStrengths = Object.entries(strengthMap)
       .sort(([, a], [, b]) => b.length - a.length)
       .slice(0, 5)
-      .map(([text, sessions]) => ({ text, count: sessions.length, sessions }))
+      .map(([text, sources]) => ({ text, count: sources.length, sources }))
 
     const topGaps = Object.entries(gapMap)
       .sort(([, a], [, b]) => b.length - a.length)
       .slice(0, 5)
-      .map(([text, sessions]) => ({ text, count: sessions.length, sessions }))
+      .map(([text, sources]) => ({ text, count: sources.length, sources }))
 
     setSummaryData({
-      totalSessions: completedSessions.length,
+      totalSessions: unifiedEvaluations.length,
       avgScore,
       spinAverages: spinAveragesSummary,
       topStrengths,
       topGaps,
-      allImprovements: allImprovements.slice(0, 10) // Top 10 melhorias
+      allImprovements: allImprovements.slice(0, 10)
     })
 
     setShowSummary(true)
+
+    // Atualizar resumo no banco de dados (para PDI)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        fetch('/api/performance-summary/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id })
+        }).then(() => {
+          console.log('📊 Resumo de performance atualizado no banco de dados')
+        }).catch(err => {
+          console.error('⚠️ Erro ao atualizar resumo no banco:', err)
+        })
+      }
+    } catch (err) {
+      console.error('⚠️ Erro ao obter usuário para atualização:', err)
+    }
   }
 
   // Funções de navegação do gráfico
@@ -1385,7 +1455,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                       <p className="text-gray-500 text-sm flex items-center gap-2">
                         <span className="text-green-600 font-medium">{userName}</span>
                         <span>·</span>
-                        <span>{summaryData.totalSessions} sessões completadas</span>
+                        <span>{summaryData.totalSessions} avaliações completadas</span>
                       </p>
                     </div>
                   </div>
@@ -1457,9 +1527,9 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                             <div className="flex-1">
                               <p className="text-gray-700">{strength.text}</p>
                               <div className="flex flex-wrap gap-1.5 mt-2">
-                                {strength.sessions?.map((session: number, idx: number) => (
-                                  <span key={idx} className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
-                                    #{session}
+                                {strength.sources?.map((source: string, idx: number) => (
+                                  <span key={idx} className="text-sm px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                                    {source}
                                   </span>
                                 ))}
                               </div>
@@ -1488,9 +1558,9 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                             <div className="flex-1">
                               <p className="text-gray-700">{gap.text}</p>
                               <div className="flex flex-wrap gap-1.5 mt-2">
-                                {gap.sessions?.map((session: number, idx: number) => (
-                                  <span key={idx} className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full font-medium">
-                                    #{session}
+                                {gap.sources?.map((source: string, idx: number) => (
+                                  <span key={idx} className="text-sm px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full font-medium">
+                                    {source}
                                   </span>
                                 ))}
                               </div>
@@ -1526,9 +1596,9 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                             <div className="flex-1">
                               <div className="flex items-start justify-between gap-2 mb-2">
                                 <p className="font-semibold text-gray-900">{improvement.area}</p>
-                                {improvement.session && (
-                                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
-                                    #{improvement.session}
+                                {improvement.sourceLabel && (
+                                  <span className="text-sm px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+                                    {improvement.sourceLabel}
                                   </span>
                                 )}
                               </div>

@@ -726,6 +726,20 @@ export async function POST(request: NextRequest) {
       console.log(`💳 ${MEET_ANALYSIS_CREDIT_COST} créditos consumidos para análise de Meet: ${currentUsed} → ${currentUsed + MEET_ANALYSIS_CREDIT_COST}`)
     }
 
+    // Atualizar resumo de performance do usuário (inclui Meet agora)
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      await fetch(`${baseUrl}/api/performance-summary/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      })
+      console.log('📊 Performance summary atualizado com dados do Meet')
+    } catch (summaryError) {
+      console.error('⚠️ Erro ao atualizar performance summary:', summaryError)
+      // Não falha a requisição principal
+    }
+
     return NextResponse.json({
       evaluation,
       saved: true,
