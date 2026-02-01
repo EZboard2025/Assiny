@@ -928,7 +928,7 @@ export default function CompaniesAdmin() {
                   <span className="text-pink-400 font-medium">{challengeGenInfo?.totalEmployees || 0}</span> vendedores
                 </div>
                 <div className="text-xs text-gray-500">
-                  Todos os dias às 10:00
+                  Todos os dias à meia-noite
                 </div>
                 <button
                   onClick={generateChallengesNow}

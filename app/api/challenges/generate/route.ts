@@ -417,6 +417,8 @@ export async function GET(req: NextRequest) {
         .eq('id', companyId)
         .single()
 
+      console.log(`📋 [GET challenges] companyId: ${companyId}, enabled: ${company?.daily_challenges_enabled}`)
+
       if (!company?.daily_challenges_enabled) {
         return NextResponse.json({
           success: true,
@@ -426,14 +428,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Get the most recent pending challenge for today
-    // (now we allow multiple challenges per day)
-    const today = new Date().toISOString().split('T')[0]
+    // Get the most recent pending/in_progress challenge (any date)
+    // This ensures users always see their active challenge
     const { data: challenges, error } = await supabaseAdmin
       .from('daily_challenges')
       .select('*')
       .eq('user_id', userId)
-      .eq('challenge_date', today)
       .in('status', ['pending', 'in_progress'])
       .order('created_at', { ascending: false })
       .limit(1)
@@ -444,6 +444,8 @@ export async function GET(req: NextRequest) {
 
     // Return the most recent pending/in_progress challenge, or null if none
     const challenge = challenges && challenges.length > 0 ? challenges[0] : null
+
+    console.log(`📋 [GET challenges] userId: ${userId}, found: ${challenge ? challenge.id : 'none'}`)
 
     return NextResponse.json({
       success: true,

@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-O sistema de desafios diários gera automaticamente desafios personalizados para todos os vendedores das empresas que têm essa funcionalidade habilitada. A geração acontece todos os dias às **10:00 da manhã**.
+O sistema de desafios diários gera automaticamente desafios personalizados para todos os vendedores das empresas que têm essa funcionalidade habilitada. A geração acontece todos os dias à **meia-noite (00:00)**.
 
 ## Endpoint
 
@@ -80,10 +80,10 @@ crontab -e
 
 Adicione a linha:
 ```
-0 10 * * * /var/www/assiny/scripts/generate-daily-challenges.sh
+0 0 * * * /var/www/assiny/scripts/generate-daily-challenges.sh
 ```
 
-Isso executa todos os dias às 10:00 (horário do servidor).
+Isso executa todos os dias à meia-noite (00:00, horário do servidor).
 
 ### 7. Verifique o cron
 

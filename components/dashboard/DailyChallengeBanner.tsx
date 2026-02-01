@@ -231,7 +231,7 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Desafio Diário</h3>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {error || 'Nenhum desafio disponível hoje. Novos desafios são gerados diariamente às 10h.'}
+                  {error || 'Nenhum desafio disponível hoje. Novos desafios são gerados diariamente à meia-noite.'}
                 </p>
               </div>
             </div>
@@ -322,10 +322,18 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
                 ))}
               </div>
               <span className="text-gray-300">•</span>
-              {/* Clear Goal Badge */}
-              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
-                🎯 Meta: {config.success_criteria.spin_min_score}+ em {formatSpinLetter(config.success_criteria.spin_letter_target)} ({extractSpinLetter(config.success_criteria.spin_letter_target)})
-              </span>
+              {/* Goal Badge - Eye-catching and motivating */}
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 rounded-xl blur-sm opacity-60 group-hover:opacity-80 transition-opacity animate-pulse"></div>
+                <span className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-black bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30">
+                  <span className="text-lg">🔥</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="bg-white/20 px-1.5 py-0.5 rounded-md text-xs font-bold">{extractSpinLetter(config.success_criteria.spin_letter_target)}</span>
+                    <span>≥</span>
+                    <span className="text-xl font-black">{config.success_criteria.spin_min_score}</span>
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
