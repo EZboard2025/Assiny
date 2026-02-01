@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { User, TrendingUp, Target, Zap, Search, Settings, BarChart3, Play, ChevronLeft, ChevronRight, FileText, History, Users, MessageSquare, FileSearch, Award, Calendar, CheckCircle, AlertCircle, Sparkles, X, AlertTriangle, Lightbulb } from 'lucide-react'
-import { getUserRoleplaySessions, type RoleplaySession } from '@/lib/roleplay'
+import { getAllUserRoleplaySessions, getUserMeetEvaluations, type RoleplaySession, type MeetEvaluation } from '@/lib/roleplay'
+import { supabase } from '@/lib/supabase'
 import { getFollowUpAnalyses, getFollowUpStats } from '@/lib/followup'
 
 interface PerfilViewProps {
@@ -37,8 +38,9 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
-  const [evolutionData, setEvolutionData] = useState<Array<{ label: string, score: number, date: string }>>([])
-  const [latestSession, setLatestSession] = useState<{ label: string, score: number, improvement: number } | null>(null)
+  const [evolutionData, setEvolutionData] = useState<Array<{ label: string, score: number, date: string, source: 'roleplay' | 'meet' | 'challenge' }>>([])
+  const [latestSession, setLatestSession] = useState<{ label: string, score: number, improvement: number, source?: string } | null>(null)
+  const [meetEvaluations, setMeetEvaluations] = useState<MeetEvaluation[]>([])
   const [scrollIndex, setScrollIndex] = useState(0)
   const [overallAverage, setOverallAverage] = useState(0)
   const [totalSessions, setTotalSessions] = useState(0)
@@ -71,12 +73,32 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
       // Load SPIN averages with mounted check
       try {
         setLoading(true)
-        const allSessions = await getUserRoleplaySessions(1000)
+
+        // Buscar TODAS as fontes de dados em paralelo
+        const [allSessions, meetEvals, challengeData] = await Promise.all([
+          getAllUserRoleplaySessions(1000),
+          getUserMeetEvaluations(100),
+          // Buscar desafios completados para identificar quais sessões são de desafios
+          supabase
+            .from('daily_challenges')
+            .select('roleplay_session_id, challenge_config')
+            .eq('status', 'completed')
+            .not('roleplay_session_id', 'is', null)
+        ])
 
         if (!isMounted) return // Prevent state updates if unmounted
 
-        console.log(`📊 PerfilView: Total de sessões carregadas: ${allSessions.length}`)
+        // Criar mapa de sessões que são desafios
+        const challengeSessionMap = new Map<string, string>()
+        challengeData.data?.forEach((c: any) => {
+          if (c.roleplay_session_id) {
+            challengeSessionMap.set(c.roleplay_session_id, c.challenge_config?.title || 'Desafio')
+          }
+        })
+
+        console.log(`📊 PerfilView: Roleplays: ${allSessions.length}, Meets: ${meetEvals.length}, Desafios: ${challengeSessionMap.size}`)
         setSessions(allSessions)
+        setMeetEvaluations(meetEvals)
 
         // Filtrar apenas sessões completadas com avaliação
         const completedSessions = allSessions.filter(session =>
@@ -85,21 +107,17 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
         console.log(`✅ Sessões completadas com avaliação: ${completedSessions.length}`)
 
-        if (completedSessions.length === 0) {
-          if (isMounted) setLoading(false)
-          return
-        }
-
         // Somar todas as notas de cada pilar SPIN
         const totals = { S: 0, P: 0, I: 0, N: 0 }
         const counts = { S: 0, P: 0, I: 0, N: 0 }
 
-        // Preparar dados de evolução
-        const evolutionPoints: Array<{ label: string, score: number, date: string }> = []
+        // Preparar dados de evolução UNIFICADOS
+        const evolutionPoints: Array<{ label: string, score: number, date: string, source: 'roleplay' | 'meet' | 'challenge', timestamp: number }> = []
         let totalOverallScore = 0
         let countOverallScore = 0
 
-        completedSessions.forEach((session, index) => {
+        // Processar sessões de roleplay (incluindo desafios)
+        completedSessions.forEach((session) => {
           let evaluation = (session as any).evaluation
 
           // Parse se necessário (formato N8N)
@@ -147,12 +165,69 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
             countOverallScore++
 
             const sessionDate = new Date(session.created_at)
-            const label = `#${completedSessions.length - index}`
+            const isChallenge = challengeSessionMap.has(session.id)
+
             evolutionPoints.push({
-              label,
+              label: isChallenge ? '🎯' : '🎭',
               score: scoreValue,
-              date: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+              date: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+              source: isChallenge ? 'challenge' : 'roleplay',
+              timestamp: sessionDate.getTime()
             })
+          }
+        })
+
+        // Processar avaliações de Meet
+        console.log(`🔍 Processando ${meetEvals.length} avaliações de Meet...`)
+        meetEvals.forEach((meet, index) => {
+          console.log(`📹 Meet ${index + 1}:`, {
+            id: meet.id,
+            overall_score: meet.overall_score,
+            spin_s: meet.spin_s_score,
+            spin_p: meet.spin_p_score,
+            spin_i: meet.spin_i_score,
+            spin_n: meet.spin_n_score
+          })
+
+          // Meet scores já vêm no formato 0-10 (usar != null para cobrir null E undefined)
+          if (meet.spin_s_score != null && !isNaN(Number(meet.spin_s_score))) {
+            totals.S += Number(meet.spin_s_score)
+            counts.S += 1
+          }
+          if (meet.spin_p_score != null && !isNaN(Number(meet.spin_p_score))) {
+            totals.P += Number(meet.spin_p_score)
+            counts.P += 1
+          }
+          if (meet.spin_i_score != null && !isNaN(Number(meet.spin_i_score))) {
+            totals.I += Number(meet.spin_i_score)
+            counts.I += 1
+          }
+          if (meet.spin_n_score != null && !isNaN(Number(meet.spin_n_score))) {
+            totals.N += Number(meet.spin_n_score)
+            counts.N += 1
+          }
+
+          // Overall score do Meet (0-100 -> 0-10)
+          if (meet.overall_score != null && !isNaN(Number(meet.overall_score))) {
+            let scoreValue = Number(meet.overall_score)
+            if (scoreValue > 10) {
+              scoreValue = scoreValue / 10
+            }
+
+            totalOverallScore += scoreValue
+            countOverallScore++
+
+            const meetDate = new Date(meet.created_at)
+            evolutionPoints.push({
+              label: '📹',
+              score: scoreValue,
+              date: meetDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+              source: 'meet',
+              timestamp: meetDate.getTime()
+            })
+            console.log(`✅ Meet adicionado à evolução: score=${scoreValue}`)
+          } else {
+            console.log(`⚠️ Meet sem overall_score válido:`, meet.overall_score)
           }
         })
 
@@ -171,8 +246,11 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
         setOverallAverage(avgOverall)
         setTotalSessions(countOverallScore)
 
-        // Reverter para ordem cronológica
-        const orderedData = evolutionPoints.reverse()
+        // Ordenar por timestamp (cronológico)
+        const orderedData = evolutionPoints
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .map(({ timestamp, ...rest }) => rest) // Remove timestamp do objeto final
+
         setEvolutionData(orderedData)
 
         // Calcular melhoria da última sessão
@@ -184,13 +262,15 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           setLatestSession({
             label: latest.label,
             score: latest.score,
-            improvement
+            improvement,
+            source: latest.source
           })
         }
 
-        // Processar estatísticas por persona e objeção
-        processPersonaStats(completedSessions)
-        processObjectionStats(completedSessions)
+        // Processar estatísticas por persona e objeção (apenas roleplays regulares, não desafios)
+        const regularSessions = completedSessions.filter(s => !challengeSessionMap.has(s.id))
+        processPersonaStats(regularSessions)
+        processObjectionStats(regularSessions)
 
         if (isMounted) setLoading(false)
       } catch (error) {
@@ -650,7 +730,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                       {overallAverage.toFixed(1)}
                     </div>
                     <p className="text-gray-500 text-sm">
-                      {totalSessions} {totalSessions === 1 ? 'sessão' : 'sessões'}
+                      {totalSessions} {totalSessions === 1 ? 'avaliação' : 'avaliações'}
                     </p>
                   </div>
 
@@ -734,14 +814,17 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                     <TrendingUp className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">Evolução nos Roleplays</h2>
-                    <p className="text-gray-500 text-sm">Média geral das últimas simulações</p>
+                    <h2 className="text-lg font-bold text-gray-900">Evolução Geral</h2>
+                    <p className="text-gray-500 text-sm">Roleplays, Desafios e Google Meet</p>
                   </div>
                 </div>
                 {latestSession && (
                   <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
                     <div className="text-center">
-                      <div className="text-[10px] font-bold text-green-600 mb-1 tracking-wider uppercase">Sessão {latestSession.label.replace('#', '')}</div>
+                      <div className="text-[10px] font-bold text-green-600 mb-1 tracking-wider uppercase flex items-center justify-center gap-1">
+                        <span>{latestSession.label}</span>
+                        <span>Última</span>
+                      </div>
                       <div className="flex items-center justify-center gap-1.5 mb-2">
                         <span className="text-xs font-medium text-gray-500">Nota:</span>
                         <span className={`text-xl font-bold ${
@@ -884,35 +967,43 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                         </>
                       )}
 
-                      {/* Points - estilo corporativo minimalista */}
+                      {/* Points - estilo corporativo com cores por fonte */}
                       {visibleData.map((point, i) => {
                         const totalWidth = 500
                         const spacing = visibleData.length > 1 ? totalWidth / (visibleData.length - 1) : 0
                         const x = 80 + (i * spacing)
                         const y = 260 - (point.score * 24)
 
+                        // Cores baseadas na fonte
+                        const sourceColors = {
+                          roleplay: '#10b981', // verde
+                          challenge: '#8b5cf6', // roxo
+                          meet: '#f59e0b' // amarelo/laranja
+                        }
+                        const color = sourceColors[point.source] || '#10b981'
+
                         return (
                           <g key={i}>
-                            {/* Ponto com borda */}
-                            <circle cx={x} cy={y} r="5" fill="#10b981" stroke="#fff" strokeWidth="2" />
+                            {/* Ponto com borda - cor baseada na fonte */}
+                            <circle cx={x} cy={y} r="6" fill={color} stroke="#fff" strokeWidth="2" />
 
-                            {/* X-axis label - session number */}
+                            {/* X-axis label - emoji da fonte */}
                             <text
                               x={x}
                               y="285"
-                              fill="#9CA3AF"
-                              fontSize="11"
+                              fill="#6B7280"
+                              fontSize="12"
                               textAnchor="middle"
                               fontWeight="600"
                             >
-                              {point.label.replace('#', '')}
+                              {point.label}
                             </text>
 
-                            {/* Nota acima do ponto - simples */}
+                            {/* Nota acima do ponto */}
                             <text
                               x={x}
-                              y={y - 10}
-                              fill="#10b981"
+                              y={y - 12}
+                              fill={color}
                               fontSize="11"
                               textAnchor="middle"
                               fontWeight="700"
@@ -923,6 +1014,22 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                         )
                       })}
                     </svg>
+                  </div>
+
+                  {/* Legenda */}
+                  <div className="flex items-center justify-center gap-6 mt-4 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-xs text-gray-500">🎭 Roleplay</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                      <span className="text-xs text-gray-500">🎯 Desafio</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                      <span className="text-xs text-gray-500">📹 Meet</span>
+                    </div>
                   </div>
 
                   {/* Navigation Controls */}
@@ -948,7 +1055,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
                         </span>
                         <span className="text-sm text-gray-500">de</span>
                         <span className="text-sm font-semibold text-green-600">{evolutionData.length}</span>
-                        <span className="text-sm text-gray-500">sessões</span>
+                        <span className="text-sm text-gray-500">avaliações</span>
                       </div>
 
                       <button
