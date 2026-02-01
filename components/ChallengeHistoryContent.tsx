@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Target, Trophy, Clock, Star, TrendingUp, Calendar, CheckCircle, XCircle, ChevronDown, Play, Lightbulb, AlertTriangle } from 'lucide-react'
+import { Target, Trophy, Star, TrendingUp, Calendar, CheckCircle, XCircle, ChevronDown, Play, Lightbulb, AlertTriangle } from 'lucide-react'
 
 interface ChallengeConfig {
   title: string
@@ -128,18 +128,11 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
         </span>
       )
     }
-    if (challenge.status === 'in_progress') {
-      return (
-        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          Em andamento
-        </span>
-      )
-    }
+    // Pending or in_progress - show as "Não feito"
     return (
       <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full flex items-center gap-1">
-        <Target className="w-3 h-3" />
-        Pendente
+        <Play className="w-3 h-3" />
+        Não feito
       </span>
     )
   }
@@ -289,19 +282,25 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                         </span>
                       </div>
                     ) : (
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        challenge.status === 'in_progress' ? 'bg-yellow-100' : 'bg-purple-100'
-                      }`}>
-                        <Target className={`w-5 h-5 ${
-                          challenge.status === 'in_progress' ? 'text-yellow-600' : 'text-purple-600'
-                        }`} />
+                      <div className="relative w-12 h-12 flex-shrink-0 group/icon">
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-400 rounded-xl opacity-60 group-hover/icon:opacity-100 animate-pulse"></div>
+                        <div className="relative w-full h-full rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                          <Play className="w-5 h-5 text-white" />
+                        </div>
                       </div>
                     )}
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 mb-0.5 truncate">
-                        {cleanSpinText(config.title)}
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {cleanSpinText(config.title)}
+                        </span>
+                        {challenge.status !== 'completed' && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-md uppercase tracking-wide">
+                            Fazer
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span>{formatDate(challenge.challenge_date)}</span>
@@ -418,16 +417,28 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
                     <p className="text-xs text-gray-600 mb-1">Melhoria</p>
                     <div className="flex items-center gap-2">
-                      <TrendingUp className={`w-6 h-6 ${
-                        (selectedChallenge.improvement_from_baseline || 0) > 0 ? 'text-green-500' : 'text-gray-400'
-                      }`} />
-                      <span className={`text-2xl font-bold ${
-                        (selectedChallenge.improvement_from_baseline || 0) > 0 ? 'text-green-600' : 'text-gray-500'
-                      }`}>
-                        {selectedChallenge.improvement_from_baseline != null
-                          ? `${selectedChallenge.improvement_from_baseline > 0 ? '+' : ''}${selectedChallenge.improvement_from_baseline.toFixed(1)}`
-                          : 'N/A'}
-                      </span>
+                      {selectedChallenge.improvement_from_baseline != null ? (
+                        <>
+                          <TrendingUp className={`w-6 h-6 ${
+                            selectedChallenge.improvement_from_baseline > 0 ? 'text-green-500' :
+                            selectedChallenge.improvement_from_baseline < 0 ? 'text-red-500' : 'text-gray-400'
+                          }`} />
+                          <span className={`text-2xl font-bold ${
+                            selectedChallenge.improvement_from_baseline > 0 ? 'text-green-600' :
+                            selectedChallenge.improvement_from_baseline < 0 ? 'text-red-600' : 'text-gray-500'
+                          }`}>
+                            {selectedChallenge.improvement_from_baseline > 0 ? '+' : ''}{selectedChallenge.improvement_from_baseline.toFixed(1)}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Star className="w-6 h-6 text-blue-500" />
+                          <div>
+                            <span className="text-lg font-bold text-blue-600">Referência</span>
+                            <p className="text-xs text-gray-500">Primeira medição</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
