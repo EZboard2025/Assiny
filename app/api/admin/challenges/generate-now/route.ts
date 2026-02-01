@@ -338,6 +338,7 @@ REGRAS IMPORTANTES:
 3. A explicação (ai_explanation) deve ser em português, empática, motivacional e explicar claramente POR QUE o vendedor precisa desse treino
 4. Retorne APENAS JSON válido, sem markdown ou texto adicional
 5. ⚠️ TODOS OS TEXTOS DEVEM SER EM PORTUGUÊS BRASILEIRO - incluindo title, description, coaching_tips, ai_explanation, pattern_detected e analysis_summary. NUNCA escreva em inglês!
+6. ⚠️ OBRIGATÓRIO: Se houver objetivos disponíveis, você DEVE selecionar um objetivo (objective_id) da lista. Escolha o objetivo que melhor se alinha com o desafio.
 
 ⚠️ REGRA CRÍTICA PARA METAS:
 - O spin_min_score DEVE ser calculado assim: score_atual + 1.5 (mínimo de 7.0, máximo de 10.0)
@@ -404,7 +405,7 @@ Retorne um JSON com esta estrutura:
     "objection_ids": [],
     "age_range": "45-60",
     "temperament": "Analítico",
-    "objective_id": null
+    "objective_id": "UUID do objetivo (OBRIGATÓRIO se houver objetivos disponíveis)"
   },
 
   "new_persona": {
@@ -486,7 +487,7 @@ Retorne um JSON com esta estrutura:
     "objection_ids": ["UUIDs existentes OU vazios se criar novas"],
     "age_range": "35-44",
     "temperament": "Analítico|Empático|Determinado|Indeciso|Sociável",
-    "objective_id": null
+    "objective_id": "UUID do objetivo (OBRIGATÓRIO se houver objetivos disponíveis)"
   },
 
   "new_persona": null ou {

@@ -820,15 +820,13 @@ export async function GET(req: NextRequest) {
       .eq('key', 'last_challenge_generation')
       .single()
 
-    // Calculate next generation time (10:00 AM)
+    // Calculate next generation time (midnight / 00:00)
     const now = new Date()
     const nextGeneration = new Date()
-    nextGeneration.setHours(10, 0, 0, 0)
+    nextGeneration.setHours(0, 0, 0, 0)
 
-    // If it's already past 10 AM today, next generation is tomorrow
-    if (now.getHours() >= 10) {
-      nextGeneration.setDate(nextGeneration.getDate() + 1)
-    }
+    // Next generation is always tomorrow at midnight
+    nextGeneration.setDate(nextGeneration.getDate() + 1)
 
     // Count companies with challenges enabled
     const { count: enabledCompanies } = await supabaseAdmin

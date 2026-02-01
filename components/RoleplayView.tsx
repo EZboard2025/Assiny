@@ -2339,10 +2339,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
 
                   {/* Objetivo do Roleplay */}
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                    <span className="text-sm font-medium text-gray-700 mb-3 block">
-                      Objetivo do Roleplay <span className="text-red-500">*</span>
-                    </span>
+                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-sm font-medium text-gray-700">
+                        Objetivo do Roleplay <span className="text-red-500">*</span>
+                      </span>
+                      {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                    </div>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
@@ -2352,11 +2355,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     ) : (
                       <select
                         value={selectedObjective}
-                        onChange={(e) => setSelectedObjective(e.target.value)}
-                        className={`w-full p-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
-                          hiddenMode
-                            ? 'bg-gray-400 text-gray-600'
-                            : 'bg-green-600 text-white hover:bg-green-500'
+                        onChange={(e) => !isChallengeLocked && setSelectedObjective(e.target.value)}
+                        disabled={isChallengeLocked}
+                        className={`w-full p-2.5 rounded-lg text-sm font-medium transition-colors ${
+                          isChallengeLocked
+                            ? 'bg-purple-500 text-white cursor-not-allowed'
+                            : hiddenMode
+                              ? 'bg-gray-400 text-gray-600 cursor-pointer'
+                              : 'bg-green-600 text-white hover:bg-green-500 cursor-pointer'
                         }`}
                       >
                         {hiddenMode ? (

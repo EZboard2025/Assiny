@@ -242,6 +242,7 @@ REGRAS PARA SELEÇÃO:
 5. Se a fraqueza for em Situação (S), escolha persona que exige muitas perguntas de contexto
 6. Se a fraqueza for em CTA, escolha persona indecisa que precisa de direcionamento claro
 7. ⚠️ TODOS OS TEXTOS DEVEM SER EM PORTUGUÊS BRASILEIRO - incluindo title, description, coaching_tips, pattern_detected. NUNCA escreva em inglês!
+8. ⚠️ OBRIGATÓRIO: Se houver objetivos disponíveis, você DEVE selecionar um objetivo (objective_id). Escolha o objetivo que melhor se alinha com o desafio.
 
 IMPORTANTE: Retorne APENAS JSON válido, sem markdown ou texto adicional.`
 
@@ -266,7 +267,7 @@ Retorne um JSON com esta estrutura EXATA:
     "objection_ids": ["UUID1", "UUID2"],
     "age_range": "faixa etária (ex: 35-44)",
     "temperament": "temperamento (Analítico, Empático, Determinado, Indeciso ou Sociável)",
-    "objective_id": "UUID do objetivo ou null"
+    "objective_id": "UUID do objetivo selecionado (OBRIGATÓRIO se houver objetivos disponíveis)"
   },
   "success_criteria": {
     "spin_letter_target": "S, P, I ou N",
