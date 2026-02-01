@@ -136,6 +136,37 @@ export default function PDIView() {
         return
       }
 
+      // Verificar se a empresa tem créditos suficientes (1 crédito para PDI)
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+      const companyId = await getCompanyId()
+
+      if (companyId) {
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+          .eq('id', companyId)
+          .single()
+
+        if (companyData) {
+          const { PLAN_CONFIGS } = await import('@/lib/types/plans')
+          const planConfig = PLAN_CONFIGS[companyData.training_plan as keyof typeof PLAN_CONFIGS]
+          const baseLimit = planConfig?.monthlyCredits
+          const extraCredits = companyData.extra_monthly_credits || 0
+          const totalLimit = baseLimit !== null ? baseLimit + extraCredits : null
+
+          if (totalLimit !== null) {
+            const currentUsed = companyData.monthly_credits_used || 0
+            const remaining = totalLimit - currentUsed
+
+            if (remaining < 1) {
+              setErrorMessage(`Créditos insuficientes. Você tem ${remaining} crédito(s) restante(s), mas a geração de PDI requer 1 crédito.`)
+              setIsLoading(false)
+              return
+            }
+          }
+        }
+      }
+
       // Deletar PDI antigo antes de criar novo
       if (hasData) {
         const { error: deleteError } = await supabase
@@ -242,11 +273,7 @@ export default function PDIView() {
 
       const userName = user.user_metadata?.name || user.email?.split('@')[0] || 'Vendedor'
 
-      // Buscar dados da empresa (personas, objeções, company_data)
-      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
-      const companyId = await getCompanyId()
-
-      // Buscar company_type e company_data
+      // Buscar company_type e company_data (companyId já foi obtido na verificação de créditos)
       const { data: companyType } = await supabase
         .from('company_type')
         .select('business_type')
