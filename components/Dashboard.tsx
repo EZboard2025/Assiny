@@ -373,7 +373,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'perfil') {
-      return <PerfilView key={Date.now()} onViewChange={handleViewChange} />
+      return <PerfilView onViewChange={handleViewChange} />
     }
 
     if (currentView === 'roleplay-links') {
