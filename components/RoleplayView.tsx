@@ -1076,13 +1076,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     setLastUserMessage('');
     setShowFinalizingMessage(false);
 
-    // Marcar sessão como cancelada (sem avaliação)
+    // Marcar sessão como abandonada (sem avaliação)
     if (sessionId) {
       try {
-        await endRoleplaySession(sessionId, 'cancelled');
-        console.log('📝 Sessão marcada como cancelada (sem avaliação)');
+        await endRoleplaySession(sessionId, 'abandoned');
+        console.log('📝 Sessão marcada como abandonada (sem avaliação)');
       } catch (error) {
-        console.error('Erro ao marcar sessão como cancelada:', error);
+        console.error('Erro ao marcar sessão como abandonada:', error);
       }
     }
 
