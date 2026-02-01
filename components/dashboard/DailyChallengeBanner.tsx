@@ -146,24 +146,26 @@ export default function DailyChallengeBanner({ userId, companyId, onStartChallen
         return
       }
 
-      setChallenge(data.challenge)
+      // Sempre buscar o último completado de hoje, independente de haver pendente
+      const today = new Date().toISOString().split('T')[0]
+      const { data: completedData } = await supabase
+        .from('daily_challenges')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .gte('challenge_date', today)
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .single()
 
-      // Se não há desafio pendente/em progresso, buscar o último completado de hoje
-      if (!data.challenge) {
-        const today = new Date().toISOString().split('T')[0]
-        const { data: completedData } = await supabase
-          .from('daily_challenges')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('status', 'completed')
-          .gte('challenge_date', today)
-          .order('completed_at', { ascending: false })
-          .limit(1)
-          .single()
+      if (completedData) {
+        setCompletedChallenge(completedData as DailyChallenge)
+      }
 
-        if (completedData) {
-          setCompletedChallenge(completedData as DailyChallenge)
-        }
+      // Só mostra o desafio pendente se NÃO houver um completado hoje
+      // Isso evita mostrar um novo desafio quando o usuário acabou de completar um
+      if (!completedData) {
+        setChallenge(data.challenge)
       }
 
       // Fetch persona and objections names if challenge exists
