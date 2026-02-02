@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 // @ts-expect-error - pdf-parse types are incomplete
 import pdf from 'pdf-parse'
 
+// Configuração para permitir uploads grandes (até 100MB)
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
+
+// Aumentar limite de tamanho do body para Next.js App Router
+export const maxDuration = 60 // 60 segundos de timeout
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 const SYSTEM_PROMPT = `Você é um extrator de dados de empresas especializado em analisar documentos corporativos (apresentações, playbooks, materiais de vendas, etc).
@@ -145,8 +155,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // Limitar texto total para não exceder tokens
-    const maxChars = 50000
+    // Limitar texto total para não exceder tokens (GPT-4 suporta ~128k tokens)
+    // 150.000 caracteres ≈ 37.500 tokens, deixa margem para resposta
+    const maxChars = 150000
     if (allText.length > maxChars) {
       allText = allText.substring(0, maxChars) + '\n\n[... conteúdo truncado por exceder limite ...]'
     }
