@@ -119,7 +119,6 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isCameraOn, setIsCameraOn] = useState(true)
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
-  const [showChatSidebar, setShowChatSidebar] = useState(false)
   const [showChallengeTips, setShowChallengeTips] = useState(true) // Mostrar dicas do desafio por padrão
   const [isChallengeTipsMinimized, setIsChallengeTipsMinimized] = useState(false) // Painel de dicas minimizado
 
@@ -1538,11 +1537,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao gerar áudio')
+        const errorText = await response.text()
+        console.error('❌ Erro na resposta TTS:', response.status, errorText)
+        throw new Error(`Erro ao gerar áudio: ${response.status}`)
       }
 
       // Receber o áudio
       const audioBlob = await response.blob()
+      console.log('🔊 Blob de áudio recebido:', audioBlob.size, 'bytes, tipo:', audioBlob.type)
+
+      if (audioBlob.size === 0) {
+        throw new Error('Áudio recebido está vazio')
+      }
+
       const audioUrl = URL.createObjectURL(audioBlob)
 
       // Criar e tocar o áudio
@@ -1553,8 +1560,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       const audio = new Audio(audioUrl)
       audioRef.current = audio
 
-      // Configurar visualizador de áudio
-      setupAudioVisualizer(audio)
+      // Configurar visualizador de áudio (não bloqueia reprodução se falhar)
+      try {
+        await setupAudioVisualizer(audio)
+      } catch (vizError) {
+        console.warn('⚠️ Visualizador de áudio falhou, continuando sem visualização:', vizError)
+      }
 
       // Função para limpar estado do áudio
       const cleanupAudio = () => {
@@ -1610,7 +1621,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   }
 
   // Configurar visualizador de áudio
-  const setupAudioVisualizer = (audio: HTMLAudioElement) => {
+  const setupAudioVisualizer = async (audio: HTMLAudioElement) => {
     try {
       // Criar contexto de áudio se não existir
       if (!audioContextRef.current) {
@@ -1618,6 +1629,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       }
 
       const audioContext = audioContextRef.current
+
+      // Resumir AudioContext se estiver suspenso (política de autoplay)
+      if (audioContext.state === 'suspended') {
+        console.log('🔊 Resumindo AudioContext suspenso...')
+        await audioContext.resume()
+      }
+
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 128 // Menor FFT = mais responsivo aos picos
       analyser.smoothingTimeConstant = 0.3 // Menos suavização = mais reativo
@@ -1650,6 +1668,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       updateVolume()
     } catch (error) {
       console.error('Erro ao configurar visualizador de áudio:', error)
+      throw error // Propagar erro para ser capturado no textToSpeech
     }
   }
 
@@ -1674,92 +1693,90 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <Lightbulb size={20} />
                 </button>
               )}
-              <button
-                onClick={() => setShowChatSidebar(!showChatSidebar)}
-                className={`p-2 rounded-lg transition-colors ${showChatSidebar ? 'bg-green-600/20 text-green-400' : 'hover:bg-gray-800 text-white/70'}`}
-                title="Mostrar/Ocultar Chat"
-              >
-                <MessageCircle size={20} />
-              </button>
             </div>
           </div>
 
           <div className="flex-1 flex overflow-hidden">
             {/* Painel de Dicas do Desafio - Flutuante na esquerda */}
             {challengeConfig && showChallengeTips && (
-              <div className={`${isChallengeTipsMinimized ? 'w-16' : 'w-72'} bg-gray-900/95 border-r border-gray-800 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
-                <div className="p-3 border-b border-gray-800 flex items-center justify-between">
+              <div className={`${isChallengeTipsMinimized ? 'w-16' : 'w-72'} bg-white/95 border-r border-gray-200 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
+                {/* Header */}
+                <button
+                  onClick={() => setIsChallengeTipsMinimized(!isChallengeTipsMinimized)}
+                  className="w-full p-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors text-left border-b border-gray-100"
+                >
                   {!isChallengeTipsMinimized ? (
                     <>
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                          <Target size={16} className="text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-white font-medium text-sm">Desafio Ativo</h3>
-                          <div className="mt-1">
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-sm">
-                              🔥 <span className="bg-white/20 px-1 rounded text-[10px]">{extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}</span> ≥ <span className="text-sm font-black">{challengeConfig.success_criteria.spin_min_score}</span>
-                            </span>
-                          </div>
-                        </div>
+                      <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Target size={18} className="text-green-600" />
                       </div>
-                      <button
-                        onClick={() => setIsChallengeTipsMinimized(true)}
-                        className="p-1 hover:bg-gray-800 rounded text-gray-500 hover:text-gray-300"
-                        title="Minimizar"
-                      >
-                        <ChevronDown size={16} />
-                      </button>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-gray-900">Desafio Ativo</h3>
+                        <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100 inline-block mt-1">
+                          {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)} ≥ {challengeConfig.success_criteria.spin_min_score}
+                        </span>
+                      </div>
+                      <ChevronDown size={16} className="text-gray-400" />
                     </>
                   ) : (
-                    <button
-                      onClick={() => setIsChallengeTipsMinimized(false)}
-                      className="w-full flex flex-col items-center gap-2 py-1"
-                      title="Expandir dicas do desafio"
-                    >
-                      <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                        <Target size={16} className="text-white" />
+                    <div className="w-full flex flex-col items-center gap-2">
+                      <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
+                        <Target size={18} className="text-green-600" />
                       </div>
-                      <ChevronUp size={14} className="text-gray-500" />
-                    </button>
+                      <ChevronUp size={14} className="text-gray-400" />
+                    </div>
                   )}
-                </div>
+                </button>
 
                 {/* Conteúdo expandido */}
                 {!isChallengeTipsMinimized && (
                   <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
                     {/* Título e Descrição */}
-                    <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-700/30">
-                      <h4 className="text-purple-300 font-medium text-sm mb-1">{cleanSpinText(challengeConfig.title)}</h4>
-                      <p className="text-gray-400 text-xs">{cleanSpinText(challengeConfig.description)}</p>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-1">{cleanSpinText(challengeConfig.title)}</h4>
+                      <p className="text-xs text-gray-600 leading-relaxed">{cleanSpinText(challengeConfig.description)}</p>
+                    </div>
+
+                    {/* Meta */}
+                    <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Target size={14} className="text-green-600" />
+                        <span className="text-xs font-semibold text-green-700">Meta</span>
+                      </div>
+                      <p className="text-sm text-gray-700">
+                        Alcançar <span className="font-bold text-green-700">{challengeConfig.success_criteria.spin_min_score}+</span> em {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
+                      </p>
                     </div>
 
                     {/* Dicas de Coaching */}
                     {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Lightbulb size={14} className="text-amber-400" />
-                          <span className="text-amber-400 text-xs font-semibold uppercase tracking-wider">Dicas</span>
-                        </div>
-                        <div className="space-y-2">
+                      <details className="group" open>
+                        <summary className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-700 mb-2">
+                          <Lightbulb size={14} className="text-green-600" />
+                          <span className="font-medium">Dicas de coaching</span>
+                          <ChevronDown size={12} className="group-open:rotate-180 transition-transform ml-auto text-gray-400" />
+                        </summary>
+                        <ul className="space-y-1.5">
                           {challengeConfig.coaching_tips.map((tip, index) => (
-                            <div key={index} className="bg-gray-800/50 rounded-lg p-2.5 border-l-2 border-amber-500/50">
-                              <p className="text-gray-300 text-xs leading-relaxed">{cleanSpinText(tip)}</p>
-                            </div>
+                            <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
+                              <span className="w-4 h-4 bg-green-100 text-green-700 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
+                                {index + 1}
+                              </span>
+                              <span className="leading-relaxed">{cleanSpinText(tip)}</span>
+                            </li>
                           ))}
-                        </div>
-                      </div>
+                        </ul>
+                      </details>
                     )}
 
                     {/* Foco SPIN */}
-                    <div className="bg-gray-800/30 rounded-lg p-3">
-                      <p className="text-gray-400 text-xs mb-2">Foque em perguntas de:</p>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-xs text-gray-500 mb-2">Foque em perguntas de:</p>
                       <div className="flex items-center gap-2">
-                        <span className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold rounded-lg">
+                        <span className="w-8 h-8 bg-green-600 text-white text-sm font-bold rounded-lg flex items-center justify-center">
                           {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
                         </span>
-                        <span className="text-white text-sm font-medium">
+                        <span className="text-gray-900 text-sm font-medium">
                           {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
                         </span>
                       </div>
@@ -1770,10 +1787,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 {/* Versão minimizada - mostrar meta e letra */}
                 {isChallengeTipsMinimized && (
                   <div className="flex-1 flex flex-col items-center py-4 gap-3">
-                    <span className="px-2 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold rounded-lg">
+                    <span className="w-8 h-8 bg-green-600 text-white text-sm font-bold rounded-lg flex items-center justify-center">
                       {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
                     </span>
-                    <span className="text-xs text-gray-400 font-semibold">
+                    <span className="text-xs text-gray-500 font-semibold">
                       ≥{challengeConfig.success_criteria.spin_min_score}
                     </span>
                   </div>
@@ -1782,7 +1799,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
             )}
 
             {/* Área dos vídeos */}
-            <div className={`flex-1 flex items-center justify-center gap-4 p-6 transition-all ${showChatSidebar ? 'pr-0' : ''}`}>
+            <div className="flex-1 flex items-center justify-center gap-4 p-6 transition-all">
               {/* Avatar do Cliente Virtual (gerado por IA) */}
               <div className="flex-1 max-w-[600px] aspect-video bg-gray-800 rounded-xl flex items-center justify-center relative overflow-hidden">
                 {isLoadingAvatar ? (
@@ -1840,34 +1857,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <div className="absolute top-4 left-4 text-white/40 text-xs font-medium">Você</div>
               </div>
             </div>
-
-            {/* Chat Sidebar */}
-            {showChatSidebar && (
-              <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col flex-shrink-0">
-                <div className="p-4 border-b border-gray-800 flex items-center gap-2">
-                  <MessageCircle size={18} className="text-green-400" />
-                  <h3 className="text-white font-medium">Chat da Simulação</h3>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                  {messages.length === 0 ? (
-                    <p className="text-gray-500 text-sm text-center py-8">Aguardando início da conversa...</p>
-                  ) : (
-                    messages.map((msg, i) => (
-                      <div key={i} className={`p-3 rounded-lg text-sm ${
-                        msg.role === 'seller'
-                          ? 'bg-green-600/20 text-green-100 ml-4'
-                          : 'bg-gray-800 text-gray-100 mr-4'
-                      }`}>
-                        <span className="text-xs opacity-60 block mb-1">
-                          {msg.role === 'seller' ? 'Você' : 'Cliente'}
-                        </span>
-                        {msg.text}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Controles */}
@@ -1981,7 +1970,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
           {/* Challenge Banner - quando inciando de um desafio (colapsável) */}
           {challengeConfig && (
-            <div className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 overflow-hidden">
+            <div className="mb-6 bg-white rounded-xl border border-gray-200 overflow-hidden">
               {/* Header - sempre visível, clicável para expandir */}
               <button
                 type="button"
@@ -1990,64 +1979,64 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   e.stopPropagation()
                   setIsChallengeExpanded(!isChallengeExpanded)
                 }}
-                className="w-full p-4 flex items-center justify-between hover:bg-purple-50/50 transition-colors cursor-pointer"
+                className="w-full p-4 flex items-start gap-3 hover:bg-gray-50/50 transition-colors text-left"
               >
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl">🎯</div>
-                  <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-gray-900">{cleanSpinText(challengeConfig.title)}</h3>
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-                        Desafio Diário
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="relative group">
-                        <div className="absolute inset-0 bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 rounded-lg blur-sm opacity-50 group-hover:opacity-70 transition-opacity animate-pulse"></div>
-                        <span className="relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white shadow-md shadow-orange-500/20">
-                          <span>🔥</span>
-                          <span className="bg-white/20 px-1 py-0.5 rounded text-[10px] font-bold">{extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}</span>
-                          <span>≥</span>
-                          <span className="text-base font-black">{challengeConfig.success_criteria.spin_min_score}</span>
-                        </span>
-                      </div>
-                    </div>
+                <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Target className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">{cleanSpinText(challengeConfig.title)}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
+                      {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)} ≥ {challengeConfig.success_criteria.spin_min_score}
+                    </span>
+                    <span className="text-gray-300">|</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded">
+                      Desafio Diário
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-purple-600">
-                  <span className="text-xs">{isChallengeExpanded ? 'Ocultar' : 'Ver detalhes'}</span>
-                  {isChallengeExpanded ? (
-                    <ChevronUp className="w-5 h-5" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5" />
-                  )}
+                <div className="text-gray-400">
+                  {isChallengeExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </div>
               </button>
 
               {/* Conteúdo expandido */}
               {isChallengeExpanded && (
-                <div className="px-4 pb-4 border-t border-purple-100">
-                  <div className="pt-4 pl-11">
-                    <p className="text-gray-600 text-sm mb-4">{cleanSpinText(challengeConfig.description)}</p>
+                <div className="px-4 pb-4 space-y-3">
+                  <p className="text-xs text-gray-600 leading-relaxed">{cleanSpinText(challengeConfig.description)}</p>
 
-                    {/* Dicas de Coaching */}
-                    {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
-                      <div className="bg-white/50 rounded-lg p-4 border border-purple-100">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Lightbulb className="w-4 h-4 text-amber-500" />
-                          <span className="text-sm font-semibold text-gray-700">Dicas para este desafio:</span>
-                        </div>
-                        <ul className="space-y-1">
-                          {challengeConfig.coaching_tips.map((tip, index) => (
-                            <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
-                              <span className="text-purple-400 mt-0.5">•</span>
-                              <span>{cleanSpinText(tip)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                  {/* Meta */}
+                  <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Target className="w-4 h-4 text-green-600" />
+                      <span className="text-xs font-semibold text-green-700">Meta</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      Alcançar <span className="font-bold text-green-700">{challengeConfig.success_criteria.spin_min_score}+</span> em {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
+                    </p>
                   </div>
+
+                  {/* Dicas de Coaching */}
+                  {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
+                    <details className="group" open>
+                      <summary className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+                        <Lightbulb className="w-3.5 h-3.5 text-green-600" />
+                        <span>Dicas de coaching</span>
+                        <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform ml-auto" />
+                      </summary>
+                      <ul className="mt-2 space-y-1.5">
+                        {challengeConfig.coaching_tips.map((tip, index) => (
+                          <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
+                            <span className="w-4 h-4 bg-green-100 text-green-700 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
+                              {index + 1}
+                            </span>
+                            <span className="leading-relaxed">{cleanSpinText(tip)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </div>
               )}
             </div>

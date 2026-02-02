@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { evaluateRoleplay } from '@/lib/evaluation/evaluateRoleplay'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,8 +12,6 @@ const supabaseAdmin = createClient(
     }
   }
 )
-
-const N8N_EVALUATION_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/b34f1d38-493b-4ae8-8998-b8450ab84d16'
 
 export async function POST(request: Request) {
   try {
@@ -96,56 +95,30 @@ OBJEÇÕES TRABALHADAS:`
 
     console.log('👤 Perfil do Cliente:\n', client_profile)
 
-    // Enviar para N8N para avaliação
-    console.log('🚀 Enviando para N8N webhook...')
-    const n8nPayload = {
+    // Avaliar roleplay diretamente via OpenAI (substituiu N8N)
+    const objetivo = config?.objective?.name
+      ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
+      : 'Não especificado'
+
+    console.log('📤 Iniciando avaliação direta via OpenAI...')
+
+    const evaluation = await evaluateRoleplay({
       transcription,
-      context,
-      client_profile,
-      companyId: session.company_id,
-      objetivo: config?.objective?.name
-        ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
-        : 'Não especificado'
-    }
-
-    console.log('📡 Payload completo para N8N:', JSON.stringify(n8nPayload, null, 2))
-
-    const n8nResponse = await fetch(N8N_EVALUATION_WEBHOOK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(n8nPayload)
+      clientProfile: client_profile,
+      objetivo,
+      companyId: session.company_id
     })
 
-    if (!n8nResponse.ok) {
-      console.error('❌ Erro ao chamar N8N:', n8nResponse.status)
-      throw new Error('Erro ao avaliar sessão')
-    }
-
-    const rawEvaluation = await n8nResponse.json()
-    console.log('📥 Resposta bruta do N8N:', rawEvaluation)
-
-    // Parse da avaliação (N8N retorna [{output: "json_string"}])
-    let evaluation = rawEvaluation
-
-    if (evaluation?.output && typeof evaluation.output === 'string') {
-      evaluation = JSON.parse(evaluation.output)
-    } else if (Array.isArray(evaluation) && evaluation[0]?.output && typeof evaluation[0].output === 'string') {
-      evaluation = JSON.parse(evaluation[0].output)
-    }
-
-    console.log('✅ Avaliação parseada:', evaluation)
+    console.log('✅ Avaliação pronta - Score:', evaluation.overall_score, '| Level:', evaluation.performance_level)
 
     // Calcular duração da sessão
     const startedAt = new Date(session.created_at || session.started_at)
     const endedAt = new Date()
     const durationSeconds = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000)
 
-    // Converter overall_score de 0-100 para 0-10 (formato do banco)
-    let overallScoreConverted = null
-    if (evaluation?.overall_score !== undefined && evaluation?.overall_score !== null) {
-      overallScoreConverted = evaluation.overall_score / 10
-      console.log(`📊 Score convertido: ${evaluation.overall_score}/100 → ${overallScoreConverted}/10`)
-    }
+    // overall_score já vem na escala 0-10 da função evaluateRoleplay
+    const overallScoreConverted = evaluation?.overall_score ?? null
+    console.log(`📊 Score final: ${overallScoreConverted}/10`)
 
     // Atualizar sessão com avaliação e status completed
     const { error: updateError } = await supabaseAdmin

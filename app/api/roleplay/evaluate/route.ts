@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { evaluateChallengePerformance } from '@/lib/challenges/evaluateChallengePerformance'
+import { evaluateRoleplay } from '@/lib/evaluation/evaluateRoleplay'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,8 +13,6 @@ const supabase = createClient(
     }
   }
 )
-
-const N8N_WEBHOOK_URL = 'https://ezboard.app.n8n.cloud/webhook/b34f1d38-493b-4ae8-8998-b8450ab84d16'
 
 export async function POST(request: Request) {
   try {
@@ -188,62 +187,24 @@ OBJEÇÕES TRABALHADAS:`
       console.warn('⚠️ Erro ao buscar desafio:', challengeError)
     }
 
-    console.log('📤 Enviando para N8N...')
+    console.log('📤 Iniciando avaliação direta via OpenAI...')
     console.log('Contexto:', JSON.stringify(context, null, 2))
-    console.log('Perfil do Cliente:\n', client_profile)
     console.log('Transcrição:', transcription.substring(0, 200) + '...')
     if (challenge_context) {
       console.log('🎯 Challenge Context:', JSON.stringify(challenge_context, null, 2))
     }
 
-    // Enviar para N8N
-    const n8nPayload = {
+    // Avaliar roleplay diretamente via OpenAI (substituiu N8N)
+    const objetivo = config.objective?.name
+      ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
+      : 'Não especificado'
+
+    const evaluation = await evaluateRoleplay({
       transcription,
-      context,
-      client_profile,
-      companyId: companyId, // ID da empresa para contexto do agente
-      objetivo: config.objective?.name
-        ? `${config.objective.name}${config.objective.description ? `\nDescrição: ${config.objective.description}` : ''}`
-        : 'Não especificado',
-      challenge_context: challenge_context // null para roleplays normais, objeto para desafios
-    }
-
-    console.log('📡 Enviando payload para N8N:', JSON.stringify(n8nPayload, null, 2))
-
-    const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(n8nPayload)
+      clientProfile: client_profile,
+      objetivo,
+      companyId
     })
-
-    if (!n8nResponse.ok) {
-      const errorText = await n8nResponse.text()
-      console.error('❌ Erro do N8N - Status:', n8nResponse.status)
-      console.error('❌ Erro do N8N - Response:', errorText)
-      return NextResponse.json(
-        { error: `Erro ao processar avaliação no N8N: ${errorText}` },
-        { status: 500 }
-      )
-    }
-
-    let rawResponse = await n8nResponse.json()
-    console.log('✅ Resposta N8N recebida')
-
-    // Parse do formato N8N: sempre verifica se tem campo 'output' string
-    let evaluation = rawResponse
-
-    // Caso 1: {output: "json_string"}
-    if (evaluation?.output && typeof evaluation.output === 'string') {
-      console.log('📦 Parseando campo output...')
-      evaluation = JSON.parse(evaluation.output)
-    }
-    // Caso 2: [{output: "json_string"}]
-    else if (Array.isArray(evaluation) && evaluation[0]?.output && typeof evaluation[0].output === 'string') {
-      console.log('📦 Parseando campo output do array...')
-      evaluation = JSON.parse(evaluation[0].output)
-    }
 
     console.log('✅ Avaliação pronta - Score:', evaluation.overall_score, '| Level:', evaluation.performance_level)
 
