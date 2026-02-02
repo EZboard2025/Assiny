@@ -226,7 +226,7 @@ export default function CompaniesAdmin() {
   const [newUserName, setNewUserName] = useState('')
   const [newUserEmail, setNewUserEmail] = useState('')
   const [newUserPassword, setNewUserPassword] = useState('')
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'vendedor'>('vendedor')
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'vendedor' | 'representante'>('vendedor')
   const [creatingUser, setCreatingUser] = useState(false)
   const [selectedCompanyForNewUser, setSelectedCompanyForNewUser] = useState<Company | null>(null)
 
@@ -1555,10 +1555,12 @@ export default function CompaniesAdmin() {
                         <select
                           value={user.role}
                           onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
-                          className="px-4 py-2 bg-gray-700/50 border border-emerald-500/30 rounded-lg text-white focus:border-emerald-400/60 focus:outline-none"
+                          className="px-4 py-2 bg-gray-700/50 border border-emerald-500/30 rounded-lg text-white focus:border-emerald-400/60 focus:outline-none appearance-none cursor-pointer"
+                          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5rem', paddingRight: '2.5rem' }}
                         >
-                          <option value="Admin">Admin</option>
-                          <option value="Vendedor">Vendedor</option>
+                          <option value="Admin" className="bg-gray-800 text-white">Admin</option>
+                          <option value="Vendedor" className="bg-gray-800 text-white">Vendedor</option>
+                          <option value="Representante" className="bg-gray-800 text-white">Representante</option>
                         </select>
                       </div>
                     </div>
@@ -1572,6 +1574,7 @@ export default function CompaniesAdmin() {
                   <ul className="space-y-1 ml-4">
                     <li>• <strong className="text-emerald-400">Admin:</strong> Acesso total, incluindo ConfigHub</li>
                     <li>• <strong className="text-emerald-400">Vendedor:</strong> Acesso apenas aos treinamentos</li>
+                    <li>• <strong className="text-emerald-400">Representante:</strong> Portal de parceiros (sem acesso a treinamentos)</li>
                     <li>• As alterações são aplicadas imediatamente</li>
                   </ul>
                 </div>
@@ -1656,11 +1659,13 @@ export default function CompaniesAdmin() {
                   </label>
                   <select
                     value={newUserRole}
-                    onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'vendedor')}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:border-green-500/50 focus:outline-none"
+                    onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'vendedor' | 'representante')}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:border-green-500/50 focus:outline-none appearance-none cursor-pointer"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1.25rem', paddingRight: '2.5rem' }}
                   >
-                    <option value="vendedor">Vendedor</option>
-                    <option value="admin">Administrador</option>
+                    <option value="vendedor" className="bg-gray-800 text-white">Vendedor</option>
+                    <option value="admin" className="bg-gray-800 text-white">Administrador</option>
+                    <option value="representante" className="bg-gray-800 text-white">Representante</option>
                   </select>
                 </div>
 

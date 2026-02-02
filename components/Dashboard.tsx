@@ -13,6 +13,7 @@ import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
 import FollowUpHistoryView from './FollowUpHistoryView'
 import MeetAnalysisView from './MeetAnalysisView'
+import RepresentanteView from './RepresentanteView'
 import Sidebar from './dashboard/Sidebar'
 import StatsPanel from './dashboard/StatsPanel'
 import TopBanner from './dashboard/TopBanner'
@@ -561,6 +562,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         </div>
       </div>
     )
+  }
+
+  // Se o usuário é REPRESENTANTE, mostrar apenas a view de representante
+  // Representantes não têm acesso às features de treinamento, apenas ao painel de parceiros
+  if (userRole?.toLowerCase() === 'representante') {
+    return <RepresentanteView userName={userName} onLogout={onLogout} />
   }
 
   return (
