@@ -104,6 +104,25 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
       .replace(/spin selling/gi, 'SPIN Selling')
   }
 
+  // Helper function to safely render values (prevents rendering objects as React children)
+  const safeRender = (value: any): string => {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    // If it's an object, try to extract common text fields or stringify
+    if (typeof value === 'object') {
+      // Common text fields that might contain the actual content
+      if (value.text) return safeRender(value.text)
+      if (value.content) return safeRender(value.content)
+      if (value.message) return safeRender(value.message)
+      if (value.analysis) return safeRender(value.analysis)
+      if (value.description) return safeRender(value.description)
+      // Fallback: stringify the object
+      return JSON.stringify(value)
+    }
+    return String(value)
+  }
+
   const [isSimulating, setIsSimulating] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [roleplayLimitReached, setRoleplayLimitReached] = useState(false)
@@ -175,6 +194,58 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const [roleplayConfig, setRoleplayConfig] = useState<any>(null) // Armazena toda a configuração do roleplay
   const [dataLoading, setDataLoading] = useState(true) // Loading state para dados iniciais
   const [isChallengeExpanded, setIsChallengeExpanded] = useState(false) // Estado para expandir/colapsar card do desafio
+
+  // DEBUG: Função para visualizar modal de avaliação sem fazer sessão
+  const showMockEvaluation = () => {
+    const mockEvaluation = {
+      overall_score: 6.8,
+      performance_level: 'good',
+      executive_summary: 'Você demonstrou habilidades sólidas ao iniciar a conversa com perguntas abertas, o que é fundamental para entender a situação do cliente. No entanto, houve oportunidades perdidas para aprofundar nas implicações dos problemas identificados.',
+      top_strengths: [
+        'Boa abertura com perguntas situacionais',
+        'Tom de voz adequado e profissional',
+        'Demonstrou empatia genuína com o cliente'
+      ],
+      critical_gaps: [
+        'Faltou explorar as consequências do problema',
+        'Não quantificou o impacto financeiro',
+        'Fechamento precipitado sem criar urgência'
+      ],
+      priority_improvements: [
+        { area: 'Implicação', current_gap: 'Não explorou consequências de inação', action_plan: 'Perguntar sobre impacto futuro caso problema persista', priority: 'critical' },
+        { area: 'Problema', current_gap: 'Superficial na identificação', action_plan: 'Usar técnica 5 Whys para aprofundar', priority: 'high' }
+      ],
+      spin_evaluation: {
+        S: { final_score: 7.2, technical_feedback: 'Boas perguntas iniciais sobre a estrutura da equipe.', indicators: { open_questions_score: 7, scenario_mapping_score: 7, adaptability_score: 8 }, missed_opportunities: [] },
+        P: { final_score: 6.5, technical_feedback: 'Identificou problema mas não aprofundou.', indicators: { problem_identification_score: 7, consequences_exploration_score: 6, depth_score: 6, empathy_score: 7, impact_understanding_score: 6 }, missed_opportunities: ['Poderia ter perguntado há quanto tempo o problema existe'] },
+        I: { final_score: 5.8, technical_feedback: 'Não explorou consequências de forma adequada.', indicators: { inaction_consequences_score: 5, urgency_amplification_score: 6, concrete_risks_score: 6, non_aggressive_urgency_score: 6 }, missed_opportunities: ['Deveria ter quantificado perdas', 'Faltou criar cenário de inação'] },
+        N: { final_score: 6.2, technical_feedback: 'Apresentou solução sem conectar aos problemas.', indicators: { solution_clarity_score: 7, personalization_score: 6, benefits_clarity_score: 6, credibility_score: 6, cta_effectiveness_score: 6 }, missed_opportunities: ['CTA poderia ser mais específico'] }
+      },
+      objections_analysis: [
+        { objection_id: 'obj-1', objection_type: 'timing', objection_text: 'Não tenho tempo agora para avaliar isso', score: 6, detailed_analysis: 'Respondeu de forma adequada mas não transformou em oportunidade.' }
+      ],
+      challenge_performance: {
+        goal_achieved: false,
+        target_letter: 'S',
+        achieved_score: 6.0,
+        target_score: 7.0,
+        challenge_feedback: 'Você fez um bom trabalho ao iniciar a conversa com perguntas abertas, o que é fundamental. No entanto, há espaço para aprofundar mais na situação do cliente e explorar suas necessidades de forma mais detalhada. Continue praticando e buscando entender o contexto completo, isso tornará suas interações ainda mais eficazes!',
+        coaching_tips_applied: ['O vendedor fez perguntas abertas.'],
+        coaching_tips_missed: [
+          'Quando o cliente disser que não vê urgência, deveria ter respondido com "Se esse problema persistir, que impacto você prevê para os próximos meses?"',
+          'Não praticou o silêncio após fazer perguntas abertas.'
+        ],
+        key_moments: [
+          { moment: 'Exploração inicial do time comercial', analysis: 'O vendedor perguntou sobre a estrutura do time comercial.', suggestion: 'Além da estrutura, quais desafios você e sua equipe enfrentam no dia a dia para fechar vendas?' },
+          { moment: 'Resposta à falta de urgência', analysis: 'O cliente disse que não via uma urgência para a solução.', suggestion: 'Se essa situação persistir, que impacto você prevê para os resultados da clínica nos próximos meses?' },
+          { moment: 'Discussão sobre o fechamento', analysis: 'O vendedor fez uma pergunta sobre o que estava causando o travamento.', suggestion: 'O que especificamente está impedindo que vocês avancem com mais confiança no processo de vendas?' }
+        ],
+        target_letter_deep_analysis: 'Na fase de Situação, você demonstrou boa iniciativa ao fazer perguntas abertas sobre a estrutura da equipe. No entanto, as perguntas poderiam ter sido mais estratégicas para mapear não apenas a estrutura, mas também os processos, ferramentas utilizadas e histórico de tentativas anteriores.'
+      }
+    }
+    setEvaluation(mockEvaluation)
+    setShowEvaluationSummary(true)
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -2699,99 +2770,101 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           </div>
         )}
 
-        {/* Modal de Avaliação - Design matching HistoricoView */}
+        {/* Modal de Avaliação - Design Tema Claro */}
         {showEvaluationSummary && evaluation && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] overflow-y-auto">
             <div className="min-h-screen py-8 px-4 sm:px-6">
-              <div className="max-w-5xl mx-auto">
+              <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl">
                 {/* Header */}
-                <div className="mb-6 flex items-center justify-between">
+                <div className="p-6 border-b border-gray-200 flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">Resultado da Sessão</h1>
-                    <p className="text-gray-400 text-sm">Análise detalhada do seu desempenho</p>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-1">Resultado da Sessão</h1>
+                    <p className="text-gray-500 text-sm">Análise detalhada do seu desempenho</p>
                   </div>
                   <button
                     onClick={() => setShowEvaluationSummary(false)}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     <X className="w-6 h-6" />
                   </button>
                 </div>
 
-                {/* Score Principal */}
-                {(() => {
-                  const overallScore = evaluation.overall_score !== undefined
-                    ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
-                    : null
-                  return (
-                    <div className={`rounded-xl border p-6 text-center mb-6 ${getScoreBg(overallScore || 0)}`}>
-                      <div className={`text-5xl font-bold mb-2 ${getScoreColor(overallScore || 0)}`}>
-                        {overallScore?.toFixed(1) || 'N/A'}
+                {/* Conteúdo do Modal */}
+                <div className="p-6">
+                  {/* Score Principal */}
+                  {(() => {
+                    const overallScore = evaluation.overall_score !== undefined
+                      ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
+                      : null
+                    return (
+                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6 text-center mb-6">
+                        <div className={`text-5xl font-bold mb-2 ${getScoreColor(overallScore || 0)}`}>
+                          {overallScore?.toFixed(1) || 'N/A'}
+                        </div>
+                        <div className="text-gray-600 text-sm font-medium">
+                          {evaluation.performance_level && getPerformanceLabel(evaluation.performance_level)}
+                        </div>
                       </div>
-                      <div className="text-gray-400 text-sm">
-                        {evaluation.performance_level && getPerformanceLabel(evaluation.performance_level)}
-                      </div>
-                    </div>
-                  )
-                })()}
+                    )
+                  })()}
 
-                {/* Seção de Feedback do Desafio - só aparece quando challenge_performance existe */}
-                {evaluation.challenge_performance && (
-                  <div className="mb-6 space-y-4">
-                    {/* Card de Resultado do Desafio */}
-                    <div className={`rounded-xl border p-5 ${
-                      evaluation.challenge_performance.goal_achieved
-                        ? 'bg-green-500/10 border-green-500/30'
-                        : 'bg-orange-500/10 border-orange-500/30'
-                    }`}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            evaluation.challenge_performance.goal_achieved
-                              ? 'bg-green-500/20'
-                              : 'bg-orange-500/20'
-                          }`}>
-                            {evaluation.challenge_performance.goal_achieved ? (
-                              <Trophy className="w-5 h-5 text-green-400" />
-                            ) : (
-                              <Target className="w-5 h-5 text-orange-400" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className={`font-semibold ${
-                              evaluation.challenge_performance.goal_achieved ? 'text-green-400' : 'text-orange-400'
+                  {/* Seção de Feedback do Desafio - só aparece quando challenge_performance existe */}
+                  {evaluation.challenge_performance && (
+                    <div className="mb-6 space-y-4">
+                      {/* Card de Resultado do Desafio */}
+                      <div className={`rounded-xl border p-5 ${
+                        evaluation.challenge_performance.goal_achieved
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-amber-50 border-amber-200'
+                      }`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              evaluation.challenge_performance.goal_achieved
+                                ? 'bg-green-100'
+                                : 'bg-amber-100'
                             }`}>
-                              {evaluation.challenge_performance.goal_achieved ? 'Meta Alcançada!' : 'Continue Praticando'}
-                            </h3>
-                            <p className="text-sm text-gray-400">
-                              Foco: {evaluation.challenge_performance.target_letter?.toUpperCase()} - {
-                                evaluation.challenge_performance.target_letter === 'S' ? 'Situação' :
-                                evaluation.challenge_performance.target_letter === 'P' ? 'Problema' :
-                                evaluation.challenge_performance.target_letter === 'I' ? 'Implicação' :
-                                'Necessidade'
-                              }
-                            </p>
+                              {evaluation.challenge_performance.goal_achieved ? (
+                                <Trophy className="w-5 h-5 text-green-600" />
+                              ) : (
+                                <Target className="w-5 h-5 text-amber-600" />
+                              )}
+                            </div>
+                            <div>
+                              <h3 className={`font-semibold ${
+                                evaluation.challenge_performance.goal_achieved ? 'text-green-700' : 'text-amber-700'
+                              }`}>
+                                {evaluation.challenge_performance.goal_achieved ? 'Meta Alcançada!' : 'Continue Praticando'}
+                              </h3>
+                              <p className="text-sm text-gray-600">
+                                Foco: {evaluation.challenge_performance.target_letter?.toUpperCase()} - {
+                                  evaluation.challenge_performance.target_letter === 'S' ? 'Situação' :
+                                  evaluation.challenge_performance.target_letter === 'P' ? 'Problema' :
+                                  evaluation.challenge_performance.target_letter === 'I' ? 'Implicação' :
+                                  'Necessidade'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-2xl font-bold ${
+                              evaluation.challenge_performance.goal_achieved ? 'text-green-600' : 'text-amber-600'
+                            }`}>
+                              {evaluation.challenge_performance.achieved_score?.toFixed(1) || 'N/A'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Meta: {evaluation.challenge_performance.target_score?.toFixed(1) || 'N/A'}
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className={`text-2xl font-bold ${
-                            evaluation.challenge_performance.goal_achieved ? 'text-green-400' : 'text-orange-400'
-                          }`}>
-                            {evaluation.challenge_performance.achieved_score?.toFixed(1) || 'N/A'}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Meta: {evaluation.challenge_performance.target_score?.toFixed(1) || 'N/A'}
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Feedback do desafio */}
-                      {evaluation.challenge_performance.challenge_feedback && (
-                        <p className="text-sm text-gray-300 border-t border-gray-700/50 pt-3 mt-3">
-                          {evaluation.challenge_performance.challenge_feedback}
-                        </p>
-                      )}
-                    </div>
+                        {/* Feedback do desafio */}
+                        {evaluation.challenge_performance.challenge_feedback && (
+                          <p className="text-sm text-gray-700 border-t border-gray-200 pt-3 mt-3">
+                            {safeRender(evaluation.challenge_performance.challenge_feedback)}
+                          </p>
+                        )}
+                      </div>
 
                     {/* Grid de Dicas de Coaching */}
                     {(evaluation.challenge_performance.coaching_tips_applied?.length > 0 ||
@@ -2799,16 +2872,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Dicas Aplicadas */}
                         {evaluation.challenge_performance.coaching_tips_applied?.length > 0 && (
-                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                            <h4 className="flex items-center gap-2 text-sm font-medium text-green-400 mb-3">
+                          <div className="bg-green-50 rounded-xl border border-green-200 p-4">
+                            <h4 className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
                               <CheckCircle className="w-4 h-4" />
                               Dicas Aplicadas
                             </h4>
                             <ul className="space-y-2">
-                              {evaluation.challenge_performance.coaching_tips_applied.map((tip: string, i: number) => (
-                                <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                  <span className="text-green-400 mt-0.5">✓</span>
-                                  {cleanSpinText(tip)}
+                              {evaluation.challenge_performance.coaching_tips_applied.map((tip: any, i: number) => (
+                                <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                  <span className="text-green-600 mt-0.5">✓</span>
+                                  {cleanSpinText(safeRender(tip))}
                                 </li>
                               ))}
                             </ul>
@@ -2817,16 +2890,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                         {/* Dicas Não Aplicadas */}
                         {evaluation.challenge_performance.coaching_tips_missed?.length > 0 && (
-                          <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                            <h4 className="flex items-center gap-2 text-sm font-medium text-orange-400 mb-3">
+                          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+                            <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
                               <AlertTriangle className="w-4 h-4" />
                               Dicas a Praticar
                             </h4>
                             <ul className="space-y-2">
-                              {evaluation.challenge_performance.coaching_tips_missed.map((tip: string, i: number) => (
-                                <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                  <span className="text-orange-400 mt-0.5">○</span>
-                                  {cleanSpinText(tip)}
+                              {evaluation.challenge_performance.coaching_tips_missed.map((tip: any, i: number) => (
+                                <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                  <span className="text-amber-600 mt-0.5">○</span>
+                                  {cleanSpinText(safeRender(tip))}
                                 </li>
                               ))}
                             </ul>
@@ -2837,28 +2910,28 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Momentos-Chave */}
                     {evaluation.challenge_performance.key_moments?.length > 0 && (
-                      <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-purple-400 mb-3">
+                      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
                           <Lightbulb className="w-4 h-4" />
                           Momentos-Chave para Melhoria
                         </h4>
                         <div className="space-y-3">
                           {evaluation.challenge_performance.key_moments.map((moment: any, i: number) => (
-                            <div key={i} className="bg-gray-800/50 rounded-lg p-3 border-l-2 border-purple-500/50">
-                              <p className="text-sm text-gray-300 mb-2">{moment.moment}</p>
-                              {moment.what_happened && (
-                                <p className="text-xs text-gray-500 mb-1">
-                                  <span className="text-gray-400">O que aconteceu:</span> {moment.what_happened}
+                            <div key={i} className="bg-gray-50 rounded-lg p-3 border-l-2 border-green-500">
+                              <p className="text-sm text-gray-800 mb-2">{safeRender(moment.moment)}</p>
+                              {(moment.what_happened || moment.analysis) && (
+                                <p className="text-xs text-gray-600 mb-1">
+                                  <span className="text-gray-700 font-medium">O que aconteceu:</span> {safeRender(moment.what_happened || moment.analysis)}
                                 </p>
                               )}
                               {moment.what_should_have_done && (
-                                <p className="text-xs text-gray-500 mb-1">
-                                  <span className="text-gray-400">O que fazer:</span> {moment.what_should_have_done}
+                                <p className="text-xs text-gray-600 mb-1">
+                                  <span className="text-gray-700 font-medium">O que fazer:</span> {safeRender(moment.what_should_have_done)}
                                 </p>
                               )}
-                              {moment.suggested_phrase && (
-                                <p className="text-xs italic text-purple-300/80 bg-purple-500/10 rounded px-2 py-1 mt-2">
-                                  &ldquo;{moment.suggested_phrase}&rdquo;
+                              {(moment.suggested_phrase || moment.suggestion) && (
+                                <p className="text-xs italic text-green-700 bg-green-100 rounded px-2 py-1 mt-2">
+                                  &ldquo;{safeRender(moment.suggested_phrase || moment.suggestion)}&rdquo;
                                 </p>
                               )}
                             </div>
@@ -2869,16 +2942,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Análise Profunda da Letra Alvo */}
                     {evaluation.challenge_performance.target_letter_deep_analysis && (
-                      <details className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
-                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
-                          <span className="text-sm font-medium text-gray-300">
+                      <details className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
+                          <span className="text-sm font-medium text-gray-700">
                             Análise Detalhada: {evaluation.challenge_performance.target_letter?.toUpperCase()}
                           </span>
                           <ChevronDown className="w-4 h-4 text-gray-500" />
                         </summary>
                         <div className="px-4 pb-4">
-                          <p className="text-sm text-gray-400 whitespace-pre-line leading-relaxed">
-                            {evaluation.challenge_performance.target_letter_deep_analysis}
+                          <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
+                            {safeRender(evaluation.challenge_performance.target_letter_deep_analysis)}
                           </p>
                         </div>
                       </details>
@@ -2887,7 +2960,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 )}
 
                 {/* Tabs de navegação */}
-                <div className="flex gap-1 bg-gray-900/50 rounded-xl border border-gray-800 p-1 mb-6">
+                <div className="flex gap-1 bg-gray-100 rounded-xl border border-gray-200 p-1 mb-6">
                   {['resumo', 'spin', 'transcricao'].map((tab) => (
                     <button
                       key={tab}
@@ -2896,8 +2969,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         (tab === 'resumo' && activeEvaluationTab === 'evaluation') ||
                         (tab === 'spin' && activeEvaluationTab === 'feedback') ||
                         (tab === 'transcricao' && activeEvaluationTab === 'conversation')
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                          ? 'bg-white text-green-700 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
                       }`}
                     >
                       {tab === 'resumo' && 'Resumo'}
@@ -2913,12 +2986,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <div className="space-y-4">
                     {/* Resumo executivo */}
                     {evaluation.executive_summary && (
-                      <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                        <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+                      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
                           Resumo Executivo
                         </h4>
-                        <p className="text-gray-300 text-sm leading-relaxed">
-                          {evaluation.executive_summary}
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                          {safeRender(evaluation.executive_summary)}
                         </p>
                       </div>
                     )}
@@ -2927,16 +3000,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Pontos fortes */}
                       {evaluation.top_strengths?.length > 0 && (
-                        <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                          <h4 className="flex items-center gap-2 text-sm font-medium text-green-400 mb-3">
+                        <div className="bg-green-50 rounded-xl border border-green-200 p-4">
+                          <h4 className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
                             <TrendingUp className="w-4 h-4" />
                             Pontos Fortes
                           </h4>
                           <ul className="space-y-2">
-                            {evaluation.top_strengths.map((strength: string, i: number) => (
-                              <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                <span className="text-green-400 mt-0.5">•</span>
-                                {strength}
+                            {evaluation.top_strengths.map((strength: any, i: number) => (
+                              <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                <span className="text-green-600 mt-0.5">•</span>
+                                {safeRender(strength)}
                               </li>
                             ))}
                           </ul>
@@ -2945,16 +3018,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                       {/* Gaps críticos */}
                       {evaluation.critical_gaps?.length > 0 && (
-                        <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                          <h4 className="flex items-center gap-2 text-sm font-medium text-red-400 mb-3">
+                        <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+                          <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
                             <AlertTriangle className="w-4 h-4" />
                             Pontos a Melhorar
                           </h4>
                           <ul className="space-y-2">
-                            {evaluation.critical_gaps.map((gap: string, i: number) => (
-                              <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                <span className="text-red-400 mt-0.5">•</span>
-                                {gap}
+                            {evaluation.critical_gaps.map((gap: any, i: number) => (
+                              <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                <span className="text-amber-600 mt-0.5">•</span>
+                                {safeRender(gap)}
                               </li>
                             ))}
                           </ul>
@@ -2964,26 +3037,26 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Prioridades de melhoria */}
                     {evaluation.priority_improvements?.length > 0 && (
-                      <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-yellow-400 mb-3">
+                      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
                           <Lightbulb className="w-4 h-4" />
                           Prioridades de Melhoria
                         </h4>
                         <div className="space-y-3">
                           {evaluation.priority_improvements.map((imp: any, i: number) => (
-                            <div key={i} className="bg-gray-800/50 rounded-lg p-3">
+                            <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-xs px-2 py-0.5 rounded ${
-                                  imp.priority === 'critical' ? 'bg-red-500/20 text-red-400' :
-                                  imp.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                                  'bg-yellow-500/20 text-yellow-400'
+                                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                                  imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                                  imp.priority === 'high' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-gray-200 text-gray-700'
                                 }`}>
                                   {imp.priority === 'critical' ? 'Crítico' :
                                    imp.priority === 'high' ? 'Alta' : 'Média'}
                                 </span>
-                                <span className="text-sm font-medium text-white">{imp.area}</span>
+                                <span className="text-sm font-medium text-gray-800">{safeRender(imp.area)}</span>
                               </div>
-                              <p className="text-xs text-gray-400">{imp.action_plan}</p>
+                              <p className="text-xs text-gray-600">{safeRender(imp.action_plan)}</p>
                             </div>
                           ))}
                         </div>
@@ -2998,14 +3071,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     {/* Grid de scores SPIN */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { key: 'S', label: 'Situação', color: 'text-blue-400' },
-                        { key: 'P', label: 'Problema', color: 'text-purple-400' },
-                        { key: 'I', label: 'Implicação', color: 'text-orange-400' },
-                        { key: 'N', label: 'Necessidade', color: 'text-green-400' }
+                        { key: 'S', label: 'Situação', color: 'text-blue-600' },
+                        { key: 'P', label: 'Problema', color: 'text-purple-600' },
+                        { key: 'I', label: 'Implicação', color: 'text-orange-600' },
+                        { key: 'N', label: 'Necessidade', color: 'text-green-600' }
                       ].map(({ key, label, color }) => {
                         const score = evaluation.spin_evaluation[key]?.final_score || 0
                         return (
-                          <div key={key} className="bg-gray-900/50 rounded-xl border border-gray-800 p-4 text-center">
+                          <div key={key} className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
                             <div className={`text-3xl font-bold mb-1 ${color}`}>
                               {score.toFixed(1)}
                             </div>
@@ -3018,8 +3091,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </div>
 
                     {/* Média SPIN */}
-                    <div className="bg-green-500/10 rounded-xl border border-green-500/20 p-4 text-center">
-                      <div className="text-2xl font-bold text-green-400 mb-1">
+                    <div className="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600 mb-1">
                         {(
                           ((evaluation.spin_evaluation.S?.final_score || 0) +
                           (evaluation.spin_evaluation.P?.final_score || 0) +
@@ -3027,7 +3100,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           (evaluation.spin_evaluation.N?.final_score || 0)) / 4
                         ).toFixed(1)}
                       </div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wider">
+                      <div className="text-xs text-gray-600 uppercase tracking-wider">
                         Média Geral SPIN
                       </div>
                     </div>
@@ -3045,16 +3118,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       }
 
                       return (
-                        <details key={letter} className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
-                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                        <details key={letter} className="bg-white rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
+                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
                             <div className="flex items-center gap-3">
-                              <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-sm font-bold text-green-400">
+                              <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-sm font-bold text-green-700">
                                 {letter}
                               </span>
-                              <span className="font-medium text-white">{labels[letter]}</span>
+                              <span className="font-medium text-gray-800">{labels[letter]}</span>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-white">
+                              <span className="text-lg font-bold text-gray-800">
                                 {data.final_score?.toFixed(1)}
                               </span>
                               <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
@@ -3063,8 +3136,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           <div className="p-4 pt-0 space-y-3">
                             {/* Feedback */}
                             {data.technical_feedback && (
-                              <p className="text-sm text-gray-300 leading-relaxed">
-                                {data.technical_feedback}
+                              <p className="text-sm text-gray-700 leading-relaxed">
+                                {safeRender(data.technical_feedback)}
                               </p>
                             )}
 
@@ -3074,19 +3147,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                 {Object.entries(data.indicators).map(([key, value]: [string, any]) => {
                                   const score = typeof value === 'number' ? value : 0
                                   const getIndicatorStyle = (s: number) => {
-                                    if (s >= 8) return 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-300'
-                                    if (s >= 6) return 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30 text-yellow-300'
-                                    return 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-500/30 text-red-300'
+                                    if (s >= 8) return 'bg-green-100 border-green-300 text-green-700'
+                                    if (s >= 6) return 'bg-yellow-100 border-yellow-300 text-yellow-700'
+                                    return 'bg-red-100 border-red-300 text-red-700'
                                   }
                                   const getIndicatorScoreStyle = (s: number) => {
-                                    if (s >= 8) return 'text-green-400 font-semibold'
-                                    if (s >= 6) return 'text-yellow-400 font-semibold'
-                                    return 'text-red-400 font-semibold'
+                                    if (s >= 8) return 'text-green-700 font-semibold'
+                                    if (s >= 6) return 'text-yellow-700 font-semibold'
+                                    return 'text-red-700 font-semibold'
                                   }
                                   return (
                                     <span
                                       key={key}
-                                      className={`text-xs px-3 py-1.5 rounded-lg border backdrop-blur-sm transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
+                                      className={`text-xs px-3 py-1.5 rounded-lg border transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
                                     >
                                       {translateIndicator(key)}: <span className={getIndicatorScoreStyle(score)}>{value}/10</span>
                                     </span>
@@ -3097,11 +3170,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                             {/* Oportunidades perdidas */}
                             {data.missed_opportunities?.length > 0 && (
-                              <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
-                                <p className="text-xs font-medium text-orange-400 mb-2">Oportunidades Perdidas</p>
+                              <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                                <p className="text-xs font-medium text-amber-700 mb-2">Oportunidades Perdidas</p>
                                 <ul className="space-y-1">
-                                  {data.missed_opportunities.map((opp: string, i: number) => (
-                                    <li key={i} className="text-xs text-orange-300">• {opp}</li>
+                                  {data.missed_opportunities.map((opp: any, i: number) => (
+                                    <li key={i} className="text-xs text-amber-700">• {safeRender(opp)}</li>
                                   ))}
                                 </ul>
                               </div>
@@ -3113,16 +3186,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                     {/* Análise de objeções */}
                     {evaluation.objections_analysis?.length > 0 && (
-                      <details className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden group">
-                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-800/50 transition-colors">
+                      <details className="bg-white rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
+                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
                           <div className="flex items-center gap-3">
-                            <span className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center">
-                              <Target className="w-4 h-4 text-green-400" />
+                            <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                              <Target className="w-4 h-4 text-green-700" />
                             </span>
-                            <span className="font-medium text-white">Análise de Objeções</span>
+                            <span className="font-medium text-gray-800">Análise de Objeções</span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-400">
+                            <span className="text-sm text-gray-500">
                               {evaluation.objections_analysis.length} objeções
                             </span>
                             <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
@@ -3130,20 +3203,20 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         </summary>
                         <div className="p-4 pt-0 space-y-3">
                           {evaluation.objections_analysis.map((obj: any, idx: number) => (
-                            <div key={idx} className="bg-gray-800/50 rounded-lg p-3">
+                            <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs px-2 py-0.5 bg-gray-700 rounded text-gray-300">
-                                  {obj.objection_type}
+                                <span className="text-xs px-2 py-0.5 bg-gray-200 rounded text-gray-700">
+                                  {safeRender(obj.objection_type)}
                                 </span>
                                 <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
                                   {obj.score}/10
                                 </span>
                               </div>
-                              <p className="text-sm text-gray-300 italic mb-2">
-                                "{obj.objection_text}"
+                              <p className="text-sm text-gray-700 italic mb-2">
+                                "{safeRender(obj.objection_text)}"
                               </p>
                               {obj.detailed_analysis && (
-                                <p className="text-xs text-gray-400">{obj.detailed_analysis}</p>
+                                <p className="text-xs text-gray-600">{safeRender(obj.detailed_analysis)}</p>
                               )}
                             </div>
                           ))}
@@ -3155,8 +3228,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Tab Transcrição (conversation) */}
                 {activeEvaluationTab === 'conversation' && (
-                  <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-                    <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4">
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                    <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
                       {messages.length} mensagens
                     </h4>
                     <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
@@ -3167,11 +3240,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         >
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                             msg.role === 'client'
-                              ? 'bg-gray-800'
-                              : 'bg-green-500/20'
+                              ? 'bg-gray-200'
+                              : 'bg-green-100'
                           }`}>
                             <User className={`w-4 h-4 ${
-                              msg.role === 'client' ? 'text-gray-400' : 'text-green-400'
+                              msg.role === 'client' ? 'text-gray-600' : 'text-green-600'
                             }`} />
                           </div>
                           <div className={`flex-1 max-w-[80%] ${msg.role === 'seller' ? 'text-right' : ''}`}>
@@ -3180,8 +3253,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                             </div>
                             <div className={`inline-block p-3 rounded-xl text-sm ${
                               msg.role === 'client'
-                                ? 'bg-gray-800 text-gray-300 rounded-tl-none'
-                                : 'bg-green-500/20 text-green-100 rounded-tr-none'
+                                ? 'bg-gray-100 text-gray-700 rounded-tl-none border border-gray-200'
+                                : 'bg-green-100 text-green-800 rounded-tr-none border border-green-200'
                             }`}>
                               {msg.text}
                             </div>
@@ -3196,7 +3269,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <div className="flex gap-3 mt-6">
                   <button
                     onClick={() => setShowEvaluationSummary(false)}
-                    className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl font-medium hover:bg-gray-800 transition-colors text-gray-300 text-sm"
+                    className="flex-1 px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl font-medium hover:bg-gray-200 transition-colors text-gray-700 text-sm"
                   >
                     Fechar
                   </button>
@@ -3209,7 +3282,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         window.location.href = '/?view=historico';
                       }
                     }}
-                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-500 rounded-xl font-medium transition-colors text-white text-sm"
+                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-medium transition-colors text-white text-sm"
                   >
                     Ver Análise Completa no Histórico
                   </button>
@@ -3217,7 +3290,17 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </div>
             </div>
           </div>
+        </div>
         )}
+
+        {/* DEBUG: Botão para visualizar modal de avaliação - REMOVER EM PRODUÇÃO */}
+        <button
+          onClick={showMockEvaluation}
+          className="fixed bottom-4 left-4 px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg opacity-30 hover:opacity-100 transition-opacity z-50"
+          title="DEBUG: Ver modal de avaliação"
+        >
+          🧪 Preview Avaliação
+        </button>
     </>
   )
 }
