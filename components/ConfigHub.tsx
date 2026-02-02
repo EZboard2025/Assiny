@@ -481,6 +481,13 @@ function ConfigurationInterface({
   const [aiConfidence, setAIConfidence] = useState<Record<string, number>>({})
   const [aiError, setAIError] = useState<string | null>(null)
 
+  // Estados para Upload de PDFs e Extração com IA
+  const [uploadedPdfs, setUploadedPdfs] = useState<File[]>([])
+  const [pdfExtracting, setPdfExtracting] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [pdfPreviewData, setPdfPreviewData] = useState<typeof companyData | null>(null)
+
   // Estados para IA Geração de Conteúdo (Objeções, Personas, Objetivos)
   // showAIGenerateModal e setShowAIGenerateModal vem como props
   const [aiGenerateUrl, setAIGenerateUrl] = useState('')
@@ -860,6 +867,110 @@ function ConfigurationInterface({
     setShowAIModal(false)
     setAIPreviewData(null)
     setAIUrl('')
+
+    showToast('success', 'Dados Aplicados', 'Revise e salve os dados')
+  }
+
+  // Manipular upload de PDFs
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf')
+
+    if (pdfFiles.length !== files.length) {
+      showToast('warning', 'Formato Inválido', 'Apenas arquivos PDF são aceitos')
+    }
+
+    if (pdfFiles.length > 0) {
+      setUploadedPdfs(prev => [...prev, ...pdfFiles])
+      setPdfError(null)
+    }
+  }
+
+  // Remover PDF da lista
+  const handleRemovePdf = (index: number) => {
+    setUploadedPdfs(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Extrair informações dos PDFs com IA
+  const handlePdfExtract = async () => {
+    if (uploadedPdfs.length === 0) {
+      showToast('warning', 'Nenhum PDF', 'Faça upload de pelo menos um arquivo PDF')
+      return
+    }
+
+    setPdfExtracting(true)
+    setPdfError(null)
+
+    try {
+      const formData = new FormData()
+      uploadedPdfs.forEach((pdf, index) => {
+        formData.append(`pdf_${index}`, pdf)
+      })
+
+      const response = await fetch('/api/company/extract-from-pdf', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao extrair dados dos PDFs')
+      }
+
+      setPdfPreviewData(result.data)
+      setShowPdfPreview(true)
+
+      // Consumir 1 crédito por extração de PDF (mais custoso que URL)
+      if (userCompanyId) {
+        try {
+          await fetch('/api/company/consume-ai-credit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: userCompanyId,
+              generationType: 'pdf-extract'
+            })
+          })
+        } catch (e) {
+          console.error('Erro ao consumir crédito de IA:', e)
+        }
+      }
+
+      showToast('success', 'Dados Extraídos', 'Revise os dados antes de aplicar')
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      setPdfError(errorMessage)
+      showToast('error', 'Erro', errorMessage)
+    } finally {
+      setPdfExtracting(false)
+    }
+  }
+
+  // Aplicar dados extraídos dos PDFs no formulário
+  const handleApplyPdfData = () => {
+    if (!pdfPreviewData) return
+
+    setCompanyData({
+      nome: pdfPreviewData.nome || companyData.nome,
+      descricao: pdfPreviewData.descricao || companyData.descricao,
+      produtos_servicos: pdfPreviewData.produtos_servicos || companyData.produtos_servicos,
+      funcao_produtos: pdfPreviewData.funcao_produtos || companyData.funcao_produtos,
+      diferenciais: pdfPreviewData.diferenciais || companyData.diferenciais,
+      concorrentes: pdfPreviewData.concorrentes || companyData.concorrentes,
+      dados_metricas: pdfPreviewData.dados_metricas || companyData.dados_metricas,
+      erros_comuns: pdfPreviewData.erros_comuns || companyData.erros_comuns,
+      percepcao_desejada: pdfPreviewData.percepcao_desejada || companyData.percepcao_desejada,
+      dores_resolvidas: pdfPreviewData.dores_resolvidas || companyData.dores_resolvidas
+    })
+
+    setCompanyDataEdited(true)
+    setShowPdfPreview(false)
+    setPdfPreviewData(null)
+    setUploadedPdfs([])
 
     showToast('success', 'Dados Aplicados', 'Revise e salve os dados')
   }
@@ -4459,18 +4570,103 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               </div>
 
+              {/* Upload de PDFs para Extração */}
+              <div className="p-4 border-b border-gray-100">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Preencher com IA</h4>
+                <p className="text-xs text-gray-500 mb-4">
+                  Faça upload de PDFs sobre sua empresa (apresentações, materiais, playbooks) e deixe a IA preencher automaticamente.
+                </p>
+
+                {/* Área de Upload */}
+                <div className="mb-4">
+                  <label
+                    htmlFor="pdf-upload"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 hover:border-purple-400 transition-all"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-500">
+                        <span className="font-semibold text-purple-600">Clique para fazer upload</span> ou arraste PDFs
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">Apenas arquivos PDF</p>
+                    </div>
+                    <input
+                      id="pdf-upload"
+                      type="file"
+                      accept=".pdf"
+                      multiple
+                      onChange={handlePdfUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Lista de PDFs Uploaded */}
+                {uploadedPdfs.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    <p className="text-xs font-medium text-gray-600">{uploadedPdfs.length} arquivo(s) selecionado(s):</p>
+                    {uploadedPdfs.map((pdf, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg border border-purple-100">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-purple-600" />
+                          <span className="text-sm text-gray-700 truncate max-w-[200px]">{pdf.name}</span>
+                          <span className="text-xs text-gray-400">({(pdf.size / 1024).toFixed(0)} KB)</span>
+                        </div>
+                        <button
+                          onClick={() => handleRemovePdf(index)}
+                          className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Erro de PDF */}
+                {pdfError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{pdfError}</p>
+                  </div>
+                )}
+
+                {/* Botões de Ação */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handlePdfExtract}
+                    disabled={uploadedPdfs.length === 0 || pdfExtracting}
+                    className={`flex-1 group relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                      uploadedPdfs.length > 0 && !pdfExtracting
+                        ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02]'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {pdfExtracting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Extraindo...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Extrair dos PDFs
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowAIModal(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
+                  >
+                    <Globe className="w-4 h-4" />
+                    Extrair de URL
+                  </button>
+                </div>
+              </div>
+
               {/* Formulário de Dados da Empresa */}
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Informações da Empresa</h4>
-                  <button
-                    onClick={() => setShowAIModal(true)}
-                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
-                  >
-                    <Sparkles className="w-4 h-4 animate-pulse" />
-                    Preencher com IA
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
-                  </button>
                 </div>
                 <div className="space-y-4">
                   {/* Nome da Empresa */}
@@ -5433,6 +5629,108 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                 </div>
               )}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {/* Modal de Preview dos PDFs - Tela Cheia (Portal) */}
+        {showPdfPreview && pdfPreviewData && typeof document !== 'undefined' && createPortal(
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+            <div className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden">
+              <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Dados Extraídos dos PDFs</h3>
+                      <p className="text-sm text-gray-500">Revise e edite antes de aplicar</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowPdfPreview(false)
+                      setPdfPreviewData(null)
+                    }}
+                    className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-200 transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 max-h-[calc(90vh-100px)] overflow-y-auto">
+                  <div className="space-y-4">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
+                      <p className="text-sm text-green-700 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Dados extraídos de {uploadedPdfs.length} PDF(s)! Revise antes de aplicar.
+                      </p>
+                    </div>
+
+                    {/* Campos com Preview */}
+                    <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
+                      {Object.entries(pdfPreviewData)
+                        .filter(([key]) => !key.startsWith('_'))
+                        .map(([campo, valor]) => {
+                          const fieldLabels: Record<string, string> = {
+                            nome: 'Nome',
+                            descricao: 'Descrição',
+                            produtos_servicos: 'Produtos/Serviços',
+                            funcao_produtos: 'Função dos Produtos',
+                            diferenciais: 'Diferenciais',
+                            concorrentes: 'Concorrentes',
+                            dados_metricas: 'Provas Sociais',
+                            erros_comuns: 'Erros Comuns',
+                            percepcao_desejada: 'Percepção Desejada',
+                            dores_resolvidas: 'Dores Resolvidas'
+                          }
+
+                          return (
+                            <div key={campo} className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                              <label className="text-xs text-gray-500 uppercase tracking-wider mb-1 block font-medium">
+                                {fieldLabels[campo] || campo}
+                              </label>
+                              <textarea
+                                value={valor as string}
+                                onChange={(e) => setPdfPreviewData({
+                                  ...pdfPreviewData,
+                                  [campo]: e.target.value
+                                })}
+                                rows={3}
+                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-y"
+                                placeholder={!valor ? '(não encontrado)' : undefined}
+                              />
+                            </div>
+                          )
+                        })}
+                    </div>
+
+                    {/* Botões de Ação */}
+                    <div className="flex gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={() => {
+                          setShowPdfPreview(false)
+                          setPdfPreviewData(null)
+                        }}
+                        className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl font-medium text-gray-700 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleApplyPdfData}
+                        className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 shadow-md"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Aplicar Dados
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
