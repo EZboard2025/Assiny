@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,7 +105,7 @@ FORMATO DE RESPOSTA (JSON válido, sem markdown):
 
 export async function POST(req: Request) {
   try {
-    const { pdfIds } = await req.json()
+    const { pdfIds, companyId } = await req.json()
 
     if (!pdfIds || !Array.isArray(pdfIds) || pdfIds.length === 0) {
       return NextResponse.json(
@@ -115,8 +114,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // Obter company_id do subdomain
-    const companyId = await getCompanyId()
     if (!companyId) {
       return NextResponse.json(
         { error: 'Empresa não identificada' },
@@ -150,7 +147,7 @@ export async function POST(req: Request) {
 
         // Baixar arquivo do storage
         const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-          .from('company-pdfs')
+          .from('company-pdf')
           .download(pdf.file_path)
 
         if (downloadError || !fileData) {

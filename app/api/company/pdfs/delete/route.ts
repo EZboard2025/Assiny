@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 // Usar service role para bypass RLS no storage
 const supabaseAdmin = createClient(
@@ -12,6 +11,7 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const pdfId = searchParams.get('id')
+    const companyId = searchParams.get('companyId')
 
     if (!pdfId) {
       return NextResponse.json(
@@ -20,8 +20,6 @@ export async function DELETE(req: Request) {
       )
     }
 
-    // Obter company_id do subdomain
-    const companyId = await getCompanyId()
     if (!companyId) {
       return NextResponse.json(
         { error: 'Empresa não identificada' },
@@ -49,7 +47,7 @@ export async function DELETE(req: Request) {
 
     // Deletar do Storage
     const { error: storageError } = await supabaseAdmin.storage
-      .from('company-pdfs')
+      .from('company-pdf')
       .remove([pdf.file_path])
 
     if (storageError) {

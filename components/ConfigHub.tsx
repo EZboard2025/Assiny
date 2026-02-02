@@ -523,9 +523,9 @@ function ConfigurationInterface({
   const [editStageObjective, setEditStageObjective] = useState('')
 
   // Carregar PDFs salvos da empresa
-  const loadSavedPdfs = async () => {
+  const loadSavedPdfs = async (companyId: string) => {
     try {
-      const response = await fetch('/api/company/pdfs')
+      const response = await fetch(`/api/company/pdfs?companyId=${companyId}`)
       const result = await response.json()
       if (result.success) {
         setSavedPdfs(result.pdfs || [])
@@ -540,8 +540,14 @@ function ConfigurationInterface({
     loadData()
     loadCompanyData()
     loadTags()
-    loadSavedPdfs()
   }, [])
+
+  // Carregar PDFs quando userCompanyId estiver disponível
+  useEffect(() => {
+    if (userCompanyId) {
+      loadSavedPdfs(userCompanyId)
+    }
+  }, [userCompanyId])
 
   // Carregar subdomínio da empresa do usuário logado (para o link de convite)
   useEffect(() => {
@@ -909,6 +915,11 @@ function ConfigurationInterface({
 
     if (pdfFiles.length === 0) return
 
+    if (!userCompanyId) {
+      showToast('error', 'Erro', 'Empresa não identificada')
+      return
+    }
+
     setPdfUploading(true)
     setPdfError(null)
 
@@ -921,6 +932,7 @@ function ConfigurationInterface({
       for (const file of pdfFiles) {
         const formData = new FormData()
         formData.append('file', file)
+        formData.append('companyId', userCompanyId)
         if (user?.id) {
           formData.append('userId', user.id)
         }
@@ -960,8 +972,13 @@ function ConfigurationInterface({
 
   // Deletar PDF salvo permanentemente
   const handleDeleteSavedPdf = async (pdfId: string) => {
+    if (!userCompanyId) {
+      showToast('error', 'Erro', 'Empresa não identificada')
+      return
+    }
+
     try {
-      const response = await fetch(`/api/company/pdfs/delete?id=${pdfId}`, {
+      const response = await fetch(`/api/company/pdfs/delete?id=${pdfId}&companyId=${userCompanyId}`, {
         method: 'DELETE'
       })
 
@@ -988,6 +1005,11 @@ function ConfigurationInterface({
       return
     }
 
+    if (!userCompanyId) {
+      showToast('error', 'Erro', 'Empresa não identificada')
+      return
+    }
+
     setPdfExtracting(true)
     setPdfError(null)
 
@@ -998,7 +1020,7 @@ function ConfigurationInterface({
       const response = await fetch('/api/company/pdfs/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdfIds })
+        body: JSON.stringify({ pdfIds, companyId: userCompanyId })
       })
 
       const result = await response.json()

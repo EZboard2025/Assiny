@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 // Usar service role para bypass RLS
 const supabaseAdmin = createClient(
@@ -8,10 +7,11 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    // Obter company_id do subdomain
-    const companyId = await getCompanyId()
+    const { searchParams } = new URL(req.url)
+    const companyId = searchParams.get('companyId')
+
     if (!companyId) {
       return NextResponse.json(
         { error: 'Empresa não identificada' },

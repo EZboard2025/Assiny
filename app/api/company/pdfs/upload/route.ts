@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 // Usar service role para bypass RLS no storage
 const supabaseAdmin = createClient(
@@ -15,6 +14,7 @@ export async function POST(req: Request) {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const userId = formData.get('userId') as string | null
+    const companyId = formData.get('companyId') as string | null
 
     if (!file) {
       return NextResponse.json(
@@ -23,8 +23,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // Obter company_id do subdomain
-    const companyId = await getCompanyId()
     if (!companyId) {
       return NextResponse.json(
         { error: 'Empresa não identificada' },
@@ -45,7 +43,7 @@ export async function POST(req: Request) {
 
     // Upload para Supabase Storage
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('company-pdfs')
+      .from('company-pdf')
       .upload(filePath, buffer, {
         contentType: 'application/pdf',
         cacheControl: '3600',
@@ -78,7 +76,7 @@ export async function POST(req: Request) {
     if (dbError) {
       console.error('❌ Erro ao salvar metadados:', dbError)
       // Tentar deletar o arquivo do storage se falhar no banco
-      await supabaseAdmin.storage.from('company-pdfs').remove([filePath])
+      await supabaseAdmin.storage.from('company-pdf').remove([filePath])
       return NextResponse.json(
         { error: 'Erro ao salvar informações do arquivo', details: dbError.message },
         { status: 500 }
