@@ -556,7 +556,7 @@ Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
 
   // 3. Chamar OpenAI com JSON mode
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-4.1',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt }

@@ -111,7 +111,7 @@ export async function evaluateSimpleChallenge(transcription: string): Promise<Si
   const userPrompt = USER_PROMPT_TEMPLATE.replace('{transcription}', transcription)
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini', // Modelo mais rápido e barato para desafios simples
+    model: 'gpt-4.1',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt }
