@@ -30,8 +30,7 @@ export async function POST(request: NextRequest) {
       adminName,
       adminEmail,
       adminPassword,
-      businessType,
-      employeeLimit
+      businessType
     } = body
 
     // Validações - subdomínio não é mais obrigatório (sistema unificado)
@@ -47,7 +46,6 @@ export async function POST(request: NextRequest) {
     // 1. Criar empresa
     const companyData: any = {
       name: companyName,
-      employee_limit: employeeLimit || null,
       subdomain: subdomain || '' // Subdomínio é opcional
     }
 
