@@ -32,6 +32,22 @@ export async function POST(req: Request) {
 
     console.log(`📤 Uploading PDF: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`)
 
+    // Verificar se já existe um PDF com o mesmo nome para esta empresa
+    const { data: existingPdf } = await supabaseAdmin
+      .from('company_pdfs')
+      .select('id, file_name')
+      .eq('company_id', companyId)
+      .eq('file_name', file.name)
+      .single()
+
+    if (existingPdf) {
+      console.log(`⚠️ PDF já existe: ${file.name}`)
+      return NextResponse.json(
+        { error: `Arquivo "${file.name}" já foi enviado anteriormente` },
+        { status: 409 }
+      )
+    }
+
     // Converter File para Buffer
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)

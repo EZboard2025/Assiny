@@ -928,6 +928,10 @@ function ConfigurationInterface({
       const { supabase } = await import('@/lib/supabase')
       const { data: { user } } = await supabase.auth.getUser()
 
+      let uploaded = 0
+      let skipped = 0
+      const skippedNames: string[] = []
+
       // Upload de cada arquivo
       for (const file of pdfFiles) {
         const formData = new FormData()
@@ -944,15 +948,30 @@ function ConfigurationInterface({
 
         const result = await response.json()
 
+        if (response.status === 409) {
+          // Arquivo já existe - pular mas não parar
+          skipped++
+          skippedNames.push(file.name)
+          continue
+        }
+
         if (!response.ok) {
           throw new Error(result.error || `Erro ao fazer upload de ${file.name}`)
         }
 
         // Adicionar à lista de PDFs salvos
         setSavedPdfs(prev => [result.pdf, ...prev])
+        uploaded++
       }
 
-      showToast('success', 'Upload Concluído', `${pdfFiles.length} arquivo(s) salvo(s)`)
+      // Mostrar mensagem apropriada
+      if (uploaded > 0 && skipped === 0) {
+        showToast('success', 'Upload Concluído', `${uploaded} arquivo(s) salvo(s)`)
+      } else if (uploaded > 0 && skipped > 0) {
+        showToast('warning', 'Upload Parcial', `${uploaded} salvo(s), ${skipped} já existia(m)`)
+      } else if (uploaded === 0 && skipped > 0) {
+        showToast('warning', 'Arquivos Duplicados', `${skipped} arquivo(s) já enviado(s) anteriormente`)
+      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
