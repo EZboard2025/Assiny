@@ -230,13 +230,38 @@ export default function PDIView() {
         .map(s => getProcessedEvaluation(s))
         .filter(e => e !== null)
 
-      // Calcular médias gerais
+      // ========== COLETA DE DADOS ENRIQUECIDOS ==========
+
+      // 1. Calcular médias gerais e coletar indicadores detalhados
       let totalScore = 0
       let countScore = 0
       const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
       const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
 
-      allEvaluations.forEach((e: any) => {
+      // Agregadores para indicadores detalhados
+      const indicatorTotals: Record<string, Record<string, number>> = {
+        S: {}, P: {}, I: {}, N: {}
+      }
+      const indicatorCounts: Record<string, Record<string, number>> = {
+        S: {}, P: {}, I: {}, N: {}
+      }
+
+      // Agregadores para objeções
+      const objectionTotals: Record<string, { total: number; count: number }> = {}
+
+      // Coletar missed opportunities
+      const missedOpportunityCounts: Record<string, number> = {}
+
+      // Coletar priority improvements
+      const priorityImprovementsCounts: Record<string, { item: any; count: number }> = {}
+
+      // Executive summaries recentes
+      const recentExecutiveSummaries: string[] = []
+
+      // Performance por temperamento
+      const performanceByTemperament: Record<string, { total: number; count: number }> = {}
+
+      allEvaluations.forEach((e: any, idx: number) => {
         if (e?.overall_score !== undefined) {
           let scoreValue = e.overall_score
           if (scoreValue > 10) scoreValue = scoreValue / 10
@@ -246,10 +271,78 @@ export default function PDIView() {
 
         if (e?.spin_evaluation) {
           const spin = e.spin_evaluation
-          if (spin.S?.final_score !== undefined) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
-          if (spin.P?.final_score !== undefined) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
-          if (spin.I?.final_score !== undefined) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
-          if (spin.N?.final_score !== undefined) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
+          const letters = ['S', 'P', 'I', 'N'] as const
+
+          letters.forEach(letter => {
+            if (spin[letter]?.final_score !== undefined) {
+              spinTotals[letter] += spin[letter].final_score
+              spinCounts[letter]++
+
+              // Coletar indicadores detalhados
+              if (spin[letter]?.indicators) {
+                Object.entries(spin[letter].indicators).forEach(([indicator, score]) => {
+                  if (typeof score === 'number') {
+                    indicatorTotals[letter][indicator] = (indicatorTotals[letter][indicator] || 0) + score
+                    indicatorCounts[letter][indicator] = (indicatorCounts[letter][indicator] || 0) + 1
+                  }
+                })
+              }
+
+              // Coletar missed opportunities
+              if (spin[letter]?.missed_opportunities && Array.isArray(spin[letter].missed_opportunities)) {
+                spin[letter].missed_opportunities.forEach((opp: string) => {
+                  const oppNormalized = opp.toLowerCase().trim()
+                  missedOpportunityCounts[oppNormalized] = (missedOpportunityCounts[oppNormalized] || 0) + 1
+                })
+              }
+            }
+          })
+        }
+
+        // Coletar análise de objeções
+        if (e?.objections_analysis && Array.isArray(e.objections_analysis)) {
+          e.objections_analysis.forEach((obj: any) => {
+            if (obj.objection_type && typeof obj.score === 'number') {
+              const type = obj.objection_type.toLowerCase()
+              if (!objectionTotals[type]) {
+                objectionTotals[type] = { total: 0, count: 0 }
+              }
+              objectionTotals[type].total += obj.score
+              objectionTotals[type].count++
+            }
+          })
+        }
+
+        // Coletar priority improvements
+        if (e?.priority_improvements && Array.isArray(e.priority_improvements)) {
+          e.priority_improvements.forEach((imp: any) => {
+            const key = `${imp.area}:${imp.current_gap}`
+            if (!priorityImprovementsCounts[key]) {
+              priorityImprovementsCounts[key] = { item: imp, count: 0 }
+            }
+            priorityImprovementsCounts[key].count++
+          })
+        }
+
+        // Coletar executive summaries (últimos 3)
+        if (e?.executive_summary && idx >= allEvaluations.length - 3) {
+          recentExecutiveSummaries.push(e.executive_summary)
+        }
+      })
+
+      // Coletar performance por temperamento das sessões
+      completedSessions.forEach((session: any) => {
+        const config = session.config
+        const evaluation = getProcessedEvaluation(session)
+        if (config?.temperament && evaluation?.overall_score !== undefined) {
+          const temp = config.temperament
+          let score = evaluation.overall_score
+          if (score > 10) score = score / 10
+          if (!performanceByTemperament[temp]) {
+            performanceByTemperament[temp] = { total: 0, count: 0 }
+          }
+          performanceByTemperament[temp].total += score
+          performanceByTemperament[temp].count++
         }
       })
 
@@ -258,6 +351,86 @@ export default function PDIView() {
       const spinP = spinCounts.P > 0 ? spinTotals.P / spinCounts.P : 0
       const spinI = spinCounts.I > 0 ? spinTotals.I / spinCounts.I : 0
       const spinN = spinCounts.N > 0 ? spinTotals.N / spinCounts.N : 0
+
+      // 2. Calcular indicador mais fraco por letra SPIN
+      const findWeakestIndicator = (letter: string) => {
+        const indicators = indicatorTotals[letter]
+        const counts = indicatorCounts[letter]
+        let weakestIndicator = 'N/A'
+        let weakestScore = 10
+
+        Object.entries(indicators).forEach(([indicator, total]) => {
+          const count = counts[indicator] || 1
+          const avg = total / count
+          if (avg < weakestScore) {
+            weakestScore = avg
+            weakestIndicator = indicator
+          }
+        })
+
+        return { weakestIndicator, weakestScore: Number(weakestScore.toFixed(1)) }
+      }
+
+      const spinDetailed = {
+        S: { average: Number(spinS.toFixed(1)), ...findWeakestIndicator('S') },
+        P: { average: Number(spinP.toFixed(1)), ...findWeakestIndicator('P') },
+        I: { average: Number(spinI.toFixed(1)), ...findWeakestIndicator('I') },
+        N: { average: Number(spinN.toFixed(1)), ...findWeakestIndicator('N') }
+      }
+
+      // 3. Calcular objeções com pior desempenho
+      const objectionPerformance = Object.entries(objectionTotals)
+        .map(([type, data]) => ({
+          type,
+          averageScore: Number((data.total / data.count).toFixed(1)),
+          count: data.count
+        }))
+        .sort((a, b) => a.averageScore - b.averageScore)
+
+      // 4. Encontrar oportunidades perdidas recorrentes (top 5)
+      const recurringMissedOpportunities = Object.entries(missedOpportunityCounts)
+        .filter(([_, count]) => count >= 2)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([opp, count]) => `${opp} (${count}/${completedSessions.length} sessões)`)
+
+      // 5. Priority improvements mais frequentes
+      const priorityImprovements = Object.values(priorityImprovementsCounts)
+        .filter(({ count }) => count >= 2)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map(({ item, count }) => ({
+          area: item.area,
+          current_gap: item.current_gap,
+          action_plan: item.action_plan,
+          priority: item.priority,
+          count
+        }))
+
+      // 6. Performance por temperamento (média)
+      const temperamentPerformance: Record<string, number> = {}
+      Object.entries(performanceByTemperament).forEach(([temp, data]) => {
+        temperamentPerformance[temp] = Number((data.total / data.count).toFixed(1))
+      })
+
+      // 7. Calcular tendência (comparing last 3 to first 3)
+      let trend: 'improving' | 'stable' | 'declining' = 'stable'
+      if (allEvaluations.length >= 4) {
+        const first3 = allEvaluations.slice(0, 3)
+        const last3 = allEvaluations.slice(-3)
+        const avgFirst = first3.reduce((sum: number, e: any) => {
+          let score = e?.overall_score || 0
+          if (score > 10) score = score / 10
+          return sum + score
+        }, 0) / 3
+        const avgLast = last3.reduce((sum: number, e: any) => {
+          let score = e?.overall_score || 0
+          if (score > 10) score = score / 10
+          return sum + score
+        }, 0) / 3
+        if (avgLast - avgFirst > 0.5) trend = 'improving'
+        else if (avgFirst - avgLast > 0.5) trend = 'declining'
+      }
 
       // Coletar pontos fortes e gaps dos últimos 5 roleplays
       const last5Sessions = completedSessions.slice(-5)
@@ -270,6 +443,18 @@ export default function PDIView() {
         if (e.top_strengths) allStrengths.push(...e.top_strengths)
         if (e.critical_gaps) allGaps.push(...e.critical_gaps)
       })
+
+      // Contar gaps recorrentes
+      const gapCounts: Record<string, number> = {}
+      allGaps.forEach(gap => {
+        const normalized = gap.toLowerCase().trim()
+        gapCounts[normalized] = (gapCounts[normalized] || 0) + 1
+      })
+      const recurringGaps = Object.entries(gapCounts)
+        .filter(([_, count]) => count >= 2)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([gap]) => gap)
 
       const userName = user.user_metadata?.name || user.email?.split('@')[0] || 'Vendedor'
 
@@ -310,36 +495,32 @@ export default function PDIView() {
         `"${o.name}" → Rebatidas: ${Array.isArray(o.rebuttals) ? o.rebuttals.join(', ') : 'N/A'}`
       ).join('\n') || 'Nenhuma objeção cadastrada'
 
-      const resumoTexto = `
-RESUMO DE PERFORMANCE - ${userName}
+      // Construir objeto de performance enriquecido
+      const enrichedPerformance = {
+        totalSessions: completedSessions.length,
+        overallAverage: Number(overallAverage.toFixed(1)),
+        trend,
+        spin: spinDetailed,
+        objectionPerformance,
+        recurringMissedOpportunities,
+        recurringGaps,
+        recentExecutiveSummaries,
+        priorityImprovements,
+        performanceByTemperament: temperamentPerformance,
+        topStrengths: [...new Set(allStrengths)].slice(0, 5),
+        criticalGaps: [...new Set(allGaps)].slice(0, 5)
+      }
 
-DADOS GERAIS:
-- Nome: ${userName}
-- Total de Sessões: ${completedSessions.length}
-- Nota Média Geral: ${overallAverage.toFixed(1)}
-
-MÉDIAS SPIN:
-- Situação (S): ${spinS.toFixed(1)}
-- Problema (P): ${spinP.toFixed(1)}
-- Implicação (I): ${spinI.toFixed(1)}
-- Necessidade (N): ${spinN.toFixed(1)}
-
-PONTOS FORTES RECORRENTES:
-${allStrengths.length > 0 ? allStrengths.map(s => `- ${s}`).join('\n') : '- Nenhum ponto forte identificado ainda'}
-
-GAPS CRÍTICOS RECORRENTES:
-${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap identificado ainda'}
-      `.trim()
-
-      console.log('=== DEBUG PDI ===')
+      console.log('=== DEBUG PDI ENRIQUECIDO ===')
       console.log('Sessões processadas:', completedSessions.length)
-      console.log('SPIN Averages:', { spinS, spinP, spinI, spinN })
-      console.log('Strengths:', allStrengths.length)
-      console.log('Gaps:', allGaps.length)
-      console.log('Resumo formatado:', resumoTexto)
+      console.log('SPIN Detalhado:', spinDetailed)
+      console.log('Objeções:', objectionPerformance)
+      console.log('Oportunidades perdidas recorrentes:', recurringMissedOpportunities.length)
+      console.log('Tendência:', trend)
+      console.log('Performance por temperamento:', temperamentPerformance)
 
-      // Enviar para o webhook do N8N (produção)
-      const response = await fetch('https://ezboard.app.n8n.cloud/webhook/pdi/generate', {
+      // Gerar PDI via API direta (OpenAI)
+      const response = await fetch('/api/pdi/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -347,7 +528,7 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
         body: JSON.stringify({
           userId: user.id,
           userName: userName,
-          resumoPerformance: resumoTexto,
+          enrichedPerformance,
           companyName: companyDataRecord?.nome || 'Empresa',
           companyDescription: companyDataRecord?.descricao || '',
           companyType: companyType?.business_type || 'B2B',
@@ -357,18 +538,14 @@ ${allGaps.length > 0 ? allGaps.map(g => `- ${g}`).join('\n') : '- Nenhum gap ide
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao gerar PDI')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Erro ao gerar PDI')
       }
 
       const pdiResult = await response.json()
 
-      // Processar resposta do N8N (pode vir em diferentes formatos)
-      let parsedPDI = pdiResult
-      if (Array.isArray(pdiResult) && pdiResult[0]?.output) {
-        parsedPDI = JSON.parse(pdiResult[0].output)
-      } else if (pdiResult?.output && typeof pdiResult.output === 'string') {
-        parsedPDI = JSON.parse(pdiResult.output)
-      }
+      // API retorna { success: true, pdi: {...} }
+      let parsedPDI = pdiResult.pdi || pdiResult
 
       // Adicionar dados do vendedor se não vieram no PDI
       if (!parsedPDI.vendedor) {
