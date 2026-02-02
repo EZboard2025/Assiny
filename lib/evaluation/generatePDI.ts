@@ -82,6 +82,30 @@ export interface PDIResult {
     implicacao: number
     necessidade: number
   }
+  // NOVOS CAMPOS - Overview com 5 funcionalidades
+  overview: {
+    causa_raiz: {
+      indicador: string
+      descricao: string
+      impacto: string
+    }
+    gatilhos: {
+      situacoes: string[]
+      comportamentos: string[]
+    }
+    metrica: {
+      kpi_principal: string
+      valor_atual: number
+      valor_meta: number
+      unidade: string
+    }
+    cadencia: {
+      frequencia: string
+      dias_recomendados: string[]
+      duracao_sessao: string
+      total_semanal: number
+    }
+  }
   foco_da_semana: {
     area: string
     motivo: string
@@ -257,6 +281,45 @@ Nota média do vendedor com cada tipo de cliente
 - Se o vendedor tem nota baixa com temperamento X, sugira simulações com esse temperamento
 - Exemplo: "Você tem 4.9 com Determinados - inclua simulações focadas nesse perfil"
 
+### Para o Overview (5 Funcionalidades):
+
+**1. Causa Raiz:**
+- Identifique o indicador SPIN que é a ORIGEM do problema (não apenas o sintoma)
+- Exemplo: Se "Riscos Concretos" está baixo, a causa raiz pode ser "Perguntas Abertas" fracas (não coleta dados suficientes para quantificar riscos)
+- Explique o impacto real nas vendas do vendedor
+
+**2. Gatilhos:**
+- Liste 3 situações específicas que fazem o vendedor errar (ex: "Quando cliente menciona concorrente", "Quando precisa criar urgência")
+- Liste 3 comportamentos problemáticos observados (ex: "Pula direto para solução", "Não quantifica perdas")
+
+**3. Métrica:**
+- Defina O KPI principal que será monitorado
+- IMPORTANTE: Use APENAS métricas que existem no sistema:
+  - "Nota geral" (overall_score)
+  - "Nota em Situação" (S)
+  - "Nota em Problema" (P)
+  - "Nota em Implicação" (I)
+  - "Nota em Necessidade" (N)
+- NUNCA use nomes de indicadores detalhados como "Nota em Riscos Concretos" - esses não existem como métricas isoladas
+- valor_atual = score atual da letra SPIN mais fraca ou nota geral
+- valor_meta = meta AGRESSIVA baseada na nota atual (quanto menor a nota, maior o aumento):
+  - Nota < 4.0: aumentar +1.5 a +2.0 pontos (ex: 3.5 → 5.0)
+  - Nota 4.0-5.5: aumentar +1.0 a +1.5 pontos (ex: 5.0 → 6.5)
+  - Nota 5.5-7.0: aumentar +0.7 a +1.0 pontos (ex: 6.0 → 7.0)
+  - Nota > 7.0: aumentar +0.5 pontos (mínimo) (ex: 7.5 → 8.0)
+- MÍNIMO de aumento: 0.5 pontos
+- unidade = "pontos"
+- Exemplo CORRETO: "Nota em Implicação" com valor_atual 5.3 e valor_meta 6.5
+- Exemplo ERRADO: "Nota em Riscos Concretos" (não existe como métrica)
+
+**4. Cadência:**
+- Recomende frequência baseada na gravidade do gap:
+  - Gap crítico (< 4.0): "Diária" - 14 sessões/semana (2x por dia)
+  - Gap moderado (4.0-5.5): "Diária" - 10 sessões/semana
+  - Gap leve (5.5-6.5): "Diária" - 8 sessões/semana
+- MÍNIMO: 8 sessões por semana (total_semanal >= 8)
+- duracao_sessao deve ser "15-20 minutos"
+
 ---
 
 ## REGRAS CRÍTICAS
@@ -269,15 +332,16 @@ Nota média do vendedor com cada tipo de cliente
 6. Notas sempre com 1 casa decimal (ex: 6.5)
 7. Datas em formato ISO (YYYY-MM-DD)
 8. **CITE indicadores específicos** no diagnóstico e critérios de sucesso
-9. Meta realista: evolução de **+0.3 a +0.5 pontos** em 7 dias
+9. Meta AGRESSIVA: evolução de **+0.5 a +2.0 pontos** em 7 dias (quanto menor a nota, maior o aumento. Mínimo: +0.5)
 10. **TODOS os nomes de indicadores DEVEM estar em PORTUGUÊS** - NUNCA use termos como "concrete_risks_score", "depth_score", etc. Use a tradução: "Riscos Concretos", "Profundidade", etc.
+11. **CADÊNCIA MÍNIMA: 8 sessões por semana** - total_semanal DEVE ser >= 8
 
 ---
 
 ## Estrutura do JSON
 
 {
-  "versao": "pdi.7dias.v3",
+  "versao": "pdi.7dias.v4",
   "gerado_em": "YYYY-MM-DD",
   "periodo": "7 dias",
 
@@ -298,6 +362,30 @@ Nota média do vendedor com cada tipo de cliente
     "problema": number,
     "implicacao": number,
     "necessidade": number
+  },
+
+  "overview": {
+    "causa_raiz": {
+      "indicador": "Nome do indicador SPIN que é a raiz do problema (em PORTUGUÊS)",
+      "descricao": "Explicação clara de por que esse indicador é a causa raiz (2-3 frases)",
+      "impacto": "Como esse gap afeta as vendas reais do vendedor (1-2 frases)"
+    },
+    "gatilhos": {
+      "situacoes": ["Situação 1 que dispara o erro", "Situação 2", "Situação 3"],
+      "comportamentos": ["Comportamento 1 problemático", "Comportamento 2", "Comportamento 3"]
+    },
+    "metrica": {
+      "kpi_principal": "APENAS: Nota geral | Nota em Situação | Nota em Problema | Nota em Implicação | Nota em Necessidade",
+      "valor_atual": number,
+      "valor_meta": number,
+      "unidade": "pontos"
+    },
+    "cadencia": {
+      "frequencia": "Diária",
+      "dias_recomendados": ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"],
+      "duracao_sessao": "15-20 minutos",
+      "total_semanal": 8
+    }
   },
 
   "foco_da_semana": {
@@ -538,7 +626,7 @@ export async function generatePDI(params: PDIParams): Promise<PDIResult> {
 
   // Garantir versão
   if (!pdiResult.versao) {
-    pdiResult.versao = 'pdi.7dias.v3'
+    pdiResult.versao = 'pdi.7dias.v4'
   }
 
   console.log('📊 PDI pronto - Foco:', pdiResult.foco_da_semana?.area,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Target, TrendingUp, Zap, CheckCircle, Calendar, Award, Sparkles, AlertTriangle } from 'lucide-react'
+import { Target, TrendingUp, Zap, CheckCircle, Calendar, Award, Sparkles, AlertTriangle, Search, Activity, BarChart3, Clock, RefreshCw } from 'lucide-react'
 
 interface PDIData {
   versao?: string
@@ -25,6 +25,30 @@ interface PDIData {
     problema: number
     implicacao: number
     necessidade: number
+  }
+  // NOVO: Overview com 5 funcionalidades
+  overview?: {
+    causa_raiz: {
+      indicador: string
+      descricao: string
+      impacto: string
+    }
+    gatilhos: {
+      situacoes: string[]
+      comportamentos: string[]
+    }
+    metrica: {
+      kpi_principal: string
+      valor_atual: number
+      valor_meta: number
+      unidade: string
+    }
+    cadencia: {
+      frequencia: string
+      dias_recomendados: string[]
+      duracao_sessao: string
+      total_semanal: number
+    }
   }
   foco_da_semana: {
     area: string
@@ -62,13 +86,129 @@ interface PDIData {
   proximos_passos?: string
 }
 
+// Interface para dados do Dashboard Tempo Real
+interface WeeklyPerformance {
+  roleplays: Array<{
+    date: string
+    dayName: string
+    score: number
+  }>
+  callsReais: Array<{
+    date: string
+    dayName: string
+    score: number
+  }>
+  aderencia: number
+}
+
 export default function PDIView() {
   const [pdiData, setPdiData] = useState<PDIData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [lastPdiDate, setLastPdiDate] = useState<string | null>(null)
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [weeklyPerformance, setWeeklyPerformance] = useState<WeeklyPerformance | null>(null)
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
   const hasData = pdiData !== null
+
+  // Helper para obter nome do dia da semana
+  const getDayName = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    return days[date.getDay()]
+  }
+
+  // Função para buscar dados do Dashboard (roleplays + calls reais da semana)
+  const loadWeeklyDashboard = async () => {
+    setIsLoadingDashboard(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Calcular início da semana (domingo)
+      const now = new Date()
+      const startOfWeek = new Date(now)
+      startOfWeek.setDate(now.getDate() - now.getDay())
+      startOfWeek.setHours(0, 0, 0, 0)
+
+      // Buscar roleplays da semana
+      const { data: roleplays } = await supabase
+        .from('roleplay_sessions')
+        .select('created_at, evaluation')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .gte('created_at', startOfWeek.toISOString())
+        .order('created_at', { ascending: true })
+
+      // Buscar calls reais (meet_evaluations) da semana
+      const { data: meetEvals } = await supabase
+        .from('meet_evaluations')
+        .select('created_at, overall_score')
+        .eq('user_id', user.id)
+        .gte('created_at', startOfWeek.toISOString())
+        .order('created_at', { ascending: true })
+
+      // Processar roleplays
+      const roleplayData = (roleplays || []).map(rp => {
+        let score = 0
+        if (rp.evaluation) {
+          const evalData = typeof rp.evaluation === 'string'
+            ? JSON.parse(rp.evaluation)
+            : rp.evaluation
+          score = evalData?.overall_score || 0
+          if (score > 10) score = score / 10
+        }
+        return {
+          date: rp.created_at,
+          dayName: getDayName(rp.created_at),
+          score: Number(score.toFixed(1))
+        }
+      })
+
+      // Processar calls reais
+      const callsData = (meetEvals || []).map(me => {
+        let score = me.overall_score || 0
+        if (score > 10) score = score / 10
+        return {
+          date: me.created_at,
+          dayName: getDayName(me.created_at),
+          score: Number(score.toFixed(1))
+        }
+      })
+
+      // Calcular aderência (correlação entre treino e vendas reais)
+      let aderencia = 0
+      if (roleplayData.length > 0 && callsData.length > 0) {
+        const avgRoleplay = roleplayData.reduce((sum, r) => sum + r.score, 0) / roleplayData.length
+        const avgCalls = callsData.reduce((sum, c) => sum + c.score, 0) / callsData.length
+        // Aderência = % de similaridade entre treino e vendas reais
+        // Se as médias são próximas, o treino está funcionando
+        const diff = Math.abs(avgRoleplay - avgCalls)
+        aderencia = Math.max(0, Math.round((1 - diff / 10) * 100))
+      } else if (roleplayData.length > 0) {
+        // Se só tem roleplay, aderência baseada na consistência do treino
+        aderencia = Math.min(100, Math.round(roleplayData.length * 15))
+      }
+
+      setWeeklyPerformance({
+        roleplays: roleplayData,
+        callsReais: callsData,
+        aderencia
+      })
+    } catch (error) {
+      console.error('Erro ao carregar dashboard:', error)
+    } finally {
+      setIsLoadingDashboard(false)
+    }
+  }
+
+  // Carregar dashboard quando componente montar e a cada 30 segundos
+  useEffect(() => {
+    loadWeeklyDashboard()
+    const interval = setInterval(loadWeeklyDashboard, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Carregar PDI mais recente ao montar o componente
   useEffect(() => {
@@ -907,6 +1047,201 @@ export default function PDIView() {
               {hasData ? pdiData.diagnostico.resumo : 'O resumo do seu diagnóstico aparecerá aqui após a geração do PDI...'}
             </p>
           </div>
+        </div>
+
+        {/* OVERVIEW - 5 Funcionalidades */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+              <Activity className="w-5 h-5 text-indigo-600" />
+            </div>
+            Visão Estratégica
+          </h2>
+
+          {/* Linha 1: Causa Raiz (grande) + Gatilhos (grande) */}
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            {/* 1. Causa Raiz */}
+            <div className="p-5 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border border-red-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <Search className="w-5 h-5 text-red-600" />
+                </div>
+                <h3 className="text-base font-bold text-red-800">Causa Raiz</h3>
+              </div>
+              {hasData && pdiData.overview?.causa_raiz ? (
+                <>
+                  <p className="text-red-700 font-semibold text-base mb-2">{pdiData.overview.causa_raiz.indicador}</p>
+                  <p className="text-gray-700 text-sm leading-relaxed mb-3">{pdiData.overview.causa_raiz.descricao}</p>
+                  <div className="p-2 bg-red-100/50 rounded-lg border-l-2 border-red-400">
+                    <p className="text-red-700 text-sm">{pdiData.overview.causa_raiz.impacto}</p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-400 text-sm">Indicador origem do problema será identificado após gerar o PDI...</p>
+              )}
+            </div>
+
+            {/* 2. Gatilhos */}
+            <div className="p-5 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border border-amber-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-amber-600" />
+                </div>
+                <h3 className="text-base font-bold text-amber-800">Gatilhos</h3>
+              </div>
+              {hasData && pdiData.overview?.gatilhos ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-amber-800 text-xs font-bold uppercase tracking-wide mb-2 pb-1 border-b border-amber-200">Situações</p>
+                    <ul className="space-y-2">
+                      {pdiData.overview.gatilhos.situacoes.map((s, i) => (
+                        <li key={i} className="text-gray-700 text-sm pl-3 border-l-2 border-amber-300">{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-amber-800 text-xs font-bold uppercase tracking-wide mb-2 pb-1 border-b border-amber-200">Comportamentos</p>
+                    <ul className="space-y-2">
+                      {pdiData.overview.gatilhos.comportamentos.map((c, i) => (
+                        <li key={i} className="text-gray-700 text-sm pl-3 border-l-2 border-amber-300">{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm">Gatilhos que disparam erros serão identificados...</p>
+              )}
+            </div>
+          </div>
+
+          {/* Linha 2: Métrica + Cadência */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* 3. Métrica */}
+            <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                </div>
+                <h3 className="text-base font-bold text-blue-800">Métrica</h3>
+              </div>
+              {hasData && pdiData.overview?.metrica ? (
+                <>
+                  <p className="text-blue-700 font-semibold text-sm mb-3">{pdiData.overview.metrica.kpi_principal}</p>
+                  <div className="flex items-center justify-center gap-3 p-3 bg-white rounded-lg">
+                    <div className="text-center">
+                      <p className="text-xs text-gray-500 mb-1">Atual</p>
+                      <span className="text-orange-600 font-bold text-2xl">{pdiData.overview.metrica.valor_atual}</span>
+                    </div>
+                    <span className="text-gray-400 text-xl">→</span>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-500 mb-1">Meta</p>
+                      <span className="text-green-600 font-bold text-2xl">{pdiData.overview.metrica.valor_meta}</span>
+                    </div>
+                  </div>
+                  <p className="text-center text-gray-500 text-xs mt-2">{pdiData.overview.metrica.unidade}</p>
+                </>
+              ) : (
+                <p className="text-gray-400 text-sm">KPI principal a ser monitorado...</p>
+              )}
+            </div>
+
+            {/* 4. Cadência */}
+            <div className="p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-green-600" />
+                </div>
+                <h3 className="text-base font-bold text-green-800">Cadência</h3>
+              </div>
+              {hasData && pdiData.overview?.cadencia ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">Frequência</span>
+                    <span className="text-green-700 font-semibold text-sm">{pdiData.overview.cadencia.frequencia}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">Dias</span>
+                    <span className="text-green-700 font-medium text-sm">{pdiData.overview.cadencia.dias_recomendados.join(', ')}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">Duração</span>
+                    <span className="text-green-700 font-medium text-sm">{pdiData.overview.cadencia.duracao_sessao}</span>
+                  </div>
+                  <div className="pt-2 border-t border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-green-800 font-semibold text-sm">Total semanal</span>
+                      <span className="text-green-700 font-bold text-lg">{pdiData.overview.cadencia.total_semanal} sessões</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm">Frequência recomendada de prática...</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* DASHBOARD TEMPO REAL - % de Conclusão da Cadência */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                <Activity className="w-5 h-5 text-purple-600" />
+              </div>
+              Progresso da Cadência
+            </h2>
+            <button
+              onClick={loadWeeklyDashboard}
+              disabled={isLoadingDashboard}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
+              Atualizar
+            </button>
+          </div>
+
+          {/* % de Conclusão da Cadência */}
+          {(() => {
+            const metaSemanal = pdiData?.overview?.cadencia?.total_semanal || pdiData?.meta_semanal?.total_simulacoes || 4
+            const sessoesFeitas = weeklyPerformance?.roleplays?.length || 0
+            const percentual = Math.min(100, Math.round((sessoesFeitas / metaSemanal) * 100))
+
+            return (
+              <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <span className="text-purple-700 font-semibold text-lg">Conclusão da Cadência</span>
+                    <p className="text-gray-500 text-sm mt-1">
+                      {sessoesFeitas} de {metaSemanal} sessões esta semana
+                    </p>
+                  </div>
+                  <span className={`text-4xl font-bold ${
+                    percentual >= 100 ? 'text-green-600' :
+                    percentual >= 50 ? 'text-yellow-600' : 'text-purple-600'
+                  }`}>
+                    {percentual}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${
+                      percentual >= 100 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                      percentual >= 50 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
+                      'bg-gradient-to-r from-purple-500 to-indigo-500'
+                    }`}
+                    style={{ width: `${percentual}%` }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600 mt-3">
+                  {percentual >= 100
+                    ? 'Meta da semana alcançada! Continue praticando para manter a consistência.'
+                    : percentual >= 50
+                    ? `Você está no caminho certo! Faltam ${metaSemanal - sessoesFeitas} sessões para completar a meta.`
+                    : `Faltam ${metaSemanal - sessoesFeitas} sessões para atingir a meta semanal.`}
+                </p>
+              </div>
+            )
+          })()}
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
