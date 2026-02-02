@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 
 // Função para extrair texto de PDF usando pdf-parse
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  // Dynamic import com type assertion para evitar problemas com ESM
-  const pdfParseModule = await import('pdf-parse')
-  const pdfParse = (pdfParseModule as unknown as { default: (buffer: Buffer) => Promise<{ text: string }> }).default
+  // Usar require para compatibilidade com pdf-parse
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require('pdf-parse')
   const data = await pdfParse(buffer)
   return data.text || ''
 }
