@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-// @ts-expect-error - pdf-parse types are incomplete
-import pdf from 'pdf-parse'
+
+// Usar require para pdf-parse (não suporta ESM)
+const pdf = require('pdf-parse/lib/pdf-parse')
 
 // Configuração para permitir uploads grandes (até 100MB)
 export const config = {
