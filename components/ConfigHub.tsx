@@ -481,9 +481,20 @@ function ConfigurationInterface({
   const [aiConfidence, setAIConfidence] = useState<Record<string, number>>({})
   const [aiError, setAIError] = useState<string | null>(null)
 
+  // Interface para PDFs salvos no banco
+  interface SavedPdf {
+    id: string
+    file_name: string
+    file_path: string
+    file_size: number
+    uploaded_at: string
+  }
+
   // Estados para Upload de PDFs e Extração com IA
+  const [savedPdfs, setSavedPdfs] = useState<SavedPdf[]>([])
   const [uploadedPdfs, setUploadedPdfs] = useState<File[]>([])
   const [pdfExtracting, setPdfExtracting] = useState(false)
+  const [pdfUploading, setPdfUploading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
   const [pdfPreviewData, setPdfPreviewData] = useState<typeof companyData | null>(null)
@@ -511,11 +522,25 @@ function ConfigurationInterface({
   const [editStageDescription, setEditStageDescription] = useState('')
   const [editStageObjective, setEditStageObjective] = useState('')
 
+  // Carregar PDFs salvos da empresa
+  const loadSavedPdfs = async () => {
+    try {
+      const response = await fetch('/api/company/pdfs')
+      const result = await response.json()
+      if (result.success) {
+        setSavedPdfs(result.pdfs || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar PDFs:', error)
+    }
+  }
+
   // Carregar dados do Supabase
   useEffect(() => {
     loadData()
     loadCompanyData()
     loadTags()
+    loadSavedPdfs()
   }, [])
 
   // Carregar subdomínio da empresa do usuário logado (para o link de convite)
@@ -871,8 +896,8 @@ function ConfigurationInterface({
     showToast('success', 'Dados Aplicados', 'Revise e salve os dados')
   }
 
-  // Manipular upload de PDFs
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Manipular upload de PDFs - salva permanentemente no Supabase Storage
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
 
@@ -882,20 +907,83 @@ function ConfigurationInterface({
       showToast('warning', 'Formato Inválido', 'Apenas arquivos PDF são aceitos')
     }
 
-    if (pdfFiles.length > 0) {
-      setUploadedPdfs(prev => [...prev, ...pdfFiles])
-      setPdfError(null)
+    if (pdfFiles.length === 0) return
+
+    setPdfUploading(true)
+    setPdfError(null)
+
+    try {
+      // Obter userId para o upload
+      const { supabase } = await import('@/lib/supabase')
+      const { data: { user } } = await supabase.auth.getUser()
+
+      // Upload de cada arquivo
+      for (const file of pdfFiles) {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (user?.id) {
+          formData.append('userId', user.id)
+        }
+
+        const response = await fetch('/api/company/pdfs/upload', {
+          method: 'POST',
+          body: formData
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || `Erro ao fazer upload de ${file.name}`)
+        }
+
+        // Adicionar à lista de PDFs salvos
+        setSavedPdfs(prev => [result.pdf, ...prev])
+      }
+
+      showToast('success', 'Upload Concluído', `${pdfFiles.length} arquivo(s) salvo(s)`)
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      setPdfError(errorMessage)
+      showToast('error', 'Erro no Upload', errorMessage)
+    } finally {
+      setPdfUploading(false)
+      // Limpar input
+      e.target.value = ''
     }
   }
 
-  // Remover PDF da lista
+  // Remover PDF da lista local (não usado mais, mantido por compatibilidade)
   const handleRemovePdf = (index: number) => {
     setUploadedPdfs(prev => prev.filter((_, i) => i !== index))
   }
 
+  // Deletar PDF salvo permanentemente
+  const handleDeleteSavedPdf = async (pdfId: string) => {
+    try {
+      const response = await fetch(`/api/company/pdfs/delete?id=${pdfId}`, {
+        method: 'DELETE'
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao deletar PDF')
+      }
+
+      // Remover da lista
+      setSavedPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
+      showToast('success', 'PDF Removido', 'Arquivo deletado com sucesso')
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      showToast('error', 'Erro', errorMessage)
+    }
+  }
+
   // Extrair informações dos PDFs com IA
   const handlePdfExtract = async () => {
-    if (uploadedPdfs.length === 0) {
+    if (savedPdfs.length === 0) {
       showToast('warning', 'Nenhum PDF', 'Faça upload de pelo menos um arquivo PDF')
       return
     }
@@ -904,14 +992,13 @@ function ConfigurationInterface({
     setPdfError(null)
 
     try {
-      const formData = new FormData()
-      uploadedPdfs.forEach((pdf, index) => {
-        formData.append(`pdf_${index}`, pdf)
-      })
+      // Usar a nova API que extrai dos PDFs salvos no storage
+      const pdfIds = savedPdfs.map(pdf => pdf.id)
 
-      const response = await fetch('/api/company/extract-from-pdf', {
+      const response = await fetch('/api/company/pdfs/extract', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfIds })
       })
 
       const result = await response.json()
@@ -4601,20 +4688,29 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </label>
                 </div>
 
-                {/* Lista de PDFs Uploaded */}
-                {uploadedPdfs.length > 0 && (
+                {/* Loading de Upload */}
+                {pdfUploading && (
+                  <div className="mb-4 flex items-center gap-2 text-purple-600">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Salvando arquivo(s)...</span>
+                  </div>
+                )}
+
+                {/* Lista de PDFs Salvos */}
+                {savedPdfs.length > 0 && (
                   <div className="mb-4 space-y-2">
-                    <p className="text-xs font-medium text-gray-600">{uploadedPdfs.length} arquivo(s) selecionado(s):</p>
-                    {uploadedPdfs.map((pdf, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg border border-purple-100">
+                    <p className="text-xs font-medium text-gray-600">{savedPdfs.length} arquivo(s) salvo(s):</p>
+                    {savedPdfs.map((pdf) => (
+                      <div key={pdf.id} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg border border-purple-100">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-purple-600" />
-                          <span className="text-sm text-gray-700 truncate max-w-[200px]">{pdf.name}</span>
-                          <span className="text-xs text-gray-400">({(pdf.size / 1024).toFixed(0)} KB)</span>
+                          <span className="text-sm text-gray-700 truncate max-w-[200px]">{pdf.file_name}</span>
+                          <span className="text-xs text-gray-400">({(pdf.file_size / 1024).toFixed(0)} KB)</span>
                         </div>
                         <button
-                          onClick={() => handleRemovePdf(index)}
+                          onClick={() => handleDeleteSavedPdf(pdf.id)}
                           className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          title="Remover arquivo"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -4634,9 +4730,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="flex gap-3">
                   <button
                     onClick={handlePdfExtract}
-                    disabled={uploadedPdfs.length === 0 || pdfExtracting}
+                    disabled={savedPdfs.length === 0 || pdfExtracting || pdfUploading}
                     className={`flex-1 group relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                      uploadedPdfs.length > 0 && !pdfExtracting
+                      savedPdfs.length > 0 && !pdfExtracting && !pdfUploading
                         ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02]'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
@@ -5669,7 +5765,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
                       <p className="text-sm text-green-700 flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
-                        Dados extraídos de {uploadedPdfs.length} PDF(s)! Revise antes de aplicar.
+                        Dados extraídos de {savedPdfs.length} PDF(s)! Revise antes de aplicar.
                       </p>
                     </div>
 

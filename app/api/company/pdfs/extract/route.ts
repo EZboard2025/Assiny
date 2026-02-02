@@ -1,4 +1,15 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+
+export const maxDuration = 60
 
 // Função para extrair texto de PDF usando pdf-parse
 async function extractPdfText(buffer: Buffer): Promise<string> {
@@ -8,11 +19,6 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   const data = await pdfParse(buffer)
   return data.text || ''
 }
-
-// Aumentar limite de timeout para Next.js App Router
-export const maxDuration = 60 // 60 segundos de timeout
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 const SYSTEM_PROMPT = `Você é um extrator de dados de empresas especializado em analisar documentos corporativos (apresentações, playbooks, materiais de vendas, etc).
 
@@ -100,70 +106,91 @@ FORMATO DE RESPOSTA (JSON válido, sem markdown):
 
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData()
+    const { pdfIds } = await req.json()
 
-    // Coletar todos os PDFs do FormData
-    const pdfFiles: File[] = []
-    for (const [key, value] of formData.entries()) {
-      if (key.startsWith('pdf_') && value instanceof File) {
-        pdfFiles.push(value)
-      }
-    }
-
-    if (pdfFiles.length === 0) {
+    if (!pdfIds || !Array.isArray(pdfIds) || pdfIds.length === 0) {
       return NextResponse.json(
-        { error: 'Nenhum arquivo PDF enviado' },
+        { error: 'IDs dos PDFs são obrigatórios' },
         { status: 400 }
       )
     }
 
-    console.log(`📄 Processando ${pdfFiles.length} arquivo(s) PDF...`)
+    // Obter company_id do subdomain
+    const companyId = await getCompanyId()
+    if (!companyId) {
+      return NextResponse.json(
+        { error: 'Empresa não identificada' },
+        { status: 400 }
+      )
+    }
 
-    // Extrair texto de cada PDF
+    // Buscar PDFs do banco
+    const { data: pdfs, error: fetchError } = await supabaseAdmin
+      .from('company_pdfs')
+      .select('*')
+      .in('id', pdfIds)
+      .eq('company_id', companyId)
+
+    if (fetchError || !pdfs || pdfs.length === 0) {
+      return NextResponse.json(
+        { error: 'PDFs não encontrados' },
+        { status: 404 }
+      )
+    }
+
+    console.log(`📄 Processando ${pdfs.length} PDF(s) do storage...`)
+
+    // Baixar e extrair texto de cada PDF
     let allText = ''
     const processedFiles: string[] = []
 
-    for (const file of pdfFiles) {
+    for (const pdf of pdfs) {
       try {
-        console.log(`📖 Lendo: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`)
+        console.log(`📖 Baixando: ${pdf.file_name}`)
 
-        // Converter File para Buffer
-        const arrayBuffer = await file.arrayBuffer()
+        // Baixar arquivo do storage
+        const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+          .from('company-pdfs')
+          .download(pdf.file_path)
+
+        if (downloadError || !fileData) {
+          console.error(`❌ Erro ao baixar ${pdf.file_name}:`, downloadError)
+          continue
+        }
+
+        // Converter para Buffer
+        const arrayBuffer = await fileData.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
 
-        // Extrair texto do PDF
+        // Extrair texto
         const text = (await extractPdfText(buffer)).trim()
 
         if (text.length > 0) {
-          allText += `\n\n===== ARQUIVO: ${file.name} =====\n\n${text}`
-          processedFiles.push(file.name)
-          console.log(`✅ ${file.name}: ${text.length} caracteres extraídos`)
+          allText += `\n\n===== ARQUIVO: ${pdf.file_name} =====\n\n${text}`
+          processedFiles.push(pdf.file_name)
+          console.log(`✅ ${pdf.file_name}: ${text.length} caracteres extraídos`)
         } else {
-          console.log(`⚠️ ${file.name}: PDF sem texto extraível (pode ser imagem)`)
+          console.log(`⚠️ ${pdf.file_name}: PDF sem texto extraível`)
         }
       } catch (pdfError) {
-        console.error(`❌ Erro ao processar ${file.name}:`, pdfError)
-        // Continua para o próximo arquivo
+        console.error(`❌ Erro ao processar ${pdf.file_name}:`, pdfError)
       }
     }
 
     if (allText.length < 100) {
       return NextResponse.json(
-        { error: 'Não foi possível extrair texto suficiente dos PDFs. Verifique se os arquivos contêm texto (não apenas imagens).' },
+        { error: 'Não foi possível extrair texto suficiente dos PDFs.' },
         { status: 422 }
       )
     }
 
-    // Limitar texto total para não exceder tokens (GPT-4 suporta ~128k tokens)
-    // 150.000 caracteres ≈ 37.500 tokens, deixa margem para resposta
+    // Limitar texto (150k chars ≈ 37.5k tokens)
     const maxChars = 150000
     if (allText.length > maxChars) {
-      allText = allText.substring(0, maxChars) + '\n\n[... conteúdo truncado por exceder limite ...]'
+      allText = allText.substring(0, maxChars) + '\n\n[... conteúdo truncado ...]'
     }
 
     console.log(`📊 Total extraído: ${allText.length} caracteres de ${processedFiles.length} arquivo(s)`)
-
-    // Processar com OpenAI
     console.log('🤖 Enviando para GPT-4...')
 
     const userPrompt = `TAREFA: Analisar os documentos da empresa abaixo e extrair informações EXPLÍCITAS.
@@ -209,7 +236,7 @@ Retorne o JSON conforme instruído.`
       const openaiData = await openaiResponse.json()
       const extractedData = JSON.parse(openaiData.choices[0].message.content)
 
-      console.log('✅ Dados extraídos com sucesso dos PDFs!')
+      console.log('✅ Dados extraídos com sucesso!')
 
       return NextResponse.json({
         success: true,
@@ -241,10 +268,10 @@ Retorne o JSON conforme instruído.`
     }
 
   } catch (error) {
-    console.error('💥 Erro geral na extração de PDF:', error)
+    console.error('💥 Erro geral na extração:', error)
     return NextResponse.json(
       {
-        error: 'Erro ao processar arquivos PDF',
+        error: 'Erro ao processar PDFs',
         details: error instanceof Error ? error.message : 'Erro desconhecido'
       },
       { status: 500 }
