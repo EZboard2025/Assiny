@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 
-// Usar require para pdf-parse (não suporta ESM)
-const pdf = require('pdf-parse/lib/pdf-parse')
+// Função para extrair texto de PDF usando pdf-parse
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  // Dynamic import para evitar problemas com ESM
+  const pdfParse = (await import('pdf-parse')).default
+  const data = await pdfParse(buffer)
+  return data.text || ''
+}
 
 // Configuração para permitir uploads grandes (até 100MB)
 export const config = {
@@ -133,8 +138,7 @@ export async function POST(req: Request) {
         const buffer = Buffer.from(arrayBuffer)
 
         // Extrair texto do PDF
-        const pdfData = await pdf(buffer)
-        const text = pdfData.text?.trim() || ''
+        const text = (await extractPdfText(buffer)).trim()
 
         if (text.length > 0) {
           allText += `\n\n===== ARQUIVO: ${file.name} =====\n\n${text}`
