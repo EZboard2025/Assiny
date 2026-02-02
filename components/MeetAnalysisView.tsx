@@ -28,7 +28,7 @@ const VEXA_API_URL = isDevelopment
   : '/vexa-api'              // Production (proxied via Nginx)
 const VEXA_API_KEY = 'q7ZeKSTwiAhjPH1pMFNmNNgx5bPdyDYBv5Nl8jZ5'
 
-type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'error'
+type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'evaluating' | 'error'
 
 interface TranscriptSegment {
   speaker: string
@@ -42,6 +42,36 @@ interface MeetingSession {
   status: BotStatus
   startTime?: Date
   transcript: TranscriptSegment[]
+}
+
+interface MeetEvaluation {
+  overall_score: number
+  performance_level: string
+  executive_summary: string
+  top_strengths: string[]
+  critical_gaps: string[]
+  spin_evaluation: {
+    S: { final_score: number; technical_feedback: string }
+    P: { final_score: number; technical_feedback: string }
+    I: { final_score: number; technical_feedback: string }
+    N: { final_score: number; technical_feedback: string }
+  }
+  objections_analysis: Array<{
+    objection_type: string
+    objection_text: string
+    score: number
+    detailed_analysis: string
+  }>
+  priority_improvements: Array<{
+    area: string
+    current_gap: string
+    action_plan: string
+    priority: string
+  }>
+  seller_identification?: {
+    name: string
+    speaking_time_percentage: number
+  }
 }
 
 // Consolidate consecutive messages from the same speaker
@@ -83,6 +113,8 @@ export default function MeetAnalysisView() {
   const [session, setSession] = useState<MeetingSession | null>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
+  const [isEvaluating, setIsEvaluating] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -272,7 +304,7 @@ export default function MeetAnalysisView() {
     }
   }
 
-  // End session
+  // End session and evaluate
   const endSession = async () => {
     stopPolling()
 
@@ -288,7 +320,62 @@ export default function MeetAnalysisView() {
       }
     }
 
-    setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+    // Set status to evaluating and trigger evaluation
+    setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
+
+    // Only evaluate if there's a transcript
+    if (session && session.transcript.length > 0) {
+      await evaluateTranscript()
+    } else {
+      setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+    }
+  }
+
+  // Evaluate the transcript
+  const evaluateTranscript = async () => {
+    if (!session || session.transcript.length === 0) return
+
+    setIsEvaluating(true)
+    setError('')
+
+    try {
+      // Format transcript for evaluation
+      const transcriptText = session.transcript
+        .map(s => `${s.speaker}: ${s.text}`)
+        .join('\n')
+
+      console.log('📊 Enviando transcrição para avaliação...')
+
+      const response = await fetch('/api/meet/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: transcriptText,
+          meetingId: session.meetingId
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao avaliar reunião')
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.evaluation) {
+        console.log('✅ Avaliação recebida:', data.evaluation.overall_score)
+        setEvaluation(data.evaluation)
+      } else {
+        throw new Error('Resposta inválida da API')
+      }
+
+    } catch (err: any) {
+      console.error('❌ Erro na avaliação:', err)
+      setError(`Erro ao avaliar: ${err.message}`)
+    } finally {
+      setIsEvaluating(false)
+      setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+    }
   }
 
   // Reset session
@@ -298,6 +385,8 @@ export default function MeetAnalysisView() {
     setMeetUrl('')
     setMeetingId('')
     setError('')
+    setEvaluation(null)
+    setIsEvaluating(false)
   }
 
   // Copy meeting ID
@@ -329,6 +418,7 @@ export default function MeetAnalysisView() {
       joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600' },
       in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600' },
       transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600' },
+      evaluating: { icon: Loader2, text: 'Avaliando performance...', color: 'text-purple-600' },
       ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600' },
       error: { icon: XCircle, text: 'Erro', color: 'text-red-600' }
     }
@@ -338,7 +428,7 @@ export default function MeetAnalysisView() {
 
     return (
       <div className={`flex items-center gap-2 ${config.color}`}>
-        <Icon className={`w-5 h-5 ${session.status === 'sending' || session.status === 'joining' ? 'animate-spin' : ''}`} />
+        <Icon className={`w-5 h-5 ${session.status === 'sending' || session.status === 'joining' || session.status === 'evaluating' ? 'animate-spin' : ''}`} />
         <span className="font-medium">{config.text}</span>
       </div>
     )
@@ -540,14 +630,190 @@ export default function MeetAnalysisView() {
               </div>
             </div>
 
-            {/* Actions when ended */}
-            {session.status === 'ended' && session.transcript.length > 0 && (
+            {/* Evaluation Loading */}
+            {(session.status === 'evaluating' || isEvaluating) && (
+              <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Avaliando Performance...</h3>
+                    <p className="text-gray-600 text-sm">Analisando a reunião com metodologia SPIN Selling</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Evaluation Results */}
+            {session.status === 'ended' && evaluation && (
+              <div className="space-y-4">
+                {/* Score Header */}
+                <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-2xl font-bold mb-1">Avaliação da Reunião</h3>
+                      {evaluation.seller_identification?.name && (
+                        <p className="text-purple-200">Vendedor: {evaluation.seller_identification.name}</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-5xl font-bold">{evaluation.overall_score?.toFixed(1)}</div>
+                      <div className="text-purple-200 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SPIN Scores */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h4 className="text-lg font-bold text-gray-900 mb-4">Metodologia SPIN</h4>
+                  <div className="grid grid-cols-4 gap-4">
+                    {['S', 'P', 'I', 'N'].map((letter) => {
+                      const score = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]?.final_score || 0
+                      const color = score >= 7 ? 'text-green-600 bg-green-50' : score >= 5 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50'
+                      const labels: Record<string, string> = {
+                        S: 'Situação',
+                        P: 'Problema',
+                        I: 'Implicação',
+                        N: 'Necessidade'
+                      }
+                      return (
+                        <div key={letter} className={`rounded-xl p-4 ${color.split(' ')[1]}`}>
+                          <div className={`text-3xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
+                          <div className="text-gray-600 text-sm font-medium">{labels[letter]}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Executive Summary */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h4 className="text-lg font-bold text-gray-900 mb-3">Resumo Executivo</h4>
+                  <p className="text-gray-700 whitespace-pre-line">{evaluation.executive_summary}</p>
+                </div>
+
+                {/* Strengths & Gaps */}
+                <div className="grid grid-cols-2 gap-4">
+                  {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
+                    <div className="bg-green-50 rounded-xl p-5 border border-green-200">
+                      <h4 className="text-md font-bold text-green-800 mb-3">Pontos Fortes</h4>
+                      <ul className="space-y-2">
+                        {evaluation.top_strengths.map((strength, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-green-700 text-sm">
+                            <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{strength}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
+                    <div className="bg-red-50 rounded-xl p-5 border border-red-200">
+                      <h4 className="text-md font-bold text-red-800 mb-3">Gaps Críticos</h4>
+                      <ul className="space-y-2">
+                        {evaluation.critical_gaps.map((gap, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-red-700 text-sm">
+                            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{gap}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Objections Analysis */}
+                {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
+                  <div className="bg-white rounded-xl p-6 border border-gray-200">
+                    <h4 className="text-lg font-bold text-gray-900 mb-4">Análise de Objeções</h4>
+                    <div className="space-y-4">
+                      {evaluation.objections_analysis.map((obj, idx) => (
+                        <div key={idx} className="border-l-4 border-purple-400 pl-4 py-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">
+                              {obj.objection_type}
+                            </span>
+                            <span className={`text-sm font-bold ${obj.score >= 7 ? 'text-green-600' : obj.score >= 5 ? 'text-amber-600' : 'text-red-600'}`}>
+                              Nota: {obj.score}/10
+                            </span>
+                          </div>
+                          <p className="text-gray-600 text-sm italic mb-2">"{obj.objection_text}"</p>
+                          <p className="text-gray-700 text-sm">{obj.detailed_analysis}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Priority Improvements */}
+                {evaluation.priority_improvements && evaluation.priority_improvements.length > 0 && (
+                  <div className="bg-amber-50 rounded-xl p-6 border border-amber-200">
+                    <h4 className="text-lg font-bold text-amber-800 mb-4">Melhorias Prioritárias</h4>
+                    <div className="space-y-3">
+                      {evaluation.priority_improvements.map((imp, idx) => (
+                        <div key={idx} className="bg-white rounded-lg p-4 border border-amber-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                              imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                              imp.priority === 'high' ? 'bg-amber-100 text-amber-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {imp.priority}
+                            </span>
+                            <span className="font-semibold text-gray-900">{imp.area}</span>
+                          </div>
+                          <p className="text-gray-600 text-sm mb-1"><strong>Gap:</strong> {imp.current_gap}</p>
+                          <p className="text-gray-700 text-sm"><strong>Plano:</strong> {imp.action_plan}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => {
+                      const text = session.transcript
+                        .map(s => `${s.speaker}: ${s.text}`)
+                        .join('\n')
+                      navigator.clipboard.writeText(text)
+                    }}
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copiar Transcrição
+                  </button>
+                  <button
+                    onClick={resetSession}
+                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-gray-200 font-medium"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Nova Análise
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Session ended without evaluation (no transcript) */}
+            {session.status === 'ended' && !evaluation && session.transcript.length > 0 && !isEvaluating && (
               <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Sessão Encerrada</h3>
                 <p className="text-gray-600 mb-4">
-                  A transcrição foi capturada com sucesso. Você pode:
+                  A transcrição foi capturada. Você pode avaliar a performance ou copiar a transcrição.
                 </p>
                 <div className="flex gap-3">
+                  <button
+                    onClick={evaluateTranscript}
+                    disabled={isEvaluating}
+                    className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium disabled:opacity-50"
+                  >
+                    {isEvaluating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    Avaliar Performance
+                  </button>
                   <button
                     onClick={() => {
                       const text = session.transcript
