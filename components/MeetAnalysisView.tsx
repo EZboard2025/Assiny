@@ -330,33 +330,38 @@ export default function MeetAnalysisView() {
 
     // Wait for Recall.ai to process the final transcript
     console.log('⏳ Aguardando processamento da transcrição final...')
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    await new Promise(resolve => setTimeout(resolve, 5000)) // Increased wait time
 
     // Fetch the final transcript
     let transcriptToEvaluate: TranscriptSegment[] = []
+    let localTranscriptLength = 0
 
     // First, get current session transcript
     setSession(prev => {
       if (prev) {
         transcriptToEvaluate = prev.transcript
+        localTranscriptLength = prev.transcript.length
       }
       return prev
     })
 
-    // If local transcript is empty, try to fetch from API
-    if (transcriptToEvaluate.length === 0) {
-      console.log('📡 Buscando transcrição final da API...')
-      try {
-        const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
-        const data = await response.json()
-        if (data.transcript && data.transcript.length > 0) {
+    // ALWAYS try to fetch from Recall.ai API to get complete transcript
+    console.log(`📡 Buscando transcrição completa da API (local tem ${localTranscriptLength} segmentos)...`)
+    try {
+      const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
+      const data = await response.json()
+      if (data.transcript && data.transcript.length > 0) {
+        // Use API transcript if it has more data than local
+        if (data.transcript.length >= localTranscriptLength) {
           transcriptToEvaluate = data.transcript
           setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
-          console.log(`✅ Transcrição recuperada: ${data.transcript.length} segmentos`)
+          console.log(`✅ Transcrição da API: ${data.transcript.length} segmentos (melhor que local: ${localTranscriptLength})`)
+        } else {
+          console.log(`📝 Mantendo transcrição local: ${localTranscriptLength} segmentos (API: ${data.transcript.length})`)
         }
-      } catch (err) {
-        console.error('Error fetching final transcript:', err)
       }
+    } catch (err) {
+      console.error('Error fetching final transcript:', err)
     }
 
     // Evaluate if we have transcript
@@ -402,21 +407,27 @@ export default function MeetAnalysisView() {
 
     // Wait a moment for Recall.ai to process the final transcript
     console.log('⏳ Aguardando processamento da transcrição...')
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    await new Promise(resolve => setTimeout(resolve, 5000)) // Increased wait time
 
-    // Try to fetch transcript from API if local transcript is empty
+    // Get local transcript length
     let transcriptToEvaluate = session?.transcript || []
+    const localTranscriptLength = transcriptToEvaluate.length
 
-    if (transcriptToEvaluate.length === 0 && session?.botId) {
-      console.log('📡 Buscando transcrição final da API...')
+    // ALWAYS try to fetch from Recall.ai API to get complete transcript
+    if (session?.botId) {
+      console.log(`📡 Buscando transcrição completa da API (local tem ${localTranscriptLength} segmentos)...`)
       try {
-        // Use fallback=true to fetch from Recall.ai API when ending session
         const response = await fetch(`/api/recall/webhook?botId=${session.botId}&fallback=true`)
         const data = await response.json()
         if (data.transcript && data.transcript.length > 0) {
-          transcriptToEvaluate = data.transcript
-          setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
-          console.log(`✅ Transcrição recuperada: ${data.transcript.length} segmentos`)
+          // Use API transcript if it has more data than local
+          if (data.transcript.length >= localTranscriptLength) {
+            transcriptToEvaluate = data.transcript
+            setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
+            console.log(`✅ Transcrição da API: ${data.transcript.length} segmentos (melhor que local: ${localTranscriptLength})`)
+          } else {
+            console.log(`📝 Mantendo transcrição local: ${localTranscriptLength} segmentos (API: ${data.transcript.length})`)
+          }
         }
       } catch (err) {
         console.error('Error fetching final transcript:', err)
