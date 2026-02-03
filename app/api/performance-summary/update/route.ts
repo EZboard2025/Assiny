@@ -41,18 +41,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Buscar dados do usuário
-    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId)
-
-    if (userError || !userData) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    const userName = userData.user.user_metadata?.name || userData.user.email?.split('@')[0] || 'Usuário'
-
     // ===== BUSCAR TODAS AS FONTES DE DADOS EM PARALELO =====
     const [sessionsResult, meetResult, challengesResult] = await Promise.all([
       // 1. Roleplay sessions
@@ -289,7 +277,6 @@ export async function POST(request: NextRequest) {
       .from('user_performance_summaries')
       .upsert({
         user_id: userId,
-        user_name: userName,
         total_sessions: unifiedEvaluations.length,
         overall_average: overallAverage,
         spin_s_average: spinAverages.S,

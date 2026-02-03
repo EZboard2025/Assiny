@@ -189,7 +189,7 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const audioContextRef = useRef<AudioContext | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
-  const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback'>('evaluation') // Aba ativa no modal de avaliação
+  const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback' | 'playbook'>('evaluation') // Aba ativa no modal de avaliação
   const [clientName, setClientName] = useState<string>('Cliente') // Nome do cliente virtual
   const [roleplayConfig, setRoleplayConfig] = useState<any>(null) // Armazena toda a configuração do roleplay
   const [dataLoading, setDataLoading] = useState(true) // Loading state para dados iniciais
@@ -1752,7 +1752,15 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         <div className="fixed inset-0 bg-[#1a1a1a] z-50 flex flex-col">
           {/* Header minimalista */}
           <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800">
-            <span className="text-white/60 text-sm">Roleplay em andamento</span>
+            <div className="flex items-center gap-3">
+              <span className="text-white/60 text-sm">Roleplay em andamento</span>
+              {roleplayConfig?.objective?.name && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-lg border border-green-500/30">
+                  <Target size={14} className="text-green-400" />
+                  <span className="text-green-400 text-sm font-medium">{roleplayConfig.objective.name}</span>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               {/* Botão de Dicas do Desafio - Expande/Minimiza */}
               {challengeConfig && (
@@ -2961,13 +2969,18 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Tabs de navegação */}
                 <div className="flex gap-1 bg-gray-100 rounded-xl border border-gray-200 p-1 mb-6">
-                  {['resumo', 'spin', 'transcricao'].map((tab) => (
+                  {['resumo', 'spin', ...(evaluation.playbook_adherence ? ['playbook'] : []), 'transcricao'].map((tab) => (
                     <button
                       key={tab}
-                      onClick={() => setActiveEvaluationTab(tab === 'resumo' ? 'evaluation' : tab === 'spin' ? 'feedback' : 'conversation')}
+                      onClick={() => setActiveEvaluationTab(
+                        tab === 'resumo' ? 'evaluation' :
+                        tab === 'spin' ? 'feedback' :
+                        tab === 'playbook' ? 'playbook' : 'conversation'
+                      )}
                       className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
                         (tab === 'resumo' && activeEvaluationTab === 'evaluation') ||
                         (tab === 'spin' && activeEvaluationTab === 'feedback') ||
+                        (tab === 'playbook' && activeEvaluationTab === 'playbook') ||
                         (tab === 'transcricao' && activeEvaluationTab === 'conversation')
                           ? 'bg-white text-green-700 shadow-sm'
                           : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
@@ -2975,6 +2988,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     >
                       {tab === 'resumo' && 'Resumo'}
                       {tab === 'spin' && 'Análise SPIN'}
+                      {tab === 'playbook' && 'Playbook'}
                       {tab === 'transcricao' && 'Transcrição'}
                     </button>
                   ))}
@@ -3262,6 +3276,162 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Tab Playbook Adherence */}
+                {activeEvaluationTab === 'playbook' && evaluation.playbook_adherence && (
+                  <div className="space-y-4">
+                    {/* Score Geral do Playbook */}
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 p-4 shadow-sm">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-purple-700 uppercase tracking-wider">
+                          Aderência ao Playbook
+                        </h4>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
+                          evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
+                          evaluation.playbook_adherence.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'Exemplar' :
+                           evaluation.playbook_adherence.adherence_level === 'compliant' ? 'Conforme' :
+                           evaluation.playbook_adherence.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
+                        </span>
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <span className="text-4xl font-bold text-purple-600">
+                          {evaluation.playbook_adherence.overall_adherence_score}%
+                        </span>
+                        <span className="text-sm text-gray-500 mb-1">de aderência</span>
+                      </div>
+                    </div>
+
+                    {/* Dimensões do Playbook */}
+                    {evaluation.playbook_adherence.dimensions && (
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        {[
+                          { key: 'opening', label: 'Abertura', icon: '🎯' },
+                          { key: 'closing', label: 'Fechamento', icon: '🤝' },
+                          { key: 'conduct', label: 'Conduta', icon: '👔' },
+                          { key: 'required_scripts', label: 'Scripts', icon: '📝' },
+                          { key: 'process', label: 'Processo', icon: '⚙️' }
+                        ].map(({ key, label, icon }) => {
+                          const dim = evaluation.playbook_adherence?.dimensions?.[key as keyof typeof evaluation.playbook_adherence.dimensions]
+                          if (!dim || dim.status === 'not_evaluated') return null
+                          return (
+                            <div key={key} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
+                              <div className="text-xl mb-1">{icon}</div>
+                              <div className={`text-2xl font-bold ${
+                                (dim.score || 0) >= 70 ? 'text-green-600' :
+                                (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {dim.score || 0}%
+                              </div>
+                              <div className="text-xs text-gray-500">{label}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Violações */}
+                    <div className="bg-red-50 rounded-xl border border-red-200 p-4">
+                      <h4 className="flex items-center gap-2 text-sm font-medium text-red-700 mb-3">
+                        <AlertTriangle className="w-4 h-4" />
+                        Violações Detectadas
+                      </h4>
+                      {evaluation.playbook_adherence.violations && evaluation.playbook_adherence.violations.length > 0 ? (
+                        <ul className="space-y-2">
+                          {evaluation.playbook_adherence.violations.map((v: any, i: number) => (
+                            <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-2 border border-red-100">
+                              <div className="font-medium text-red-700">{safeRender(v.criterion)}</div>
+                              {v.evidence && <p className="text-xs text-gray-500 mt-1 italic">"{safeRender(v.evidence)}"</p>}
+                              {v.recommendation && <p className="text-xs text-red-600 mt-1">{safeRender(v.recommendation)}</p>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-green-600 flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" />
+                          Nenhuma violação detectada
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Requisitos Perdidos */}
+                    <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+                      <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
+                        <AlertCircle className="w-4 h-4" />
+                        Requisitos Não Cumpridos
+                      </h4>
+                      {evaluation.playbook_adherence.missed_requirements && evaluation.playbook_adherence.missed_requirements.length > 0 ? (
+                        <ul className="space-y-2">
+                          {evaluation.playbook_adherence.missed_requirements.map((m: any, i: number) => (
+                            <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-2 border border-amber-100">
+                              <div className="font-medium text-amber-700">{safeRender(m.criterion)}</div>
+                              {m.expected && <p className="text-xs text-gray-500 mt-1">Esperado: {safeRender(m.expected)}</p>}
+                              {m.recommendation && <p className="text-xs text-amber-600 mt-1">{safeRender(m.recommendation)}</p>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-green-600 flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" />
+                          Todos os requisitos foram cumpridos
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Momentos Exemplares - dados salvos na avaliação para feature futura, mas não exibidos na UI */}
+
+                    {/* Notas de Coaching */}
+                    {evaluation.playbook_adherence.coaching_notes && (
+                      <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-3">
+                          <Lightbulb className="w-4 h-4" />
+                          Orientações para Melhorar
+                        </h4>
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {safeRender(evaluation.playbook_adherence.coaching_notes)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Resumo de Critérios */}
+                    {evaluation.playbook_adherence.playbook_summary && (
+                      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
+                          Resumo dos Critérios
+                        </h4>
+                        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-center text-xs">
+                          <div className="bg-white rounded-lg p-2 border border-gray-200">
+                            <div className="font-bold text-gray-700">{evaluation.playbook_adherence.playbook_summary.total_criteria_extracted}</div>
+                            <div className="text-gray-500">Total</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2 border border-green-200">
+                            <div className="font-bold text-green-600">{evaluation.playbook_adherence.playbook_summary.criteria_compliant}</div>
+                            <div className="text-gray-500">Conforme</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2 border border-yellow-200">
+                            <div className="font-bold text-yellow-600">{evaluation.playbook_adherence.playbook_summary.criteria_partial}</div>
+                            <div className="text-gray-500">Parcial</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2 border border-orange-200">
+                            <div className="font-bold text-orange-600">{evaluation.playbook_adherence.playbook_summary.criteria_missed}</div>
+                            <div className="text-gray-500">Perdido</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2 border border-red-200">
+                            <div className="font-bold text-red-600">{evaluation.playbook_adherence.playbook_summary.criteria_violated}</div>
+                            <div className="text-gray-500">Violado</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2 border border-purple-200">
+                            <div className="font-bold text-purple-600">{evaluation.playbook_adherence.playbook_summary.compliance_rate}</div>
+                            <div className="text-gray-500">Taxa</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
