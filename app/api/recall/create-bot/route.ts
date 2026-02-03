@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         recording_config: {
           transcript: {
             provider: {
-              // Use Recall.ai native transcription for best quality
+              // Use Recall.ai native transcription
               recallai_streaming: {
                 language_code: 'pt', // Portuguese
                 mode: 'prioritize_accuracy' // Better quality over speed
@@ -57,6 +57,13 @@ export async function POST(request: Request) {
               events: ['transcript.data', 'transcript.partial_data']
             }
           ]
+        },
+        // Chat configuration - helps with speaker identification
+        chat: {
+          on_bot_join: {
+            send_to: 'everyone',
+            message: '🎙️ Ramppy está gravando e transcrevendo esta reunião.'
+          }
         },
         // Auto-leave settings
         automatic_leave: {
