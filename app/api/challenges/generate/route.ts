@@ -243,6 +243,11 @@ REGRAS PARA SELEÇÃO:
 6. Se a fraqueza for em CTA, escolha persona indecisa que precisa de direcionamento claro
 7. ⚠️ TODOS OS TEXTOS DEVEM SER EM PORTUGUÊS BRASILEIRO - incluindo title, description, coaching_tips, pattern_detected. NUNCA escreva em inglês!
 8. ⚠️ OBRIGATÓRIO: Se houver objetivos disponíveis, você DEVE selecionar um objetivo (objective_id). Escolha o objetivo que melhor se alinha com o desafio.
+9. ⚠️ COACHING_TIPS - REGRAS ESPECIAIS:
+   - Este é um treino por SIMULAÇÃO/ROLEPLAY de texto, NÃO uma ligação real
+   - NUNCA sugira "praticar silêncio", "fazer pausas", "deixar o cliente processar" - isso NÃO se aplica a simulações
+   - NUNCA sugira técnicas que dependem de tempo real, linguagem corporal ou interação presencial
+   - Foque em dicas sobre: estrutura de perguntas, argumentação, tratamento de objeções, linguagem usada
 
 IMPORTANTE: Retorne APENAS JSON válido, sem markdown ou texto adicional.`
 
