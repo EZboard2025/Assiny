@@ -129,6 +129,7 @@ export default function MeetAnalysisView() {
   const [savedToHistory, setSavedToHistory] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const hasTriggeredAutoEvalRef = useRef<boolean>(false)
 
   // Validate Google Meet URL
   const isValidMeetUrl = (url: string): boolean => {
@@ -166,6 +167,7 @@ export default function MeetAnalysisView() {
     // Clear any previous evaluation state
     setEvaluation(null)
     setSavedToHistory(false)
+    hasTriggeredAutoEvalRef.current = false
 
     setSession({
       botId: '',
@@ -245,8 +247,15 @@ export default function MeetAnalysisView() {
                 newStatus = 'transcribing'
                 break
               case 'ended':
+                // Bot left automatically - trigger auto-evaluation
+                if (!hasTriggeredAutoEvalRef.current && prev.status !== 'ended') {
+                  console.log('🤖 Bot saiu automaticamente, iniciando avaliação...')
+                  hasTriggeredAutoEvalRef.current = true
+                  stopPolling()
+                  // Trigger auto-evaluation after a short delay
+                  setTimeout(() => triggerAutoEvaluation(botId), 500)
+                }
                 newStatus = 'ended'
-                stopPolling()
                 break
               case 'error':
                 newStatus = 'error'
@@ -312,8 +321,67 @@ export default function MeetAnalysisView() {
     }
   }
 
-  // End session and evaluate
+  // Auto-evaluation when bot leaves automatically
+  const triggerAutoEvaluation = async (botId: string) => {
+    console.log('🔄 Iniciando avaliação automática...')
+
+    // Set status to evaluating
+    setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
+
+    // Wait for Recall.ai to process the final transcript
+    console.log('⏳ Aguardando processamento da transcrição final...')
+    await new Promise(resolve => setTimeout(resolve, 3000))
+
+    // Fetch the final transcript
+    let transcriptToEvaluate: TranscriptSegment[] = []
+
+    // First, get current session transcript
+    setSession(prev => {
+      if (prev) {
+        transcriptToEvaluate = prev.transcript
+      }
+      return prev
+    })
+
+    // If local transcript is empty, try to fetch from API
+    if (transcriptToEvaluate.length === 0) {
+      console.log('📡 Buscando transcrição final da API...')
+      try {
+        const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
+        const data = await response.json()
+        if (data.transcript && data.transcript.length > 0) {
+          transcriptToEvaluate = data.transcript
+          setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
+          console.log(`✅ Transcrição recuperada: ${data.transcript.length} segmentos`)
+        }
+      } catch (err) {
+        console.error('Error fetching final transcript:', err)
+      }
+    }
+
+    // Evaluate if we have transcript
+    if (transcriptToEvaluate.length > 0) {
+      await evaluateTranscript(transcriptToEvaluate)
+    } else {
+      console.log('⚠️ Nenhuma transcrição encontrada para avaliar')
+      setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+      setError('Nenhuma transcrição foi capturada. A reunião pode não ter tido áudio ou o bot não conseguiu gravar.')
+    }
+
+    // Clean up transcript storage
+    try {
+      await fetch(`/api/recall/webhook?botId=${botId}`, {
+        method: 'DELETE'
+      })
+    } catch (err) {
+      console.error('Error cleaning up transcript:', err)
+    }
+  }
+
+  // End session and evaluate (manual)
   const endSession = async () => {
+    // Mark as triggered to prevent double-evaluation
+    hasTriggeredAutoEvalRef.current = true
     stopPolling()
 
     if (session?.botId) {
@@ -509,6 +577,7 @@ export default function MeetAnalysisView() {
   // Reset session
   const resetSession = () => {
     stopPolling()
+    hasTriggeredAutoEvalRef.current = false
     setSession(null)
     setMeetUrl('')
     setError('')
