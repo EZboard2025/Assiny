@@ -109,6 +109,13 @@ FORMATO DE RESPOSTA (JSON):
   "coaching_feedback": "Feedback motivacional e construtivo de 2-3 frases"
 }
 
+REGRAS IMPORTANTES PARA SUGESTÕES:
+- Esta é uma SIMULAÇÃO de vendas, NÃO uma ligação real
+- NÃO sugira "praticar silêncio", "fazer pausas", "deixar o cliente processar" ou similar - isso não se aplica a simulações
+- NÃO sugira técnicas que dependem de tempo real ou interação presencial
+- Foque em sugestões sobre: estrutura do pitch, argumentação, perguntas, tratamento de objeções, linguagem usada
+- Todas as sugestões devem ser aplicáveis em um contexto de simulação/roleplay de texto
+
 Seja objetivo e forneça feedback acionável.`
 
 const USER_PROMPT_TEMPLATE = `Avalie a seguinte transcrição de um desafio de vendas:

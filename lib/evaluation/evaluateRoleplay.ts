@@ -550,6 +550,13 @@ DIRETRIZES CRÍTICAS
 5. Especificidade: "Melhorar perguntas" é inútil. "Fazer perguntas de implicação que quantifiquem custo de inação" é acionável
 6. Compare o que o vendedor fala com os dados da empresa fornecidos e reporte se o vendedor falar algo incorreto sobre a empresa ou sobre os produtos da empresa.
 
+CONTEXTO DE SIMULAÇÃO:
+- Esta é uma SIMULAÇÃO de vendas, NÃO uma ligação real
+- NÃO sugira "praticar silêncio", "fazer pausas", "deixar o cliente processar" ou similar - isso não se aplica a simulações
+- NÃO sugira técnicas que dependem de tempo real, linguagem corporal ou interação presencial
+- Foque em sugestões sobre: estrutura do pitch, argumentação, perguntas, tratamento de objeções, linguagem usada
+- Todas as sugestões devem ser aplicáveis em um contexto de simulação/roleplay
+
 Esta avaliação tem impacto direto no desenvolvimento profissional. Mantenha rigor técnico absoluto.`
 
 const USER_PROMPT_TEMPLATE = `Avalie com precisão cirúrgica. Identifique todos os gaps, oportunidades perdidas e áreas de desenvolvimento. Seja objetivo, específico e baseado em evidências.
