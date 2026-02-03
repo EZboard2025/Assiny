@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { createClient } from '@supabase/supabase-js'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export const maxDuration = 120 // 2 minutos para processar transcrições longas
 
@@ -150,10 +156,139 @@ DIRETRIZES CRÍTICAS
 3. Seja objetivo e técnico
 4. Todo feedback deve ter próximo passo concreto`
 
+const PLAYBOOK_SECTION = `
+
+=== CARD: PLAYBOOK ADHERENCE ===
+
+CONTEXTO DA EMPRESA:
+- Nome da empresa: {company_name}
+- Descrição da empresa: {company_description}
+- Tipo da empresa: {company_type}
+
+A empresa possui o seguinte PLAYBOOK DE VENDAS:
+
+--- INÍCIO DO PLAYBOOK ---
+{playbook_content}
+--- FIM DO PLAYBOOK ---
+
+OBJETIVO DO CARD PLAYBOOK ADHERENCE:
+Este card avalia a aderência do vendedor às regras ESPECÍFICAS do playbook que NÃO são cobertas pela avaliação SPIN e de objeções.
+
+O que este card AVALIA - 5 DIMENSÕES:
+
+1. ABERTURA (opening)
+- Apresentação conforme script do playbook
+- Uso de gancho específico
+- Pedido de tempo/permissão
+- Primeiros 30-60 segundos
+
+2. FECHAMENTO (closing)
+- Próximo passo concreto definido
+- Data/hora específica agendada
+- Recapitulação de acordos
+- Compromisso claro do prospect
+
+3. CONDUTA (conduct)
+- Regras de comportamento seguidas
+- Proibições respeitadas
+- Tom e linguagem adequados
+- Escuta ativa demonstrada
+
+4. SCRIPTS OBRIGATÓRIOS (required_scripts)
+- Frases específicas que a empresa exige
+- Perguntas padronizadas utilizadas
+- Respostas-padrão aplicadas corretamente
+
+5. PROCESSO (process)
+- Etapas obrigatórias do funil seguidas
+- Qualificação conforme critérios da empresa
+- Documentação/registro mencionado
+- Handoff adequado (se aplicável)
+
+INSTRUÇÕES PARA AVALIAÇÃO:
+
+PASSO 1: Extrair critérios do playbook
+Extraia APENAS critérios que se encaixam nas 5 dimensões acima.
+
+PASSO 2: Classificar cada critério
+type:
+- required: linguagem imperativa ("deve", "sempre", "obrigatório")
+- recommended: linguagem sugestiva ("recomendado", "ideal", "prefira")
+- prohibited: linguagem negativa ("nunca", "não", "evitar", "proibido")
+
+weight:
+- critical: marcado como crítico, essencial, ou pode causar perda de deal
+- high: enfatizado, tem seção dedicada
+- medium: mencionado como boa prática
+- low: sugestão, nice-to-have
+
+PASSO 3: Avaliar cada critério
+result | Quando usar | points_earned
+compliant | Executou corretamente | 100
+partial | Executou com falhas | 50
+missed | Não executou | 0
+violated | Fez o oposto (para prohibited) | -50
+not_applicable | Contexto não permitiu avaliar | N/A
+
+PASSO 4: Calcular scores
+Score por dimensão:
+score = (Σ points_earned × weight_multiplier) / (Σ max_points × weight_multiplier) × 100
+
+weight_multiplier: critical=3, high=2, medium=1, low=0.5
+
+Score geral (pesos das dimensões):
+- opening: 20%
+- closing: 25%
+- conduct: 20%
+- required_scripts: 20%
+- process: 15%
+
+adherence_level:
+- exemplary: 90-100%
+- compliant: 70-89%
+- partial: 50-69%
+- non_compliant: 0-49%
+
+REGRAS ESPECIAIS:
+1. Se playbook não menciona uma dimensão: marque como not_evaluated e exclua do cálculo
+2. Se call foi interrompida: avalie apenas o possível e indique no coaching_notes
+3. Violações são sempre reportadas mesmo com score bom
+4. Momentos exemplares merecem destaque em exemplary_moments
+
+Inclua no JSON de resposta o campo "playbook_adherence":
+{
+  "playbook_adherence": {
+    "overall_adherence_score": 0-100,
+    "adherence_level": "non_compliant|partial|compliant|exemplary",
+    "dimensions": {
+      "opening": { "score": 0-100, "status": "...", "criteria_evaluated": [...], "dimension_feedback": "..." },
+      "closing": { "score": 0-100, "status": "...", "criteria_evaluated": [...], "dimension_feedback": "..." },
+      "conduct": { "score": 0-100, "status": "...", "criteria_evaluated": [...], "dimension_feedback": "..." },
+      "required_scripts": { "score": 0-100, "status": "...", "criteria_evaluated": [...], "dimension_feedback": "..." },
+      "process": { "score": 0-100, "status": "...", "criteria_evaluated": [...], "dimension_feedback": "..." }
+    },
+    "violations": [...],
+    "missed_requirements": [...],
+    "exemplary_moments": [...],
+    "playbook_summary": {
+      "total_criteria_extracted": 0,
+      "criteria_compliant": 0,
+      "criteria_partial": 0,
+      "criteria_missed": 0,
+      "criteria_violated": 0,
+      "criteria_not_applicable": 0,
+      "critical_criteria_met": "X de Y",
+      "compliance_rate": "XX%"
+    },
+    "coaching_notes": "orientações específicas para melhorar aderência ao playbook"
+  }
+}
+`
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { transcript, meetingId, sellerName } = body
+    const { transcript, meetingId, sellerName, companyId } = body
 
     if (!transcript || transcript.length < 100) {
       return NextResponse.json(
@@ -165,6 +300,61 @@ export async function POST(request: Request) {
     console.log(`📊 Avaliando reunião: ${meetingId || 'sem ID'}`)
     console.log(`📝 Transcrição: ${transcript.length} caracteres`)
 
+    // Variáveis para contexto do playbook
+    let companyName = 'Não informado'
+    let companyDescription = 'Não informado'
+    let companyType = 'Não informado'
+    let playbookContent: string | null = null
+
+    // Buscar dados da empresa e playbook (se companyId fornecido)
+    if (companyId) {
+      // Buscar nome da empresa
+      const { data: company } = await supabaseAdmin
+        .from('companies')
+        .select('name')
+        .eq('id', companyId)
+        .single()
+
+      if (company?.name) {
+        companyName = company.name
+      }
+
+      // Buscar tipo da empresa (B2B/B2C)
+      const { data: typeData } = await supabaseAdmin
+        .from('company_type')
+        .select('type')
+        .eq('company_id', companyId)
+        .single()
+
+      if (typeData?.type) {
+        companyType = typeData.type
+      }
+
+      // Buscar dados da empresa
+      const { data: companyData } = await supabaseAdmin
+        .from('company_data')
+        .select('descricao')
+        .eq('company_id', companyId)
+        .single()
+
+      if (companyData?.descricao) {
+        companyDescription = companyData.descricao
+      }
+
+      // Buscar playbook da empresa
+      const { data: playbook } = await supabaseAdmin
+        .from('sales_playbooks')
+        .select('content')
+        .eq('company_id', companyId)
+        .eq('is_active', true)
+        .single()
+
+      if (playbook?.content) {
+        playbookContent = playbook.content
+        console.log('📖 Playbook encontrado, incluindo na avaliação do meet')
+      }
+    }
+
     // Limitar transcrição para não exceder tokens
     const maxChars = 50000
     let processedTranscript = transcript
@@ -172,12 +362,21 @@ export async function POST(request: Request) {
       processedTranscript = transcript.substring(0, maxChars) + '\n\n[... transcrição truncada ...]'
     }
 
-    const userPrompt = `Avalie esta reunião de vendas com precisão. Identifique o vendedor${sellerName ? ` (provavelmente ${sellerName})` : ''} e analise sua performance.
+    let userPrompt = `Avalie esta reunião de vendas com precisão. Identifique o vendedor${sellerName ? ` (provavelmente ${sellerName})` : ''} e analise sua performance.
 
 TRANSCRIÇÃO DA REUNIÃO:
 ${processedTranscript}
 
 Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSON conforme especificado.`
+
+    // Se houver playbook, adicionar seção de análise
+    if (playbookContent) {
+      userPrompt += PLAYBOOK_SECTION
+        .replace('{company_name}', companyName)
+        .replace('{company_description}', companyDescription)
+        .replace('{company_type}', companyType)
+        .replace('{playbook_content}', playbookContent)
+    }
 
     console.log('🤖 Enviando para OpenAI...')
 
@@ -189,7 +388,7 @@ Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSO
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3,
-      max_tokens: 8000
+      max_tokens: 10000
     })
 
     const content = response.choices[0].message.content
@@ -207,7 +406,15 @@ Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSO
       evaluation.overall_score = evaluation.overall_score / 10
     }
 
+    // Se não tinha playbook, garantir que playbook_adherence não exista
+    if (!playbookContent && evaluation.playbook_adherence) {
+      delete evaluation.playbook_adherence
+    }
+
     console.log('✅ Avaliação pronta - Score:', evaluation.overall_score, '| Level:', evaluation.performance_level)
+    if (evaluation.playbook_adherence) {
+      console.log('📖 Playbook Adherence - Score:', evaluation.playbook_adherence.overall_adherence_score + '%', '| Level:', evaluation.playbook_adherence.adherence_level)
+    }
 
     return NextResponse.json({
       success: true,

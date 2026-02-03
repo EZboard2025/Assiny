@@ -73,6 +73,20 @@ interface ConfigHubProps {
   onClose: () => void
 }
 
+// Interface para Playbook de Vendas
+interface SalesPlaybook {
+  id: string
+  company_id: string
+  title: string
+  content: string
+  version: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+}
+
 // Sortable Stage Card Component
 interface SortableStageCardProps {
   stage: FunnelStage
@@ -522,6 +536,13 @@ function ConfigurationInterface({
   const [editStageDescription, setEditStageDescription] = useState('')
   const [editStageObjective, setEditStageObjective] = useState('')
 
+  // Estados para Playbook de Vendas
+  const [playbook, setPlaybook] = useState<SalesPlaybook | null>(null)
+  const [playbookTitle, setPlaybookTitle] = useState('Playbook de Vendas')
+  const [playbookLoaded, setPlaybookLoaded] = useState(false)
+  const [playbookFileUploading, setPlaybookFileUploading] = useState(false)
+  const [playbookFileError, setPlaybookFileError] = useState<string | null>(null)
+
   // Carregar PDFs salvos da empresa
   const loadSavedPdfs = async (companyId: string) => {
     try {
@@ -532,6 +553,28 @@ function ConfigurationInterface({
       }
     } catch (error) {
       console.error('Erro ao carregar PDFs:', error)
+    }
+  }
+
+  // Carregar Playbook da empresa
+  const loadPlaybook = async () => {
+    if (!userCompanyId) {
+      setPlaybookLoaded(true)
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/playbook/save?companyId=${userCompanyId}`)
+      const result = await response.json()
+
+      if (response.ok && result.success && result.playbook) {
+        setPlaybook(result.playbook)
+        setPlaybookTitle(result.playbook.title)
+      }
+      setPlaybookLoaded(true)
+    } catch (error) {
+      console.error('Erro ao carregar playbook:', error)
+      setPlaybookLoaded(true)
     }
   }
 
@@ -548,6 +591,13 @@ function ConfigurationInterface({
       loadSavedPdfs(userCompanyId)
     }
   }, [userCompanyId])
+
+  // Carregar playbook quando userCompanyId estiver disponível
+  useEffect(() => {
+    if (userCompanyId && !playbookLoaded) {
+      loadPlaybook()
+    }
+  }, [userCompanyId, playbookLoaded])
 
   // Carregar subdomínio da empresa do usuário logado (para o link de convite)
   useEffect(() => {
@@ -711,6 +761,120 @@ function ConfigurationInterface({
       }
     } catch (error) {
       console.error('Erro ao carregar dados da empresa:', error)
+    }
+  }
+
+  // Upload e extração de arquivo do Playbook (PDF/DOCX)
+  const handlePlaybookFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar extensão
+    const allowedExtensions = ['pdf', 'docx', 'doc']
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+
+    if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+      setPlaybookFileError('Formato não suportado. Use PDF ou DOCX.')
+      return
+    }
+
+    setPlaybookFileUploading(true)
+    setPlaybookFileError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/playbook/extract', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao processar arquivo')
+      }
+
+      if (result.success && result.content) {
+        // Determinar título do playbook
+        const newTitle = (playbookTitle === 'Playbook de Vendas' || !playbookTitle.trim())
+          ? file.name.replace(/\.(pdf|docx|doc)$/i, '').replace(/[-_]/g, ' ')
+          : playbookTitle
+
+        // Verificar se temos companyId
+        if (!userCompanyId) {
+          throw new Error('ID da empresa não encontrado')
+        }
+
+        // Obter userId para o registro
+        const { supabase } = await import('@/lib/supabase')
+        const { data: { user } } = await supabase.auth.getUser()
+
+        // Salvar automaticamente o playbook via API (bypass RLS)
+        const saveResponse = await fetch('/api/playbook/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: newTitle,
+            content: result.content,
+            companyId: userCompanyId,
+            userId: user?.id || null
+          })
+        })
+
+        const saveResult = await saveResponse.json()
+
+        if (saveResponse.ok && saveResult.success) {
+          setPlaybook(saveResult.playbook)
+          setPlaybookTitle(saveResult.playbook.title)
+          showToast('success', 'Sucesso', `Playbook "${file.name}" salvo com sucesso!`)
+        } else {
+          showToast('error', 'Erro', saveResult.error || 'Não foi possível salvar o playbook. Tente novamente.')
+        }
+      } else {
+        throw new Error('Não foi possível extrair o conteúdo')
+      }
+    } catch (error) {
+      console.error('Erro ao processar arquivo:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      setPlaybookFileError(errorMessage)
+      showToast('error', 'Erro', errorMessage)
+    } finally {
+      setPlaybookFileUploading(false)
+      // Limpar o input para permitir reupload do mesmo arquivo
+      e.target.value = ''
+    }
+  }
+
+  // Excluir playbook
+  const handleDeletePlaybook = async () => {
+    const confirmed = window.confirm('Tem certeza que deseja excluir o playbook? As avaliações futuras não terão análise de aderência.')
+
+    if (!confirmed) return
+
+    if (!userCompanyId) {
+      showToast('error', 'Erro', 'ID da empresa não encontrado')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/playbook/save?companyId=${userCompanyId}`, {
+        method: 'DELETE'
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setPlaybook(null)
+        setPlaybookTitle('Playbook de Vendas')
+        showToast('success', 'Sucesso', 'Playbook excluído com sucesso!')
+      } else {
+        showToast('error', 'Erro', result.error || 'Não foi possível excluir o playbook')
+      }
+    } catch (error) {
+      console.error('Erro ao excluir playbook:', error)
+      showToast('error', 'Erro', 'Erro ao excluir playbook')
     }
   }
 
@@ -4653,6 +4817,98 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Dados da Empresa Tab */}
         {activeTab === 'files' && (
           <div className="space-y-6">
+            {/* Playbook de Vendas - No topo */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-purple-600" />
+                  Playbook de Vendas
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Faça upload do seu playbook para análise de aderência nas avaliações.
+                </p>
+              </div>
+
+              <div className="p-4">
+                {playbook ? (
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between p-4 bg-purple-50 rounded-lg border border-purple-100">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                          <FileText className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-900">{playbook.title}</h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Versão {playbook.version} • Atualizado em {new Date(playbook.updated_at).toLocaleDateString('pt-BR')}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {playbook.content.length.toLocaleString()} caracteres
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleDeletePlaybook}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Excluir playbook"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="pt-2 border-t border-gray-100">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.doc"
+                          onChange={handlePlaybookFileUpload}
+                          className="hidden"
+                          disabled={playbookFileUploading}
+                        />
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
+                          <Upload className="w-4 h-4" />
+                          Substituir playbook
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.doc"
+                        onChange={handlePlaybookFileUpload}
+                        className="hidden"
+                        disabled={playbookFileUploading}
+                      />
+                      <div className="border-2 border-dashed border-purple-200 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-colors">
+                        {playbookFileUploading ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
+                            <p className="text-sm text-purple-600">Processando...</p>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600">
+                              <span className="font-semibold text-purple-600">Clique para upload</span> ou arraste
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">PDF ou DOCX</p>
+                          </>
+                        )}
+                      </div>
+                    </label>
+                    {playbookFileError && (
+                      <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border border-red-100">
+                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <p className="text-xs text-red-600">{playbookFileError}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Dados da Empresa</h3>
