@@ -104,12 +104,18 @@ export async function GET(request: Request) {
       if (overallScore > 10) overallScore = overallScore / 10
 
       const spinScores = { S: 0, P: 0, I: 0, N: 0 }
+      const spinFeedback = { S: '', P: '', I: '', N: '' }
       if (evaluation?.spin_evaluation) {
         const spinEval = evaluation.spin_evaluation
         if (spinEval.S?.final_score !== undefined) spinScores.S = spinEval.S.final_score
         if (spinEval.P?.final_score !== undefined) spinScores.P = spinEval.P.final_score
         if (spinEval.I?.final_score !== undefined) spinScores.I = spinEval.I.final_score
         if (spinEval.N?.final_score !== undefined) spinScores.N = spinEval.N.final_score
+        // Feedback por categoria SPIN
+        spinFeedback.S = spinEval.S?.technical_feedback || ''
+        spinFeedback.P = spinEval.P?.technical_feedback || ''
+        spinFeedback.I = spinEval.I?.technical_feedback || ''
+        spinFeedback.N = spinEval.N?.technical_feedback || ''
       }
 
       return {
@@ -118,9 +124,13 @@ export async function GET(request: Request) {
         status: session.status,
         overall_score: overallScore,
         spin_scores: spinScores,
+        spin_feedback: spinFeedback,
         top_strengths: evaluation?.top_strengths || [],
         critical_gaps: evaluation?.critical_gaps || [],
-        performance_level: evaluation?.performance_level || null
+        performance_level: evaluation?.performance_level || null,
+        executive_summary: evaluation?.executive_summary || null,
+        priority_improvements: evaluation?.priority_improvements || [],
+        playbook_adherence: evaluation?.playbook_adherence || null
       }
     })
 
@@ -135,26 +145,66 @@ export async function GET(request: Request) {
         }
       }
 
+      // Extrair SPIN scores se disponíveis
+      const spinScores = { S: 0, P: 0, I: 0, N: 0 }
+      const spinFeedback = { S: '', P: '', I: '', N: '' }
+      if (evaluation?.spin_evaluation) {
+        const spinEval = evaluation.spin_evaluation
+        if (spinEval.S?.final_score !== undefined) spinScores.S = spinEval.S.final_score
+        if (spinEval.P?.final_score !== undefined) spinScores.P = spinEval.P.final_score
+        if (spinEval.I?.final_score !== undefined) spinScores.I = spinEval.I.final_score
+        if (spinEval.N?.final_score !== undefined) spinScores.N = spinEval.N.final_score
+        spinFeedback.S = spinEval.S?.technical_feedback || ''
+        spinFeedback.P = spinEval.P?.technical_feedback || ''
+        spinFeedback.I = spinEval.I?.technical_feedback || ''
+        spinFeedback.N = spinEval.N?.technical_feedback || ''
+      }
+
+      let overallScore = evaluation?.overall_score || meet.overall_score || 0
+      if (overallScore > 10) overallScore = overallScore / 10
+
       return {
         id: meet.id,
         created_at: meet.created_at,
         meeting_url: meet.meeting_url,
-        overall_score: evaluation?.overall_score || meet.overall_score || 0,
-        strengths: evaluation?.pontos_fortes || [],
-        improvements: evaluation?.areas_melhoria || [],
-        summary: evaluation?.resumo_executivo || meet.summary || null
+        overall_score: overallScore,
+        performance_level: evaluation?.performance_level || null,
+        spin_scores: spinScores,
+        spin_feedback: spinFeedback,
+        strengths: evaluation?.top_strengths || [],
+        critical_gaps: evaluation?.critical_gaps || [],
+        summary: evaluation?.executive_summary || null,
+        priority_improvements: evaluation?.priority_improvements || [],
+        objections_analysis: evaluation?.objections_analysis || [],
+        playbook_adherence: evaluation?.playbook_adherence || null
       }
     })
 
     // Processar daily challenges
-    const dailyChallenges = (challengesResult.data || []).map((challenge: any) => ({
-      id: challenge.id,
-      created_at: challenge.created_at,
-      challenge_type: challenge.challenge_type,
-      score: challenge.score || 0,
-      completed: challenge.completed || false,
-      response: challenge.response
-    }))
+    const dailyChallenges = (challengesResult.data || []).map((challenge: any) => {
+      let evaluation = challenge.evaluation
+      if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
+        try {
+          evaluation = JSON.parse(evaluation.output)
+        } catch (e) {
+          evaluation = null
+        }
+      }
+
+      return {
+        id: challenge.id,
+        created_at: challenge.created_at,
+        challenge_type: challenge.challenge_type,
+        challenge_title: challenge.challenge_title || challenge.challenge_type,
+        challenge_description: challenge.challenge_description || challenge.description || null,
+        score: challenge.score || evaluation?.nota_final || 0,
+        completed: challenge.completed || false,
+        response: challenge.response,
+        feedback: evaluation?.feedback || evaluation?.analise || challenge.feedback || null,
+        pontos_fortes: evaluation?.pontos_fortes || [],
+        areas_melhoria: evaluation?.areas_melhoria || []
+      }
+    })
 
     // Calcular estatísticas de desafios
     const completedChallenges = dailyChallenges.filter((c: any) => c.completed).length

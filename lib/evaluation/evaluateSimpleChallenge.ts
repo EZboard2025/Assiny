@@ -194,23 +194,33 @@ weight:
 PASSO 3: Avaliar cada critério
 result | Quando usar | points_earned
 compliant | Executou corretamente | 100
-partial | Executou com falhas | 50
-missed | Não executou | 0
-violated | Fez o oposto (para prohibited) | -50
-not_applicable | Contexto não permitiu avaliar | N/A
+partial | Executou com falhas menores | 50
+missed | NÃO executou E tinha oportunidade clara para executar | 0
+violated | Fez o OPOSTO do que era esperado (APENAS para prohibited) | -50
+not_applicable | Não teve oportunidade de executar OU contexto não permitiu | N/A (exclui do cálculo)
+
+IMPORTANTE SOBRE "missed" vs "not_applicable":
+- Use "missed" APENAS quando o vendedor CLARAMENTE tinha oportunidade de seguir o critério mas não o fez
+- Use "not_applicable" quando:
+  - A call não chegou nesse ponto (ex: fechamento em call de discovery)
+  - O contexto não permitiu (ex: script de preço quando cliente não perguntou)
+  - O playbook menciona algo muito específico que não se aplica ao caso
+- NA DÚVIDA, prefira "not_applicable" a "missed"
 
 PASSO 4: Calcular scores
 Score por dimensão:
 score = (Σ points_earned × weight_multiplier) / (Σ max_points × weight_multiplier) × 100
+IMPORTANTE: Critérios "not_applicable" são EXCLUÍDOS do cálculo (não contam no denominador)
 
 weight_multiplier: critical=3, high=2, medium=1, low=0.5
 
-Score geral (pesos das dimensões):
+Score geral (pesos das dimensões - apenas dimensões avaliadas):
 - opening: 20%
 - closing: 25%
 - conduct: 20%
 - required_scripts: 20%
 - process: 15%
+Se uma dimensão for "not_evaluated", redistribua o peso entre as outras proporcionalmente.
 
 adherence_level:
 - exemplary: 90-100%
@@ -220,9 +230,9 @@ adherence_level:
 
 REGRAS ESPECIAIS:
 1. Se playbook não menciona uma dimensão: marque como not_evaluated e exclua do cálculo
-2. Se call foi interrompida: avalie apenas o possível e indique no coaching_notes
-3. Violações são sempre reportadas mesmo com score bom
-4. Momentos exemplares merecem destaque em exemplary_moments
+2. Se simulação foi curta ou é de tipo específico: marque critérios não aplicáveis como not_applicable
+3. Violações são APENAS para quando o vendedor fez o OPOSTO do esperado (não apenas "não fez")
+4. TODOS os campos de texto devem ser preenchidos com descrições claras em português
 
 Inclua no JSON de resposta o campo "playbook_adherence":
 {
@@ -236,7 +246,7 @@ Inclua no JSON de resposta o campo "playbook_adherence":
         "status": "not_evaluated|missed|partial|compliant|exemplary",
         "criteria_evaluated": [
           {
-            "criterion": "descrição do critério extraído do playbook",
+            "criterion": "OBRIGATÓRIO: descrição clara do critério extraído do playbook em português",
             "type": "required|recommended|prohibited",
             "weight": "critical|high|medium|low",
             "result": "compliant|partial|missed|violated|not_applicable",
@@ -255,31 +265,31 @@ Inclua no JSON de resposta o campo "playbook_adherence":
 
     "violations": [
       {
-        "criterion": "regra violada",
+        "criterion": "OBRIGATÓRIO: Descrição clara da regra violada em português",
         "type": "prohibited",
         "severity": "critical|high|medium|low",
-        "evidence": "trecho exato da transcrição",
-        "impact": "impacto potencial da violação",
-        "recommendation": "como corrigir"
+        "evidence": "Trecho exato da transcrição que comprova a violação",
+        "impact": "Impacto potencial desta violação",
+        "recommendation": "Como corrigir este comportamento"
       }
     ],
 
     "missed_requirements": [
       {
-        "criterion": "requisito não cumprido",
+        "criterion": "OBRIGATÓRIO: Descrição clara do requisito não cumprido em português",
         "type": "required",
         "weight": "critical|high|medium|low",
-        "expected": "o que deveria ter acontecido",
-        "moment": "momento da call onde deveria ter ocorrido",
-        "recommendation": "como implementar"
+        "expected": "O que deveria ter acontecido",
+        "moment": "Momento da call onde deveria ter ocorrido",
+        "recommendation": "Como implementar na próxima vez"
       }
     ],
 
     "exemplary_moments": [
       {
-        "criterion": "critério executado de forma exemplar",
-        "evidence": "trecho da transcrição",
-        "why_exemplary": "por que foi acima do esperado"
+        "criterion": "Descrição do critério executado de forma exemplar",
+        "evidence": "Trecho da transcrição que demonstra",
+        "why_exemplary": "Por que foi acima do esperado"
       }
     ],
 
@@ -294,7 +304,7 @@ Inclua no JSON de resposta o campo "playbook_adherence":
       "compliance_rate": "XX%"
     },
 
-    "coaching_notes": "1-2 parágrafos com orientações específicas para o vendedor melhorar aderência ao playbook"
+    "coaching_notes": "Orientações específicas e práticas para o vendedor melhorar aderência ao playbook"
   }
 }
 `

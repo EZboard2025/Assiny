@@ -90,7 +90,8 @@ export async function POST(request: Request) {
       challengesResult,
       followupsResult,
       summaryResult,
-      pdiResult
+      pdiResult,
+      playbookResult
     ] = await Promise.all([
       // Employee info
       supabaseAdmin
@@ -143,6 +144,16 @@ export async function POST(request: Request) {
         .eq('status', 'ativo')
         .order('created_at', { ascending: false })
         .limit(1)
+        .single(),
+
+      // Company Playbook (for aptitude analysis)
+      supabaseAdmin
+        .from('sales_playbooks')
+        .select('id, title, content')
+        .eq('company_id', companyId)
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .single()
     ])
 
@@ -151,6 +162,7 @@ export async function POST(request: Request) {
     }
 
     const employee = employeeResult.data
+    const playbook = playbookResult.data || null
     const roleplaySessions = roleplayResult.data || []
     const meetEvaluations = meetsResult.data || []
     const dailyChallenges = challengesResult.data || []
@@ -231,6 +243,9 @@ export async function POST(request: Request) {
         }
       }
 
+      // Extract playbook adherence data
+      const playbookAdherence = evaluation?.playbook_adherence || null
+
       return {
         id: meet.id,
         created_at: meet.created_at,
@@ -238,7 +253,65 @@ export async function POST(request: Request) {
         pontos_fortes: evaluation?.pontos_fortes || [],
         areas_melhoria: evaluation?.areas_melhoria || [],
         resumo_executivo: evaluation?.resumo_executivo || meet.summary || null,
-        detalhes_avaliacao: evaluation?.detalhes || null
+        detalhes_avaliacao: evaluation?.detalhes || null,
+        playbook_adherence: playbookAdherence ? {
+          overall_score: playbookAdherence.overall_adherence_score || 0,
+          adherence_level: playbookAdherence.adherence_level || 'N/A',
+          dimensions: playbookAdherence.dimensions || null,
+          violations: playbookAdherence.violations || [],
+          missed_requirements: playbookAdherence.missed_requirements || [],
+          coaching_notes: playbookAdherence.coaching_notes || null
+        } : null
+      }
+    })
+
+    // Calculate playbook adherence statistics
+    const meetsWithPlaybook = processedMeetEvaluations.filter((m: any) => m.playbook_adherence !== null)
+    const avgPlaybookScore = meetsWithPlaybook.length > 0
+      ? meetsWithPlaybook.reduce((sum: number, m: any) => sum + (m.playbook_adherence?.overall_score || 0), 0) / meetsWithPlaybook.length
+      : null
+
+    // Aggregate playbook dimensions
+    const playbookDimensionsTotals: Record<string, { total: number; count: number }> = {
+      opening: { total: 0, count: 0 },
+      closing: { total: 0, count: 0 },
+      conduct: { total: 0, count: 0 },
+      required_scripts: { total: 0, count: 0 },
+      process: { total: 0, count: 0 }
+    }
+
+    meetsWithPlaybook.forEach((m: any) => {
+      const dims = m.playbook_adherence?.dimensions
+      if (dims) {
+        Object.keys(playbookDimensionsTotals).forEach(key => {
+          const dimData = dims[key]
+          if (dimData && dimData.status !== 'not_evaluated' && typeof dimData.score === 'number') {
+            playbookDimensionsTotals[key].total += dimData.score
+            playbookDimensionsTotals[key].count++
+          }
+        })
+      }
+    })
+
+    const playbookDimensionsAverages: Record<string, number | null> = {}
+    Object.keys(playbookDimensionsTotals).forEach(key => {
+      const data = playbookDimensionsTotals[key]
+      playbookDimensionsAverages[key] = data.count > 0 ? data.total / data.count : null
+    })
+
+    // Collect all playbook violations and missed requirements
+    const allViolations: any[] = []
+    const allMissedRequirements: any[] = []
+    meetsWithPlaybook.forEach((m: any) => {
+      if (m.playbook_adherence?.violations?.length > 0) {
+        m.playbook_adherence.violations.forEach((v: any) => {
+          if (v.criterion) allViolations.push({ ...v, date: m.created_at })
+        })
+      }
+      if (m.playbook_adherence?.missed_requirements?.length > 0) {
+        m.playbook_adherence.missed_requirements.forEach((mr: any) => {
+          if (mr.criterion) allMissedRequirements.push({ ...mr, date: m.created_at })
+        })
       }
     })
 
@@ -406,7 +479,29 @@ Nota: ${m.overall_score?.toFixed(1) || 'N/A'}/10
 ${m.resumo_executivo ? `Resumo: ${m.resumo_executivo}` : ''}
 ${m.pontos_fortes?.length > 0 ? `Pontos Fortes: ${m.pontos_fortes.join('; ')}` : ''}
 ${m.areas_melhoria?.length > 0 ? `Áreas de Melhoria: ${m.areas_melhoria.join('; ')}` : ''}
+${m.playbook_adherence ? `Aderência ao Playbook: ${m.playbook_adherence.overall_score}% (${m.playbook_adherence.adherence_level})
+  ${m.playbook_adherence.coaching_notes ? `Notas: ${m.playbook_adherence.coaching_notes}` : ''}` : ''}
 `).join('') || 'Nenhuma avaliação de reunião registrada'}
+
+${meetsWithPlaybook.length > 0 ? `
+================================================================================
+ANÁLISE DE ADERÊNCIA AO PLAYBOOK (${meetsWithPlaybook.length} reuniões avaliadas)
+================================================================================
+MÉDIA GERAL DE ADERÊNCIA: ${avgPlaybookScore?.toFixed(1)}%
+
+MÉDIAS POR DIMENSÃO:
+- Abertura: ${playbookDimensionsAverages.opening !== null ? playbookDimensionsAverages.opening.toFixed(1) + '%' : 'Não avaliado'}
+- Fechamento: ${playbookDimensionsAverages.closing !== null ? playbookDimensionsAverages.closing.toFixed(1) + '%' : 'Não avaliado'}
+- Conduta: ${playbookDimensionsAverages.conduct !== null ? playbookDimensionsAverages.conduct.toFixed(1) + '%' : 'Não avaliado'}
+- Scripts Obrigatórios: ${playbookDimensionsAverages.required_scripts !== null ? playbookDimensionsAverages.required_scripts.toFixed(1) + '%' : 'Não avaliado'}
+- Processo: ${playbookDimensionsAverages.process !== null ? playbookDimensionsAverages.process.toFixed(1) + '%' : 'Não avaliado'}
+
+${allViolations.length > 0 ? `VIOLAÇÕES IDENTIFICADAS (${allViolations.length} total):
+${allViolations.slice(0, 10).map((v, i) => `${i + 1}. ${v.criterion} (${v.severity}) - ${new Date(v.date).toLocaleDateString('pt-BR')}`).join('\n')}` : 'Nenhuma violação identificada nas reuniões'}
+
+${allMissedRequirements.length > 0 ? `REQUISITOS NÃO CUMPRIDOS (${allMissedRequirements.length} total):
+${allMissedRequirements.slice(0, 10).map((mr, i) => `${i + 1}. ${mr.criterion} (${mr.weight}) - ${new Date(mr.date).toLocaleDateString('pt-BR')}`).join('\n')}` : 'Nenhum requisito faltante identificado'}
+` : ''}
 
 ================================================================================
 HISTÓRICO DE DESAFIOS DIÁRIOS - ${processedChallenges.length} desafios
@@ -452,6 +547,18 @@ SPIN P: ${performanceSummary.spin_p_average?.toFixed(2) || 'N/A'}
 SPIN I: ${performanceSummary.spin_i_average?.toFixed(2) || 'N/A'}
 SPIN N: ${performanceSummary.spin_n_average?.toFixed(2) || 'N/A'}
 ` : 'Resumo de performance não encontrado'}
+
+${playbook ? `
+================================================================================
+PLAYBOOK DE VENDAS DA EMPRESA
+================================================================================
+Título: ${playbook.title}
+Conteúdo do Playbook:
+---
+${playbook.content.substring(0, 8000)}
+---
+(Use este playbook para avaliar a aptidão do vendedor às práticas definidas pela empresa)
+` : ''}
 `
 
     // Generate AI summary with comprehensive data
@@ -469,6 +576,7 @@ Você receberá dados COMPLETOS e DETALHADOS sobre um vendedor, incluindo:
 - Desafios diários completados
 - Análises de follow-up
 - PDI (Plano de Desenvolvimento Individual) atual
+${playbook ? '- PLAYBOOK DE VENDAS da empresa (documento que define as práticas, processos e abordagens que o vendedor deve seguir)' : ''}
 
 Sua tarefa é fazer uma análise PROFUNDA e COMPLETA, identificando:
 1. Padrões de comportamento ao longo do tempo
@@ -476,31 +584,61 @@ Sua tarefa é fazer uma análise PROFUNDA e COMPLETA, identificando:
 3. Correlações entre diferentes métricas
 4. Problemas recorrentes que precisam de atenção urgente
 5. Pontos fortes que podem ser potencializados
+${playbook ? '6. APTIDÃO AO PLAYBOOK: Avalie o quanto o vendedor está aderente ao playbook da empresa' : ''}
+
+ESTILO DE ESCRITA (MUITO IMPORTANTE):
+- Escreva de forma CONVERSACIONAL e FLUIDA, como um coach de vendas falando com um gestor
+- NÃO coloque números no meio das frases - quando precisar citar dados, use frases separadas ou coloque em contexto natural
+- EVITE jargões técnicos desnecessários - use linguagem simples e direta
+- Em vez de "A média SPIN S foi 7.5/10", escreva "O vendedor demonstra boa habilidade em fazer perguntas de situação"
+- Em vez de "Score de 4.2/10 em Implicação", escreva "Há dificuldade em explorar as consequências dos problemas do cliente"
+- Use descrições qualitativas (excelente, bom, precisa melhorar) em vez de focar em números específicos
+- Organize os textos em parágrafos fluidos, não em listas técnicas
+- O objetivo é que qualquer pessoa leiga consiga entender a análise facilmente
 
 IMPORTANTE:
-- Seja MUITO específico e cite números/datas/dados concretos
 - Identifique PADRÕES nos dados históricos
 - Compare sessões antigas com recentes para identificar evolução
 - Analise cada área SPIN separadamente
 - Forneça insights ACIONÁVEIS e PRÁTICOS
 - Se há poucos dados, mencione isso e sugira mais prática
+- NUNCA especule sobre erros de sistema, bugs ou problemas de dados - relate os dados de forma objetiva sem questionar sua validade
+- NUNCA diga que algo "provavelmente é um erro" ou "não representa a realidade" - apenas apresente os fatos
+${playbook ? '- Para a APTIDÃO AO PLAYBOOK: Compare as práticas do vendedor com o que está definido no playbook' : ''}
 
 Responda APENAS em JSON válido com a seguinte estrutura:
 {
-  "summary": "Análise completa de 3-4 parágrafos sobre a performance do vendedor, incluindo: contexto geral, análise de evolução temporal, análise de cada área SPIN, e conclusão sobre estado atual",
-  "highlights": ["5-7 destaques positivos ESPECÍFICOS com dados/números/datas concretos"],
-  "concerns": ["5-7 pontos de atenção ESPECÍFICOS com dados/números/datas e impacto potencial"],
-  "recommendations": ["5-7 recomendações PRÁTICAS e ESPECÍFICAS ordenadas por prioridade, com ações concretas"],
+  "summary": "Análise completa de 3-4 parágrafos FLUIDOS e CONVERSACIONAIS sobre a performance do vendedor. Escreva como um coach falando com o gestor, sem números espalhados pelo texto. Inclua: contexto geral, como o vendedor tem evoluído, análise qualitativa de cada área SPIN (sem ficar citando scores), e uma conclusão sobre o estado atual.",
+  "highlights": ["5-7 destaques positivos escritos de forma clara e direta, sem jargões. Ex: 'Consegue criar rapport rapidamente com os clientes' em vez de 'Score de rapport 8.2/10'"],
+  "concerns": ["5-7 pontos de atenção escritos de forma clara, focando no impacto prático. Ex: 'Perde oportunidades de aprofundar nas dores do cliente' em vez de 'Score P de 4.5/10'"],
+  "recommendations": ["5-7 recomendações PRÁTICAS escritas como ações claras. Ex: 'Antes de cada call, preparar 3 perguntas sobre os problemas do cliente' em vez de 'Melhorar score P'"],
   "performance_level": "excelente | bom | regular | precisa_atencao | critico",
-  "priority_action": "A ação MAIS importante que o vendedor deve tomar IMEDIATAMENTE, com detalhes de como executar",
+  "priority_action": "A ação MAIS importante que o vendedor deve tomar AGORA, escrita de forma clara e prática como um conselho de coach",
   "spin_analysis": {
-    "S": "Análise detalhada da performance em perguntas de Situação",
-    "P": "Análise detalhada da performance em perguntas de Problema",
-    "I": "Análise detalhada da performance em perguntas de Implicação",
-    "N": "Análise detalhada da performance em perguntas de Necessidade"
+    "S": "Análise em 2-3 frases sobre como o vendedor faz perguntas de Situação, escrita de forma conversacional",
+    "P": "Análise em 2-3 frases sobre como o vendedor identifica Problemas, escrita de forma conversacional",
+    "I": "Análise em 2-3 frases sobre como o vendedor explora Implicações, escrita de forma conversacional",
+    "N": "Análise em 2-3 frases sobre como o vendedor trabalha Necessidades, escrita de forma conversacional"
   },
-  "evolution_trend": "Descrição da tendência de evolução do vendedor ao longo do tempo com dados",
-  "coaching_focus": "Principal área que um coach/gestor deveria focar ao trabalhar com este vendedor"
+  "evolution_trend": "Descrição da tendência de evolução de forma narrativa, como 'O vendedor tem mostrado melhora consistente...' ou 'Nos últimos treinos, houve uma queda...'",
+  "coaching_focus": "Principal área para o gestor focar, escrita como uma recomendação prática de coaching",
+  "real_calls_summary": "Resumo de 2-3 parágrafos CONVERSACIONAIS focado EXCLUSIVAMENTE na performance em REUNIÕES REAIS (Meet). NÃO inclua follow-ups, roleplay ou desafios. Escreva de forma fluida como um coach analisando as calls do vendedor. Se não houver reuniões avaliadas, diga simplesmente que o vendedor ainda não tem reuniões Meet avaliadas."${playbook ? `,
+  "playbook_aptitude": {
+    "score": 0.0,
+    "percentage": 0,
+    "level": "exemplary | compliant | partial | non_compliant",
+    "summary": "Resumo de 2-3 parágrafos CONVERSACIONAIS analisando a aderência do vendedor ao playbook. Explique de forma fluida como o vendedor está seguindo as práticas definidas, onde ele se destaca e onde precisa melhorar. Baseie-se nos dados de ANÁLISE DE ADERÊNCIA AO PLAYBOOK fornecidos.",
+    "dimension_analysis": {
+      "opening": "Análise conversacional da performance na abertura de calls (se avaliado)",
+      "closing": "Análise conversacional da performance no fechamento (se avaliado)",
+      "conduct": "Análise conversacional da conduta e comportamento (se avaliado)",
+      "required_scripts": "Análise conversacional do uso de scripts obrigatórios (se avaliado)",
+      "process": "Análise conversacional do seguimento do processo de vendas (se avaliado)"
+    },
+    "strengths": ["3-5 práticas do playbook que o vendedor executa bem, escritas de forma clara"],
+    "gaps": ["3-5 práticas do playbook que o vendedor NÃO está seguindo ou precisa melhorar"],
+    "priority_actions": ["2-3 ações prioritárias para melhorar aderência ao playbook"]
+  }` : ''}
 }`
         },
         {
@@ -532,7 +670,14 @@ Responda APENAS em JSON válido com a seguinte estrutura:
       total_challenges: processedChallenges.length,
       total_followups: processedFollowups.length,
       trend,
-      spin_averages: spinAverages
+      spin_averages: spinAverages,
+      playbook_adherence: avgPlaybookScore !== null ? {
+        average_score: avgPlaybookScore,
+        meets_evaluated: meetsWithPlaybook.length,
+        dimensions_averages: playbookDimensionsAverages,
+        total_violations: allViolations.length,
+        total_missed_requirements: allMissedRequirements.length
+      } : null
     }
 
     // Save analysis to database
