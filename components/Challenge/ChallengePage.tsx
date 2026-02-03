@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { User, Mail, Loader2, Sparkles, PenTool, Mic, MicOff, Phone, Volume2, Trophy, Target, TrendingUp, AlertCircle, CheckCircle, XCircle, Lightbulb } from 'lucide-react'
 import Image from 'next/image'
+import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 interface Message {
   role: 'client' | 'seller'
@@ -732,13 +733,18 @@ export default function ChallengePage() {
     try {
       console.log('📊 Enviando para avaliação...')
 
+      // Get company ID for playbook evaluation
+      const companyId = await getCompanyId()
+      console.log('🏢 Company ID para avaliação:', companyId || 'não encontrado')
+
       const response = await fetch('/api/challenge/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcription,
           sessionId,
-          leadId
+          leadId,
+          companyId
         })
       })
 

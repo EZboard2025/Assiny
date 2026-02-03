@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Clock, Target, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2 } from 'lucide-react'
+import { Video, Clock, Target, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText } from 'lucide-react'
 
 interface MeetEvaluation {
   id: string
@@ -355,6 +355,118 @@ export default function MeetHistoryContent() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+
+                    {/* Playbook Adherence */}
+                    {selectedEvaluation.evaluation.playbook_adherence && (
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <FileText className="w-5 h-5 text-purple-600" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-purple-700">Aderência ao Playbook</h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-2xl font-bold text-purple-600">
+                                  {selectedEvaluation.evaluation.playbook_adherence.overall_adherence_score}%
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                  selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
+                                  selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
+                                  selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'Exemplar' :
+                                   selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'Conforme' :
+                                   selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Dimensões */}
+                        {selectedEvaluation.evaluation.playbook_adherence.dimensions && (
+                          <div className="grid grid-cols-5 gap-2 mb-4">
+                            {[
+                              { key: 'opening', label: 'Abertura', icon: '🎯' },
+                              { key: 'closing', label: 'Fechamento', icon: '🤝' },
+                              { key: 'conduct', label: 'Conduta', icon: '👔' },
+                              { key: 'required_scripts', label: 'Scripts', icon: '📝' },
+                              { key: 'process', label: 'Processo', icon: '⚙️' }
+                            ].map(({ key, label, icon }) => {
+                              const dim = selectedEvaluation.evaluation.playbook_adherence?.dimensions?.[key]
+                              if (!dim || dim.status === 'not_evaluated') return null
+                              return (
+                                <div key={key} className="bg-white/70 rounded-lg p-2 text-center border border-purple-100">
+                                  <div className="text-lg">{icon}</div>
+                                  <div className={`text-lg font-bold ${
+                                    (dim.score || 0) >= 70 ? 'text-green-600' :
+                                    (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                  }`}>
+                                    {dim.score || 0}%
+                                  </div>
+                                  <div className="text-[10px] text-gray-500">{label}</div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                          {/* Violações */}
+                          <div className="bg-red-50/80 rounded-lg p-3 border border-red-100">
+                            <h5 className="flex items-center gap-2 text-xs font-semibold text-red-700 mb-2">
+                              <AlertTriangle className="w-3 h-3" />
+                              Violações
+                            </h5>
+                            {selectedEvaluation.evaluation.playbook_adherence.violations?.length > 0 ? (
+                              <ul className="space-y-1">
+                                {selectedEvaluation.evaluation.playbook_adherence.violations.slice(0, 3).map((v: any, i: number) => (
+                                  <li key={i} className="text-xs text-gray-700">{v.criterion}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-green-600 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" />
+                                Nenhuma violação
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Requisitos não cumpridos */}
+                          <div className="bg-amber-50/80 rounded-lg p-3 border border-amber-100">
+                            <h5 className="flex items-center gap-2 text-xs font-semibold text-amber-700 mb-2">
+                              <AlertCircle className="w-3 h-3" />
+                              Não Cumpridos
+                            </h5>
+                            {selectedEvaluation.evaluation.playbook_adherence.missed_requirements?.length > 0 ? (
+                              <ul className="space-y-1">
+                                {selectedEvaluation.evaluation.playbook_adherence.missed_requirements.slice(0, 3).map((m: any, i: number) => (
+                                  <li key={i} className="text-xs text-gray-700">{m.criterion}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-green-600 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" />
+                                Todos cumpridos
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Orientações */}
+                        {selectedEvaluation.evaluation.playbook_adherence.coaching_notes && (
+                          <div className="bg-blue-50/80 rounded-lg p-3 border border-blue-100 mt-3">
+                            <h5 className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-2">
+                              <Lightbulb className="w-3 h-3" />
+                              Orientações para Melhorar
+                            </h5>
+                            <p className="text-xs text-gray-700 leading-relaxed">{selectedEvaluation.evaluation.playbook_adherence.coaching_notes}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

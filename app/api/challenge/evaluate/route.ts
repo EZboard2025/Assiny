@@ -9,7 +9,7 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { transcription, sessionId, leadId, userId } = await request.json()
+    const { transcription, sessionId, leadId, userId, companyId: providedCompanyId } = await request.json()
 
     if (!transcription || !sessionId) {
       return NextResponse.json(
@@ -22,10 +22,12 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Transcrição recebida (${transcription?.length || 0} chars):`, transcription?.substring(0, 1000))
     console.log(`🎯 LeadId: ${leadId || 'não fornecido'}`)
     console.log(`👤 UserId: ${userId || 'não fornecido'}`)
+    console.log(`🏢 CompanyId recebido: ${providedCompanyId || 'não fornecido'}`)
 
-    // Buscar company_id do usuário
-    let companyId: string | null = null
-    if (userId) {
+    // Usar companyId fornecido ou buscar do usuário
+    let companyId: string | null = providedCompanyId || null
+
+    if (!companyId && userId) {
       const { data: employeeData } = await supabase
         .from('employees')
         .select('company_id')
@@ -34,10 +36,12 @@ export async function POST(request: NextRequest) {
 
       companyId = employeeData?.company_id || null
       if (companyId) {
-        console.log('✅ company_id encontrado:', companyId)
+        console.log('✅ company_id encontrado via userId:', companyId)
       } else {
         console.warn('⚠️ company_id não encontrado para o usuário:', userId)
       }
+    } else if (companyId) {
+      console.log('✅ company_id fornecido diretamente:', companyId)
     }
 
     // Avaliar desafio diretamente via OpenAI (substituiu N8N)

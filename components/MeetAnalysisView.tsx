@@ -16,6 +16,7 @@ import {
   Copy,
   Check
 } from 'lucide-react'
+import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 
 // Vexa API config - production uses relative path via Nginx proxy
 const isDevelopment = typeof window !== 'undefined' && (
@@ -346,12 +347,17 @@ export default function MeetAnalysisView() {
 
       console.log('📊 Enviando transcrição para avaliação...')
 
+      // Get company ID for playbook evaluation
+      const companyId = await getCompanyId()
+      console.log('🏢 Company ID para avaliação:', companyId || 'não encontrado')
+
       const response = await fetch('/api/meet/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcript: transcriptText,
-          meetingId: session.meetingId
+          meetingId: session.meetingId,
+          companyId
         })
       })
 
