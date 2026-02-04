@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, QrCode, Search, ChevronRight, ChevronLeft } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, QrCode, Search, ChevronRight, ChevronLeft, Send } from 'lucide-react'
 
 interface FollowUpAnalysis {
   notas: {
@@ -78,6 +78,12 @@ export default function FollowUpView() {
   const [isInitializing, setIsInitializing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Message input state
+  const [messageInput, setMessageInput] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const selectedChatRef = useRef<WhatsAppChat | null>(null)
+
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<FollowUpAnalysis | null>(null)
@@ -130,6 +136,55 @@ export default function FollowUpView() {
     loadCompanyData()
     checkConnectionStatus()
   }, [])
+
+  // Keep ref in sync with selectedChat for polling
+  useEffect(() => {
+    selectedChatRef.current = selectedChat
+  }, [selectedChat])
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Poll for new messages when a chat is selected
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
+    if (connectionStatus === 'connected' && selectedChat) {
+      interval = setInterval(async () => {
+        const currentChat = selectedChatRef.current
+        if (!currentChat) return
+
+        try {
+          const response = await fetch(`/api/whatsapp-web/messages?chatId=${encodeURIComponent(currentChat.id)}`)
+          const data = await response.json()
+
+          if (data.messages) {
+            setMessages(prev => {
+              // Only update if there are new messages
+              if (data.messages.length !== prev.length) {
+                return data.messages
+              }
+              // Check if last message is different
+              const lastNew = data.messages[data.messages.length - 1]
+              const lastOld = prev[prev.length - 1]
+              if (lastNew && lastOld && lastNew.id !== lastOld.id) {
+                return data.messages
+              }
+              return prev
+            })
+          }
+        } catch (e) {
+          // Silent fail for polling
+        }
+      }, 5000) // Poll every 5 seconds
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [connectionStatus, selectedChat])
 
   // Poll for connection status
   useEffect(() => {
@@ -230,6 +285,58 @@ export default function FollowUpView() {
       console.error('Error loading messages:', error)
     } finally {
       setIsLoadingMessages(false)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!selectedChat || !messageInput.trim() || isSending) return
+
+    const text = messageInput.trim()
+    setMessageInput('')
+    setIsSending(true)
+
+    // Optimistic update: add message immediately
+    const tempMsg: WhatsAppMessage = {
+      id: `temp_${Date.now()}`,
+      body: text,
+      fromMe: true,
+      timestamp: new Date().toISOString(),
+      type: 'chat',
+      hasMedia: false
+    }
+    setMessages(prev => [...prev, tempMsg])
+
+    try {
+      const response = await fetch('/api/whatsapp-web/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId: selectedChat.id, message: text })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao enviar mensagem')
+      }
+
+      // Replace temp message with real one
+      setMessages(prev => prev.map(msg =>
+        msg.id === tempMsg.id ? data.message : msg
+      ))
+    } catch (err) {
+      console.error('Error sending message:', err)
+      // Remove temp message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+      setError(err instanceof Error ? err.message : 'Erro ao enviar mensagem')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
     }
   }
 
@@ -682,8 +789,42 @@ export default function FollowUpView() {
                     </div>
                   )
                 })}
+                <div ref={messagesEndRef} />
               </div>
             )}
+          </div>
+
+          {/* Message Input Bar */}
+          <div className="px-4 py-3 bg-[#202c33]">
+            <div className="flex items-end gap-2">
+              <div className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2">
+                <textarea
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Digite uma mensagem"
+                  rows={1}
+                  className="w-full bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none resize-none max-h-[120px] overflow-y-auto"
+                  style={{ minHeight: '20px' }}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement
+                    target.style.height = '20px'
+                    target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSendMessage}
+                disabled={!messageInput.trim() || isSending}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                {isSending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

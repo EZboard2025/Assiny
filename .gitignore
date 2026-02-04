@@ -36,3 +36,7 @@ next-env.d.ts
 
 # transcripts folder (local only)
 /transcripts/
+
+# whatsapp-web.js auth session data
+.wwebjs_auth/
+.wwebjs_cache/
