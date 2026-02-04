@@ -721,9 +721,22 @@ export default function MeetAnalysisView() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 font-bold">4.</span>
-                  A transcrição aparecerá em tempo real aqui
+                  Realize a reunião normalmente - o bot irá gravar e transcrever
                 </li>
               </ol>
+
+              {/* Warning about ending the call */}
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 text-lg">⚠️</span>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-700">Importante:</p>
+                    <p className="text-sm text-amber-600">
+                      Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
