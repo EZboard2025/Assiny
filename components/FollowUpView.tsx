@@ -91,16 +91,54 @@ export default function FollowUpView() {
   const [savedAnalyses, setSavedAnalyses] = useState<Record<string, { analysis: FollowUpAnalysis; date: string }>>({})
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(false)
 
-  // Load saved analyses from localStorage on mount
+  // Load saved analyses from Supabase on mount (with localStorage fallback)
   useEffect(() => {
-    const saved = localStorage.getItem('whatsapp_followup_analyses')
-    if (saved) {
+    const loadSavedAnalyses = async () => {
       try {
-        setSavedAnalyses(JSON.parse(saved))
+        const { supabase } = await import('@/lib/supabase')
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+          const { data, error } = await supabase
+            .from('followup_analyses')
+            .select('whatsapp_chat_id, whatsapp_contact_name, avaliacao, nota_final, classificacao, created_at')
+            .eq('user_id', user.id)
+            .not('whatsapp_chat_id', 'is', null)
+            .order('created_at', { ascending: false })
+
+          if (data && !error) {
+            const analysesMap: Record<string, { analysis: FollowUpAnalysis; date: string }> = {}
+            // Only keep the most recent analysis per chat
+            for (const row of data) {
+              if (row.whatsapp_chat_id && !analysesMap[row.whatsapp_chat_id]) {
+                analysesMap[row.whatsapp_chat_id] = {
+                  analysis: row.avaliacao as FollowUpAnalysis,
+                  date: row.created_at
+                }
+              }
+            }
+            setSavedAnalyses(analysesMap)
+            // Also sync to localStorage as cache
+            localStorage.setItem('whatsapp_followup_analyses', JSON.stringify(analysesMap))
+            return
+          }
+        }
       } catch (e) {
-        console.error('Error loading saved analyses:', e)
+        console.error('Error loading analyses from Supabase:', e)
+      }
+
+      // Fallback to localStorage
+      const saved = localStorage.getItem('whatsapp_followup_analyses')
+      if (saved) {
+        try {
+          setSavedAnalyses(JSON.parse(saved))
+        } catch (e) {
+          console.error('Error loading saved analyses:', e)
+        }
       }
     }
+
+    loadSavedAnalyses()
   }, [])
 
   // Company data state
@@ -392,7 +430,9 @@ export default function FollowUpView() {
           avaliacao: {
             canal: 'WhatsApp'
           },
-          dados_empresa: companyData
+          dados_empresa: companyData,
+          whatsapp_chat_id: selectedChat.id,
+          whatsapp_contact_name: selectedChat.name
         })
       })
 

@@ -22,6 +22,8 @@ export async function POST(req: NextRequest) {
     const dadosEmpresa = body.dados_empresa || null
     const funil = body.funil || null  // String formatada: "Fase 1: xxx, Fase 2: xxx"
     const faseDoLead = body.fase_do_lead || null  // String: "Fase X: Nome da Fase"
+    const whatsappChatId = body.whatsapp_chat_id || null  // ID do chat WhatsApp
+    const whatsappContactName = body.whatsapp_contact_name || null  // Nome do contato
 
     // Permitir transcrição direta OU imagens
     if ((!images || images.length === 0) && !transcricao) {
@@ -489,6 +491,13 @@ Retorne as mensagens organizadas conforme o formato especificado.`
                 console.log('✅ company_id incluído na inserção:', userCompanyId)
               } else {
                 console.warn('⚠️ company_id não encontrado - RAG pode não funcionar corretamente')
+              }
+
+              // Adicionar WhatsApp chat ID se fornecido
+              if (whatsappChatId) {
+                dataToInsert.whatsapp_chat_id = whatsappChatId
+                dataToInsert.whatsapp_contact_name = whatsappContactName
+                console.log('📱 WhatsApp chat ID incluído:', whatsappChatId, whatsappContactName)
               }
 
               console.log('💾 Dados preparados para inserção:')
