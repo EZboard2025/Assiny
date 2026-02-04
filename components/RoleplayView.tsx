@@ -559,6 +559,17 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
 
   const temperaments = ['Analítico', 'Empático', 'Determinado', 'Indeciso', 'Sociável']
 
+  // Função para converter idade numérica em faixa etária para TTS
+  const getAgeRangeFromAge = (ageValue: number): string => {
+    if (ageValue >= 18 && ageValue <= 24) return '18-24'
+    if (ageValue >= 25 && ageValue <= 34) return '25-34'
+    if (ageValue >= 35 && ageValue <= 44) return '35-44'
+    if (ageValue >= 45 && ageValue <= 60) return '45-60'
+    // Fallback para idades fora do range
+    if (ageValue < 18) return '18-24'
+    return '45-60'
+  }
+
   // Função para seleção aleatória de todas as configurações
   const handleRandomSelection = () => {
     // Idade aleatória entre 18 e 60
@@ -1595,16 +1606,18 @@ Interprete este personagem de forma realista e consistente com todas as caracter
   // Função para converter texto em áudio e tocar
   const textToSpeech = async (text: string, isFinalizationMessage: boolean = false) => {
     try {
-      console.log('🔊 Enviando texto para TTS:', text)
+      // Obter faixa etária para selecionar a voz correta
+      const ageRange = getAgeRangeFromAge(age)
+      console.log('🔊 Enviando texto para TTS:', text, '| Faixa etária:', ageRange)
       setIsPlayingAudio(true)
 
-      // Enviar texto para TTS via API proxy
+      // Enviar texto para TTS via API proxy com a faixa etária
       const response = await fetch('/api/roleplay/tts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ageRange }),
       })
 
       if (!response.ok) {

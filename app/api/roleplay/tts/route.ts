@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
-const ELEVENLABS_VOICE_ID = 'RW887Krqkhkn77rPnjT9'
+
+// Vozes mapeadas por faixa etária
+const VOICE_BY_AGE_RANGE: Record<string, string> = {
+  '18-24': 'RW887Krqkhkn77rPnjT9',
+  '25-34': 'F7823wtD50WK1gnmgBk5',
+  '35-44': '3QAt3IeuUNgSZQCVUNIu',
+  '45-60': 'rnJZLKxtlBZt77uIED10'
+}
+
+const DEFAULT_VOICE_ID = 'RW887Krqkhkn77rPnjT9' // 18-24 anos
 
 export async function POST(request: NextRequest) {
   try {
-    const { text } = await request.json()
+    const { text, ageRange } = await request.json()
 
     if (!text) {
       return NextResponse.json(
@@ -22,10 +31,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`🔊 Gerando TTS para: ${text.substring(0, 50)}...`)
+    // Selecionar voz baseada na faixa etária
+    const voiceId = ageRange && VOICE_BY_AGE_RANGE[ageRange]
+      ? VOICE_BY_AGE_RANGE[ageRange]
+      : DEFAULT_VOICE_ID
+
+    console.log(`🔊 Gerando TTS para: ${text.substring(0, 50)}... (Idade: ${ageRange || 'padrão'}, Voz: ${voiceId})`)
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
         method: 'POST',
         headers: {
