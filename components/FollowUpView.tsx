@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, QrCode, Search, MoreVertical } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, QrCode, Search, ChevronRight, ChevronLeft } from 'lucide-react'
 
 interface FollowUpAnalysis {
   notas: {
@@ -83,6 +83,7 @@ export default function FollowUpView() {
   const [analysis, setAnalysis] = useState<FollowUpAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [savedAnalyses, setSavedAnalyses] = useState<Record<string, { analysis: FollowUpAnalysis; date: string }>>({})
+  const [showAnalysisPanel, setShowAnalysisPanel] = useState(false)
 
   // Load saved analyses from localStorage on mount
   useEffect(() => {
@@ -240,8 +241,10 @@ export default function FollowUpView() {
     const saved = savedAnalyses[chat.id]
     if (saved) {
       setAnalysis(saved.analysis)
+      setShowAnalysisPanel(false) // Don't auto-open, let user click the card
     } else {
       setAnalysis(null)
+      setShowAnalysisPanel(false)
     }
 
     loadMessages(chat.id)
@@ -293,6 +296,7 @@ export default function FollowUpView() {
       }
 
       setAnalysis(data.analysis)
+      setShowAnalysisPanel(true) // Auto-open panel when new analysis completes
 
       // Save analysis to localStorage
       if (selectedChat && data.analysis) {
@@ -541,24 +545,26 @@ export default function FollowUpView() {
     }
 
     return (
-      <div className="flex-1 flex flex-col bg-[#0b141a]">
-        {/* Chat Header */}
-        <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center">
-              <span className="text-white font-medium">
-                {getInitials(selectedChat.name)}
-              </span>
+      <div className="flex-1 flex bg-[#0b141a] relative">
+        {/* Messages Column */}
+        <div className={`flex-1 flex flex-col transition-all duration-300 ${showAnalysisPanel ? 'mr-[400px]' : ''}`}>
+          {/* Chat Header */}
+          <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center">
+                <span className="text-white font-medium">
+                  {getInitials(selectedChat.name)}
+                </span>
+              </div>
+              <div>
+                <h3 className="text-[#e9edef] font-medium">{selectedChat.name}</h3>
+                <p className="text-[#8696a0] text-xs">
+                  {selectedChat.lastMessageTime ? `Última msg: ${formatTime(selectedChat.lastMessageTime)}` : ''}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-[#e9edef] font-medium">{selectedChat.name}</h3>
-              <p className="text-[#8696a0] text-xs">
-                {selectedChat.lastMessageTime ? `Última msg: ${formatTime(selectedChat.lastMessageTime)}` : ''}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {!analysis && (
+            <div className="flex items-center gap-2">
+              {/* Analyze Button */}
               <button
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || messages.length === 0}
@@ -572,101 +578,143 @@ export default function FollowUpView() {
                 ) : (
                   <>
                     <BarChart3 className="w-4 h-4" />
-                    Analisar
+                    {analysis ? 'Re-analisar' : 'Analisar'}
                   </>
                 )}
               </button>
+
+              {/* Analysis Score Card (when analysis exists) */}
+              {analysis && !showAnalysisPanel && (
+                <button
+                  onClick={() => setShowAnalysisPanel(true)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                    analysis.nota_final >= 8 ? 'bg-green-900/50 border border-green-700 hover:bg-green-900/70' :
+                    analysis.nota_final >= 6 ? 'bg-yellow-900/50 border border-yellow-700 hover:bg-yellow-900/70' :
+                    analysis.nota_final >= 4 ? 'bg-orange-900/50 border border-orange-700 hover:bg-orange-900/70' :
+                    'bg-red-900/50 border border-red-700 hover:bg-red-900/70'
+                  }`}
+                >
+                  <span className={`text-lg font-bold ${
+                    analysis.nota_final >= 8 ? 'text-green-400' :
+                    analysis.nota_final >= 6 ? 'text-yellow-400' :
+                    analysis.nota_final >= 4 ? 'text-orange-400' :
+                    'text-red-400'
+                  }`}>{analysis.nota_final.toFixed(1)}</span>
+                  <span className="text-[#8696a0] text-xs">Ver avaliação</span>
+                  <ChevronRight className="w-4 h-4 text-[#8696a0]" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto px-16 py-4" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+          }}>
+            {error && (
+              <div className="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+            )}
+
+            {isLoadingMessages ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-8 h-8 animate-spin text-[#00a884]" />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-[#8696a0] text-sm">Nenhuma mensagem encontrada</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {messages.map((msg, idx) => {
+                  const showDate = idx === 0 ||
+                    new Date(msg.timestamp).toDateString() !== new Date(messages[idx - 1].timestamp).toDateString()
+
+                  return (
+                    <div key={msg.id}>
+                      {showDate && (
+                        <div className="flex justify-center my-3">
+                          <span className="bg-[#182229] text-[#8696a0] text-xs px-3 py-1 rounded-lg shadow">
+                            {new Date(msg.timestamp).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[65%] rounded-lg px-3 py-2 shadow ${
+                          msg.fromMe
+                            ? 'bg-[#005c4b] rounded-tr-none'
+                            : 'bg-[#202c33] rounded-tl-none'
+                        }`}>
+                          {msg.hasMedia && msg.type !== 'chat' && (
+                            <div className="text-[#8696a0] text-xs italic mb-1">
+                              [{msg.type === 'image' ? '📷 Imagem' :
+                                msg.type === 'video' ? '🎥 Vídeo' :
+                                msg.type === 'audio' ? '🎵 Áudio' :
+                                msg.type === 'document' ? '📄 Documento' :
+                                msg.type === 'sticker' ? '🎨 Sticker' :
+                                `📎 ${msg.type}`}]
+                            </div>
+                          )}
+                          <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">
+                            {msg.body || (msg.hasMedia ? '' : '[Mensagem sem texto]')}
+                          </p>
+                          <div className="flex items-center justify-end gap-1 mt-1">
+                            <span className="text-[10px] text-[#8696a0]">
+                              {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                            {msg.fromMe && (
+                              <svg className="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 15" fill="currentColor">
+                                <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-        }}>
-          {error && (
-            <div className="m-4 p-4 bg-red-900/50 border border-red-700 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-300">{error}</p>
+        {/* Analysis Panel (slides in from right) */}
+        {analysis && (
+          <div className={`absolute top-0 right-0 h-full w-[400px] bg-[#111b21] border-l border-[#222d34] flex flex-col transition-transform duration-300 ${showAnalysisPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+            {/* Panel Header */}
+            <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowAnalysisPanel(false)}
+                  className="p-1 hover:bg-[#2a3942] rounded-full transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5 text-[#aebac1]" />
+                </button>
+                <span className="text-[#e9edef] font-medium">Avaliação</span>
+              </div>
+              <button
+                onClick={() => setShowAnalysisPanel(false)}
+                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-[#aebac1]" />
+              </button>
             </div>
-          )}
 
-          {analysis ? (
-            <div className="flex-1 overflow-y-auto p-6">
+            {/* Panel Content */}
+            <div className="flex-1 overflow-y-auto p-4">
               {renderAnalysisResults()}
             </div>
-          ) : (
-            /* Messages Area */
-            <div className="flex-1 overflow-y-auto px-16 py-4">
-              {isLoadingMessages ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#00a884]" />
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-[#8696a0] text-sm">Nenhuma mensagem encontrada</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {messages.map((msg, idx) => {
-                    const showDate = idx === 0 ||
-                      new Date(msg.timestamp).toDateString() !== new Date(messages[idx - 1].timestamp).toDateString()
-
-                    return (
-                      <div key={msg.id}>
-                        {showDate && (
-                          <div className="flex justify-center my-3">
-                            <span className="bg-[#182229] text-[#8696a0] text-xs px-3 py-1 rounded-lg shadow">
-                              {new Date(msg.timestamp).toLocaleDateString('pt-BR', {
-                                day: '2-digit',
-                                month: 'long',
-                                year: 'numeric'
-                              })}
-                            </span>
-                          </div>
-                        )}
-                        <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[65%] rounded-lg px-3 py-2 shadow ${
-                            msg.fromMe
-                              ? 'bg-[#005c4b] rounded-tr-none'
-                              : 'bg-[#202c33] rounded-tl-none'
-                          }`}>
-                            {msg.hasMedia && msg.type !== 'chat' && (
-                              <div className="text-[#8696a0] text-xs italic mb-1">
-                                [{msg.type === 'image' ? '📷 Imagem' :
-                                  msg.type === 'video' ? '🎥 Vídeo' :
-                                  msg.type === 'audio' ? '🎵 Áudio' :
-                                  msg.type === 'document' ? '📄 Documento' :
-                                  msg.type === 'sticker' ? '🎨 Sticker' :
-                                  `📎 ${msg.type}`}]
-                              </div>
-                            )}
-                            <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">
-                              {msg.body || (msg.hasMedia ? '' : '[Mensagem sem texto]')}
-                            </p>
-                            <div className="flex items-center justify-end gap-1 mt-1">
-                              <span className="text-[10px] text-[#8696a0]">
-                                {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </span>
-                              {msg.fromMe && (
-                                <svg className="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 15" fill="currentColor">
-                                  <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
-                                </svg>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -677,69 +725,57 @@ export default function FollowUpView() {
     const analysisDate = savedData?.date ? new Date(savedData.date) : null
 
     return (
-    <div className="space-y-4 max-w-3xl mx-auto">
+    <div className="space-y-3">
       {/* Analysis Header with Date */}
       {analysisDate && (
-        <div className="flex items-center justify-between text-[#8696a0] text-sm">
-          <span>Análise realizada em {analysisDate.toLocaleDateString('pt-BR', {
+        <p className="text-[#8696a0] text-xs text-center">
+          {analysisDate.toLocaleDateString('pt-BR', {
             day: '2-digit',
-            month: 'long',
+            month: 'short',
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
-          })}</span>
-          <button
-            onClick={() => {
-              setAnalysis(null)
-              // After setting null, handleAnalyze will be available
-            }}
-            className="text-[#00a884] hover:underline"
-          >
-            Re-analisar
-          </button>
-        </div>
+          })}
+        </p>
       )}
 
       {/* Overall Score */}
-      <div className={`rounded-2xl p-6 ${
+      <div className={`rounded-xl p-4 text-center ${
         analysis!.nota_final >= 8 ? 'bg-green-900/50 border border-green-700' :
         analysis!.nota_final >= 6 ? 'bg-yellow-900/50 border border-yellow-700' :
         analysis!.nota_final >= 4 ? 'bg-orange-900/50 border border-orange-700' :
         'bg-red-900/50 border border-red-700'
       }`}>
-        <p className="text-xs font-medium mb-2 uppercase tracking-wider text-[#8696a0]">Nota Final</p>
-        <div className="flex items-baseline gap-3">
-          <p className={`text-5xl font-bold ${
-            analysis!.nota_final >= 8 ? 'text-green-400' :
-            analysis!.nota_final >= 6 ? 'text-yellow-400' :
-            analysis!.nota_final >= 4 ? 'text-orange-400' :
-            'text-red-400'
-          }`}>{analysis!.nota_final.toFixed(1)}</p>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            analysis!.nota_final >= 8 ? 'bg-green-800 text-green-200' :
-            analysis!.nota_final >= 6 ? 'bg-yellow-800 text-yellow-200' :
-            analysis!.nota_final >= 4 ? 'bg-orange-800 text-orange-200' :
-            'bg-red-800 text-red-200'
-          }`}>
-            {analysis!.classificacao.toUpperCase()}
-          </span>
-        </div>
+        <p className={`text-4xl font-bold ${
+          analysis!.nota_final >= 8 ? 'text-green-400' :
+          analysis!.nota_final >= 6 ? 'text-yellow-400' :
+          analysis!.nota_final >= 4 ? 'text-orange-400' :
+          'text-red-400'
+        }`}>{analysis!.nota_final.toFixed(1)}</p>
+        <span className={`text-xs font-medium uppercase ${
+          analysis!.nota_final >= 8 ? 'text-green-300' :
+          analysis!.nota_final >= 6 ? 'text-yellow-300' :
+          analysis!.nota_final >= 4 ? 'text-orange-300' :
+          'text-red-300'
+        }`}>
+          {analysis!.classificacao}
+        </span>
       </div>
 
       {/* Detailed Scores */}
-      <div className="bg-[#202c33] rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <BarChart3 className="w-5 h-5 text-[#00a884]" />
-          <h3 className="text-lg font-semibold text-[#e9edef]">Análise Detalhada</h3>
+      <div className="bg-[#202c33] rounded-xl p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart3 className="w-4 h-4 text-[#00a884]" />
+          <h3 className="text-sm font-semibold text-[#e9edef]">Notas por Critério</h3>
         </div>
-        <div className="grid gap-3">
+        <div className="space-y-2">
           {Object.entries(analysis!.notas).map(([key, value]) => {
             const fieldLabels: Record<string, string> = {
-              'valor_agregado': 'Agregação de Valor',
+              'valor_agregado': 'Valor Agregado',
               'personalizacao': 'Personalização',
               'tom_consultivo': 'Tom Consultivo',
               'objetividade': 'Objetividade',
-              'cta': 'Call to Action (CTA)',
+              'cta': 'CTA',
               'timing': 'Timing'
             }
             const getColor = (nota: number) => {
@@ -751,15 +787,14 @@ export default function FollowUpView() {
             const colors = getColor(value.nota)
 
             return (
-              <div key={key} className="bg-[#111b21] rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[#e9edef] text-sm">{fieldLabels[key] || key}</span>
-                  <span className={`text-lg font-bold ${colors.text}`}>{value.nota.toFixed(1)}</span>
+              <div key={key}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[#e9edef] text-xs">{fieldLabels[key] || key}</span>
+                  <span className={`text-xs font-bold ${colors.text}`}>{value.nota.toFixed(1)}</span>
                 </div>
-                <div className="bg-[#2a3942] h-2 rounded-full overflow-hidden mb-2">
+                <div className="bg-[#111b21] h-1.5 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${colors.bar}`} style={{ width: `${value.nota * 10}%` }} />
                 </div>
-                <p className="text-[#8696a0] text-xs">{value.comentario}</p>
               </div>
             )
           })}
@@ -768,16 +803,16 @@ export default function FollowUpView() {
 
       {/* Positive Points */}
       {analysis!.pontos_positivos.length > 0 && (
-        <div className="bg-green-900/30 rounded-2xl p-6 border border-green-800">
-          <div className="flex items-center gap-3 mb-4">
-            <CheckCircle className="w-5 h-5 text-green-400" />
-            <h3 className="text-lg font-semibold text-green-400">Pontos Positivos</h3>
+        <div className="bg-green-900/30 rounded-xl p-3 border border-green-800">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle className="w-4 h-4 text-green-400" />
+            <h3 className="text-sm font-semibold text-green-400">Pontos Positivos</h3>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {analysis!.pontos_positivos.map((ponto, idx) => (
               <div key={idx} className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full mt-2 flex-shrink-0" />
-                <span className="text-[#e9edef] text-sm">{ponto}</span>
+                <div className="w-1 h-1 bg-green-400 rounded-full mt-1.5 flex-shrink-0" />
+                <span className="text-[#e9edef] text-xs">{ponto}</span>
               </div>
             ))}
           </div>
@@ -786,19 +821,16 @@ export default function FollowUpView() {
 
       {/* Points to Improve */}
       {analysis!.pontos_melhorar.length > 0 && (
-        <div className="bg-orange-900/30 rounded-2xl p-6 border border-orange-800">
-          <div className="flex items-center gap-3 mb-4">
-            <AlertCircle className="w-5 h-5 text-orange-400" />
-            <h3 className="text-lg font-semibold text-orange-400">Pontos para Melhorar</h3>
+        <div className="bg-orange-900/30 rounded-xl p-3 border border-orange-800">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-4 h-4 text-orange-400" />
+            <h3 className="text-sm font-semibold text-orange-400">Pontos para Melhorar</h3>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-2">
             {analysis!.pontos_melhorar.map((item, idx) => (
-              <div key={idx} className="bg-[#111b21] rounded-xl p-4">
-                <p className="text-[#e9edef] text-sm font-medium mb-2">{item.problema}</p>
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="w-4 h-4 text-[#00a884] flex-shrink-0 mt-0.5" />
-                  <p className="text-[#8696a0] text-xs">{item.como_resolver}</p>
-                </div>
+              <div key={idx} className="bg-[#111b21] rounded-lg p-2">
+                <p className="text-[#e9edef] text-xs font-medium mb-1">{item.problema}</p>
+                <p className="text-[#8696a0] text-xs">{item.como_resolver}</p>
               </div>
             ))}
           </div>
@@ -806,47 +838,23 @@ export default function FollowUpView() {
       )}
 
       {/* Main Tip */}
-      <div className="bg-[#00a884]/20 rounded-2xl p-6 border border-[#00a884]/50">
-        <div className="flex items-center gap-3 mb-4">
-          <Lightbulb className="w-5 h-5 text-[#00a884]" />
-          <h3 className="text-lg font-semibold text-[#00a884]">Dica Principal</h3>
+      <div className="bg-[#00a884]/20 rounded-xl p-3 border border-[#00a884]/50">
+        <div className="flex items-center gap-2 mb-2">
+          <Lightbulb className="w-4 h-4 text-[#00a884]" />
+          <h3 className="text-sm font-semibold text-[#00a884]">Dica Principal</h3>
         </div>
-        <p className="text-[#e9edef] text-sm">{analysis!.dica_principal}</p>
+        <p className="text-[#e9edef] text-xs">{analysis!.dica_principal}</p>
       </div>
 
       {/* Rewritten Version */}
-      <div className="bg-[#202c33] rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <FileText className="w-5 h-5 text-[#53bdeb]" />
-          <h3 className="text-lg font-semibold text-[#53bdeb]">Versão Melhorada</h3>
+      <div className="bg-[#202c33] rounded-xl p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <FileText className="w-4 h-4 text-[#53bdeb]" />
+          <h3 className="text-sm font-semibold text-[#53bdeb]">Versão Melhorada</h3>
         </div>
-        <div className="bg-[#111b21] rounded-xl p-4">
-          <pre className="whitespace-pre-wrap text-[#e9edef] text-sm font-sans">{analysis!.versao_reescrita}</pre>
+        <div className="bg-[#111b21] rounded-lg p-2">
+          <pre className="whitespace-pre-wrap text-[#e9edef] text-xs font-sans">{analysis!.versao_reescrita}</pre>
         </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-4 pt-4">
-        <button
-          onClick={() => {
-            setAnalysis(null)
-            setSelectedChat(null)
-            setMessages([])
-            setError(null)
-          }}
-          className="flex-1 bg-[#00a884] hover:bg-[#06cf9c] text-white rounded-full py-3 font-medium transition-colors"
-        >
-          Analisar Outra Conversa
-        </button>
-        <button
-          onClick={() => {
-            setAnalysis(null)
-            setError(null)
-          }}
-          className="px-6 py-3 bg-[#2a3942] hover:bg-[#3a4a54] text-[#e9edef] rounded-full font-medium transition-colors"
-        >
-          Ver Conversa
-        </button>
       </div>
     </div>
   )}
