@@ -63,6 +63,8 @@ interface WhatsAppMessage {
   timestamp: string
   type: string
   hasMedia: boolean
+  mediaUrl?: string | null
+  mimetype?: string | null
 }
 
 type ConnectionStatus = 'disconnected' | 'qr' | 'connecting' | 'connected'
@@ -84,6 +86,7 @@ export default function FollowUpView() {
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const selectedChatRef = useRef<WhatsAppChat | null>(null)
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -201,13 +204,14 @@ export default function FollowUpView() {
 
           if (data.messages) {
             setMessages(prev => {
-              // Only update if there are new messages
-              if (data.messages.length !== prev.length) {
+              // Filter out temp messages for comparison
+              const realPrev = prev.filter(m => !m.id.startsWith('temp_'))
+              // Only update if message count differs or last message ID changed
+              if (data.messages.length !== realPrev.length) {
                 return data.messages
               }
-              // Check if last message is different
               const lastNew = data.messages[data.messages.length - 1]
-              const lastOld = prev[prev.length - 1]
+              const lastOld = realPrev[realPrev.length - 1]
               if (lastNew && lastOld && lastNew.id !== lastOld.id) {
                 return data.messages
               }
@@ -217,13 +221,45 @@ export default function FollowUpView() {
         } catch (e) {
           // Silent fail for polling
         }
-      }, 5000) // Poll every 5 seconds
+      }, 3000) // Poll every 3 seconds
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
   }, [connectionStatus, selectedChat])
+
+  // Poll for chat list updates (new messages, unread counts)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
+    if (connectionStatus === 'connected') {
+      interval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/whatsapp-web/chats')
+          const data = await response.json()
+
+          if (data.chats) {
+            setChats(data.chats)
+            // Update selectedChat data if it's in the new list
+            const currentChat = selectedChatRef.current
+            if (currentChat) {
+              const updated = data.chats.find((c: WhatsAppChat) => c.id === currentChat.id)
+              if (updated) {
+                setSelectedChat(prev => prev ? { ...prev, unreadCount: updated.unreadCount, lastMessage: updated.lastMessage, lastMessageTime: updated.lastMessageTime } : prev)
+              }
+            }
+          }
+        } catch (e) {
+          // Silent fail for polling
+        }
+      }, 10000) // Poll chat list every 10 seconds
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [connectionStatus])
 
   // Poll for connection status
   useEffect(() => {
@@ -583,7 +619,7 @@ export default function FollowUpView() {
           <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center">
             <MessageSquare className="w-5 h-5 text-white" />
           </div>
-          <span className="text-[#e9edef] font-medium">Follow-up</span>
+          <span className="text-[#e9edef] font-medium">WhatsApp IA+</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -807,9 +843,37 @@ export default function FollowUpView() {
               </div>
             ) : (
               <div className="space-y-1">
-                {messages.map((msg, idx) => {
+                {messages
+                  .filter(msg => {
+                    // Hide system/notification messages that add no value
+                    const hiddenTypes = ['e2e_notification', 'notification_template', 'notification', 'ciphertext', 'reaction']
+                    return !hiddenTypes.includes(msg.type)
+                  })
+                  .map((msg, idx, filtered) => {
                   const showDate = idx === 0 ||
-                    new Date(msg.timestamp).toDateString() !== new Date(messages[idx - 1].timestamp).toDateString()
+                    new Date(msg.timestamp).toDateString() !== new Date(filtered[idx - 1].timestamp).toDateString()
+
+                  // Revoked messages get special center-aligned styling
+                  if (msg.type === 'revoked') {
+                    return (
+                      <div key={msg.id}>
+                        {showDate && (
+                          <div className="flex justify-center my-3">
+                            <span className="bg-[#182229] text-[#8696a0] text-xs px-3 py-1 rounded-lg shadow">
+                              {new Date(msg.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`rounded-lg px-3 py-2 shadow ${msg.fromMe ? 'bg-[#005c4b]/50' : 'bg-[#202c33]/50'}`}>
+                            <p className="text-[#8696a0] text-xs italic flex items-center gap-1">
+                              <span>🚫</span> Mensagem apagada
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
 
                   return (
                     <div key={msg.id}>
@@ -830,19 +894,79 @@ export default function FollowUpView() {
                             ? 'bg-[#005c4b] rounded-tr-none'
                             : 'bg-[#202c33] rounded-tl-none'
                         }`}>
-                          {msg.hasMedia && msg.type !== 'chat' && (
-                            <div className="text-[#8696a0] text-xs italic mb-1">
-                              [{msg.type === 'image' ? '📷 Imagem' :
-                                msg.type === 'video' ? '🎥 Vídeo' :
-                                msg.type === 'audio' ? '🎵 Áudio' :
-                                msg.type === 'document' ? '📄 Documento' :
-                                msg.type === 'sticker' ? '🎨 Sticker' :
-                                `📎 ${msg.type}`}]
+                          {/* Image */}
+                          {msg.mediaUrl && (msg.type === 'image' || (msg.mimetype?.startsWith('image/') && msg.type !== 'sticker')) && (
+                            <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
+                              <img
+                                src={msg.mediaUrl}
+                                alt="Imagem"
+                                className="w-full max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => setLightboxImage(msg.mediaUrl!)}
+                              />
                             </div>
                           )}
-                          <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">
-                            {msg.body || (msg.hasMedia ? '' : '[Mensagem sem texto]')}
-                          </p>
+                          {/* Sticker */}
+                          {msg.type === 'sticker' && msg.mediaUrl && (
+                            <div className="mb-1">
+                              <img src={msg.mediaUrl} alt="Sticker" className="max-w-[150px] max-h-[150px]" />
+                            </div>
+                          )}
+                          {/* Audio / PTT (voice message) */}
+                          {(msg.type === 'audio' || msg.type === 'ptt') && msg.mediaUrl && (
+                            <div className="mb-1 min-w-[240px]">
+                              <audio controls className="w-full h-8" style={{ filter: 'invert(1) hue-rotate(180deg)' }}>
+                                <source src={msg.mediaUrl} type={msg.mimetype || 'audio/ogg'} />
+                              </audio>
+                            </div>
+                          )}
+                          {/* Video */}
+                          {msg.type === 'video' && msg.mediaUrl && (
+                            <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
+                              <video controls className="w-full max-h-[300px]">
+                                <source src={msg.mediaUrl} type={msg.mimetype || 'video/mp4'} />
+                              </video>
+                            </div>
+                          )}
+                          {/* Document */}
+                          {msg.type === 'document' && (
+                            <div className="flex items-center gap-2 mb-1 bg-[#0b141a]/40 rounded px-2 py-1.5">
+                              <span className="text-2xl">📄</span>
+                              <span className="text-[#e9edef] text-sm truncate">{msg.body || 'Documento'}</span>
+                              {msg.mediaUrl && (
+                                <a href={msg.mediaUrl} download className="text-[#00a884] text-xs hover:underline ml-auto flex-shrink-0">Baixar</a>
+                              )}
+                            </div>
+                          )}
+                          {/* Media failed to load */}
+                          {msg.hasMedia && !msg.mediaUrl && msg.type !== 'chat' && (
+                            <p className="text-[#8696a0] text-xs italic mb-1">
+                              {msg.type === 'image' ? '📷 Imagem não carregada' :
+                               msg.type === 'sticker' ? '🎨 Sticker não carregado' :
+                               msg.type === 'video' ? '🎥 Vídeo não carregado' :
+                               msg.type === 'audio' || msg.type === 'ptt' ? '🎵 Áudio não carregado' :
+                               msg.type === 'document' ? '📄 Documento não carregado' :
+                               `📎 ${msg.type}`}
+                            </p>
+                          )}
+                          {/* Special message types with no body and no media */}
+                          {!msg.body && !msg.hasMedia && msg.type !== 'chat' && (
+                            <p className="text-[#8696a0] text-xs italic">
+                              {msg.type === 'sticker' ? '🎨 Sticker' :
+                               msg.type === 'location' ? '📍 Localização' :
+                               msg.type === 'vcard' || msg.type === 'multi_vcard' ? '👤 Contato' :
+                               msg.type === 'call_log' ? '📞 Chamada' :
+                               msg.type === 'poll_creation' ? '📊 Enquete' :
+                               msg.type === 'order' || msg.type === 'product' ? '🛒 Pedido' :
+                               msg.type === 'image' ? '📷 Imagem' :
+                               msg.type === 'video' ? '🎥 Vídeo' :
+                               msg.type === 'audio' || msg.type === 'ptt' ? '🎵 Áudio' :
+                               `[${msg.type}]`}
+                            </p>
+                          )}
+                          {/* Text body (skip for stickers and documents already showing body) */}
+                          {msg.body && msg.type !== 'sticker' && msg.type !== 'document' && (
+                            <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                          )}
                           <div className="flex items-center justify-end gap-1 mt-1">
                             <span className="text-[10px] text-[#8696a0]">
                               {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
@@ -1085,6 +1209,27 @@ export default function FollowUpView() {
         renderConnecting()
       ) : (
         renderDisconnected()
+      )}
+
+      {/* Image Lightbox */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center cursor-pointer"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white text-3xl font-light z-10"
+            onClick={() => setLightboxImage(null)}
+          >
+            ✕
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Imagem ampliada"
+            className="max-w-[90vw] max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   )

@@ -242,14 +242,42 @@ export async function getChatMessages(chatId: string, limit: number = 50): Promi
   const chat = await state.client.getChatById(chatId)
   const messages = await chat.fetchMessages({ limit })
 
-  return messages.map((msg: any) => ({
-    id: msg.id._serialized,
-    body: msg.body,
-    fromMe: msg.fromMe,
-    timestamp: new Date(msg.timestamp * 1000).toISOString(),
-    type: msg.type,
-    hasMedia: msg.hasMedia
-  }))
+  // Types that can have downloadable media
+  const mediaTypes = ['image', 'video', 'audio', 'ptt', 'sticker', 'document']
+
+  const results = await Promise.all(
+    messages.map(async (msg: any) => {
+      let mediaUrl: string | null = null
+      let mimetype: string | null = null
+
+      // Download media for supported types (also try for sticker/image/audio types even if hasMedia is false)
+      const shouldTryMedia = msg.hasMedia || mediaTypes.includes(msg.type)
+      if (shouldTryMedia) {
+        try {
+          const media = await msg.downloadMedia()
+          if (media) {
+            mimetype = media.mimetype || null
+            mediaUrl = `data:${media.mimetype};base64,${media.data}`
+          }
+        } catch (e) {
+          // Silent fail - media may not be available
+        }
+      }
+
+      return {
+        id: msg.id._serialized,
+        body: msg.body,
+        fromMe: msg.fromMe,
+        timestamp: new Date(msg.timestamp * 1000).toISOString(),
+        type: msg.type,
+        hasMedia: msg.hasMedia || !!mediaUrl,
+        mediaUrl,
+        mimetype
+      }
+    })
+  )
+
+  return results
 }
 
 export async function sendMessage(chatId: string, message: string): Promise<any> {
