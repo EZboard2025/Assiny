@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { Upload, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, X, FileText, TrendingUp, Building2, Users, MessageSquare, Target, Lightbulb, BarChart3 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, QrCode, Search, MoreVertical } from 'lucide-react'
 
 interface FollowUpAnalysis {
   notas: {
@@ -47,48 +47,71 @@ interface FollowUpAnalysis {
   dica_principal: string
 }
 
-interface FunnelStage {
+interface WhatsAppChat {
   id: string
-  company_id: string
-  stage_name: string
-  description: string
-  objective: string | null
-  stage_order: number
-  created_at: string
-  updated_at: string
+  name: string
+  lastMessage: string
+  lastMessageTime: string | null
+  unreadCount: number
 }
 
+interface WhatsAppMessage {
+  id: string
+  body: string
+  fromMe: boolean
+  timestamp: string
+  type: string
+  hasMedia: boolean
+}
+
+type ConnectionStatus = 'disconnected' | 'qr' | 'connecting' | 'connected'
+
 export default function FollowUpView() {
-  const [selectedImages, setSelectedImages] = useState<File[]>([])
-  const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  // WhatsApp state
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [chats, setChats] = useState<WhatsAppChat[]>([])
+  const [selectedChat, setSelectedChat] = useState<WhatsAppChat | null>(null)
+  const [messages, setMessages] = useState<WhatsAppMessage[]>([])
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isLoadingChats, setIsLoadingChats] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<FollowUpAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [extractedText, setExtractedText] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [savedAnalyses, setSavedAnalyses] = useState<Record<string, { analysis: FollowUpAnalysis; date: string }>>({})
+
+  // Load saved analyses from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('whatsapp_followup_analyses')
+    if (saved) {
+      try {
+        setSavedAnalyses(JSON.parse(saved))
+      } catch (e) {
+        console.error('Error loading saved analyses:', e)
+      }
+    }
+  }, [])
+
+  // Company data state
   const [companyData, setCompanyData] = useState<any>(null)
-  const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([])
 
-  // Context form state
-  const [tipoVenda, setTipoVenda] = useState<'B2B' | 'B2C'>('B2B')
-  const [canal, setCanal] = useState<string>('WhatsApp')
-  const [faseFunil, setFaseFunil] = useState<string>('')
-
-  // Carregar dados da empresa e fases do funil ao montar o componente
+  // Load company data on mount
   useEffect(() => {
     const loadCompanyData = async () => {
       try {
         const { supabase } = await import('@/lib/supabase')
         const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
 
-        // Buscar company_id (prioriza subdomínio, depois usuário)
         const companyId = await getCompanyId()
         if (!companyId) {
-          console.warn('⚠️ company_id não encontrado')
+          console.warn('company_id not found')
           return
         }
 
-        // Carregar dados da empresa
         const { data, error } = await supabase
           .from('company_data')
           .select('*')
@@ -97,79 +120,136 @@ export default function FollowUpView() {
 
         if (data && !error) {
           setCompanyData(data)
-          console.log('✅ Dados da empresa carregados:', data)
-        }
-
-        // Carregar fases do funil
-        const { data: stagesData, error: stagesError } = await supabase
-          .from('funnel_stages')
-          .select('*')
-          .eq('company_id', companyId)
-          .order('stage_order', { ascending: true })
-
-        if (stagesData && !stagesError) {
-          setFunnelStages(stagesData)
-          // Selecionar a primeira fase como padrão
-          if (stagesData.length > 0) {
-            setFaseFunil(stagesData[0].id)
-          }
-          console.log('✅ Fases do funil carregadas:', stagesData)
-        } else if (stagesError) {
-          console.warn('⚠️ Erro ao carregar fases do funil:', stagesError)
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error)
+        console.error('Error loading data:', error)
       }
     }
 
     loadCompanyData()
+    checkConnectionStatus()
   }, [])
 
+  // Poll for connection status
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-
-    if (files.length === 0) return
-
-    // Verificar limite de 5 imagens
-    if (selectedImages.length + files.length > 5) {
-      setError('Você pode adicionar no máximo 5 imagens')
-      return
+    if (connectionStatus === 'qr' || connectionStatus === 'connecting') {
+      interval = setInterval(checkConnectionStatus, 2000)
     }
 
-    // Verificar tamanho de cada arquivo
-    const oversizedFiles = files.filter(file => file.size > 10 * 1024 * 1024)
-    if (oversizedFiles.length > 0) {
-      setError('Cada imagem deve ter no máximo 10MB')
-      return
+    return () => {
+      if (interval) clearInterval(interval)
     }
+  }, [connectionStatus])
 
-    setError(null)
-    setAnalysis(null)
+  const checkConnectionStatus = async () => {
+    try {
+      const response = await fetch('/api/whatsapp-web/status')
+      const data = await response.json()
 
-    // Adicionar novos arquivos
-    const newImages = [...selectedImages, ...files]
-    setSelectedImages(newImages)
-
-    // Criar previews para todas as imagens
-    files.forEach(file => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreviews(prev => [...prev, reader.result as string])
+      setConnectionStatus(data.status)
+      if (data.qrCode) {
+        setQrCode(data.qrCode)
       }
-      reader.readAsDataURL(file)
-    })
+
+      if (data.status === 'connected' && chats.length === 0) {
+        loadChats()
+      }
+    } catch (error) {
+      console.error('Error checking status:', error)
+    }
   }
 
-  const removeImage = (index: number) => {
-    setSelectedImages(prev => prev.filter((_, i) => i !== index))
-    setImagePreviews(prev => prev.filter((_, i) => i !== index))
+  const initWhatsApp = async () => {
+    setIsInitializing(true)
     setError(null)
+
+    try {
+      const response = await fetch('/api/whatsapp-web/init', { method: 'POST' })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error initializing WhatsApp')
+      }
+
+      if (data.qrCode) {
+        setQrCode(data.qrCode)
+        setConnectionStatus('qr')
+      } else if (data.status === 'connected') {
+        setConnectionStatus('connected')
+        loadChats()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Connection error')
+    } finally {
+      setIsInitializing(false)
+    }
+  }
+
+  const disconnectWhatsApp = async () => {
+    try {
+      await fetch('/api/whatsapp-web/disconnect', { method: 'POST' })
+      setConnectionStatus('disconnected')
+      setQrCode(null)
+      setChats([])
+      setSelectedChat(null)
+    } catch (error) {
+      console.error('Error disconnecting:', error)
+    }
+  }
+
+  const loadChats = async () => {
+    setIsLoadingChats(true)
+    try {
+      const response = await fetch('/api/whatsapp-web/chats')
+      const data = await response.json()
+
+      if (data.chats) {
+        setChats(data.chats)
+      }
+    } catch (error) {
+      console.error('Error loading chats:', error)
+    } finally {
+      setIsLoadingChats(false)
+    }
+  }
+
+  const loadMessages = async (chatId: string) => {
+    setIsLoadingMessages(true)
+    setMessages([])
+    try {
+      const response = await fetch(`/api/whatsapp-web/messages?chatId=${encodeURIComponent(chatId)}`)
+      const data = await response.json()
+
+      if (data.messages) {
+        setMessages(data.messages)
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error)
+    } finally {
+      setIsLoadingMessages(false)
+    }
+  }
+
+  const selectChat = (chat: WhatsAppChat) => {
+    setSelectedChat(chat)
+    setError(null)
+
+    // Check if there's a saved analysis for this chat
+    const saved = savedAnalyses[chat.id]
+    if (saved) {
+      setAnalysis(saved.analysis)
+    } else {
+      setAnalysis(null)
+    }
+
+    loadMessages(chat.id)
   }
 
   const handleAnalyze = async () => {
-    if (selectedImages.length === 0) {
-      setError('Por favor, adicione pelo menos uma imagem')
+    if (!selectedChat) {
+      setError('Select a conversation')
       return
     }
 
@@ -177,601 +257,614 @@ export default function FollowUpView() {
     setError(null)
 
     try {
-      // Convert all images to base64
-      const base64Images = await Promise.all(
-        selectedImages.map(image =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(image)
-          })
-        )
+      const messagesResponse = await fetch(
+        `/api/whatsapp-web/messages?chatId=${encodeURIComponent(selectedChat.id)}&format=analysis`
       )
+      const messagesData = await messagesResponse.json()
 
-      // Obter o token de autenticação se disponível
+      if (!messagesResponse.ok) {
+        throw new Error(messagesData.error || 'Error fetching messages')
+      }
+
       const { supabase } = await import('@/lib/supabase')
       const { data: { session } } = await supabase.auth.getSession()
 
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      }
-
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
-      // Formatar fases do funil para N8N com todos os 3 campos
-      const funnelFormatted = funnelStages
-        .map((stage, index) => {
-          const parts = [`Fase ${index + 1}: ${stage.stage_name}`]
-          if (stage.description) {
-            parts.push(`Descrição: ${stage.description}`)
-          }
-          if (stage.objective) {
-            parts.push(`Objetivo: ${stage.objective}`)
-          }
-          return parts.join(' | ')
-        })
-        .join(' || ')
-
-      // Encontrar fase atual do lead
-      const currentStageIndex = funnelStages.findIndex(s => s.id === faseFunil)
-      const currentStage = funnelStages[currentStageIndex]
-      const leadStage = currentStage
-        ? `Fase ${currentStageIndex + 1}: ${currentStage.stage_name}`
-        : 'Não definida'
-
-      // Send to API for OCR and analysis with context
       const response = await fetch('/api/followup/analyze', {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          images: base64Images, // Agora enviando array de imagens
-          filenames: selectedImages.map(img => img.name),
+          transcricao: messagesData.formatted,
           avaliacao: {
-            tipo_venda: tipoVenda,
-            canal: canal,
-            fase_funil: faseFunil
+            canal: 'WhatsApp'
           },
-          dados_empresa: companyData, // Enviando todos os dados da empresa
-          funil: funnelFormatted, // String formatada: "Fase 1: xxx, Fase 2: xxx, etc"
-          fase_do_lead: leadStage // String: "Fase X: Nome da Fase"
+          dados_empresa: companyData
         })
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        console.error('Erro na API:', data)
-        const errorMessage = data.details || data.error || 'Erro ao analisar follow-up'
-        const suggestion = data.suggestion || ''
-        throw new Error(`${errorMessage}${suggestion ? '\n\n' + suggestion : ''}`)
+        throw new Error(data.error || 'Error analyzing follow-up')
       }
 
-      setExtractedText(data.extractedText)
       setAnalysis(data.analysis)
 
+      // Save analysis to localStorage
+      if (selectedChat && data.analysis) {
+        const newSavedAnalyses = {
+          ...savedAnalyses,
+          [selectedChat.id]: {
+            analysis: data.analysis,
+            date: new Date().toISOString()
+          }
+        }
+        setSavedAnalyses(newSavedAnalyses)
+        localStorage.setItem('whatsapp_followup_analyses', JSON.stringify(newSavedAnalyses))
+      }
     } catch (err) {
-      console.error('Erro na análise:', err)
-      setError(err instanceof Error ? err.message : 'Erro ao analisar o follow-up')
+      console.error('Analysis error:', err)
+      setError(err instanceof Error ? err.message : 'Error analyzing follow-up')
     } finally {
       setIsAnalyzing(false)
     }
   }
 
-  const getClassificationColor = (classification: string) => {
-    const colors: Record<string, string> = {
-      'pessimo': 'text-red-600 bg-red-50',
-      'ruim': 'text-orange-600 bg-orange-50',
-      'medio': 'text-yellow-600 bg-yellow-50',
-      'bom': 'text-green-600 bg-green-50',
-      'excelente': 'text-purple-600 bg-purple-50'
+  // Get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  // Format time for chat list
+  const formatTime = (dateStr: string | null) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) {
+      return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    } else if (diffDays === 1) {
+      return 'Ontem'
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString('pt-BR', { weekday: 'short' })
+    } else {
+      return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
     }
-    return colors[classification] || 'text-gray-600 bg-gray-50'
   }
 
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600'
-    if (score >= 6) return 'text-yellow-600'
-    if (score >= 4) return 'text-orange-600'
-    return 'text-red-600'
-  }
+  // Filter chats by search
+  const filteredChats = chats.filter(chat =>
+    chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
-  return (
-    <div className="flex-1 p-4 md:p-6 overflow-y-auto min-h-screen">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
-              <Upload className="w-6 h-6 text-green-600" />
+  // Render disconnected state
+  const renderDisconnected = () => (
+    <div className="flex-1 flex items-center justify-center bg-[#222e35]">
+      <div className="text-center max-w-md px-8">
+        <div className="w-[320px] h-[320px] mx-auto mb-8 flex items-center justify-center">
+          <Smartphone className="w-40 h-40 text-[#8696a0]" />
+        </div>
+        <h1 className="text-[32px] font-light text-[#e9edef] mb-4">
+          Análise de Follow-up
+        </h1>
+        <p className="text-[#8696a0] text-sm mb-8">
+          Conecte seu WhatsApp para analisar suas conversas de follow-up automaticamente.
+          Selecione uma conversa e receba feedback detalhado em segundos.
+        </p>
+        <button
+          onClick={initWhatsApp}
+          disabled={isInitializing}
+          className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-6 py-3 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+        >
+          {isInitializing ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Inicializando...
+            </>
+          ) : (
+            <>
+              <QrCode className="w-5 h-5" />
+              Conectar WhatsApp
+            </>
+          )}
+        </button>
+        <p className="text-[#8696a0] text-xs mt-6">
+          Esta integração usa WhatsApp Web. Use com cautela.
+        </p>
+      </div>
+    </div>
+  )
+
+  // Render QR code state
+  const renderQRCode = () => (
+    <div className="flex-1 flex items-center justify-center bg-[#222e35]">
+      <div className="text-center">
+        <h2 className="text-[#e9edef] text-xl mb-2">Escaneie o QR Code</h2>
+        <p className="text-[#8696a0] text-sm mb-6">
+          Abra o WhatsApp no celular → Menu → Dispositivos conectados → Conectar
+        </p>
+        {qrCode ? (
+          <div className="bg-white p-4 rounded-lg inline-block">
+            <img src={qrCode} alt="QR Code" className="w-64 h-64" />
+          </div>
+        ) : (
+          <div className="w-64 h-64 mx-auto bg-[#2a3942] rounded-lg flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-[#8696a0]" />
+          </div>
+        )}
+        <div className="mt-6 flex items-center justify-center gap-2 text-[#00a884]">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-sm">Aguardando conexão...</span>
+        </div>
+      </div>
+    </div>
+  )
+
+  // Render connecting state
+  const renderConnecting = () => (
+    <div className="flex-1 flex items-center justify-center bg-[#222e35]">
+      <div className="text-center">
+        <Loader2 className="w-12 h-12 animate-spin text-[#00a884] mx-auto mb-4" />
+        <h2 className="text-[#e9edef] text-xl mb-2">Conectando...</h2>
+        <p className="text-[#8696a0] text-sm">Aguarde enquanto estabelecemos a conexão.</p>
+      </div>
+    </div>
+  )
+
+  // Render chat sidebar
+  const renderChatSidebar = () => (
+    <div className="w-[400px] bg-[#111b21] border-r border-[#222d34] flex flex-col h-full">
+      {/* Header */}
+      <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center">
+            <MessageSquare className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-[#e9edef] font-medium">Follow-up</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadChats}
+            className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+            title="Atualizar"
+          >
+            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isLoadingChats ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={disconnectWhatsApp}
+            className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+            title="Desconectar"
+          >
+            <LogOut className="w-5 h-5 text-[#aebac1]" />
+          </button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="px-3 py-2 bg-[#111b21]">
+        <div className="flex items-center bg-[#202c33] rounded-lg px-4 py-2">
+          <Search className="w-5 h-5 text-[#8696a0] mr-4" />
+          <input
+            type="text"
+            placeholder="Pesquisar ou começar uma nova conversa"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Chat List */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoadingChats ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-[#00a884]" />
+          </div>
+        ) : filteredChats.length === 0 ? (
+          <div className="text-center py-8 px-4">
+            <p className="text-[#8696a0] text-sm">Nenhuma conversa encontrada</p>
+          </div>
+        ) : (
+          filteredChats.map((chat) => (
+            <button
+              key={chat.id}
+              onClick={() => selectChat(chat)}
+              className={`w-full flex items-center px-3 py-3 hover:bg-[#202c33] transition-colors ${
+                selectedChat?.id === chat.id ? 'bg-[#2a3942]' : ''
+              }`}
+            >
+              {/* Avatar */}
+              <div className="w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center flex-shrink-0 mr-3">
+                <span className="text-white text-lg font-medium">
+                  {getInitials(chat.name)}
+                </span>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0 border-b border-[#222d34] py-1">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[#e9edef] text-base truncate">{chat.name}</span>
+                    {savedAnalyses[chat.id] && (
+                      <span className="flex-shrink-0 bg-[#00a884] text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+                        {savedAnalyses[chat.id].analysis.nota_final.toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-xs flex-shrink-0 ${chat.unreadCount > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
+                    {formatTime(chat.lastMessageTime)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[#8696a0] text-sm truncate pr-2">{chat.lastMessage || 'Sem mensagens'}</p>
+                  {chat.unreadCount > 0 && (
+                    <span className="bg-[#00a884] text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                      {chat.unreadCount}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  )
+
+  // Render main content area
+  const renderMainContent = () => {
+    if (!selectedChat) {
+      return (
+        <div className="flex-1 flex items-center justify-center bg-[#222e35]">
+          <div className="text-center">
+            <div className="w-[320px] h-[200px] mx-auto mb-8 flex items-center justify-center">
+              <MessageSquare className="w-32 h-32 text-[#364147]" />
+            </div>
+            <h2 className="text-[#e9edef] text-2xl font-light mb-2">Selecione uma conversa</h2>
+            <p className="text-[#8696a0] text-sm">
+              Escolha uma conversa à esquerda para analisar o follow-up
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex-1 flex flex-col bg-[#0b141a]">
+        {/* Chat Header */}
+        <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center">
+              <span className="text-white font-medium">
+                {getInitials(selectedChat.name)}
+              </span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Análise de Follow-up</h1>
-              <p className="text-gray-500 text-sm">Preencha o contexto e faça upload de um print para receber feedback detalhado</p>
+              <h3 className="text-[#e9edef] font-medium">{selectedChat.name}</h3>
+              <p className="text-[#8696a0] text-xs">
+                {selectedChat.lastMessageTime ? `Última msg: ${formatTime(selectedChat.lastMessageTime)}` : ''}
+              </p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!analysis && (
+              <button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || messages.length === 0}
+                className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Analisando...
+                  </>
+                ) : (
+                  <>
+                    <BarChart3 className="w-4 h-4" />
+                    Analisar
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Context Form */}
-        {!analysis && (
-          <div className="bg-white rounded-2xl p-6 mb-6 border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
-                <Target className="w-4 h-4 text-green-600" />
-              </div>
-              Contexto do Follow-up
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Tipo de Venda */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
-                  <Building2 className="w-4 h-4 text-gray-500" />
-                  Tipo de Venda
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTipoVenda('B2B')}
-                    className={`flex-1 py-2 px-4 rounded-lg border transition-all font-medium ${
-                      tipoVenda === 'B2B'
-                        ? 'bg-green-500 text-white border-green-500 shadow-sm'
-                        : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
-                    }`}
-                  >
-                    B2B
-                  </button>
-                  <button
-                    onClick={() => setTipoVenda('B2C')}
-                    className={`flex-1 py-2 px-4 rounded-lg border transition-all font-medium ${
-                      tipoVenda === 'B2C'
-                        ? 'bg-green-500 text-white border-green-500 shadow-sm'
-                        : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
-                    }`}
-                  >
-                    B2C
-                  </button>
-                </div>
-              </div>
-
-              {/* Canal */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
-                  <MessageSquare className="w-4 h-4 text-gray-500" />
-                  Canal
-                </label>
-                <select
-                  value={canal}
-                  onChange={(e) => setCanal(e.target.value)}
-                  className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                >
-                  <option value="WhatsApp">WhatsApp</option>
-                  <option value="E-mail">E-mail</option>
-                  <option value="Telefone">Telefone</option>
-                  <option value="SMS">SMS</option>
-                  <option value="LinkedIn">LinkedIn</option>
-                </select>
-              </div>
-
-              {/* Fase do Funil */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
-                  <Target className="w-4 h-4 text-gray-500" />
-                  Fase do Funil
-                </label>
-                <select
-                  value={faseFunil}
-                  onChange={(e) => setFaseFunil(e.target.value)}
-                  className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                >
-                  {funnelStages.length === 0 ? (
-                    <option value="">Configure as fases no Config Hub</option>
-                  ) : (
-                    funnelStages.map((stage) => (
-                      <option key={stage.id} value={stage.id}>
-                        {stage.stage_name}
-                      </option>
-                    ))
-                  )}
-                </select>
-                {funnelStages.length === 0 && (
-                  <p className="text-xs text-yellow-600 mt-1">
-                    Nenhuma fase cadastrada. Configure no Config Hub primeiro.
-                  </p>
-                )}
-              </div>
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }}>
+          {error && (
+            <div className="m-4 p-4 bg-red-900/50 border border-red-700 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-300">{error}</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Upload Area */}
-        {!analysis && (
-          <div className="bg-white rounded-2xl p-6 mb-6 border border-gray-200 shadow-sm">
-            <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                imagePreviews.length > 0
-                  ? 'border-green-400 bg-green-50'
-                  : 'border-gray-300 bg-gray-50 hover:border-green-400 hover:bg-green-50'
-              }`}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-
-              {imagePreviews.length > 0 ? (
-                <div className="space-y-4">
-                  {/* Grid de imagens */}
-                  <div className={`grid gap-4 ${
-                    imagePreviews.length === 1 ? 'grid-cols-1' :
-                    imagePreviews.length === 2 ? 'grid-cols-2' :
-                    'grid-cols-3'
-                  }`}>
-                    {imagePreviews.map((preview, index) => (
-                      <div key={index} className="relative">
-                        <img
-                          src={preview}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg shadow-sm border border-green-200"
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            removeImage(index)
-                          }}
-                          className="absolute top-2 right-2 bg-white rounded-full p-1 hover:bg-gray-100 transition-colors border border-gray-200 shadow-sm"
-                        >
-                          <X className="w-4 h-4 text-gray-600" />
-                        </button>
-                        <span className="absolute bottom-2 left-2 bg-white px-2 py-1 rounded text-xs text-gray-600 shadow-sm">
-                          {index + 1}/{imagePreviews.length}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Botão para adicionar mais imagens */}
-                  {imagePreviews.length < 5 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        fileInputRef.current?.click()
-                      }}
-                      className="mx-auto flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Adicionar mais imagens ({imagePreviews.length}/5)
-                    </button>
-                  )}
-
-                  <p className="text-sm text-gray-500 text-center">
-                    {selectedImages.map(img => img.name).join(', ')}
-                  </p>
+          {analysis ? (
+            <div className="flex-1 overflow-y-auto p-6">
+              {renderAnalysisResults()}
+            </div>
+          ) : (
+            /* Messages Area */
+            <div className="flex-1 overflow-y-auto px-16 py-4">
+              {isLoadingMessages ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#00a884]" />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-[#8696a0] text-sm">Nenhuma mensagem encontrada</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <Upload className="w-12 h-12 mx-auto text-gray-400" />
-                  <div>
-                    <p className="text-lg font-medium text-gray-700">
-                      Clique ou arraste para fazer upload
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      PNG, JPG, JPEG até 10MB (máximo 5 imagens)
-                    </p>
-                  </div>
+                <div className="space-y-1">
+                  {messages.map((msg, idx) => {
+                    const showDate = idx === 0 ||
+                      new Date(msg.timestamp).toDateString() !== new Date(messages[idx - 1].timestamp).toDateString()
+
+                    return (
+                      <div key={msg.id}>
+                        {showDate && (
+                          <div className="flex justify-center my-3">
+                            <span className="bg-[#182229] text-[#8696a0] text-xs px-3 py-1 rounded-lg shadow">
+                              {new Date(msg.timestamp).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[65%] rounded-lg px-3 py-2 shadow ${
+                            msg.fromMe
+                              ? 'bg-[#005c4b] rounded-tr-none'
+                              : 'bg-[#202c33] rounded-tl-none'
+                          }`}>
+                            {msg.hasMedia && msg.type !== 'chat' && (
+                              <div className="text-[#8696a0] text-xs italic mb-1">
+                                [{msg.type === 'image' ? '📷 Imagem' :
+                                  msg.type === 'video' ? '🎥 Vídeo' :
+                                  msg.type === 'audio' ? '🎵 Áudio' :
+                                  msg.type === 'document' ? '📄 Documento' :
+                                  msg.type === 'sticker' ? '🎨 Sticker' :
+                                  `📎 ${msg.type}`}]
+                              </div>
+                            )}
+                            <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">
+                              {msg.body || (msg.hasMedia ? '' : '[Mensagem sem texto]')}
+                            </p>
+                            <div className="flex items-center justify-end gap-1 mt-1">
+                              <span className="text-[10px] text-[#8696a0]">
+                                {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                              {msg.fromMe && (
+                                <svg className="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 15" fill="currentColor">
+                                  <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
-
-            {error && !error.includes('contexto') && (
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            )}
-
-            {imagePreviews.length > 0 && !isAnalyzing && (
-              <button
-                onClick={handleAnalyze}
-                className="mt-6 w-full bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-xl font-medium transition-all shadow-sm"
-              >
-                Analisar Follow-up ({imagePreviews.length} {imagePreviews.length === 1 ? 'imagem' : 'imagens'})
-              </button>
-            )}
-
-            {isAnalyzing && (
-              <div className="mt-6 flex items-center justify-center gap-3 text-green-600">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="font-medium">Analisando seu follow-up...</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Analysis Results */}
-        {analysis && (
-          <div className="space-y-6">
-            {/* Overall Score Card */}
-            <div className={`rounded-2xl p-6 border ${
-              analysis.nota_final >= 8 ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200' :
-              analysis.nota_final >= 6 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200' :
-              analysis.nota_final >= 4 ? 'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200' :
-              'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
-            }`}>
-              <div>
-                <p className={`text-xs font-medium mb-2 uppercase tracking-wider ${
-                  analysis.nota_final >= 8 ? 'text-green-600' :
-                  analysis.nota_final >= 6 ? 'text-yellow-600' :
-                  analysis.nota_final >= 4 ? 'text-orange-600' :
-                  'text-red-600'
-                }`}>Nota Final</p>
-                <div className="flex items-baseline gap-3">
-                  <p className={`text-5xl font-bold ${
-                    analysis.nota_final >= 8 ? 'text-green-600' :
-                    analysis.nota_final >= 6 ? 'text-yellow-600' :
-                    analysis.nota_final >= 4 ? 'text-orange-600' :
-                    'text-red-600'
-                  }`}>{analysis.nota_final.toFixed(1)}</p>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    analysis.nota_final >= 8 ? 'bg-green-100 text-green-700' :
-                    analysis.nota_final >= 6 ? 'bg-yellow-100 text-yellow-700' :
-                    analysis.nota_final >= 4 ? 'bg-orange-100 text-orange-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {analysis.classificacao.toUpperCase()}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Detailed Scores */}
-            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Análise Detalhada</h3>
-                  <p className="text-xs text-gray-500">Avaliação critério por critério</p>
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                {Object.entries(analysis.notas).map(([key, value]) => {
-                  const fieldLabels: Record<string, string> = {
-                    'valor_agregado': 'Agregação de Valor',
-                    'personalizacao': 'Personalização',
-                    'tom_consultivo': 'Tom Consultivo',
-                    'objetividade': 'Objetividade',
-                    'cta': 'Call to Action (CTA)',
-                    'timing': 'Timing'
-                  }
-
-                  const getColorScheme = (nota: number) => {
-                    if (nota >= 8) return {
-                      bg: 'bg-green-50',
-                      border: 'border-green-100',
-                      text: 'text-green-600',
-                      bar: 'bg-green-500',
-                      badge: 'bg-green-100 text-green-700'
-                    }
-                    if (nota >= 6) return {
-                      bg: 'bg-yellow-50',
-                      border: 'border-yellow-100',
-                      text: 'text-yellow-600',
-                      bar: 'bg-yellow-500',
-                      badge: 'bg-yellow-100 text-yellow-700'
-                    }
-                    if (nota >= 4) return {
-                      bg: 'bg-orange-50',
-                      border: 'border-orange-100',
-                      text: 'text-orange-600',
-                      bar: 'bg-orange-500',
-                      badge: 'bg-orange-100 text-orange-700'
-                    }
-                    return {
-                      bg: 'bg-red-50',
-                      border: 'border-red-100',
-                      text: 'text-red-600',
-                      bar: 'bg-red-500',
-                      badge: 'bg-red-100 text-red-700'
-                    }
-                  }
-
-                  const colors = getColorScheme(value.nota)
-
-                  return (
-                    <div
-                      key={key}
-                      className={`${colors.bg} rounded-xl p-4 border ${colors.border}`}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className="font-medium text-gray-900">
-                            {fieldLabels[key] || key.replace(/_/g, ' ')}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-2xl font-bold ${colors.text}`}>
-                            {value.nota.toFixed(1)}
-                          </span>
-                          <p className={`text-xs mt-1 px-2 py-0.5 rounded-full inline-block ${colors.badge}`}>
-                            {value.nota >= 8 ? 'Excelente' :
-                             value.nota >= 6 ? 'Bom' :
-                             value.nota >= 4 ? 'Regular' : 'Precisa Melhorar'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-3 border border-gray-100 mb-3">
-                        <p className="text-sm text-gray-700 leading-relaxed">{value.comentario}</p>
-                      </div>
-
-                      {/* Progress bar */}
-                      <div className="bg-gray-200 h-2 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${colors.bar}`}
-                          style={{ width: `${value.nota * 10}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Positive Points */}
-            {analysis.pontos_positivos.length > 0 && (
-              <div className="bg-green-50 rounded-2xl p-6 border border-green-100">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-green-700">Pontos Positivos</h3>
-                    <p className="text-xs text-green-600">Você acertou nestes aspectos</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {analysis.pontos_positivos.map((ponto, idx) => (
-                    <div key={idx} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-green-100">
-                      <div className="mt-0.5 w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <CheckCircle className="w-3 h-3 text-green-600" />
-                      </div>
-                      <span className="text-gray-700 flex-1 leading-relaxed text-sm">{ponto}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Points to Improve */}
-            {analysis.pontos_melhorar.length > 0 && (
-              <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-                    <AlertCircle className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-orange-700">Pontos para Melhorar</h3>
-                    <p className="text-xs text-orange-600">Oportunidades de desenvolvimento</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {analysis.pontos_melhorar.map((item, idx) => (
-                    <div key={idx} className="bg-white rounded-xl p-4 border border-orange-100">
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="w-6 h-6 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
-                        </div>
-                        <p className="font-medium text-gray-900 flex-1">
-                          {item.problema}
-                        </p>
-                      </div>
-                      <div className="flex items-start gap-3 ml-9">
-                        <div className="w-5 h-5 bg-green-100 rounded-md flex items-center justify-center mt-0.5 flex-shrink-0">
-                          <Lightbulb className="w-3 h-3 text-green-600" />
-                        </div>
-                        <div>
-                          <span className="text-xs font-semibold text-green-600 uppercase tracking-wider">Solução:</span>
-                          <p className="text-sm text-gray-700 mt-1 leading-relaxed">{item.como_resolver}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Main Tip */}
-            <div className="bg-purple-50 rounded-2xl p-6 border border-purple-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <Lightbulb className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-purple-700">Dica Principal</h3>
-                  <p className="text-xs text-purple-600">Foque neste insight para melhorar rapidamente</p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl p-4 border border-purple-100">
-                <p className="text-gray-700 leading-relaxed">{analysis.dica_principal}</p>
-              </div>
-            </div>
-
-            {/* Rewritten Version */}
-            <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-blue-700">Versão Melhorada</h3>
-                  <p className="text-xs text-blue-600">Exemplo otimizado do seu follow-up</p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl p-4 border border-blue-100">
-                <pre className="whitespace-pre-wrap text-gray-700 leading-relaxed font-sans text-sm">
-                  {analysis.versao_reescrita}
-                </pre>
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>Copie e adapte ao seu estilo</span>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 mt-6">
-              <button
-                onClick={() => {
-                  setAnalysis(null)
-                  setSelectedImages([])
-                  setImagePreviews([])
-                  setExtractedText(null)
-                  setError(null)
-                  // Reset form but keep previous context values for convenience
-                  // User can change if needed
-                }}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white rounded-xl py-3 px-6 font-medium transition-colors shadow-sm flex items-center justify-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Fazer Nova Análise
-              </button>
-
-              <button
-                onClick={() => {
-                  // Simply clear the analysis to return to form
-                  setAnalysis(null)
-                  setSelectedImages([])
-                  setImagePreviews([])
-                  setExtractedText(null)
-                  setError(null)
-                }}
-                className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors border border-gray-200 flex items-center justify-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Fechar
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+    )
+  }
+
+  // Render analysis results
+  const renderAnalysisResults = () => {
+    const savedData = selectedChat ? savedAnalyses[selectedChat.id] : null
+    const analysisDate = savedData?.date ? new Date(savedData.date) : null
+
+    return (
+    <div className="space-y-4 max-w-3xl mx-auto">
+      {/* Analysis Header with Date */}
+      {analysisDate && (
+        <div className="flex items-center justify-between text-[#8696a0] text-sm">
+          <span>Análise realizada em {analysisDate.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</span>
+          <button
+            onClick={() => {
+              setAnalysis(null)
+              // After setting null, handleAnalyze will be available
+            }}
+            className="text-[#00a884] hover:underline"
+          >
+            Re-analisar
+          </button>
+        </div>
+      )}
+
+      {/* Overall Score */}
+      <div className={`rounded-2xl p-6 ${
+        analysis!.nota_final >= 8 ? 'bg-green-900/50 border border-green-700' :
+        analysis!.nota_final >= 6 ? 'bg-yellow-900/50 border border-yellow-700' :
+        analysis!.nota_final >= 4 ? 'bg-orange-900/50 border border-orange-700' :
+        'bg-red-900/50 border border-red-700'
+      }`}>
+        <p className="text-xs font-medium mb-2 uppercase tracking-wider text-[#8696a0]">Nota Final</p>
+        <div className="flex items-baseline gap-3">
+          <p className={`text-5xl font-bold ${
+            analysis!.nota_final >= 8 ? 'text-green-400' :
+            analysis!.nota_final >= 6 ? 'text-yellow-400' :
+            analysis!.nota_final >= 4 ? 'text-orange-400' :
+            'text-red-400'
+          }`}>{analysis!.nota_final.toFixed(1)}</p>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+            analysis!.nota_final >= 8 ? 'bg-green-800 text-green-200' :
+            analysis!.nota_final >= 6 ? 'bg-yellow-800 text-yellow-200' :
+            analysis!.nota_final >= 4 ? 'bg-orange-800 text-orange-200' :
+            'bg-red-800 text-red-200'
+          }`}>
+            {analysis!.classificacao.toUpperCase()}
+          </span>
+        </div>
+      </div>
+
+      {/* Detailed Scores */}
+      <div className="bg-[#202c33] rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <BarChart3 className="w-5 h-5 text-[#00a884]" />
+          <h3 className="text-lg font-semibold text-[#e9edef]">Análise Detalhada</h3>
+        </div>
+        <div className="grid gap-3">
+          {Object.entries(analysis!.notas).map(([key, value]) => {
+            const fieldLabels: Record<string, string> = {
+              'valor_agregado': 'Agregação de Valor',
+              'personalizacao': 'Personalização',
+              'tom_consultivo': 'Tom Consultivo',
+              'objetividade': 'Objetividade',
+              'cta': 'Call to Action (CTA)',
+              'timing': 'Timing'
+            }
+            const getColor = (nota: number) => {
+              if (nota >= 8) return { bar: 'bg-green-500', text: 'text-green-400' }
+              if (nota >= 6) return { bar: 'bg-yellow-500', text: 'text-yellow-400' }
+              if (nota >= 4) return { bar: 'bg-orange-500', text: 'text-orange-400' }
+              return { bar: 'bg-red-500', text: 'text-red-400' }
+            }
+            const colors = getColor(value.nota)
+
+            return (
+              <div key={key} className="bg-[#111b21] rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[#e9edef] text-sm">{fieldLabels[key] || key}</span>
+                  <span className={`text-lg font-bold ${colors.text}`}>{value.nota.toFixed(1)}</span>
+                </div>
+                <div className="bg-[#2a3942] h-2 rounded-full overflow-hidden mb-2">
+                  <div className={`h-full rounded-full ${colors.bar}`} style={{ width: `${value.nota * 10}%` }} />
+                </div>
+                <p className="text-[#8696a0] text-xs">{value.comentario}</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Positive Points */}
+      {analysis!.pontos_positivos.length > 0 && (
+        <div className="bg-green-900/30 rounded-2xl p-6 border border-green-800">
+          <div className="flex items-center gap-3 mb-4">
+            <CheckCircle className="w-5 h-5 text-green-400" />
+            <h3 className="text-lg font-semibold text-green-400">Pontos Positivos</h3>
+          </div>
+          <div className="space-y-2">
+            {analysis!.pontos_positivos.map((ponto, idx) => (
+              <div key={idx} className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full mt-2 flex-shrink-0" />
+                <span className="text-[#e9edef] text-sm">{ponto}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Points to Improve */}
+      {analysis!.pontos_melhorar.length > 0 && (
+        <div className="bg-orange-900/30 rounded-2xl p-6 border border-orange-800">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-5 h-5 text-orange-400" />
+            <h3 className="text-lg font-semibold text-orange-400">Pontos para Melhorar</h3>
+          </div>
+          <div className="space-y-4">
+            {analysis!.pontos_melhorar.map((item, idx) => (
+              <div key={idx} className="bg-[#111b21] rounded-xl p-4">
+                <p className="text-[#e9edef] text-sm font-medium mb-2">{item.problema}</p>
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="w-4 h-4 text-[#00a884] flex-shrink-0 mt-0.5" />
+                  <p className="text-[#8696a0] text-xs">{item.como_resolver}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main Tip */}
+      <div className="bg-[#00a884]/20 rounded-2xl p-6 border border-[#00a884]/50">
+        <div className="flex items-center gap-3 mb-4">
+          <Lightbulb className="w-5 h-5 text-[#00a884]" />
+          <h3 className="text-lg font-semibold text-[#00a884]">Dica Principal</h3>
+        </div>
+        <p className="text-[#e9edef] text-sm">{analysis!.dica_principal}</p>
+      </div>
+
+      {/* Rewritten Version */}
+      <div className="bg-[#202c33] rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <FileText className="w-5 h-5 text-[#53bdeb]" />
+          <h3 className="text-lg font-semibold text-[#53bdeb]">Versão Melhorada</h3>
+        </div>
+        <div className="bg-[#111b21] rounded-xl p-4">
+          <pre className="whitespace-pre-wrap text-[#e9edef] text-sm font-sans">{analysis!.versao_reescrita}</pre>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-4 pt-4">
+        <button
+          onClick={() => {
+            setAnalysis(null)
+            setSelectedChat(null)
+            setMessages([])
+            setError(null)
+          }}
+          className="flex-1 bg-[#00a884] hover:bg-[#06cf9c] text-white rounded-full py-3 font-medium transition-colors"
+        >
+          Analisar Outra Conversa
+        </button>
+        <button
+          onClick={() => {
+            setAnalysis(null)
+            setError(null)
+          }}
+          className="px-6 py-3 bg-[#2a3942] hover:bg-[#3a4a54] text-[#e9edef] rounded-full font-medium transition-colors"
+        >
+          Ver Conversa
+        </button>
+      </div>
+    </div>
+  )}
+
+  return (
+    <div className="flex h-[calc(100vh-64px)] bg-[#111b21]">
+      {connectionStatus === 'connected' ? (
+        <>
+          {renderChatSidebar()}
+          {renderMainContent()}
+        </>
+      ) : connectionStatus === 'qr' ? (
+        renderQRCode()
+      ) : connectionStatus === 'connecting' ? (
+        renderConnecting()
+      ) : (
+        renderDisconnected()
+      )}
     </div>
   )
 }

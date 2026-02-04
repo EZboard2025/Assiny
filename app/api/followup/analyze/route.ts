@@ -17,22 +17,34 @@ export async function POST(req: NextRequest) {
     // Compatibilidade: aceitar tanto 'image' quanto 'images'
     const images = body.images || (body.image ? [body.image] : null)
     const filenames = body.filenames || (body.filename ? [body.filename] : [])
+    const transcricao = body.transcricao || null  // Transcrição direta (WhatsApp integrado)
     const avaliacao = body.avaliacao
     const dadosEmpresa = body.dados_empresa || null
     const funil = body.funil || null  // String formatada: "Fase 1: xxx, Fase 2: xxx"
     const faseDoLead = body.fase_do_lead || null  // String: "Fase X: Nome da Fase"
 
-    if (!images || images.length === 0) {
+    // Permitir transcrição direta OU imagens
+    if ((!images || images.length === 0) && !transcricao) {
       return NextResponse.json(
-        { error: 'Pelo menos uma imagem é obrigatória' },
+        { error: 'É necessário enviar imagens ou transcrição de texto' },
         { status: 400 }
       )
     }
 
 
     try {
-      // TESTE: Extrair o texto de todas as imagens usando GPT-4 Vision
-      console.log(`Iniciando extração de texto de ${images.length} imagem(ns) com GPT-4 Vision...`)
+      let fullExtractedText = ''
+      let filteredText = ''
+
+      // Se transcrição já foi fornecida (WhatsApp integrado), pular OCR
+      if (transcricao) {
+        console.log('📱 Transcrição direta recebida (WhatsApp integrado)')
+        fullExtractedText = transcricao
+        filteredText = transcricao
+        console.log('✅ Usando transcrição direta, pulando extração OCR')
+      } else {
+      // EXTRAÇÃO OCR: Extrair o texto de todas as imagens usando GPT-4 Vision
+      console.log(`Iniciando extração de texto de ${images!.length} imagem(ns) com GPT-4 Vision...`)
 
       // Verificar se temos API key
       if (!process.env.OPENAI_API_KEY) {
@@ -85,7 +97,7 @@ Mantenha a ordem cronológica exata. Não adicione comentários ou análises, ap
       )
 
       // Combinar todos os textos extraídos
-      const fullExtractedText = extractedTexts.join('\n\n--- CONTINUAÇÃO DA CONVERSA ---\n\n')
+      fullExtractedText = extractedTexts.join('\n\n--- CONTINUAÇÃO DA CONVERSA ---\n\n')
 
       console.log('Texto extraído com sucesso de todas as imagens')
 
@@ -150,7 +162,7 @@ Retorne as mensagens organizadas conforme o formato especificado.`
         temperature: 0.3 // Baixa temperatura para ser mais preciso
       })
 
-      let filteredText = filterResponse.choices[0].message.content || fullExtractedText
+      filteredText = filterResponse.choices[0].message.content || fullExtractedText
 
       // Limpar headers de formatação
       filteredText = filteredText
@@ -161,6 +173,7 @@ Retorne as mensagens organizadas conforme o formato especificado.`
         .trim()
 
       console.log('Follow-up filtrado e organizado com sucesso')
+      } // Fim do else (processamento OCR)
 
       // TERCEIRA ETAPA: Buscar company_id do usuário para o N8N filtrar os exemplos
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
