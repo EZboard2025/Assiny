@@ -860,7 +860,7 @@ export default function FollowUpView() {
   )}
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[#111b21]">
+    <div className="flex min-h-screen bg-[#111b21]">
       {connectionStatus === 'connected' ? (
         <>
           {renderChatSidebar()}
