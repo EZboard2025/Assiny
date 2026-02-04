@@ -53,6 +53,7 @@ interface WhatsAppChat {
   lastMessage: string
   lastMessageTime: string | null
   unreadCount: number
+  profilePicUrl: string | null
 }
 
 interface WhatsAppMessage {
@@ -636,10 +637,30 @@ export default function FollowUpView() {
               }`}
             >
               {/* Avatar */}
-              <div className="w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center flex-shrink-0 mr-3">
-                <span className="text-white text-lg font-medium">
-                  {getInitials(chat.name)}
-                </span>
+              <div className="relative flex-shrink-0 mr-3">
+                {chat.profilePicUrl ? (
+                  <img
+                    src={chat.profilePicUrl}
+                    alt={chat.name}
+                    className="w-12 h-12 rounded-full object-cover"
+                    onError={(e) => {
+                      // Fallback to initials on error
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      target.nextElementSibling?.classList.remove('hidden')
+                    }}
+                  />
+                ) : null}
+                <div className={`w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center ${chat.profilePicUrl ? 'hidden' : ''}`}>
+                  <span className="text-white text-lg font-medium">
+                    {getInitials(chat.name)}
+                  </span>
+                </div>
+                {chat.unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#00a884] text-white text-[10px] font-bold min-w-[20px] h-[20px] flex items-center justify-center rounded-full px-1">
+                    {chat.unreadCount}
+                  </span>
+                )}
               </div>
 
               {/* Content */}
@@ -659,11 +680,6 @@ export default function FollowUpView() {
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-[#8696a0] text-sm truncate pr-2">{chat.lastMessage || 'Sem mensagens'}</p>
-                  {chat.unreadCount > 0 && (
-                    <span className="bg-[#00a884] text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                      {chat.unreadCount}
-                    </span>
-                  )}
                 </div>
               </div>
             </button>
@@ -698,10 +714,26 @@ export default function FollowUpView() {
           {/* Chat Header */}
           <div className="h-[60px] flex-shrink-0 bg-[#202c33] px-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center">
-                <span className="text-white font-medium">
-                  {getInitials(selectedChat.name)}
-                </span>
+              <div className="relative w-10 h-10">
+                {selectedChat.profilePicUrl ? (
+                  <img
+                    src={selectedChat.profilePicUrl}
+                    alt={selectedChat.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      if (target.nextElementSibling) {
+                        target.nextElementSibling.classList.remove('hidden')
+                      }
+                    }}
+                  />
+                ) : null}
+                <div className={`w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center ${selectedChat.profilePicUrl ? 'hidden' : ''}`}>
+                  <span className="text-white font-medium">
+                    {getInitials(selectedChat.name)}
+                  </span>
+                </div>
               </div>
               <div>
                 <h3 className="text-[#e9edef] font-medium">{selectedChat.name}</h3>

@@ -207,14 +207,31 @@ export async function getChats(): Promise<any[]> {
   // Filtrar apenas conversas individuais (não grupos) e com mensagens
   const individualChats = chats.filter((chat: any) => !chat.isGroup && chat.lastMessage)
 
-  // Mapear para formato simplificado
-  return individualChats.slice(0, 50).map((chat: any) => ({
-    id: chat.id._serialized,
-    name: chat.name,
-    lastMessage: chat.lastMessage?.body?.substring(0, 100) || '',
-    lastMessageTime: chat.lastMessage?.timestamp ? new Date(chat.lastMessage.timestamp * 1000).toISOString() : null,
-    unreadCount: chat.unreadCount || 0
-  }))
+  // Mapear para formato simplificado e buscar fotos de perfil em paralelo
+  const chatList = individualChats.slice(0, 50)
+
+  const results = await Promise.all(
+    chatList.map(async (chat: any) => {
+      let profilePicUrl: string | null = null
+      try {
+        const contact = await chat.getContact()
+        profilePicUrl = await contact.getProfilePicUrl() || null
+      } catch (e) {
+        // Silently fail - some contacts don't have profile pics
+      }
+
+      return {
+        id: chat.id._serialized,
+        name: chat.name,
+        lastMessage: chat.lastMessage?.body?.substring(0, 100) || '',
+        lastMessageTime: chat.lastMessage?.timestamp ? new Date(chat.lastMessage.timestamp * 1000).toISOString() : null,
+        unreadCount: chat.unreadCount || 0,
+        profilePicUrl
+      }
+    })
+  )
+
+  return results
 }
 
 export async function getChatMessages(chatId: string, limit: number = 50): Promise<any[]> {
