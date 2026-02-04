@@ -3476,14 +3476,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         </div>
         )}
 
-        {/* DEBUG: Botão para visualizar modal de avaliação - REMOVER EM PRODUÇÃO */}
-        <button
-          onClick={showMockEvaluation}
-          className="fixed bottom-4 left-4 px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg opacity-30 hover:opacity-100 transition-opacity z-50"
-          title="DEBUG: Ver modal de avaliação"
-        >
-          🧪 Preview Avaliação
-        </button>
     </>
   )
 }

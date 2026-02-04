@@ -5,7 +5,7 @@ const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 // Vozes mapeadas por faixa etária
 const VOICE_BY_AGE_RANGE: Record<string, string> = {
   '18-24': 'RW887Krqkhkn77rPnjT9',
-  '25-34': 'F7823wtD50WK1gnmgBk5',
+  '25-34': 'YGgtUkdLOCAVgzsgM2S7',
   '35-44': '3QAt3IeuUNgSZQCVUNIu',
   '45-60': 'rnJZLKxtlBZt77uIED10'
 }
