@@ -692,11 +692,11 @@ export default function FollowUpView() {
     }
 
     return (
-      <div className="flex-1 flex bg-[#0b141a] relative">
+      <div className="flex-1 flex bg-[#0b141a] relative overflow-hidden">
         {/* Messages Column */}
-        <div className={`flex-1 flex flex-col transition-all duration-300 ${showAnalysisPanel ? 'mr-[400px]' : ''}`}>
+        <div className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ${showAnalysisPanel ? 'mr-[400px]' : ''}`}>
           {/* Chat Header */}
-          <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
+          <div className="h-[60px] flex-shrink-0 bg-[#202c33] px-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center">
                 <span className="text-white font-medium">
@@ -755,7 +755,7 @@ export default function FollowUpView() {
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto px-16 py-4" style={{
+          <div className="flex-1 min-h-0 overflow-y-auto px-16 py-4" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
           }}>
             {error && (
@@ -835,7 +835,7 @@ export default function FollowUpView() {
           </div>
 
           {/* Message Input Bar */}
-          <div className="px-4 py-3 bg-[#202c33]">
+          <div className="px-4 py-3 bg-[#202c33] flex-shrink-0">
             <div className="flex items-end gap-2">
               <div className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2">
                 <textarea
@@ -1041,7 +1041,7 @@ export default function FollowUpView() {
   )}
 
   return (
-    <div className="flex min-h-screen bg-[#111b21]">
+    <div className="flex h-screen overflow-hidden bg-[#111b21]">
       {connectionStatus === 'connected' ? (
         <>
           {renderChatSidebar()}
