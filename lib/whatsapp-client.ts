@@ -256,11 +256,34 @@ async function syncChatHistory(state: ClientState): Promise<void> {
       try {
         // Get contact info
         const contact = await chat.getContact()
-        // chat.id.user contains just the phone number (e.g., "5531967884482")
-        const contactPhone = chat.id.user
         const contactName = contact?.pushname || contact?.name || chat.name || null
 
-        console.log(`[WA] Chat ID: ${chat.id._serialized}, user: ${chat.id.user}, contactPhone: ${contactPhone}`)
+        // Get the actual phone number - handle LID (Linked Device ID) format
+        // LID format: 80303171309822@lid (internal WhatsApp ID, NOT a phone number)
+        // Phone format: 5531967884482@c.us (actual phone number)
+        let contactPhone: string
+        const chatIdSerialized = chat.id._serialized || ''
+
+        if (chatIdSerialized.endsWith('@lid')) {
+          // This is a LID, need to get phone from contact.number
+          contactPhone = (contact as any)?.number || ''
+          // If still no number, try to extract from contact.id
+          if (!contactPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
+            contactPhone = contact.id.user
+          }
+          console.log(`[WA] LID detected - contact.number: ${(contact as any)?.number}, contactPhone: ${contactPhone}`)
+        } else {
+          // Regular @c.us format - user field contains the phone number
+          contactPhone = chat.id.user
+        }
+
+        // Skip if we couldn't get a valid phone number
+        if (!contactPhone || contactPhone.length < 8) {
+          console.log(`[WA] Skipping chat - no valid phone number found for: ${contactName || chatIdSerialized}`)
+          continue
+        }
+
+        console.log(`[WA] Chat ID: ${chatIdSerialized}, contactPhone: ${contactPhone}, name: ${contactName}`)
 
         // Fetch last 100 messages from this chat for full history
         const messages = await chat.fetchMessages({ limit: 100 })
@@ -435,18 +458,35 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     // Skip status broadcasts
     if (msg.from === 'status@broadcast' || msg.to === 'status@broadcast') return
 
-    // Extract phone number - remove any @suffix (@c.us, @lid, @g.us, etc.)
-    const rawTo = msg.to || ''
-    const rawFrom = msg.from || ''
-    const contactPhone = fromMe
-      ? rawTo.replace(/@.*$/, '')
-      : rawFrom.replace(/@.*$/, '')
-
     const contact = await msg.getContact()
     const contactName = contact?.pushname || contact?.name || null
 
+    // Get the actual phone number - handle LID (Linked Device ID) format
+    const rawTo = msg.to || ''
+    const rawFrom = msg.from || ''
+    const targetId = fromMe ? rawTo : rawFrom
+
+    let contactPhone: string
+    if (targetId.endsWith('@lid')) {
+      // LID format - get phone from contact.number
+      contactPhone = (contact as any)?.number || ''
+      if (!contactPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
+        contactPhone = contact.id.user
+      }
+      console.log(`[WA] LID message - contact.number: ${(contact as any)?.number}, resolved: ${contactPhone}`)
+    } else {
+      // Regular format - extract phone from ID
+      contactPhone = targetId.replace(/@.*$/, '')
+    }
+
+    // Skip if no valid phone
+    if (!contactPhone || contactPhone.length < 8) {
+      console.log(`[WA] Skipping message - no valid phone for: ${targetId}`)
+      return
+    }
+
     // Debug logging
-    console.log(`[WA] Message: fromMe=${fromMe}, rawTo=${rawTo}, rawFrom=${rawFrom}, contactPhone=${contactPhone}`)
+    console.log(`[WA] Message: fromMe=${fromMe}, targetId=${targetId}, contactPhone=${contactPhone}`)
 
     // Determine message type
     let messageType = 'text'
