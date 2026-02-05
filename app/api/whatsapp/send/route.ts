@@ -37,8 +37,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
     }
 
-    // Format phone number for WhatsApp (add @c.us suffix)
-    const chatId = to.includes('@') ? to : `${to.replace(/[^0-9]/g, '')}@c.us`
+    let chatId: string
+
+    // Handle LID contacts (stored with lid_ prefix)
+    if (to.startsWith('lid_')) {
+      // Extract the LID number and use @lid suffix
+      const lidNumber = to.replace('lid_', '')
+      chatId = `${lidNumber}@lid`
+      console.log(`[WA Send] LID contact detected, using: ${chatId}`)
+    } else if (to.includes('@')) {
+      // Already has a suffix, use as-is
+      chatId = to
+    } else {
+      // Regular phone number - first try to find original chat ID from recent message
+      const { data: recentMessage } = await supabaseAdmin
+        .from('whatsapp_messages')
+        .select('raw_payload')
+        .eq('user_id', user.id)
+        .eq('contact_phone', to)
+        .order('message_timestamp', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (recentMessage?.raw_payload?.original_chat_id) {
+        // Use the stored original chat ID
+        chatId = recentMessage.raw_payload.original_chat_id
+        console.log(`[WA Send] Using stored original_chat_id: ${chatId}`)
+      } else {
+        // No stored chat ID, use standard @c.us format
+        chatId = `${to.replace(/[^0-9]/g, '')}@c.us`
+        console.log(`[WA Send] Using @c.us format: ${chatId}`)
+      }
+    }
 
     // Send message via whatsapp-web.js
     const sentMsg = await client.sendMessage(chatId, message)

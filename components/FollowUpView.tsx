@@ -631,6 +631,12 @@ export default function FollowUpView() {
 
   // Format phone number for display
   const formatPhone = (phone: string) => {
+    // Handle LID contacts (stored with lid_ prefix when phone couldn't be resolved)
+    if (phone.startsWith('lid_')) {
+      // Show a shortened identifier for LID contacts
+      const lidId = phone.replace('lid_', '')
+      return `ID: ...${lidId.slice(-6)}`
+    }
     if (phone.length >= 12) {
       return `+${phone.slice(0, 2)} (${phone.slice(2, 4)}) ${phone.slice(4, 9)}-${phone.slice(9)}`
     }

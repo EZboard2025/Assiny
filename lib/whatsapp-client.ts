@@ -263,23 +263,47 @@ async function syncChatHistory(state: ClientState): Promise<void> {
         // Phone format: 5531967884482@c.us (actual phone number)
         let contactPhone: string
         const chatIdSerialized = chat.id._serialized || ''
+        const isLidContact = chatIdSerialized.endsWith('@lid')
 
-        if (chatIdSerialized.endsWith('@lid')) {
+        if (isLidContact) {
           // This is a LID, need to get phone from contact.number
           contactPhone = (contact as any)?.number || ''
-          // If still no number, try to extract from contact.id
+
+          // Fallback 1: Try to extract from contact.id if it's not a LID
           if (!contactPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
             contactPhone = contact.id.user
           }
-          console.log(`[WA] LID detected - contact.number: ${(contact as any)?.number}, contactPhone: ${contactPhone}`)
+
+          // Fallback 2: Try getFormattedNumber() method
+          if (!contactPhone) {
+            try {
+              const formattedNumber = await (contact as any).getFormattedNumber?.()
+              if (formattedNumber) {
+                // Remove formatting characters, keep only digits
+                contactPhone = formattedNumber.replace(/[^0-9]/g, '')
+              }
+            } catch (e) {
+              console.log(`[WA] getFormattedNumber failed for ${contactName || chatIdSerialized}`)
+            }
+          }
+
+          console.log(`[WA] LID detected - contact.number: ${(contact as any)?.number}, resolved contactPhone: ${contactPhone}`)
+
+          // If we still can't get a real phone number, use a placeholder with the LID
+          // This allows us to still display the chat but track that it's a LID
+          if (!contactPhone || contactPhone.length < 8) {
+            // Use the LID user part as identifier, but mark it
+            contactPhone = `lid_${chat.id.user}`
+            console.log(`[WA] Using LID identifier for: ${contactName || chatIdSerialized} -> ${contactPhone}`)
+          }
         } else {
           // Regular @c.us format - user field contains the phone number
           contactPhone = chat.id.user
         }
 
-        // Skip if we couldn't get a valid phone number
-        if (!contactPhone || contactPhone.length < 8) {
-          console.log(`[WA] Skipping chat - no valid phone number found for: ${contactName || chatIdSerialized}`)
+        // Skip if we couldn't get any identifier
+        if (!contactPhone) {
+          console.log(`[WA] Skipping chat - no identifier found for: ${contactName || chatIdSerialized}`)
           continue
         }
 
@@ -397,7 +421,7 @@ async function syncChatHistory(state: ClientState): Promise<void> {
               media_mime_type: mediaMimeType,
               message_timestamp: msgTimestamp.toISOString(),
               status: fromMe ? 'sent' : 'delivered',
-              raw_payload: { type: msg.type, hasMedia: msg.hasMedia, body: msg.body, from: msg.from, to: msg.to }
+              raw_payload: { type: msg.type, hasMedia: msg.hasMedia, body: msg.body, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
             })
 
           if (insertError && insertError.code !== '23505') {
@@ -422,6 +446,12 @@ async function syncChatHistory(state: ClientState): Promise<void> {
             .eq('connection_id', state.connectionId!)
             .eq('contact_phone', contactPhone)
             .single()
+
+          // Store original chat ID for LID contacts so we can send messages later
+          const conversationMetadata = {
+            original_chat_id: chatIdSerialized,
+            is_lid: isLidContact
+          }
 
           if (existingConv) {
             await supabaseAdmin
@@ -485,23 +515,46 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     const rawTo = msg.to || ''
     const rawFrom = msg.from || ''
     const targetId = fromMe ? rawTo : rawFrom
+    const isLidContact = targetId.endsWith('@lid')
 
     let contactPhone: string
-    if (targetId.endsWith('@lid')) {
+    if (isLidContact) {
       // LID format - get phone from contact.number
       contactPhone = (contact as any)?.number || ''
+
+      // Fallback 1: Try to extract from contact.id if it's not a LID
       if (!contactPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
         contactPhone = contact.id.user
       }
+
+      // Fallback 2: Try getFormattedNumber() method
+      if (!contactPhone) {
+        try {
+          const formattedNumber = await (contact as any).getFormattedNumber?.()
+          if (formattedNumber) {
+            contactPhone = formattedNumber.replace(/[^0-9]/g, '')
+          }
+        } catch (e) {
+          console.log(`[WA] getFormattedNumber failed for incoming message`)
+        }
+      }
+
       console.log(`[WA] LID message - contact.number: ${(contact as any)?.number}, resolved: ${contactPhone}`)
+
+      // If we still can't get a real phone, use LID identifier
+      if (!contactPhone || contactPhone.length < 8) {
+        const lidUser = targetId.replace(/@lid$/, '')
+        contactPhone = `lid_${lidUser}`
+        console.log(`[WA] Using LID identifier for message: ${contactPhone}`)
+      }
     } else {
       // Regular format - extract phone from ID
       contactPhone = targetId.replace(/@.*$/, '')
     }
 
-    // Skip if no valid phone
-    if (!contactPhone || contactPhone.length < 8) {
-      console.log(`[WA] Skipping message - no valid phone for: ${targetId}`)
+    // Skip if no identifier
+    if (!contactPhone) {
+      console.log(`[WA] Skipping message - no identifier for: ${targetId}`)
       return
     }
 
@@ -599,7 +652,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         media_mime_type: mediaMimeType,
         message_timestamp: new Date(msg.timestamp * 1000).toISOString(),
         status: fromMe ? 'sent' : 'delivered',
-        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to }
+        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: targetId, is_lid: isLidContact }
       })
 
     if (insertError) {
