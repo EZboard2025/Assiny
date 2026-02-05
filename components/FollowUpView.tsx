@@ -1,7 +1,18 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, QrCode, Search, ChevronRight, ChevronLeft, Send } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send, Link2 } from 'lucide-react'
+
+// Declare Facebook SDK types
+declare global {
+  interface Window {
+    fbAsyncInit: () => void
+    FB: {
+      init: (params: any) => void
+      login: (callback: (response: any) => void, options: any) => void
+    }
+  }
+}
 
 interface FollowUpAnalysis {
   notas: {
@@ -47,13 +58,14 @@ interface FollowUpAnalysis {
   dica_principal: string
 }
 
-interface WhatsAppChat {
+interface WhatsAppConversation {
   id: string
-  name: string
-  lastMessage: string
-  lastMessageTime: string | null
-  unreadCount: number
-  profilePicUrl: string | null
+  contact_phone: string
+  contact_name: string | null
+  last_message_at: string | null
+  last_message_preview: string | null
+  unread_count: number
+  message_count: number
 }
 
 interface WhatsAppMessage {
@@ -63,29 +75,35 @@ interface WhatsAppMessage {
   timestamp: string
   type: string
   hasMedia: boolean
-  mediaUrl?: string | null
+  mediaId?: string | null
   mimetype?: string | null
+  contactName?: string | null
+  status?: string
 }
 
-type ConnectionStatus = 'disconnected' | 'qr' | 'connecting' | 'connected'
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
+
+const FACEBOOK_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || ''
+const FACEBOOK_CONFIG_ID = process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || ''
 
 export default function FollowUpView() {
   // WhatsApp state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
-  const [qrCode, setQrCode] = useState<string | null>(null)
-  const [chats, setChats] = useState<WhatsAppChat[]>([])
-  const [selectedChat, setSelectedChat] = useState<WhatsAppChat | null>(null)
+  const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
+  const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
+  const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null)
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
-  const [isLoadingChats, setIsLoadingChats] = useState(false)
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false)
   const [isInitializing, setIsInitializing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [fbSdkLoaded, setFbSdkLoaded] = useState(false)
 
   // Message input state
   const [messageInput, setMessageInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const selectedChatRef = useRef<WhatsAppChat | null>(null)
+  const selectedConvRef = useRef<WhatsAppConversation | null>(null)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
   // Analysis state
@@ -94,6 +112,34 @@ export default function FollowUpView() {
   const [error, setError] = useState<string | null>(null)
   const [savedAnalyses, setSavedAnalyses] = useState<Record<string, { analysis: FollowUpAnalysis; date: string }>>({})
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(false)
+
+  // Auth token for API calls
+  const [authToken, setAuthToken] = useState<string | null>(null)
+
+  // Helper to get auth headers
+  const getAuthHeaders = (): HeadersInit => {
+    const headers: HeadersInit = { 'Content-Type': 'application/json' }
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`
+    }
+    return headers
+  }
+
+  // Load auth token on mount
+  useEffect(() => {
+    const loadAuth = async () => {
+      try {
+        const { supabase } = await import('@/lib/supabase')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          setAuthToken(session.access_token)
+        }
+      } catch (e) {
+        console.error('Error loading auth:', e)
+      }
+    }
+    loadAuth()
+  }, [])
 
   // Load saved analyses from Supabase on mount (with localStorage fallback)
   useEffect(() => {
@@ -112,7 +158,6 @@ export default function FollowUpView() {
 
           if (data && !error) {
             const analysesMap: Record<string, { analysis: FollowUpAnalysis; date: string }> = {}
-            // Only keep the most recent analysis per chat
             for (const row of data) {
               if (row.whatsapp_chat_id && !analysesMap[row.whatsapp_chat_id]) {
                 analysesMap[row.whatsapp_chat_id] = {
@@ -122,7 +167,6 @@ export default function FollowUpView() {
               }
             }
             setSavedAnalyses(analysesMap)
-            // Also sync to localStorage as cache
             localStorage.setItem('whatsapp_followup_analyses', JSON.stringify(analysesMap))
             return
           }
@@ -131,7 +175,6 @@ export default function FollowUpView() {
         console.error('Error loading analyses from Supabase:', e)
       }
 
-      // Fallback to localStorage
       const saved = localStorage.getItem('whatsapp_followup_analyses')
       if (saved) {
         try {
@@ -176,37 +219,77 @@ export default function FollowUpView() {
     }
 
     loadCompanyData()
-    checkConnectionStatus()
   }, [])
 
-  // Keep ref in sync with selectedChat for polling
+  // Check connection status on mount and when auth token is available
   useEffect(() => {
-    selectedChatRef.current = selectedChat
-  }, [selectedChat])
+    if (authToken) {
+      checkConnectionStatus()
+    }
+  }, [authToken])
+
+  // Load Facebook SDK
+  useEffect(() => {
+    if (!FACEBOOK_APP_ID) {
+      // No App ID configured - still allow button to show (will show config error on click)
+      setFbSdkLoaded(true)
+      return
+    }
+
+    window.fbAsyncInit = () => {
+      window.FB.init({
+        appId: FACEBOOK_APP_ID,
+        cookie: true,
+        xfbml: true,
+        version: 'v21.0'
+      })
+      setFbSdkLoaded(true)
+    }
+
+    // Check if SDK is already loaded
+    if (document.getElementById('facebook-jssdk')) {
+      if (window.FB) setFbSdkLoaded(true)
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'facebook-jssdk'
+    script.src = 'https://connect.facebook.net/en_US/sdk.js'
+    script.async = true
+    script.defer = true
+    script.crossOrigin = 'anonymous'
+    document.body.appendChild(script)
+  }, [])
+
+  // Keep ref in sync with selectedConversation for polling
+  useEffect(() => {
+    selectedConvRef.current = selectedConversation
+  }, [selectedConversation])
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Poll for new messages when a chat is selected
+  // Poll for new messages when a conversation is selected
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
 
-    if (connectionStatus === 'connected' && selectedChat) {
+    if (connectionStatus === 'connected' && selectedConversation && authToken) {
       interval = setInterval(async () => {
-        const currentChat = selectedChatRef.current
-        if (!currentChat) return
+        const currentConv = selectedConvRef.current
+        if (!currentConv) return
 
         try {
-          const response = await fetch(`/api/whatsapp-web/messages?chatId=${encodeURIComponent(currentChat.id)}`)
+          const response = await fetch(
+            `/api/whatsapp/messages?contactPhone=${encodeURIComponent(currentConv.contact_phone)}`,
+            { headers: { 'Authorization': `Bearer ${authToken}` } }
+          )
           const data = await response.json()
 
           if (data.messages) {
             setMessages(prev => {
-              // Filter out temp messages for comparison
               const realPrev = prev.filter(m => !m.id.startsWith('temp_'))
-              // Only update if message count differs or last message ID changed
               if (data.messages.length !== realPrev.length) {
                 return data.messages
               }
@@ -221,136 +304,200 @@ export default function FollowUpView() {
         } catch (e) {
           // Silent fail for polling
         }
-      }, 3000) // Poll every 3 seconds
+      }, 5000)
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [connectionStatus, selectedChat])
+  }, [connectionStatus, selectedConversation, authToken])
 
-  // Poll for chat list updates (new messages, unread counts)
+  // Poll for conversation list updates
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
 
-    if (connectionStatus === 'connected') {
+    if (connectionStatus === 'connected' && authToken) {
       interval = setInterval(async () => {
         try {
-          const response = await fetch('/api/whatsapp-web/chats')
+          const response = await fetch('/api/whatsapp/conversations', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
           const data = await response.json()
 
-          if (data.chats) {
-            setChats(data.chats)
-            // Update selectedChat data if it's in the new list
-            const currentChat = selectedChatRef.current
-            if (currentChat) {
-              const updated = data.chats.find((c: WhatsAppChat) => c.id === currentChat.id)
+          if (data.conversations) {
+            setConversations(data.conversations)
+            const currentConv = selectedConvRef.current
+            if (currentConv) {
+              const updated = data.conversations.find((c: WhatsAppConversation) => c.contact_phone === currentConv.contact_phone)
               if (updated) {
-                setSelectedChat(prev => prev ? { ...prev, unreadCount: updated.unreadCount, lastMessage: updated.lastMessage, lastMessageTime: updated.lastMessageTime } : prev)
+                setSelectedConversation(prev => prev ? {
+                  ...prev,
+                  unread_count: updated.unread_count,
+                  last_message_preview: updated.last_message_preview,
+                  last_message_at: updated.last_message_at,
+                  message_count: updated.message_count
+                } : prev)
               }
             }
           }
         } catch (e) {
           // Silent fail for polling
         }
-      }, 10000) // Poll chat list every 10 seconds
+      }, 10000)
     }
 
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [connectionStatus])
-
-  // Poll for connection status
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
-
-    if (connectionStatus === 'qr' || connectionStatus === 'connecting') {
-      interval = setInterval(checkConnectionStatus, 2000)
-    }
-
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [connectionStatus])
+  }, [connectionStatus, authToken])
 
   const checkConnectionStatus = async () => {
+    if (!authToken) return
+
     try {
-      const response = await fetch('/api/whatsapp-web/status')
+      const response = await fetch('/api/whatsapp/status', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
       const data = await response.json()
 
-      setConnectionStatus(data.status)
-      if (data.qrCode) {
-        setQrCode(data.qrCode)
-      }
-
-      if (data.status === 'connected' && chats.length === 0) {
-        loadChats()
+      if (data.connected) {
+        setConnectionStatus('connected')
+        setPhoneNumber(data.phone_number || null)
+        if (conversations.length === 0) {
+          loadConversations()
+        }
+      } else {
+        setConnectionStatus('disconnected')
       }
     } catch (error) {
       console.error('Error checking status:', error)
     }
   }
 
-  const initWhatsApp = async () => {
+  const connectWhatsApp = () => {
+    if (!FACEBOOK_APP_ID || !FACEBOOK_CONFIG_ID) {
+      setError('Configuracao incompleta: NEXT_PUBLIC_FACEBOOK_APP_ID e NEXT_PUBLIC_FACEBOOK_CONFIG_ID precisam ser definidos no .env.local')
+      return
+    }
+
+    if (!fbSdkLoaded || !window.FB) {
+      setError('Facebook SDK ainda carregando. Tente novamente.')
+      return
+    }
+
     setIsInitializing(true)
     setError(null)
 
-    try {
-      const response = await fetch('/api/whatsapp-web/init', { method: 'POST' })
-      const data = await response.json()
+    let sessionInfo: { phone_number_id?: string; waba_id?: string } = {}
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Error initializing WhatsApp')
+    // Listen for session info from Embedded Signup
+    const listener = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'WA_EMBEDDED_SIGNUP') {
+          if (data.data) {
+            sessionInfo = data.data
+          }
+        }
+      } catch {
+        // Not a JSON message, ignore
       }
-
-      if (data.qrCode) {
-        setQrCode(data.qrCode)
-        setConnectionStatus('qr')
-      } else if (data.status === 'connected') {
-        setConnectionStatus('connected')
-        loadChats()
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection error')
-    } finally {
-      setIsInitializing(false)
     }
+    window.addEventListener('message', listener)
+
+    window.FB.login(async (response: any) => {
+      window.removeEventListener('message', listener)
+
+      if (response.authResponse?.code) {
+        setConnectionStatus('connecting')
+
+        try {
+          const connectResponse = await fetch('/api/whatsapp/connect', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              code: response.authResponse.code,
+              waba_id: sessionInfo.waba_id || '',
+              phone_number_id: sessionInfo.phone_number_id || ''
+            })
+          })
+
+          const connectData = await connectResponse.json()
+
+          if (!connectResponse.ok) {
+            throw new Error(connectData.error || 'Erro ao conectar WhatsApp')
+          }
+
+          setConnectionStatus('connected')
+          setPhoneNumber(connectData.phone_number || null)
+          loadConversations()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Erro ao conectar')
+          setConnectionStatus('disconnected')
+        }
+      } else {
+        setConnectionStatus('disconnected')
+      }
+
+      setIsInitializing(false)
+    }, {
+      config_id: FACEBOOK_CONFIG_ID,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        feature: 'whatsapp_embedded_signup',
+        sessionInfoVersion: 2
+      }
+    })
   }
 
   const disconnectWhatsApp = async () => {
     try {
-      await fetch('/api/whatsapp-web/disconnect', { method: 'POST' })
+      await fetch('/api/whatsapp/disconnect', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
       setConnectionStatus('disconnected')
-      setQrCode(null)
-      setChats([])
-      setSelectedChat(null)
+      setPhoneNumber(null)
+      setConversations([])
+      setSelectedConversation(null)
+      setMessages([])
     } catch (error) {
       console.error('Error disconnecting:', error)
     }
   }
 
-  const loadChats = async () => {
-    setIsLoadingChats(true)
+  const loadConversations = async () => {
+    if (!authToken) return
+
+    setIsLoadingConversations(true)
     try {
-      const response = await fetch('/api/whatsapp-web/chats')
+      const response = await fetch('/api/whatsapp/conversations', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
       const data = await response.json()
 
-      if (data.chats) {
-        setChats(data.chats)
+      if (data.conversations) {
+        setConversations(data.conversations)
       }
     } catch (error) {
-      console.error('Error loading chats:', error)
+      console.error('Error loading conversations:', error)
     } finally {
-      setIsLoadingChats(false)
+      setIsLoadingConversations(false)
     }
   }
 
-  const loadMessages = async (chatId: string) => {
+  const loadMessages = async (contactPhone: string) => {
+    if (!authToken) return
+
     setIsLoadingMessages(true)
     setMessages([])
     try {
-      const response = await fetch(`/api/whatsapp-web/messages?chatId=${encodeURIComponent(chatId)}`)
+      const response = await fetch(
+        `/api/whatsapp/messages?contactPhone=${encodeURIComponent(contactPhone)}`,
+        { headers: { 'Authorization': `Bearer ${authToken}` } }
+      )
       const data = await response.json()
 
       if (data.messages) {
@@ -364,28 +511,31 @@ export default function FollowUpView() {
   }
 
   const handleSendMessage = async () => {
-    if (!selectedChat || !messageInput.trim() || isSending) return
+    if (!selectedConversation || !messageInput.trim() || isSending) return
 
     const text = messageInput.trim()
     setMessageInput('')
     setIsSending(true)
 
-    // Optimistic update: add message immediately
+    // Optimistic update
     const tempMsg: WhatsAppMessage = {
       id: `temp_${Date.now()}`,
       body: text,
       fromMe: true,
       timestamp: new Date().toISOString(),
-      type: 'chat',
+      type: 'text',
       hasMedia: false
     }
     setMessages(prev => [...prev, tempMsg])
 
     try {
-      const response = await fetch('/api/whatsapp-web/send', {
+      const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId: selectedChat.id, message: text })
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          to: selectedConversation.contact_phone,
+          message: text
+        })
       })
 
       const data = await response.json()
@@ -400,7 +550,6 @@ export default function FollowUpView() {
       ))
     } catch (err) {
       console.error('Error sending message:', err)
-      // Remove temp message on error
       setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
       setError(err instanceof Error ? err.message : 'Erro ao enviar mensagem')
     } finally {
@@ -415,26 +564,39 @@ export default function FollowUpView() {
     }
   }
 
-  const selectChat = (chat: WhatsAppChat) => {
-    setSelectedChat(chat)
+  const selectConversation = (conv: WhatsAppConversation) => {
+    setSelectedConversation(conv)
     setError(null)
 
-    // Check if there's a saved analysis for this chat
-    const saved = savedAnalyses[chat.id]
+    // Mark as read
+    if (conv.unread_count > 0 && authToken) {
+      fetch('/api/whatsapp/conversations', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ contactPhone: conv.contact_phone })
+      }).catch(() => {})
+      // Optimistic update
+      setConversations(prev => prev.map(c =>
+        c.contact_phone === conv.contact_phone ? { ...c, unread_count: 0 } : c
+      ))
+    }
+
+    // Check if there's a saved analysis for this conversation
+    const saved = savedAnalyses[conv.contact_phone]
     if (saved) {
       setAnalysis(saved.analysis)
-      setShowAnalysisPanel(false) // Don't auto-open, let user click the card
+      setShowAnalysisPanel(false)
     } else {
       setAnalysis(null)
       setShowAnalysisPanel(false)
     }
 
-    loadMessages(chat.id)
+    loadMessages(conv.contact_phone)
   }
 
   const handleAnalyze = async () => {
-    if (!selectedChat) {
-      setError('Select a conversation')
+    if (!selectedConversation || !authToken) {
+      setError('Selecione uma conversa')
       return
     }
 
@@ -443,50 +605,41 @@ export default function FollowUpView() {
 
     try {
       const messagesResponse = await fetch(
-        `/api/whatsapp-web/messages?chatId=${encodeURIComponent(selectedChat.id)}&format=analysis`
+        `/api/whatsapp/messages?contactPhone=${encodeURIComponent(selectedConversation.contact_phone)}&format=analysis`,
+        { headers: { 'Authorization': `Bearer ${authToken}` } }
       )
       const messagesData = await messagesResponse.json()
 
       if (!messagesResponse.ok) {
-        throw new Error(messagesData.error || 'Error fetching messages')
-      }
-
-      const { supabase } = await import('@/lib/supabase')
-      const { data: { session } } = await supabase.auth.getSession()
-
-      const headers: HeadersInit = { 'Content-Type': 'application/json' }
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
+        throw new Error(messagesData.error || 'Erro ao buscar mensagens')
       }
 
       const response = await fetch('/api/followup/analyze', {
         method: 'POST',
-        headers,
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           transcricao: messagesData.formatted,
-          avaliacao: {
-            canal: 'WhatsApp'
-          },
+          avaliacao: { canal: 'WhatsApp' },
           dados_empresa: companyData,
-          whatsapp_chat_id: selectedChat.id,
-          whatsapp_contact_name: selectedChat.name
+          whatsapp_chat_id: selectedConversation.contact_phone,
+          whatsapp_contact_name: selectedConversation.contact_name
         })
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error analyzing follow-up')
+        throw new Error(data.error || 'Erro ao analisar follow-up')
       }
 
       setAnalysis(data.analysis)
-      setShowAnalysisPanel(true) // Auto-open panel when new analysis completes
+      setShowAnalysisPanel(true)
 
-      // Save analysis to localStorage
-      if (selectedChat && data.analysis) {
+      // Save analysis
+      if (selectedConversation && data.analysis) {
         const newSavedAnalyses = {
           ...savedAnalyses,
-          [selectedChat.id]: {
+          [selectedConversation.contact_phone]: {
             analysis: data.analysis,
             date: new Date().toISOString()
           }
@@ -496,14 +649,15 @@ export default function FollowUpView() {
       }
     } catch (err) {
       console.error('Analysis error:', err)
-      setError(err instanceof Error ? err.message : 'Error analyzing follow-up')
+      setError(err instanceof Error ? err.message : 'Erro ao analisar follow-up')
     } finally {
       setIsAnalyzing(false)
     }
   }
 
   // Get initials from name
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | null) => {
+    if (!name) return '?'
     return name
       .split(' ')
       .map(n => n[0])
@@ -512,7 +666,15 @@ export default function FollowUpView() {
       .slice(0, 2)
   }
 
-  // Format time for chat list
+  // Format phone number for display
+  const formatPhone = (phone: string) => {
+    if (phone.length >= 12) {
+      return `+${phone.slice(0, 2)} (${phone.slice(2, 4)}) ${phone.slice(4, 9)}-${phone.slice(9)}`
+    }
+    return `+${phone}`
+  }
+
+  // Format time for conversation list
   const formatTime = (dateStr: string | null) => {
     if (!dateStr) return ''
     const date = new Date(dateStr)
@@ -530,10 +692,17 @@ export default function FollowUpView() {
     }
   }
 
-  // Filter chats by search
-  const filteredChats = chats.filter(chat =>
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+  // Build media URL from mediaId using the proxy endpoint
+  const getMediaSrc = (mediaId: string) => {
+    if (!authToken) return ''
+    return `/api/whatsapp/media/${mediaId}?token=${encodeURIComponent(authToken)}`
+  }
+
+  // Filter conversations by search
+  const filteredConversations = conversations.filter(conv =>
+    (conv.contact_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.contact_phone.includes(searchQuery) ||
+    (conv.last_message_preview || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   // Render disconnected state
@@ -541,60 +710,52 @@ export default function FollowUpView() {
     <div className="flex-1 flex items-center justify-center bg-[#222e35]">
       <div className="text-center max-w-md px-8">
         <div className="w-[320px] h-[320px] mx-auto mb-8 flex items-center justify-center">
-          <Smartphone className="w-40 h-40 text-[#8696a0]" />
+          <div className="relative">
+            <Smartphone className="w-40 h-40 text-[#8696a0]" />
+            <div className="absolute -bottom-2 -right-2 w-16 h-16 bg-[#25d366] rounded-full flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-9 h-9 text-white" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+            </div>
+          </div>
         </div>
         <h1 className="text-[32px] font-light text-[#e9edef] mb-4">
-          Análise de Follow-up
+          WhatsApp Business
         </h1>
         <p className="text-[#8696a0] text-sm mb-8">
-          Conecte seu WhatsApp para analisar suas conversas de follow-up automaticamente.
+          Conecte sua conta WhatsApp Business para analisar suas conversas de follow-up automaticamente.
           Selecione uma conversa e receba feedback detalhado em segundos.
         </p>
         <button
-          onClick={initWhatsApp}
-          disabled={isInitializing}
+          onClick={connectWhatsApp}
+          disabled={isInitializing || !fbSdkLoaded}
           className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-6 py-3 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
         >
           {isInitializing ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Inicializando...
+              Conectando...
+            </>
+          ) : !fbSdkLoaded ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Carregando...
             </>
           ) : (
             <>
-              <QrCode className="w-5 h-5" />
-              Conectar WhatsApp
+              <Link2 className="w-5 h-5" />
+              Conectar WhatsApp Business
             </>
           )}
         </button>
-        <p className="text-[#8696a0] text-xs mt-6">
-          Esta integração usa WhatsApp Web. Use com cautela.
-        </p>
-      </div>
-    </div>
-  )
-
-  // Render QR code state
-  const renderQRCode = () => (
-    <div className="flex-1 flex items-center justify-center bg-[#222e35]">
-      <div className="text-center">
-        <h2 className="text-[#e9edef] text-xl mb-2">Escaneie o QR Code</h2>
-        <p className="text-[#8696a0] text-sm mb-6">
-          Abra o WhatsApp no celular → Menu → Dispositivos conectados → Conectar
-        </p>
-        {qrCode ? (
-          <div className="bg-white p-4 rounded-lg inline-block">
-            <img src={qrCode} alt="QR Code" className="w-64 h-64" />
-          </div>
-        ) : (
-          <div className="w-64 h-64 mx-auto bg-[#2a3942] rounded-lg flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#8696a0]" />
+        {error && (
+          <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg">
+            <p className="text-red-300 text-sm">{error}</p>
           </div>
         )}
-        <div className="mt-6 flex items-center justify-center gap-2 text-[#00a884]">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-sm">Aguardando conexão...</span>
-        </div>
+        <p className="text-[#8696a0] text-xs mt-6">
+          Integrado via API oficial da Meta. Seguro e sem risco de bloqueio.
+        </p>
       </div>
     </div>
   )
@@ -605,12 +766,12 @@ export default function FollowUpView() {
       <div className="text-center">
         <Loader2 className="w-12 h-12 animate-spin text-[#00a884] mx-auto mb-4" />
         <h2 className="text-[#e9edef] text-xl mb-2">Conectando...</h2>
-        <p className="text-[#8696a0] text-sm">Aguarde enquanto estabelecemos a conexão.</p>
+        <p className="text-[#8696a0] text-sm">Finalizando a conexao com WhatsApp Business.</p>
       </div>
     </div>
   )
 
-  // Render chat sidebar
+  // Render conversation sidebar
   const renderChatSidebar = () => (
     <div className="w-[400px] bg-[#111b21] border-r border-[#222d34] flex flex-col h-full">
       {/* Header */}
@@ -619,15 +780,20 @@ export default function FollowUpView() {
           <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center">
             <MessageSquare className="w-5 h-5 text-white" />
           </div>
-          <span className="text-[#e9edef] font-medium">WhatsApp IA+</span>
+          <div>
+            <span className="text-[#e9edef] font-medium">WhatsApp IA+</span>
+            {phoneNumber && (
+              <p className="text-[#8696a0] text-[10px]">{phoneNumber}</p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={loadChats}
+            onClick={loadConversations}
             className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
             title="Atualizar"
           >
-            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isLoadingChats ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isLoadingConversations ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={disconnectWhatsApp}
@@ -645,7 +811,7 @@ export default function FollowUpView() {
           <Search className="w-5 h-5 text-[#8696a0] mr-4" />
           <input
             type="text"
-            placeholder="Pesquisar ou começar uma nova conversa"
+            placeholder="Pesquisar conversa"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none"
@@ -653,48 +819,45 @@ export default function FollowUpView() {
         </div>
       </div>
 
-      {/* Chat List */}
+      {/* Conversation List */}
       <div className="flex-1 overflow-y-auto">
-        {isLoadingChats ? (
+        {isLoadingConversations ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-[#00a884]" />
           </div>
-        ) : filteredChats.length === 0 ? (
+        ) : filteredConversations.length === 0 ? (
           <div className="text-center py-8 px-4">
-            <p className="text-[#8696a0] text-sm">Nenhuma conversa encontrada</p>
+            <MessageSquare className="w-12 h-12 text-[#364147] mx-auto mb-3" />
+            <p className="text-[#8696a0] text-sm">
+              {conversations.length === 0
+                ? 'Aguardando novas mensagens...'
+                : 'Nenhuma conversa encontrada'}
+            </p>
+            {conversations.length === 0 && (
+              <p className="text-[#8696a0] text-xs mt-2">
+                As conversas aparecerao aqui quando voce receber mensagens.
+              </p>
+            )}
           </div>
         ) : (
-          filteredChats.map((chat) => (
+          filteredConversations.map((conv) => (
             <button
-              key={chat.id}
-              onClick={() => selectChat(chat)}
+              key={conv.id}
+              onClick={() => selectConversation(conv)}
               className={`w-full flex items-center px-3 py-3 hover:bg-[#202c33] transition-colors ${
-                selectedChat?.id === chat.id ? 'bg-[#2a3942]' : ''
+                selectedConversation?.contact_phone === conv.contact_phone ? 'bg-[#2a3942]' : ''
               }`}
             >
               {/* Avatar */}
               <div className="relative flex-shrink-0 mr-3">
-                {chat.profilePicUrl ? (
-                  <img
-                    src={chat.profilePicUrl}
-                    alt={chat.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                    onError={(e) => {
-                      // Fallback to initials on error
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                      target.nextElementSibling?.classList.remove('hidden')
-                    }}
-                  />
-                ) : null}
-                <div className={`w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center ${chat.profilePicUrl ? 'hidden' : ''}`}>
+                <div className="w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center">
                   <span className="text-white text-lg font-medium">
-                    {getInitials(chat.name)}
+                    {getInitials(conv.contact_name)}
                   </span>
                 </div>
-                {chat.unreadCount > 0 && (
+                {conv.unread_count > 0 && (
                   <span className="absolute -top-1 -right-1 bg-[#00a884] text-white text-[10px] font-bold min-w-[20px] h-[20px] flex items-center justify-center rounded-full px-1">
-                    {chat.unreadCount}
+                    {conv.unread_count}
                   </span>
                 )}
               </div>
@@ -703,19 +866,21 @@ export default function FollowUpView() {
               <div className="flex-1 min-w-0 border-b border-[#222d34] py-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[#e9edef] text-base truncate">{chat.name}</span>
-                    {savedAnalyses[chat.id] && (
+                    <span className="text-[#e9edef] text-base truncate">
+                      {conv.contact_name || formatPhone(conv.contact_phone)}
+                    </span>
+                    {savedAnalyses[conv.contact_phone] && (
                       <span className="flex-shrink-0 bg-[#00a884] text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-                        {savedAnalyses[chat.id].analysis.nota_final.toFixed(1)}
+                        {savedAnalyses[conv.contact_phone].analysis.nota_final.toFixed(1)}
                       </span>
                     )}
                   </div>
-                  <span className={`text-xs flex-shrink-0 ${chat.unreadCount > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
-                    {formatTime(chat.lastMessageTime)}
+                  <span className={`text-xs flex-shrink-0 ${conv.unread_count > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
+                    {formatTime(conv.last_message_at)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-[#8696a0] text-sm truncate pr-2">{chat.lastMessage || 'Sem mensagens'}</p>
+                  <p className="text-[#8696a0] text-sm truncate pr-2">{conv.last_message_preview || 'Sem mensagens'}</p>
                 </div>
               </div>
             </button>
@@ -727,7 +892,7 @@ export default function FollowUpView() {
 
   // Render main content area
   const renderMainContent = () => {
-    if (!selectedChat) {
+    if (!selectedConversation) {
       return (
         <div className="flex-1 flex items-center justify-center bg-[#222e35]">
           <div className="text-center">
@@ -736,12 +901,14 @@ export default function FollowUpView() {
             </div>
             <h2 className="text-[#e9edef] text-2xl font-light mb-2">Selecione uma conversa</h2>
             <p className="text-[#8696a0] text-sm">
-              Escolha uma conversa à esquerda para analisar o follow-up
+              Escolha uma conversa a esquerda para analisar o follow-up
             </p>
           </div>
         </div>
       )
     }
+
+    const displayName = selectedConversation.contact_name || formatPhone(selectedConversation.contact_phone)
 
     return (
       <div className="flex-1 flex bg-[#0b141a] relative overflow-hidden">
@@ -750,31 +917,15 @@ export default function FollowUpView() {
           {/* Chat Header */}
           <div className="h-[60px] flex-shrink-0 bg-[#202c33] px-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10">
-                {selectedChat.profilePicUrl ? (
-                  <img
-                    src={selectedChat.profilePicUrl}
-                    alt={selectedChat.name}
-                    className="w-10 h-10 rounded-full object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                      if (target.nextElementSibling) {
-                        target.nextElementSibling.classList.remove('hidden')
-                      }
-                    }}
-                  />
-                ) : null}
-                <div className={`w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center ${selectedChat.profilePicUrl ? 'hidden' : ''}`}>
-                  <span className="text-white font-medium">
-                    {getInitials(selectedChat.name)}
-                  </span>
-                </div>
+              <div className="w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center">
+                <span className="text-white font-medium">
+                  {getInitials(selectedConversation.contact_name)}
+                </span>
               </div>
               <div>
-                <h3 className="text-[#e9edef] font-medium">{selectedChat.name}</h3>
+                <h3 className="text-[#e9edef] font-medium">{displayName}</h3>
                 <p className="text-[#8696a0] text-xs">
-                  {selectedChat.lastMessageTime ? `Última msg: ${formatTime(selectedChat.lastMessageTime)}` : ''}
+                  {selectedConversation.contact_name ? formatPhone(selectedConversation.contact_phone) : ''}
                 </p>
               </div>
             </div>
@@ -798,7 +949,7 @@ export default function FollowUpView() {
                 )}
               </button>
 
-              {/* Analysis Score Card (when analysis exists) */}
+              {/* Analysis Score Card */}
               {analysis && !showAnalysisPanel && (
                 <button
                   onClick={() => setShowAnalysisPanel(true)}
@@ -815,7 +966,7 @@ export default function FollowUpView() {
                     analysis.nota_final >= 4 ? 'text-orange-400' :
                     'text-red-400'
                   }`}>{analysis.nota_final.toFixed(1)}</span>
-                  <span className="text-[#8696a0] text-xs">Ver avaliação</span>
+                  <span className="text-[#8696a0] text-xs">Ver avaliacao</span>
                   <ChevronRight className="w-4 h-4 text-[#8696a0]" />
                 </button>
               )}
@@ -845,35 +996,12 @@ export default function FollowUpView() {
               <div className="space-y-1">
                 {messages
                   .filter(msg => {
-                    // Hide system/notification messages that add no value
-                    const hiddenTypes = ['e2e_notification', 'notification_template', 'notification', 'ciphertext', 'reaction']
+                    const hiddenTypes = ['reaction']
                     return !hiddenTypes.includes(msg.type)
                   })
                   .map((msg, idx, filtered) => {
                   const showDate = idx === 0 ||
                     new Date(msg.timestamp).toDateString() !== new Date(filtered[idx - 1].timestamp).toDateString()
-
-                  // Revoked messages get special center-aligned styling
-                  if (msg.type === 'revoked') {
-                    return (
-                      <div key={msg.id}>
-                        {showDate && (
-                          <div className="flex justify-center my-3">
-                            <span className="bg-[#182229] text-[#8696a0] text-xs px-3 py-1 rounded-lg shadow">
-                              {new Date(msg.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                            </span>
-                          </div>
-                        )}
-                        <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`rounded-lg px-3 py-2 shadow ${msg.fromMe ? 'bg-[#005c4b]/50' : 'bg-[#202c33]/50'}`}>
-                            <p className="text-[#8696a0] text-xs italic flex items-center gap-1">
-                              <span>🚫</span> Mensagem apagada
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  }
 
                   return (
                     <div key={msg.id}>
@@ -895,35 +1023,35 @@ export default function FollowUpView() {
                             : 'bg-[#202c33] rounded-tl-none'
                         }`}>
                           {/* Image */}
-                          {msg.mediaUrl && (msg.type === 'image' || (msg.mimetype?.startsWith('image/') && msg.type !== 'sticker')) && (
+                          {msg.hasMedia && msg.mediaId && (msg.type === 'image' || msg.mimetype?.startsWith('image/')) && msg.type !== 'sticker' && (
                             <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
                               <img
-                                src={msg.mediaUrl}
+                                src={getMediaSrc(msg.mediaId)}
                                 alt="Imagem"
                                 className="w-full max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => setLightboxImage(msg.mediaUrl!)}
+                                onClick={() => setLightboxImage(getMediaSrc(msg.mediaId!))}
                               />
                             </div>
                           )}
                           {/* Sticker */}
-                          {msg.type === 'sticker' && msg.mediaUrl && (
+                          {msg.type === 'sticker' && msg.mediaId && (
                             <div className="mb-1">
-                              <img src={msg.mediaUrl} alt="Sticker" className="max-w-[150px] max-h-[150px]" />
+                              <img src={getMediaSrc(msg.mediaId)} alt="Sticker" className="max-w-[150px] max-h-[150px]" />
                             </div>
                           )}
-                          {/* Audio / PTT (voice message) */}
-                          {(msg.type === 'audio' || msg.type === 'ptt') && msg.mediaUrl && (
+                          {/* Audio */}
+                          {(msg.type === 'audio' || msg.type === 'ptt') && msg.mediaId && (
                             <div className="mb-1 min-w-[240px]">
                               <audio controls className="w-full h-8" style={{ filter: 'invert(1) hue-rotate(180deg)' }}>
-                                <source src={msg.mediaUrl} type={msg.mimetype || 'audio/ogg'} />
+                                <source src={getMediaSrc(msg.mediaId)} type={msg.mimetype || 'audio/ogg'} />
                               </audio>
                             </div>
                           )}
                           {/* Video */}
-                          {msg.type === 'video' && msg.mediaUrl && (
+                          {msg.type === 'video' && msg.mediaId && (
                             <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
                               <video controls className="w-full max-h-[300px]">
-                                <source src={msg.mediaUrl} type={msg.mimetype || 'video/mp4'} />
+                                <source src={getMediaSrc(msg.mediaId)} type={msg.mimetype || 'video/mp4'} />
                               </video>
                             </div>
                           )}
@@ -932,38 +1060,32 @@ export default function FollowUpView() {
                             <div className="flex items-center gap-2 mb-1 bg-[#0b141a]/40 rounded px-2 py-1.5">
                               <span className="text-2xl">📄</span>
                               <span className="text-[#e9edef] text-sm truncate">{msg.body || 'Documento'}</span>
-                              {msg.mediaUrl && (
-                                <a href={msg.mediaUrl} download className="text-[#00a884] text-xs hover:underline ml-auto flex-shrink-0">Baixar</a>
+                              {msg.mediaId && (
+                                <a href={getMediaSrc(msg.mediaId)} download className="text-[#00a884] text-xs hover:underline ml-auto flex-shrink-0">Baixar</a>
                               )}
                             </div>
                           )}
-                          {/* Media failed to load */}
-                          {msg.hasMedia && !msg.mediaUrl && msg.type !== 'chat' && (
+                          {/* Media with no mediaId (failed to load) */}
+                          {msg.hasMedia && !msg.mediaId && msg.type !== 'text' && (
                             <p className="text-[#8696a0] text-xs italic mb-1">
-                              {msg.type === 'image' ? '📷 Imagem não carregada' :
-                               msg.type === 'sticker' ? '🎨 Sticker não carregado' :
-                               msg.type === 'video' ? '🎥 Vídeo não carregado' :
-                               msg.type === 'audio' || msg.type === 'ptt' ? '🎵 Áudio não carregado' :
-                               msg.type === 'document' ? '📄 Documento não carregado' :
+                              {msg.type === 'image' ? '📷 Imagem' :
+                               msg.type === 'sticker' ? '🎨 Sticker' :
+                               msg.type === 'video' ? '🎥 Video' :
+                               msg.type === 'audio' || msg.type === 'ptt' ? '🎵 Audio' :
+                               msg.type === 'document' ? '📄 Documento' :
                                `📎 ${msg.type}`}
                             </p>
                           )}
-                          {/* Special message types with no body and no media */}
-                          {!msg.body && !msg.hasMedia && msg.type !== 'chat' && (
+                          {/* Special message types */}
+                          {!msg.body && !msg.hasMedia && msg.type !== 'text' && (
                             <p className="text-[#8696a0] text-xs italic">
-                              {msg.type === 'sticker' ? '🎨 Sticker' :
-                               msg.type === 'location' ? '📍 Localização' :
-                               msg.type === 'vcard' || msg.type === 'multi_vcard' ? '👤 Contato' :
-                               msg.type === 'call_log' ? '📞 Chamada' :
-                               msg.type === 'poll_creation' ? '📊 Enquete' :
-                               msg.type === 'order' || msg.type === 'product' ? '🛒 Pedido' :
-                               msg.type === 'image' ? '📷 Imagem' :
-                               msg.type === 'video' ? '🎥 Vídeo' :
-                               msg.type === 'audio' || msg.type === 'ptt' ? '🎵 Áudio' :
+                              {msg.type === 'location' ? '📍 Localizacao' :
+                               msg.type === 'contacts' ? '👤 Contato' :
+                               msg.type === 'sticker' ? '🎨 Sticker' :
                                `[${msg.type}]`}
                             </p>
                           )}
-                          {/* Text body (skip for stickers and documents already showing body) */}
+                          {/* Text body */}
                           {msg.body && msg.type !== 'sticker' && msg.type !== 'document' && (
                             <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">{msg.body}</p>
                           )}
@@ -975,7 +1097,7 @@ export default function FollowUpView() {
                               })}
                             </span>
                             {msg.fromMe && (
-                              <svg className="w-4 h-4 text-[#53bdeb]" viewBox="0 0 16 15" fill="currentColor">
+                              <svg className={`w-4 h-4 ${msg.status === 'read' ? 'text-[#53bdeb]' : 'text-[#8696a0]'}`} viewBox="0 0 16 15" fill="currentColor">
                                 <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
                               </svg>
                             )}
@@ -1027,7 +1149,6 @@ export default function FollowUpView() {
         {/* Analysis Panel (slides in from right) */}
         {analysis && (
           <div className={`absolute top-0 right-0 h-full w-[400px] bg-[#111b21] border-l border-[#222d34] flex flex-col transition-transform duration-300 ${showAnalysisPanel ? 'translate-x-0' : 'translate-x-full'}`}>
-            {/* Panel Header */}
             <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button
@@ -1036,7 +1157,7 @@ export default function FollowUpView() {
                 >
                   <ChevronLeft className="w-5 h-5 text-[#aebac1]" />
                 </button>
-                <span className="text-[#e9edef] font-medium">Avaliação</span>
+                <span className="text-[#e9edef] font-medium">Avaliacao</span>
               </div>
               <button
                 onClick={() => setShowAnalysisPanel(false)}
@@ -1046,7 +1167,6 @@ export default function FollowUpView() {
               </button>
             </div>
 
-            {/* Panel Content */}
             <div className="flex-1 overflow-y-auto p-4">
               {renderAnalysisResults()}
             </div>
@@ -1058,12 +1178,11 @@ export default function FollowUpView() {
 
   // Render analysis results
   const renderAnalysisResults = () => {
-    const savedData = selectedChat ? savedAnalyses[selectedChat.id] : null
+    const savedData = selectedConversation ? savedAnalyses[selectedConversation.contact_phone] : null
     const analysisDate = savedData?.date ? new Date(savedData.date) : null
 
     return (
     <div className="space-y-3">
-      {/* Analysis Header with Date */}
       {analysisDate && (
         <p className="text-[#8696a0] text-xs text-center">
           {analysisDate.toLocaleDateString('pt-BR', {
@@ -1103,13 +1222,13 @@ export default function FollowUpView() {
       <div className="bg-[#202c33] rounded-xl p-3">
         <div className="flex items-center gap-2 mb-3">
           <BarChart3 className="w-4 h-4 text-[#00a884]" />
-          <h3 className="text-sm font-semibold text-[#e9edef]">Notas por Critério</h3>
+          <h3 className="text-sm font-semibold text-[#e9edef]">Notas por Criterio</h3>
         </div>
         <div className="space-y-2">
           {Object.entries(analysis!.notas).map(([key, value]) => {
             const fieldLabels: Record<string, string> = {
               'valor_agregado': 'Valor Agregado',
-              'personalizacao': 'Personalização',
+              'personalizacao': 'Personalizacao',
               'tom_consultivo': 'Tom Consultivo',
               'objetividade': 'Objetividade',
               'cta': 'CTA',
@@ -1187,7 +1306,7 @@ export default function FollowUpView() {
       <div className="bg-[#202c33] rounded-xl p-3">
         <div className="flex items-center gap-2 mb-2">
           <FileText className="w-4 h-4 text-[#53bdeb]" />
-          <h3 className="text-sm font-semibold text-[#53bdeb]">Versão Melhorada</h3>
+          <h3 className="text-sm font-semibold text-[#53bdeb]">Versao Melhorada</h3>
         </div>
         <div className="bg-[#111b21] rounded-lg p-2">
           <pre className="whitespace-pre-wrap text-[#e9edef] text-xs font-sans">{analysis!.versao_reescrita}</pre>
@@ -1203,8 +1322,6 @@ export default function FollowUpView() {
           {renderChatSidebar()}
           {renderMainContent()}
         </>
-      ) : connectionStatus === 'qr' ? (
-        renderQRCode()
       ) : connectionStatus === 'connecting' ? (
         renderConnecting()
       ) : (
