@@ -287,13 +287,20 @@ async function syncChatHistory(state: ClientState): Promise<void> {
             }
           }
 
-          console.log(`[WA] LID detected - contact.number: ${(contact as any)?.number}, resolved contactPhone: ${contactPhone}`)
+          console.log(`[WA] LID detected - contact.number: ${(contact as any)?.number}, resolved contactPhone: ${contactPhone}, chat.id.user: ${chat.id.user}`)
 
           // If we still can't get a real phone number, use a placeholder with the LID
           // This allows us to still display the chat but track that it's a LID
-          if (!contactPhone || contactPhone.length < 8) {
+          // IMPORTANT: Also check if the "phone" we got is actually the LID number itself
+          const lidNumber = chat.id.user
+          const isPhoneActuallyLid = !contactPhone ||
+                                      contactPhone.length < 8 ||
+                                      contactPhone === lidNumber ||
+                                      !contactPhone.startsWith('55') // Brazilian numbers start with 55
+
+          if (isPhoneActuallyLid) {
             // Use the LID user part as identifier, but mark it
-            contactPhone = `lid_${chat.id.user}`
+            contactPhone = `lid_${lidNumber}`
             console.log(`[WA] Using LID identifier for: ${contactName || chatIdSerialized} -> ${contactPhone}`)
           }
         } else {
@@ -539,11 +546,17 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         }
       }
 
-      console.log(`[WA] LID message - contact.number: ${(contact as any)?.number}, resolved: ${contactPhone}`)
+      const lidUser = targetId.replace(/@lid$/, '')
+      console.log(`[WA] LID message - contact.number: ${(contact as any)?.number}, resolved: ${contactPhone}, lidUser: ${lidUser}`)
 
       // If we still can't get a real phone, use LID identifier
-      if (!contactPhone || contactPhone.length < 8) {
-        const lidUser = targetId.replace(/@lid$/, '')
+      // IMPORTANT: Also check if the "phone" we got is actually the LID number itself
+      const isPhoneActuallyLid = !contactPhone ||
+                                  contactPhone.length < 8 ||
+                                  contactPhone === lidUser ||
+                                  !contactPhone.startsWith('55') // Brazilian numbers start with 55
+
+      if (isPhoneActuallyLid) {
         contactPhone = `lid_${lidUser}`
         console.log(`[WA] Using LID identifier for message: ${contactPhone}`)
       }
