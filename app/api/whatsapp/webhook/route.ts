@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
             content,
             media_id: mediaId,
             media_mime_type: mediaMimeType,
-            timestamp: new Date(parseInt(msg.timestamp) * 1000).toISOString(),
+            message_timestamp: new Date(parseInt(msg.timestamp) * 1000).toISOString(),
             status: 'delivered',
             raw_payload: msg
           })

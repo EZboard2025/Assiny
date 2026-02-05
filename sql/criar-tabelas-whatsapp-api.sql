@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
   content TEXT,
   media_id TEXT,
   media_mime_type TEXT,
-  timestamp TIMESTAMPTZ NOT NULL,
+  message_timestamp TIMESTAMPTZ NOT NULL,
   status TEXT DEFAULT 'sent' CHECK (status IN ('sent', 'delivered', 'read', 'failed')),
   raw_payload JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -63,7 +63,7 @@ CREATE POLICY "service_role_all_messages" ON whatsapp_messages
   FOR ALL TO service_role USING (true);
 
 CREATE INDEX IF NOT EXISTS idx_wm_contact ON whatsapp_messages(connection_id, contact_phone);
-CREATE INDEX IF NOT EXISTS idx_wm_timestamp ON whatsapp_messages(connection_id, contact_phone, timestamp);
+CREATE INDEX IF NOT EXISTS idx_wm_timestamp ON whatsapp_messages(connection_id, contact_phone, message_timestamp);
 CREATE INDEX IF NOT EXISTS idx_wm_wa_id ON whatsapp_messages(wa_message_id);
 CREATE INDEX IF NOT EXISTS idx_wm_user_id ON whatsapp_messages(user_id);
 

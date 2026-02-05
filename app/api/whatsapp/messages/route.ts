@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('connection_id', connection.id)
       .eq('contact_phone', contactPhone)
-      .order('timestamp', { ascending: true })
+      .order('message_timestamp', { ascending: true })
       .limit(limit)
 
     if (error) {
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       const contactName = messages?.[0]?.contact_name || 'Cliente'
       const lines = (messages || []).map(msg => {
         const sender = msg.direction === 'outbound' ? sellerName : contactName
-        const time = new Date(msg.timestamp).toLocaleString('pt-BR')
+        const time = new Date(msg.message_timestamp).toLocaleString('pt-BR')
         const content = msg.content || `[${msg.message_type}]`
         return `[${time}] ${sender}: ${content}`
       })
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
         waMessageId: msg.wa_message_id,
         body: msg.content || '',
         fromMe: msg.direction === 'outbound',
-        timestamp: msg.timestamp,
+        timestamp: msg.message_timestamp,
         type: msg.message_type,
         hasMedia: !!msg.media_id,
         mediaId: msg.media_id,

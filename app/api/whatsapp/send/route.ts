@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         direction: 'outbound',
         message_type: 'text',
         content: message,
-        timestamp: new Date().toISOString(),
+        message_timestamp: new Date().toISOString(),
         status: 'sent'
       })
       .select('id')
