@@ -532,7 +532,22 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     const isLidContact = targetId.endsWith('@lid')
 
     let contactPhone: string
-    if (isLidContact) {
+
+    // IMPORTANT: For consistency, first check if we already have a conversation with this chat ID
+    // This prevents mismatches where sync resolved a phone but later messages can't
+    const { data: existingMsgWithChatId } = await supabaseAdmin
+      .from('whatsapp_messages')
+      .select('contact_phone')
+      .eq('connection_id', state.connectionId!)
+      .contains('raw_payload', { original_chat_id: targetId })
+      .limit(1)
+      .single()
+
+    if (existingMsgWithChatId?.contact_phone) {
+      // Use the same contact_phone we used before for this chat
+      contactPhone = existingMsgWithChatId.contact_phone
+      console.log(`[WA] Using existing contact_phone for ${targetId}: ${contactPhone}`)
+    } else if (isLidContact) {
       // LID format - get phone from contact.number
       const lidUser = targetId.replace(/@lid$/, '')
       let rawPhone = (contact as any)?.number || ''
