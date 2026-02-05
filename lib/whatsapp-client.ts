@@ -283,6 +283,12 @@ async function syncChatHistory(state: ClientState): Promise<void> {
           continue
         }
 
+        // Skip if this is the user's own number (conversations with yourself)
+        if (state.phoneNumber && contactPhone === state.phoneNumber) {
+          console.log(`[WA] Skipping chat - this is the user's own number: ${contactPhone}`)
+          continue
+        }
+
         console.log(`[WA] Chat ID: ${chatIdSerialized}, contactPhone: ${contactPhone}, name: ${contactName}`)
 
         // Fetch last 100 messages from this chat for full history
@@ -349,11 +355,25 @@ async function syncChatHistory(state: ClientState): Promise<void> {
           } else if (msg.type === 'vcard' || msg.type === 'multi_vcard') {
             messageType = 'contact'
             content = msg.body || '[Contato]'
+          } else if (msg.type === 'e2e_notification' || (msg.type as string) === 'notification' || (msg.type as string) === 'notification_template') {
+            // System notifications - skip these
+            continue
+          } else if ((msg.type as string) === 'interactive' || (msg.type as string) === 'button_reply' || (msg.type as string) === 'list_reply') {
+            // Interactive messages (buttons, lists)
+            messageType = 'interactive'
+            content = msg.body || (msg as any).selectedButtonId || (msg as any).selectedRowId || '[Mensagem interativa]'
           } else if (msg.type === 'chat') {
             // Regular text message - use body directly, with fallback to _data
             content = msg.body || ''
             if (!content && (msg as any)._data?.body) {
               content = (msg as any)._data.body
+            }
+          } else {
+            // Unknown type - use body if available, otherwise skip
+            content = msg.body || ''
+            if (!content) {
+              console.log(`[WA] Skipping unknown message type: ${msg.type}`)
+              continue
             }
           }
 
@@ -485,6 +505,12 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       return
     }
 
+    // Skip if this is the user's own number
+    if (state.phoneNumber && contactPhone === state.phoneNumber) {
+      console.log(`[WA] Skipping message - this is the user's own number: ${contactPhone}`)
+      return
+    }
+
     // Debug logging
     console.log(`[WA] Message: fromMe=${fromMe}, targetId=${targetId}, contactPhone=${contactPhone}`)
 
@@ -528,20 +554,30 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     } else if (msg.type === 'vcard' || msg.type === 'multi_vcard') {
       messageType = 'contact'
       content = msg.body || '[Contato]'
+    } else if (msg.type === 'e2e_notification' || (msg.type as string) === 'notification' || (msg.type as string) === 'notification_template') {
+      // System notifications - skip these
+      console.log(`[WA] Skipping notification message type: ${msg.type}`)
+      return
+    } else if ((msg.type as string) === 'interactive' || (msg.type as string) === 'button_reply' || (msg.type as string) === 'list_reply') {
+      // Interactive messages (buttons, lists)
+      messageType = 'interactive'
+      content = msg.body || (msg as any).selectedButtonId || (msg as any).selectedRowId || '[Mensagem interativa]'
     } else if (msg.type === 'chat') {
       // Regular text message - ensure we get the body
       content = msg.body || ''
       if (!content && (msg as any)._data?.body) {
         content = (msg as any)._data.body
       }
+    } else {
+      // Unknown type - use body if available, otherwise skip
+      content = msg.body || ''
+      if (!content) {
+        console.log(`[WA] Skipping unknown message type: ${msg.type}`)
+        return
+      }
     }
 
     console.log(`[WA] Processed content: "${content?.substring(0, 50)}"`)
-
-    // If content is still empty for text messages, log raw data for debugging
-    if (!content && messageType === 'text') {
-      console.log(`[WA] Empty text message, raw _data:`, JSON.stringify((msg as any)._data || {}).substring(0, 500))
-    }
 
     const direction = fromMe ? 'outbound' : 'inbound'
     const waMessageId = msg.id._serialized
