@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const contactPhone = searchParams.get('contactPhone')
     const format = searchParams.get('format') // 'raw' or 'analysis'
     const sellerName = searchParams.get('sellerName') || 'Vendedor'
-    const limit = parseInt(searchParams.get('limit') || '100')
+    const limit = parseInt(searchParams.get('limit') || '500')
 
     if (!contactPhone) {
       return NextResponse.json({ error: 'contactPhone is required' }, { status: 400 })

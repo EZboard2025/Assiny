@@ -249,8 +249,8 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
     console.log(`[WA] Found ${chats.length} chats for user ${state.userId}`)
 
-    // Only sync individual chats, skip groups
-    const individualChats = chats.filter(chat => !chat.isGroup).slice(0, 50) // Limit to 50 most recent
+    // Only sync individual chats, skip groups - get all chats for full history
+    const individualChats = chats.filter(chat => !chat.isGroup).slice(0, 100) // Limit to 100 most recent
 
     for (const chat of individualChats) {
       try {
@@ -259,8 +259,8 @@ async function syncChatHistory(state: ClientState): Promise<void> {
         const contactPhone = chat.id.user
         const contactName = contact?.pushname || contact?.name || chat.name || null
 
-        // Fetch last 20 messages from this chat
-        const messages = await chat.fetchMessages({ limit: 20 })
+        // Fetch last 100 messages from this chat for full history
+        const messages = await chat.fetchMessages({ limit: 100 })
 
         console.log(`[WA] Syncing ${messages.length} messages from ${contactName || contactPhone}`)
 
@@ -324,8 +324,11 @@ async function syncChatHistory(state: ClientState): Promise<void> {
             messageType = 'contact'
             content = msg.body || '[Contato]'
           } else if (msg.type === 'chat') {
-            // Regular text message - use body directly
+            // Regular text message - use body directly, with fallback to _data
             content = msg.body || ''
+            if (!content && (msg as any)._data?.body) {
+              content = (msg as any)._data.body
+            }
           }
 
           const direction = fromMe ? 'outbound' : 'inbound'
