@@ -256,8 +256,11 @@ async function syncChatHistory(state: ClientState): Promise<void> {
       try {
         // Get contact info
         const contact = await chat.getContact()
+        // chat.id.user contains just the phone number (e.g., "5531967884482")
         const contactPhone = chat.id.user
         const contactName = contact?.pushname || contact?.name || chat.name || null
+
+        console.log(`[WA] Chat ID: ${chat.id._serialized}, user: ${chat.id.user}, contactPhone: ${contactPhone}`)
 
         // Fetch last 100 messages from this chat for full history
         const messages = await chat.fetchMessages({ limit: 100 })
@@ -432,15 +435,18 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     // Skip status broadcasts
     if (msg.from === 'status@broadcast' || msg.to === 'status@broadcast') return
 
+    // Extract phone number - remove any @suffix (@c.us, @lid, @g.us, etc.)
+    const rawTo = msg.to || ''
+    const rawFrom = msg.from || ''
     const contactPhone = fromMe
-      ? msg.to.replace('@c.us', '')
-      : msg.from.replace('@c.us', '')
+      ? rawTo.replace(/@.*$/, '')
+      : rawFrom.replace(/@.*$/, '')
 
     const contact = await msg.getContact()
     const contactName = contact?.pushname || contact?.name || null
 
-    // Debug logging for message content
-    console.log(`[WA] Incoming message debug: type=${msg.type}, body="${msg.body?.substring(0, 50)}", hasMedia=${msg.hasMedia}`)
+    // Debug logging
+    console.log(`[WA] Message: fromMe=${fromMe}, rawTo=${rawTo}, rawFrom=${rawFrom}, contactPhone=${contactPhone}`)
 
     // Determine message type
     let messageType = 'text'
