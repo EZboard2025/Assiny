@@ -293,23 +293,22 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
           console.log(`[WA] LID detected - contact.number: "${(contact as any)?.number}", rawPhone: "${rawPhone}", normalizedPhone: "${normalizedPhone}", lidNumber: "${lidNumber}", name: "${contactName}"`)
 
-          // Validate if this is a real Brazilian phone number:
-          // - Must have 12-13 digits (55 + 2 area code + 8-9 phone digits)
-          // - Must start with 55 (Brazil country code)
-          // - Must NOT be the LID number itself
-          const isValidBrazilianPhone = normalizedPhone &&
-                                         normalizedPhone.length >= 12 &&
-                                         normalizedPhone.length <= 13 &&
-                                         normalizedPhone.startsWith('55') &&
-                                         normalizedPhone !== lidNumber
+          // Validate if this is a real phone number:
+          // - Must have 8-15 digits (international phone numbers vary in length)
+          // - Must NOT be the same as the LID number (this is the key check!)
+          // - If contact.number returns the LID itself, it means we don't have the real phone
+          const isValidPhone = normalizedPhone &&
+                               normalizedPhone.length >= 8 &&
+                               normalizedPhone.length <= 15 &&
+                               normalizedPhone !== lidNumber
 
-          if (isValidBrazilianPhone) {
+          if (isValidPhone) {
             contactPhone = normalizedPhone
-            console.log(`[WA] Valid Brazilian phone found for LID contact: ${contactName || chatIdSerialized} -> ${contactPhone}`)
+            console.log(`[WA] Valid phone found for LID contact: ${contactName || chatIdSerialized} -> ${contactPhone}`)
           } else {
-            // Not a valid phone - use LID identifier
+            // Not a valid phone or it's the LID number itself - use LID identifier
             contactPhone = `lid_${lidNumber}`
-            console.log(`[WA] Using LID identifier for: ${contactName || chatIdSerialized} -> ${contactPhone} (rawPhone="${rawPhone}" failed validation)`)
+            console.log(`[WA] Using LID identifier for: ${contactName || chatIdSerialized} -> ${contactPhone} (normalizedPhone="${normalizedPhone}" is same as LID or invalid)`)
           }
         } else {
           // Regular @c.us format - user field contains the phone number
@@ -560,22 +559,20 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
 
       console.log(`[WA] LID message - contact.number: "${(contact as any)?.number}", rawPhone: "${rawPhone}", normalizedPhone: "${normalizedPhone}", lidUser: "${lidUser}"`)
 
-      // Validate if this is a real Brazilian phone number:
-      // - Must have 12-13 digits (55 + 2 area code + 8-9 phone digits)
-      // - Must start with 55 (Brazil country code)
-      // - Must NOT be the LID number itself
-      const isValidBrazilianPhone = normalizedPhone &&
-                                     normalizedPhone.length >= 12 &&
-                                     normalizedPhone.length <= 13 &&
-                                     normalizedPhone.startsWith('55') &&
-                                     normalizedPhone !== lidUser
+      // Validate if this is a real phone number:
+      // - Must have 8-15 digits (international phone numbers vary in length)
+      // - Must NOT be the same as the LID number (this is the key check!)
+      const isValidPhone = normalizedPhone &&
+                           normalizedPhone.length >= 8 &&
+                           normalizedPhone.length <= 15 &&
+                           normalizedPhone !== lidUser
 
-      if (isValidBrazilianPhone) {
+      if (isValidPhone) {
         contactPhone = normalizedPhone
-        console.log(`[WA] Valid Brazilian phone for LID message: ${contactPhone}`)
+        console.log(`[WA] Valid phone for LID message: ${contactPhone}`)
       } else {
         contactPhone = `lid_${lidUser}`
-        console.log(`[WA] Using LID identifier for message: ${contactPhone} (rawPhone="${rawPhone}" failed validation)`)
+        console.log(`[WA] Using LID identifier for message: ${contactPhone} (normalizedPhone="${normalizedPhone}" is same as LID or invalid)`)
       }
     } else {
       // Regular format - extract phone from ID
