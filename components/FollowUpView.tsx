@@ -406,41 +406,41 @@ export default function FollowUpView() {
     }
     window.addEventListener('message', listener)
 
-    window.FB.login(async (response: any) => {
+    window.FB.login((response: any) => {
       window.removeEventListener('message', listener)
 
       if (response.authResponse?.code) {
         setConnectionStatus('connecting')
 
-        try {
-          const connectResponse = await fetch('/api/whatsapp/connect', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-              code: response.authResponse.code,
-              waba_id: sessionInfo.waba_id || '',
-              phone_number_id: sessionInfo.phone_number_id || ''
-            })
+        fetch('/api/whatsapp/connect', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            code: response.authResponse.code,
+            waba_id: sessionInfo.waba_id || '',
+            phone_number_id: sessionInfo.phone_number_id || ''
           })
-
-          const connectData = await connectResponse.json()
-
-          if (!connectResponse.ok) {
-            throw new Error(connectData.error || 'Erro ao conectar WhatsApp')
-          }
-
-          setConnectionStatus('connected')
-          setPhoneNumber(connectData.phone_number || null)
-          loadConversations()
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Erro ao conectar')
-          setConnectionStatus('disconnected')
-        }
+        })
+          .then(res => res.json().then(data => ({ ok: res.ok, data })))
+          .then(({ ok, data }) => {
+            if (!ok) {
+              throw new Error(data.error || 'Erro ao conectar WhatsApp')
+            }
+            setConnectionStatus('connected')
+            setPhoneNumber(data.phone_number || null)
+            loadConversations()
+          })
+          .catch(err => {
+            setError(err instanceof Error ? err.message : 'Erro ao conectar')
+            setConnectionStatus('disconnected')
+          })
+          .finally(() => {
+            setIsInitializing(false)
+          })
       } else {
         setConnectionStatus('disconnected')
+        setIsInitializing(false)
       }
-
-      setIsInitializing(false)
     }, {
       config_id: FACEBOOK_CONFIG_ID,
       response_type: 'code',
