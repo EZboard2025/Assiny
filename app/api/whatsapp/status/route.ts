@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getClientState } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +9,6 @@ const supabaseAdmin = createClient(
 
 export async function GET(request: NextRequest) {
   try {
-    // Get authenticated user
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,10 +21,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Find active connection for this user
+    // Check in-memory client first
+    const clientState = getClientState(user.id)
+    if (clientState && clientState.status === 'connected') {
+      return NextResponse.json({
+        connected: true,
+        status: 'active',
+        phone_number: clientState.phoneNumber
+      })
+    }
+
+    // Fall back to database
     const { data: connection } = await supabaseAdmin
       .from('whatsapp_connections')
-      .select('id, phone_number_id, display_phone_number, status, connected_at, last_webhook_at')
+      .select('id, display_phone_number, status, connected_at, last_webhook_at')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .order('connected_at', { ascending: false })
@@ -42,7 +52,6 @@ export async function GET(request: NextRequest) {
       connected: true,
       status: connection.status,
       phone_number: connection.display_phone_number,
-      phone_number_id: connection.phone_number_id,
       connected_at: connection.connected_at,
       last_webhook_at: connection.last_webhook_at
     })

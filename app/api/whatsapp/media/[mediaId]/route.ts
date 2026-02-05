@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getMediaUrl, downloadMedia } from '@/lib/whatsapp-api'
+import { getConnectedClient } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +18,6 @@ export async function GET(
       return NextResponse.json({ error: 'mediaId is required' }, { status: 400 })
     }
 
-    // Get authenticated user
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,31 +30,45 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's active connection for the access token
-    const { data: connection } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('access_token')
+    // With whatsapp-web.js, media is downloaded at message time and stored in raw_payload
+    // Look up the message by wa_message_id to get the raw media data
+    const { data: message } = await supabaseAdmin
+      .from('whatsapp_messages')
+      .select('raw_payload, media_mime_type')
+      .eq('wa_message_id', mediaId)
       .eq('user_id', user.id)
-      .eq('status', 'active')
       .single()
 
-    if (!connection) {
-      return NextResponse.json({ error: 'No active WhatsApp connection' }, { status: 404 })
+    if (!message) {
+      return NextResponse.json({ error: 'Media not found' }, { status: 404 })
     }
 
-    // Get media URL from Meta
-    const mediaInfo = await getMediaUrl(mediaId, connection.access_token)
+    // Try to download media via the active client
+    const client = getConnectedClient(user.id)
+    if (!client) {
+      return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
+    }
 
-    // Download media binary
-    const { buffer, contentType } = await downloadMedia(mediaInfo.url, connection.access_token)
-
-    // Return media with appropriate content type
-    return new NextResponse(new Uint8Array(buffer), {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400' // Cache for 24 hours
+    // Get message from whatsapp-web.js by serialized ID
+    try {
+      const waMsg = await client.getMessageById(mediaId)
+      if (waMsg && waMsg.hasMedia) {
+        const media = await waMsg.downloadMedia()
+        if (media) {
+          const buffer = Buffer.from(media.data, 'base64')
+          return new NextResponse(new Uint8Array(buffer), {
+            headers: {
+              'Content-Type': media.mimetype,
+              'Cache-Control': 'public, max-age=86400'
+            }
+          })
+        }
       }
-    })
+    } catch (e) {
+      console.error('Error downloading media from WA:', e)
+    }
+
+    return NextResponse.json({ error: 'Media not available' }, { status: 404 })
 
   } catch (error: any) {
     console.error('Error fetching media:', error)

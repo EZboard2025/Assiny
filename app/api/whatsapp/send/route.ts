@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendTextMessage } from '@/lib/whatsapp-api'
+import { getConnectedClient } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get authenticated user
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -32,83 +31,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's active connection
-    const { data: connection } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('id, phone_number_id, access_token, company_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single()
-
-    if (!connection) {
-      return NextResponse.json({ error: 'No active WhatsApp connection' }, { status: 404 })
+    // Get the connected WhatsApp client
+    const client = getConnectedClient(user.id)
+    if (!client) {
+      return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
     }
 
-    // Send message via Meta API
-    const result = await sendTextMessage(
-      connection.phone_number_id,
-      to,
-      message,
-      connection.access_token
-    )
+    // Format phone number for WhatsApp (add @c.us suffix)
+    const chatId = to.includes('@') ? to : `${to.replace(/[^0-9]/g, '')}@c.us`
 
-    const waMessageId = result.messages?.[0]?.id || null
+    // Send message via whatsapp-web.js
+    const sentMsg = await client.sendMessage(chatId, message)
 
-    // Save outbound message to database
-    const { data: savedMsg } = await supabaseAdmin
-      .from('whatsapp_messages')
-      .insert({
-        connection_id: connection.id,
-        user_id: user.id,
-        company_id: connection.company_id,
-        wa_message_id: waMessageId,
-        contact_phone: to,
-        direction: 'outbound',
-        message_type: 'text',
-        content: message,
-        timestamp: new Date().toISOString(),
-        status: 'sent'
-      })
-      .select('id')
-      .single()
-
-    // Update conversation
-    const { data: existingConv } = await supabaseAdmin
-      .from('whatsapp_conversations')
-      .select('id, message_count')
-      .eq('connection_id', connection.id)
-      .eq('contact_phone', to)
-      .single()
-
-    if (existingConv) {
-      await supabaseAdmin
-        .from('whatsapp_conversations')
-        .update({
-          last_message_at: new Date().toISOString(),
-          last_message_preview: message.substring(0, 100),
-          message_count: (existingConv.message_count || 0) + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingConv.id)
-    } else {
-      await supabaseAdmin
-        .from('whatsapp_conversations')
-        .insert({
-          connection_id: connection.id,
-          user_id: user.id,
-          company_id: connection.company_id,
-          contact_phone: to,
-          last_message_at: new Date().toISOString(),
-          last_message_preview: message.substring(0, 100),
-          message_count: 1
-        })
-    }
-
+    // The message_create event handler will save it to the database
+    // But we return immediately with the sent message info
     return NextResponse.json({
       success: true,
       message: {
-        id: savedMsg?.id || null,
-        waMessageId,
+        id: sentMsg.id._serialized,
+        waMessageId: sentMsg.id._serialized,
         body: message,
         fromMe: true,
         timestamp: new Date().toISOString(),

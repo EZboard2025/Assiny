@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { exchangeCodeForToken, exchangeForLongLivedToken, subscribeToWebhooks, getPhoneNumberDetails } from '@/lib/whatsapp-api'
+import { initializeClient, getClientState } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// POST: Start connecting (initialize client, generate QR code)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { code, waba_id, phone_number_id } = body
-
-    if (!code || !waba_id || !phone_number_id) {
-      return NextResponse.json(
-        { error: 'code, waba_id, and phone_number_id are required' },
-        { status: 400 }
-      )
-    }
-
-    // Get authenticated user
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -41,83 +31,67 @@ export async function POST(request: NextRequest) {
 
     const companyId = employee?.company_id || null
 
-    // Exchange code for access token
-    console.log('Exchanging code for access token...')
-    const tokenResult = await exchangeCodeForToken(code)
-    let accessToken = tokenResult.access_token
-
-    // Exchange for long-lived token (60 days)
-    try {
-      console.log('Exchanging for long-lived token...')
-      const longLivedResult = await exchangeForLongLivedToken(accessToken)
-      accessToken = longLivedResult.access_token
-      console.log(`Long-lived token obtained, expires in ${longLivedResult.expires_in}s`)
-    } catch (e) {
-      console.warn('Could not get long-lived token, using short-lived:', e)
-    }
-
-    // Subscribe to webhooks
-    console.log('Subscribing to webhooks...')
-    await subscribeToWebhooks(waba_id, accessToken)
-
-    // Get phone number display info
-    let displayPhoneNumber = ''
-    try {
-      const phoneDetails = await getPhoneNumberDetails(phone_number_id, accessToken)
-      displayPhoneNumber = phoneDetails.display_phone_number || ''
-    } catch (e) {
-      console.warn('Could not get phone details:', e)
-    }
-
-    // Check if connection already exists for this phone_number_id
-    const { data: existing } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('id')
-      .eq('phone_number_id', phone_number_id)
-      .single()
-
-    if (existing) {
-      // Update existing connection
-      await supabaseAdmin
-        .from('whatsapp_connections')
-        .update({
-          user_id: user.id,
-          company_id: companyId,
-          waba_id,
-          access_token: accessToken,
-          display_phone_number: displayPhoneNumber,
-          status: 'active',
-          connected_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-    } else {
-      // Create new connection
-      await supabaseAdmin
-        .from('whatsapp_connections')
-        .insert({
-          user_id: user.id,
-          company_id: companyId,
-          waba_id,
-          phone_number_id,
-          display_phone_number: displayPhoneNumber,
-          access_token: accessToken,
-          status: 'active'
-        })
-    }
-
-    console.log(`WhatsApp connected: ${displayPhoneNumber} (${phone_number_id}) for user ${user.id}`)
+    console.log(`[CONNECT] Initializing WhatsApp client for user ${user.id}`)
+    const result = await initializeClient(user.id, companyId)
 
     return NextResponse.json({
       success: true,
-      phone_number: displayPhoneNumber,
-      phone_number_id
+      qrcode: result.qrCode,
+      status: result.status
     })
 
   } catch (error: any) {
     console.error('Error connecting WhatsApp:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to connect WhatsApp' },
+      { status: 500 }
+    )
+  }
+}
+
+// GET: Poll for QR code or connection status
+export async function GET(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const state = getClientState(user.id)
+
+    if (!state) {
+      // Check if there's a connection in DB (might be from a previous server session)
+      const { data: connection } = await supabaseAdmin
+        .from('whatsapp_connections')
+        .select('id, status')
+        .eq('user_id', user.id)
+        .single()
+
+      if (connection && connection.status === 'active') {
+        return NextResponse.json({ status: 'disconnected_needs_reconnect' })
+      }
+
+      return NextResponse.json({ status: 'no_client' })
+    }
+
+    return NextResponse.json({
+      status: state.status,
+      qrcode: state.qrCode,
+      phoneNumber: state.phoneNumber,
+      error: state.error
+    })
+
+  } catch (error: any) {
+    console.error('Error getting WhatsApp status:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to get status' },
       { status: 500 }
     )
   }

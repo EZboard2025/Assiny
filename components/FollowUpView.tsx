@@ -1,18 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send, Link2 } from 'lucide-react'
-
-// Declare Facebook SDK types
-declare global {
-  interface Window {
-    fbAsyncInit: () => void
-    FB: {
-      init: (params: any) => void
-      login: (callback: (response: any) => void, options: any) => void
-    }
-  }
-}
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send } from 'lucide-react'
 
 interface FollowUpAnalysis {
   notas: {
@@ -81,10 +70,7 @@ interface WhatsAppMessage {
   status?: string
 }
 
-type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
-
-const FACEBOOK_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || ''
-const FACEBOOK_CONFIG_ID = process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || ''
+type ConnectionStatus = 'disconnected' | 'initializing' | 'qr_ready' | 'connecting' | 'connected'
 
 export default function FollowUpView() {
   // WhatsApp state
@@ -97,7 +83,8 @@ export default function FollowUpView() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
   const [isInitializing, setIsInitializing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [fbSdkLoaded, setFbSdkLoaded] = useState(false)
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   // Message input state
   const [messageInput, setMessageInput] = useState('')
@@ -228,37 +215,9 @@ export default function FollowUpView() {
     }
   }, [authToken])
 
-  // Load Facebook SDK
+  // Cleanup polling on unmount
   useEffect(() => {
-    if (!FACEBOOK_APP_ID) {
-      // No App ID configured - still allow button to show (will show config error on click)
-      setFbSdkLoaded(true)
-      return
-    }
-
-    window.fbAsyncInit = () => {
-      window.FB.init({
-        appId: FACEBOOK_APP_ID,
-        cookie: true,
-        xfbml: true,
-        version: 'v21.0'
-      })
-      setFbSdkLoaded(true)
-    }
-
-    // Check if SDK is already loaded
-    if (document.getElementById('facebook-jssdk')) {
-      if (window.FB) setFbSdkLoaded(true)
-      return
-    }
-
-    const script = document.createElement('script')
-    script.id = 'facebook-jssdk'
-    script.src = 'https://connect.facebook.net/en_US/sdk.js'
-    script.async = true
-    script.defer = true
-    script.crossOrigin = 'anonymous'
-    document.body.appendChild(script)
+    return () => stopPolling()
   }, [])
 
   // Keep ref in sync with selectedConversation for polling
@@ -374,82 +333,86 @@ export default function FollowUpView() {
     }
   }
 
-  const connectWhatsApp = () => {
-    if (!FACEBOOK_APP_ID || !FACEBOOK_CONFIG_ID) {
-      setError('Configuracao incompleta: NEXT_PUBLIC_FACEBOOK_APP_ID e NEXT_PUBLIC_FACEBOOK_CONFIG_ID precisam ser definidos no .env.local')
-      return
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
     }
+  }
 
-    if (!fbSdkLoaded || !window.FB) {
-      setError('Facebook SDK ainda carregando. Tente novamente.')
-      return
-    }
-
-    setIsInitializing(true)
-    setError(null)
-
-    let sessionInfo: { phone_number_id?: string; waba_id?: string } = {}
-
-    // Listen for session info from Embedded Signup
-    const listener = (event: MessageEvent) => {
-      if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return
+  const startPolling = () => {
+    stopPolling()
+    pollingRef.current = setInterval(async () => {
+      if (!authToken) return
       try {
-        const data = JSON.parse(event.data)
-        if (data.type === 'WA_EMBEDDED_SIGNUP') {
-          if (data.data) {
-            sessionInfo = data.data
-          }
+        const response = await fetch('/api/whatsapp/connect', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+        const data = await response.json()
+
+        if (data.status === 'connected') {
+          stopPolling()
+          setConnectionStatus('connected')
+          setPhoneNumber(data.phoneNumber || null)
+          setQrCode(null)
+          setIsInitializing(false)
+          loadConversations()
+        } else if (data.status === 'qr_ready' && data.qrcode) {
+          setQrCode(data.qrcode)
+          setConnectionStatus('qr_ready')
+        } else if (data.status === 'connecting') {
+          setConnectionStatus('connecting')
+          setQrCode(null)
+        } else if (data.status === 'error') {
+          stopPolling()
+          setError(data.error || 'Erro na conexao')
+          setConnectionStatus('disconnected')
+          setIsInitializing(false)
         }
       } catch {
-        // Not a JSON message, ignore
+        // Silent fail for polling
       }
-    }
-    window.addEventListener('message', listener)
+    }, 2000)
+  }
 
-    window.FB.login(async (response: any) => {
-      window.removeEventListener('message', listener)
+  const connectWhatsApp = async () => {
+    setIsInitializing(true)
+    setError(null)
+    setConnectionStatus('initializing')
+    setQrCode(null)
 
-      if (response.authResponse?.code) {
-        setConnectionStatus('connecting')
+    try {
+      const response = await fetch('/api/whatsapp/connect', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
 
-        try {
-          const connectResponse = await fetch('/api/whatsapp/connect', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-              code: response.authResponse.code,
-              waba_id: sessionInfo.waba_id || '',
-              phone_number_id: sessionInfo.phone_number_id || ''
-            })
-          })
+      const data = await response.json()
 
-          const connectData = await connectResponse.json()
-
-          if (!connectResponse.ok) {
-            throw new Error(connectData.error || 'Erro ao conectar WhatsApp')
-          }
-
-          setConnectionStatus('connected')
-          setPhoneNumber(connectData.phone_number || null)
-          loadConversations()
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Erro ao conectar')
-          setConnectionStatus('disconnected')
-        }
-      } else {
-        setConnectionStatus('disconnected')
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao iniciar conexao')
       }
 
+      if (data.status === 'connected') {
+        setConnectionStatus('connected')
+        setIsInitializing(false)
+        loadConversations()
+        return
+      }
+
+      if (data.qrcode) {
+        setQrCode(data.qrcode)
+        setConnectionStatus('qr_ready')
+      }
+
+      // Start polling for status updates (QR regeneration, connection)
+      startPolling()
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao conectar')
+      setConnectionStatus('disconnected')
       setIsInitializing(false)
-    }, {
-      config_id: FACEBOOK_CONFIG_ID,
-      response_type: 'code',
-      override_default_response_type: true,
-      extras: {
-        feature: 'whatsapp_embedded_signup',
-        sessionInfoVersion: 2
-      }
-    })
+    }
   }
 
   const disconnectWhatsApp = async () => {
@@ -720,31 +683,26 @@ export default function FollowUpView() {
           </div>
         </div>
         <h1 className="text-[32px] font-light text-[#e9edef] mb-4">
-          WhatsApp Business
+          WhatsApp Follow-Up
         </h1>
         <p className="text-[#8696a0] text-sm mb-8">
-          Conecte sua conta WhatsApp Business para analisar suas conversas de follow-up automaticamente.
+          Conecte seu WhatsApp via QR Code para analisar suas conversas de follow-up automaticamente.
           Selecione uma conversa e receba feedback detalhado em segundos.
         </p>
         <button
           onClick={connectWhatsApp}
-          disabled={isInitializing || !fbSdkLoaded}
+          disabled={isInitializing}
           className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-6 py-3 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
         >
           {isInitializing ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Conectando...
-            </>
-          ) : !fbSdkLoaded ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Carregando...
+              Iniciando...
             </>
           ) : (
             <>
-              <Link2 className="w-5 h-5" />
-              Conectar WhatsApp Business
+              <Smartphone className="w-5 h-5" />
+              Conectar WhatsApp
             </>
           )}
         </button>
@@ -754,19 +712,62 @@ export default function FollowUpView() {
           </div>
         )}
         <p className="text-[#8696a0] text-xs mt-6">
-          Integrado via API oficial da Meta. Seguro e sem risco de bloqueio.
+          Voce precisara escanear o QR Code com seu celular.
         </p>
       </div>
     </div>
   )
 
-  // Render connecting state
+  // Render QR code / connecting state
   const renderConnecting = () => (
     <div className="flex-1 flex items-center justify-center bg-[#222e35]">
-      <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin text-[#00a884] mx-auto mb-4" />
-        <h2 className="text-[#e9edef] text-xl mb-2">Conectando...</h2>
-        <p className="text-[#8696a0] text-sm">Finalizando a conexao com WhatsApp Business.</p>
+      <div className="text-center max-w-md px-8">
+        {connectionStatus === 'qr_ready' && qrCode ? (
+          <>
+            <div className="bg-white p-4 rounded-2xl inline-block mb-6">
+              <img
+                src={qrCode}
+                alt="QR Code WhatsApp"
+                className="w-[256px] h-[256px]"
+              />
+            </div>
+            <h2 className="text-[#e9edef] text-xl mb-2">Escaneie o QR Code</h2>
+            <p className="text-[#8696a0] text-sm mb-4">
+              Abra o WhatsApp no seu celular, va em Aparelhos Conectados e escaneie o codigo acima.
+            </p>
+            <p className="text-[#8696a0] text-xs">
+              O QR Code atualiza automaticamente. Mantenha esta pagina aberta.
+            </p>
+            <button
+              onClick={() => {
+                stopPolling()
+                setConnectionStatus('disconnected')
+                setQrCode(null)
+                setIsInitializing(false)
+              }}
+              className="mt-4 text-[#8696a0] hover:text-[#e9edef] text-sm transition-colors"
+            >
+              Cancelar
+            </button>
+          </>
+        ) : connectionStatus === 'connecting' ? (
+          <>
+            <Loader2 className="w-12 h-12 animate-spin text-[#00a884] mx-auto mb-4" />
+            <h2 className="text-[#e9edef] text-xl mb-2">Conectando...</h2>
+            <p className="text-[#8696a0] text-sm">QR Code escaneado. Autenticando...</p>
+          </>
+        ) : (
+          <>
+            <Loader2 className="w-12 h-12 animate-spin text-[#00a884] mx-auto mb-4" />
+            <h2 className="text-[#e9edef] text-xl mb-2">Inicializando...</h2>
+            <p className="text-[#8696a0] text-sm">Preparando o QR Code. Aguarde...</p>
+          </>
+        )}
+        {error && (
+          <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg">
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1322,7 +1323,7 @@ export default function FollowUpView() {
           {renderChatSidebar()}
           {renderMainContent()}
         </>
-      ) : connectionStatus === 'connecting' ? (
+      ) : connectionStatus === 'initializing' || connectionStatus === 'qr_ready' || connectionStatus === 'connecting' ? (
         renderConnecting()
       ) : (
         renderDisconnected()

@@ -26,11 +26,14 @@
     "pdf-parse": "^2.4.5",
     "postgres": "^3.4.7",
     "puppeteer": "^24.33.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react-dom": "^19.2.1",
+    "whatsapp-web.js": "^1.34.6"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",

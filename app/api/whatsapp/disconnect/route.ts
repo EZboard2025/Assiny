@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { disconnectClient } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +9,6 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    // Get authenticated user
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,17 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Delete all connections for this user (CASCADE deletes messages and conversations)
-    const { error: deleteError } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .delete()
-      .eq('user_id', user.id)
-
-    if (deleteError) {
-      throw new Error(`Failed to delete connection: ${deleteError.message}`)
-    }
-
-    console.log(`WhatsApp disconnected for user ${user.id}`)
+    await disconnectClient(user.id)
 
     return NextResponse.json({ success: true })
 
