@@ -267,41 +267,49 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
         if (isLidContact) {
           // This is a LID, need to get phone from contact.number
-          contactPhone = (contact as any)?.number || ''
+          // LID contacts don't have a real phone number in the chat ID - we need to find it elsewhere
+          const lidNumber = chat.id.user // e.g., "83425679642877"
+          let rawPhone = (contact as any)?.number || ''
 
           // Fallback 1: Try to extract from contact.id if it's not a LID
-          if (!contactPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
-            contactPhone = contact.id.user
+          if (!rawPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
+            rawPhone = contact.id.user
           }
 
           // Fallback 2: Try getFormattedNumber() method
-          if (!contactPhone) {
+          if (!rawPhone) {
             try {
               const formattedNumber = await (contact as any).getFormattedNumber?.()
               if (formattedNumber) {
-                // Remove formatting characters, keep only digits
-                contactPhone = formattedNumber.replace(/[^0-9]/g, '')
+                rawPhone = formattedNumber
               }
             } catch (e) {
               console.log(`[WA] getFormattedNumber failed for ${contactName || chatIdSerialized}`)
             }
           }
 
-          console.log(`[WA] LID detected - contact.number: ${(contact as any)?.number}, resolved contactPhone: ${contactPhone}, chat.id.user: ${chat.id.user}`)
+          // Normalize phone to digits only for comparison
+          const normalizedPhone = rawPhone ? String(rawPhone).replace(/[^0-9]/g, '') : ''
 
-          // If we still can't get a real phone number, use a placeholder with the LID
-          // This allows us to still display the chat but track that it's a LID
-          // IMPORTANT: Also check if the "phone" we got is actually the LID number itself
-          const lidNumber = chat.id.user
-          const isPhoneActuallyLid = !contactPhone ||
-                                      contactPhone.length < 8 ||
-                                      contactPhone === lidNumber ||
-                                      !contactPhone.startsWith('55') // Brazilian numbers start with 55
+          console.log(`[WA] LID detected - contact.number: "${(contact as any)?.number}", rawPhone: "${rawPhone}", normalizedPhone: "${normalizedPhone}", lidNumber: "${lidNumber}", name: "${contactName}"`)
 
-          if (isPhoneActuallyLid) {
-            // Use the LID user part as identifier, but mark it
+          // Validate if this is a real Brazilian phone number:
+          // - Must have 12-13 digits (55 + 2 area code + 8-9 phone digits)
+          // - Must start with 55 (Brazil country code)
+          // - Must NOT be the LID number itself
+          const isValidBrazilianPhone = normalizedPhone &&
+                                         normalizedPhone.length >= 12 &&
+                                         normalizedPhone.length <= 13 &&
+                                         normalizedPhone.startsWith('55') &&
+                                         normalizedPhone !== lidNumber
+
+          if (isValidBrazilianPhone) {
+            contactPhone = normalizedPhone
+            console.log(`[WA] Valid Brazilian phone found for LID contact: ${contactName || chatIdSerialized} -> ${contactPhone}`)
+          } else {
+            // Not a valid phone - use LID identifier
             contactPhone = `lid_${lidNumber}`
-            console.log(`[WA] Using LID identifier for: ${contactName || chatIdSerialized} -> ${contactPhone}`)
+            console.log(`[WA] Using LID identifier for: ${contactName || chatIdSerialized} -> ${contactPhone} (rawPhone="${rawPhone}" failed validation)`)
           }
         } else {
           // Regular @c.us format - user field contains the phone number
@@ -527,38 +535,47 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     let contactPhone: string
     if (isLidContact) {
       // LID format - get phone from contact.number
-      contactPhone = (contact as any)?.number || ''
+      const lidUser = targetId.replace(/@lid$/, '')
+      let rawPhone = (contact as any)?.number || ''
 
       // Fallback 1: Try to extract from contact.id if it's not a LID
-      if (!contactPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
-        contactPhone = contact.id.user
+      if (!rawPhone && contact?.id?.user && !contact.id._serialized?.endsWith('@lid')) {
+        rawPhone = contact.id.user
       }
 
       // Fallback 2: Try getFormattedNumber() method
-      if (!contactPhone) {
+      if (!rawPhone) {
         try {
           const formattedNumber = await (contact as any).getFormattedNumber?.()
           if (formattedNumber) {
-            contactPhone = formattedNumber.replace(/[^0-9]/g, '')
+            rawPhone = formattedNumber
           }
         } catch (e) {
           console.log(`[WA] getFormattedNumber failed for incoming message`)
         }
       }
 
-      const lidUser = targetId.replace(/@lid$/, '')
-      console.log(`[WA] LID message - contact.number: ${(contact as any)?.number}, resolved: ${contactPhone}, lidUser: ${lidUser}`)
+      // Normalize phone to digits only for comparison
+      const normalizedPhone = rawPhone ? String(rawPhone).replace(/[^0-9]/g, '') : ''
 
-      // If we still can't get a real phone, use LID identifier
-      // IMPORTANT: Also check if the "phone" we got is actually the LID number itself
-      const isPhoneActuallyLid = !contactPhone ||
-                                  contactPhone.length < 8 ||
-                                  contactPhone === lidUser ||
-                                  !contactPhone.startsWith('55') // Brazilian numbers start with 55
+      console.log(`[WA] LID message - contact.number: "${(contact as any)?.number}", rawPhone: "${rawPhone}", normalizedPhone: "${normalizedPhone}", lidUser: "${lidUser}"`)
 
-      if (isPhoneActuallyLid) {
+      // Validate if this is a real Brazilian phone number:
+      // - Must have 12-13 digits (55 + 2 area code + 8-9 phone digits)
+      // - Must start with 55 (Brazil country code)
+      // - Must NOT be the LID number itself
+      const isValidBrazilianPhone = normalizedPhone &&
+                                     normalizedPhone.length >= 12 &&
+                                     normalizedPhone.length <= 13 &&
+                                     normalizedPhone.startsWith('55') &&
+                                     normalizedPhone !== lidUser
+
+      if (isValidBrazilianPhone) {
+        contactPhone = normalizedPhone
+        console.log(`[WA] Valid Brazilian phone for LID message: ${contactPhone}`)
+      } else {
         contactPhone = `lid_${lidUser}`
-        console.log(`[WA] Using LID identifier for message: ${contactPhone}`)
+        console.log(`[WA] Using LID identifier for message: ${contactPhone} (rawPhone="${rawPhone}" failed validation)`)
       }
     } else {
       // Regular format - extract phone from ID
