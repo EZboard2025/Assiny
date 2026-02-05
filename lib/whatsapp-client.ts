@@ -114,6 +114,10 @@ export async function initializeClient(userId: string, companyId: string | null)
 
     // Upsert connection in database
     await upsertConnection(state)
+
+    // Sync message history from existing chats
+    console.log(`[WA] Starting history sync for user ${userId}`)
+    await syncChatHistory(state)
   })
 
   // Message received
@@ -238,6 +242,183 @@ async function upsertConnection(state: ClientState): Promise<void> {
   console.log(`[WA] Connection saved: ${state.connectionId} for user ${state.userId}`)
 }
 
+async function syncChatHistory(state: ClientState): Promise<void> {
+  try {
+    const client = state.client
+    const chats = await client.getChats()
+
+    console.log(`[WA] Found ${chats.length} chats for user ${state.userId}`)
+
+    // Only sync individual chats, skip groups
+    const individualChats = chats.filter(chat => !chat.isGroup).slice(0, 50) // Limit to 50 most recent
+
+    for (const chat of individualChats) {
+      try {
+        // Get contact info
+        const contact = await chat.getContact()
+        const contactPhone = chat.id.user
+        const contactName = contact?.pushname || contact?.name || chat.name || null
+
+        // Fetch last 20 messages from this chat
+        const messages = await chat.fetchMessages({ limit: 20 })
+
+        console.log(`[WA] Syncing ${messages.length} messages from ${contactName || contactPhone}`)
+
+        let lastMessageAt: Date | null = null
+        let lastMessagePreview = ''
+        let messageCount = 0
+
+        for (const msg of messages) {
+          // Skip status broadcasts
+          if (msg.from === 'status@broadcast' || msg.to === 'status@broadcast') continue
+
+          const fromMe = msg.fromMe
+          const waMessageId = msg.id._serialized
+
+          // Check if message already exists
+          const { data: existingMsg } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .select('id')
+            .eq('wa_message_id', waMessageId)
+            .single()
+
+          if (existingMsg) continue // Skip if already synced
+
+          // Extract message content
+          let messageType = 'text'
+          let mediaId: string | null = null
+          let mediaMimeType: string | null = null
+          let content = msg.body || ''
+
+          // Debug logging for content extraction
+          console.log(`[WA] Message debug: type=${msg.type}, body="${msg.body?.substring(0, 50)}", hasMedia=${msg.hasMedia}`)
+
+          if (msg.hasMedia) {
+            if (msg.type === 'image') {
+              messageType = 'image'
+              mediaMimeType = 'image/jpeg'
+              content = (msg as any).caption || ''
+            } else if (msg.type === 'ptt' || msg.type === 'audio') {
+              messageType = 'audio'
+              mediaMimeType = 'audio/ogg'
+              content = '[Áudio]'
+            } else if (msg.type === 'video') {
+              messageType = 'video'
+              mediaMimeType = 'video/mp4'
+              content = (msg as any).caption || ''
+            } else if (msg.type === 'document') {
+              messageType = 'document'
+              content = (msg as any).filename || '[Documento]'
+            } else if (msg.type === 'sticker') {
+              messageType = 'sticker'
+              mediaMimeType = 'image/webp'
+              content = '[Sticker]'
+            }
+          } else if (msg.type === 'location') {
+            messageType = 'location'
+            const loc = (msg as any).location
+            if (loc) {
+              content = `${loc.latitude},${loc.longitude}${loc.description ? ` - ${loc.description}` : ''}`
+            }
+          } else if (msg.type === 'vcard' || msg.type === 'multi_vcard') {
+            messageType = 'contact'
+            content = msg.body || '[Contato]'
+          } else if (msg.type === 'chat') {
+            // Regular text message - use body directly
+            content = msg.body || ''
+          }
+
+          const direction = fromMe ? 'outbound' : 'inbound'
+          const msgTimestamp = new Date(msg.timestamp * 1000)
+
+          // Insert message
+          const { error: insertError } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .insert({
+              connection_id: state.connectionId,
+              user_id: state.userId,
+              company_id: state.companyId,
+              wa_message_id: waMessageId,
+              contact_phone: contactPhone,
+              contact_name: contactName,
+              direction,
+              message_type: messageType,
+              content,
+              media_id: mediaId,
+              media_mime_type: mediaMimeType,
+              message_timestamp: msgTimestamp.toISOString(),
+              status: fromMe ? 'sent' : 'delivered',
+              raw_payload: { type: msg.type, hasMedia: msg.hasMedia, body: msg.body, from: msg.from, to: msg.to }
+            })
+
+          if (insertError && insertError.code !== '23505') {
+            console.error('[WA] Error inserting history message:', insertError)
+            continue
+          }
+
+          messageCount++
+
+          // Track last message for conversation
+          if (!lastMessageAt || msgTimestamp > lastMessageAt) {
+            lastMessageAt = msgTimestamp
+            lastMessagePreview = content?.substring(0, 100) || `[${messageType}]`
+          }
+        }
+
+        // Upsert conversation after syncing messages
+        if (messageCount > 0 && lastMessageAt) {
+          const { data: existingConv } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('id, message_count')
+            .eq('connection_id', state.connectionId!)
+            .eq('contact_phone', contactPhone)
+            .single()
+
+          if (existingConv) {
+            await supabaseAdmin
+              .from('whatsapp_conversations')
+              .update({
+                contact_name: contactName || undefined,
+                last_message_at: lastMessageAt.toISOString(),
+                last_message_preview: lastMessagePreview,
+                message_count: (existingConv.message_count || 0) + messageCount,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingConv.id)
+          } else {
+            await supabaseAdmin
+              .from('whatsapp_conversations')
+              .insert({
+                connection_id: state.connectionId,
+                user_id: state.userId,
+                company_id: state.companyId,
+                contact_phone: contactPhone,
+                contact_name: contactName,
+                last_message_at: lastMessageAt.toISOString(),
+                last_message_preview: lastMessagePreview,
+                unread_count: 0,
+                message_count: messageCount
+              })
+          }
+
+          console.log(`[WA] Synced conversation: ${contactName || contactPhone} (${messageCount} messages)`)
+        }
+
+        // Small delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+      } catch (chatError) {
+        console.error(`[WA] Error syncing chat:`, chatError)
+      }
+    }
+
+    console.log(`[WA] History sync complete for user ${state.userId}`)
+
+  } catch (error) {
+    console.error('[WA] Error syncing chat history:', error)
+  }
+}
+
 async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: boolean): Promise<void> {
   try {
     const chat = await msg.getChat()
@@ -255,6 +436,9 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     const contact = await msg.getContact()
     const contactName = contact?.pushname || contact?.name || null
 
+    // Debug logging for message content
+    console.log(`[WA] Incoming message debug: type=${msg.type}, body="${msg.body?.substring(0, 50)}", hasMedia=${msg.hasMedia}`)
+
     // Determine message type
     let messageType = 'text'
     let mediaId: string | null = null
@@ -266,33 +450,48 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       if (msg.type === 'image') {
         messageType = 'image'
         mediaMimeType = media?.mimetype || 'image/jpeg'
-        content = (msg as any).caption || content
+        content = (msg as any).caption || '[Imagem]'
       } else if (msg.type === 'ptt' || msg.type === 'audio') {
         messageType = 'audio'
         mediaMimeType = media?.mimetype || 'audio/ogg'
-        content = ''
+        content = '[Áudio]'
       } else if (msg.type === 'video') {
         messageType = 'video'
         mediaMimeType = media?.mimetype || 'video/mp4'
-        content = (msg as any).caption || content
+        content = (msg as any).caption || '[Vídeo]'
       } else if (msg.type === 'document') {
         messageType = 'document'
         mediaMimeType = media?.mimetype || 'application/octet-stream'
-        content = (msg as any).filename || content
+        content = (msg as any).filename || '[Documento]'
       } else if (msg.type === 'sticker') {
         messageType = 'sticker'
         mediaMimeType = media?.mimetype || 'image/webp'
-        content = ''
+        content = '[Sticker]'
       }
     } else if (msg.type === 'location') {
       messageType = 'location'
       const loc = (msg as any).location
       if (loc) {
         content = `${loc.latitude},${loc.longitude}${loc.description ? ` - ${loc.description}` : ''}`
+      } else {
+        content = '[Localização]'
       }
     } else if (msg.type === 'vcard' || msg.type === 'multi_vcard') {
       messageType = 'contact'
-      content = msg.body
+      content = msg.body || '[Contato]'
+    } else if (msg.type === 'chat') {
+      // Regular text message - ensure we get the body
+      content = msg.body || ''
+      if (!content && (msg as any)._data?.body) {
+        content = (msg as any)._data.body
+      }
+    }
+
+    console.log(`[WA] Processed content: "${content?.substring(0, 50)}"`)
+
+    // If content is still empty for text messages, log raw data for debugging
+    if (!content && messageType === 'text') {
+      console.log(`[WA] Empty text message, raw _data:`, JSON.stringify((msg as any)._data || {}).substring(0, 500))
     }
 
     const direction = fromMe ? 'outbound' : 'inbound'
@@ -313,7 +512,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         content,
         media_id: mediaId,
         media_mime_type: mediaMimeType,
-        timestamp: new Date(msg.timestamp * 1000).toISOString(),
+        message_timestamp: new Date(msg.timestamp * 1000).toISOString(),
         status: fromMe ? 'sent' : 'delivered',
         raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to }
       })
