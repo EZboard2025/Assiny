@@ -490,6 +490,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               subtitle="WhatsApp"
               description="Análise detalhada do seu follow-up."
               onClick={() => handleViewChange('followup')}
+              disabled
             />
 
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') ? (
@@ -531,6 +532,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               description="Bot transcreve reuniões do Google Meet automaticamente."
               onClick={() => handleViewChange('meet-analysis')}
               betaBadge
+              disabled
             />
 
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') &&
