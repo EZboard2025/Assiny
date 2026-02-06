@@ -354,6 +354,14 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
     const contactName = contact?.pushname || contact?.name || chat.name || null
     const chatIdSerialized = chat.id._serialized || ''
 
+    // Fetch profile picture URL
+    let profilePicUrl: string | null = null
+    try {
+      profilePicUrl = await contact?.getProfilePicUrl() || null
+    } catch {
+      // Profile pic may not be available (privacy settings)
+    }
+
     const resolved = await resolveContactPhone(chatIdSerialized, contact, state)
     if (!resolved) return
 
@@ -436,6 +444,7 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
           company_id: state.companyId,
           contact_phone: contactPhone,
           contact_name: contactName,
+          profile_pic_url: profilePicUrl,
           last_message_at: latestTimestamp.toISOString(),
           last_message_preview: preview,
           unread_count: 0,
@@ -477,6 +486,16 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
 
     const contact = await chat.getContact()
     const contactName = contact?.pushname || contact?.name || chat.name || null
+
+    // Fetch profile picture URL (only for inbound messages to avoid delay)
+    let profilePicUrl: string | null = null
+    if (!fromMe) {
+      try {
+        profilePicUrl = await contact?.getProfilePicUrl() || null
+      } catch {
+        // Profile pic may not be available
+      }
+    }
 
     const targetId = fromMe ? (msg.to || '') : (msg.from || '')
 
@@ -520,20 +539,25 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       })
 
     const messagePreview = content?.substring(0, 100) || `[${messageType}]`
+    const convData: any = {
+      connection_id: state.connectionId,
+      user_id: state.userId,
+      company_id: state.companyId,
+      contact_phone: contactPhone,
+      contact_name: contactName,
+      last_message_at: msgTimestamp.toISOString(),
+      last_message_preview: messagePreview,
+      unread_count: direction === 'inbound' ? 1 : 0,
+      message_count: 1,
+      updated_at: new Date().toISOString()
+    }
+    // Only include profile_pic_url if we fetched it (inbound messages)
+    if (profilePicUrl) {
+      convData.profile_pic_url = profilePicUrl
+    }
     const convUpsert = supabaseAdmin
       .from('whatsapp_conversations')
-      .upsert({
-        connection_id: state.connectionId,
-        user_id: state.userId,
-        company_id: state.companyId,
-        contact_phone: contactPhone,
-        contact_name: contactName,
-        last_message_at: msgTimestamp.toISOString(),
-        last_message_preview: messagePreview,
-        unread_count: direction === 'inbound' ? 1 : 0,
-        message_count: 1,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'connection_id,contact_phone', ignoreDuplicates: false })
+      .upsert(convData, { onConflict: 'connection_id,contact_phone', ignoreDuplicates: false })
 
     await Promise.allSettled([messageInsert, convUpsert])
   } catch {}

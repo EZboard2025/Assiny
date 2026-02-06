@@ -51,6 +51,7 @@ interface WhatsAppConversation {
   id: string
   contact_phone: string
   contact_name: string | null
+  profile_pic_url: string | null
   last_message_at: string | null
   last_message_preview: string | null
   unread_count: number
@@ -857,7 +858,20 @@ export default function FollowUpView() {
             >
               {/* Avatar */}
               <div className="relative flex-shrink-0 mr-3">
-                <div className="w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center">
+                {conv.profile_pic_url ? (
+                  <img
+                    src={conv.profile_pic_url}
+                    alt={conv.contact_name || 'Contact'}
+                    className="w-12 h-12 rounded-full object-cover"
+                    onError={(e) => {
+                      // Fallback to initials on error
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      target.nextElementSibling?.classList.remove('hidden')
+                    }}
+                  />
+                ) : null}
+                <div className={`w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center ${conv.profile_pic_url ? 'hidden' : ''}`}>
                   <span className="text-white text-lg font-medium">
                     {getInitials(conv.contact_name)}
                   </span>
@@ -924,7 +938,19 @@ export default function FollowUpView() {
           {/* Chat Header */}
           <div className="h-[60px] flex-shrink-0 bg-[#202c33] px-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center">
+              {selectedConversation.profile_pic_url ? (
+                <img
+                  src={selectedConversation.profile_pic_url}
+                  alt={selectedConversation.contact_name || 'Contact'}
+                  className="w-10 h-10 rounded-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
+                    target.nextElementSibling?.classList.remove('hidden')
+                  }}
+                />
+              ) : null}
+              <div className={`w-10 h-10 rounded-full bg-[#6b7c85] flex items-center justify-center ${selectedConversation.profile_pic_url ? 'hidden' : ''}`}>
                 <span className="text-white font-medium">
                   {getInitials(selectedConversation.contact_name)}
                 </span>
