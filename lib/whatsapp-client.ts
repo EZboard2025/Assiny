@@ -141,16 +141,23 @@ export async function initializeClient(userId: string, companyId: string | null)
 
   // Message received
   client.on('message', async (msg: Message) => {
-    if (state.status !== 'connected' || !state.connectionId) return
+    console.log(`[WA] Message received from ${msg.from}, status=${state.status}, connectionId=${state.connectionId}`)
+    if (state.status !== 'connected' || !state.connectionId) {
+      console.log(`[WA] Skipping message - not ready`)
+      return
+    }
     handleIncomingMessage(state, msg, false)
   })
 
   // Message sent by us
   client.on('message_create', async (msg: Message) => {
-    if (state.status !== 'connected' || !state.connectionId) return
-    if (msg.fromMe) {
-      handleIncomingMessage(state, msg, true)
+    if (!msg.fromMe) return
+    console.log(`[WA] Message sent to ${msg.to}, status=${state.status}, connectionId=${state.connectionId}`)
+    if (state.status !== 'connected' || !state.connectionId) {
+      console.log(`[WA] Skipping outbound message - not ready`)
+      return
     }
+    handleIncomingMessage(state, msg, true)
   })
 
   // Disconnected
@@ -480,8 +487,12 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
 async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: boolean): Promise<void> {
   try {
+    console.log(`[WA] Processing message: type=${msg.type}, fromMe=${fromMe}, body=${msg.body?.substring(0, 50) || '[no body]'}`)
     const chat = await msg.getChat()
-    if (chat.isGroup) return
+    if (chat.isGroup) {
+      console.log(`[WA] Skipping group message`)
+      return
+    }
     if (msg.from === 'status@broadcast' || msg.to === 'status@broadcast') return
 
     const contact = await chat.getContact()
