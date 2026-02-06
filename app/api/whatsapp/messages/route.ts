@@ -31,30 +31,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's active connection (optional - fallback to user_id)
-    const { data: connection } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single()
-
-    // Fetch messages for this conversation - try by connection_id first, fallback to user_id
-    let query = supabaseAdmin
+    // Fetch ALL messages for this user and contact (regardless of connection_id)
+    // This ensures we see full history even when connection is recreated
+    const { data: messages, error } = await supabaseAdmin
       .from('whatsapp_messages')
       .select('*')
+      .eq('user_id', user.id)
       .eq('contact_phone', contactPhone)
       .order('message_timestamp', { ascending: true })
       .limit(limit)
-
-    // Filter by connection_id if available, otherwise by user_id
-    if (connection?.id) {
-      query = query.eq('connection_id', connection.id)
-    } else {
-      query = query.eq('user_id', user.id)
-    }
-
-    const { data: messages, error } = await query
 
     if (error) {
       throw new Error(`Failed to fetch messages: ${error.message}`)
