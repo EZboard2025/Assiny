@@ -80,15 +80,22 @@ export async function initializeClient(userId: string, companyId: string | null)
     }),
     puppeteer: {
       headless: true,
+      protocolTimeout: 60000, // 60s timeout for slow operations
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
-        '--no-zygote',
         '--disable-gpu',
-        '--single-process'
+        // Removed --single-process and --no-zygote to allow multiple instances
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate',
+        '--mute-audio',
+        '--hide-scrollbars'
       ]
     }
   })
