@@ -224,6 +224,7 @@ export function getConnectedClient(userId: string): Client | null {
 // ============================================
 
 async function upsertConnection(state: ClientState): Promise<void> {
+  // First check if connection exists for this user
   const { data: existing } = await supabaseAdmin
     .from('whatsapp_connections')
     .select('id')
@@ -231,23 +232,46 @@ async function upsertConnection(state: ClientState): Promise<void> {
     .single()
 
   if (existing) {
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('whatsapp_connections')
       .update({
         status: 'active',
+        phone_number_id: state.phoneNumber || 'wwebjs',
         display_phone_number: state.phoneNumber,
         connected_at: new Date().toISOString(),
         last_webhook_at: new Date().toISOString()
       })
       .eq('id', existing.id)
+
+    if (updateError) {
+      console.error(`[WA] Failed to update connection:`, updateError)
+    }
     state.connectionId = existing.id
+    console.log(`[WA] Connection updated: ${state.connectionId}`)
   } else {
-    const { data: inserted } = await supabaseAdmin
+    // Check if phone_number_id is already used by another user (and delete if so)
+    if (state.phoneNumber) {
+      const { data: existingByPhone } = await supabaseAdmin
+        .from('whatsapp_connections')
+        .select('id, user_id')
+        .eq('phone_number_id', state.phoneNumber)
+        .single()
+
+      if (existingByPhone && existingByPhone.user_id !== state.userId) {
+        console.log(`[WA] Phone ${state.phoneNumber} was connected to another user, cleaning up...`)
+        // Delete old connection and related data
+        await supabaseAdmin.from('whatsapp_messages').delete().eq('connection_id', existingByPhone.id)
+        await supabaseAdmin.from('whatsapp_conversations').delete().eq('connection_id', existingByPhone.id)
+        await supabaseAdmin.from('whatsapp_connections').delete().eq('id', existingByPhone.id)
+      }
+    }
+
+    const { data: inserted, error: insertError } = await supabaseAdmin
       .from('whatsapp_connections')
       .insert({
         user_id: state.userId,
         company_id: state.companyId,
-        phone_number_id: state.phoneNumber || 'wwebjs',
+        phone_number_id: state.phoneNumber || `wwebjs_${state.userId.substring(0, 8)}`,
         waba_id: 'wwebjs',
         display_phone_number: state.phoneNumber,
         access_token: 'wwebjs_session',
@@ -256,9 +280,15 @@ async function upsertConnection(state: ClientState): Promise<void> {
       })
       .select('id')
       .single()
-    state.connectionId = inserted?.id || null
+
+    if (insertError) {
+      console.error(`[WA] Failed to insert connection:`, insertError)
+      state.connectionId = null
+    } else {
+      state.connectionId = inserted?.id || null
+      console.log(`[WA] Connection created: ${state.connectionId}`)
+    }
   }
-  console.log(`[WA] Connection saved: ${state.connectionId}`)
 }
 
 // Helper to extract message content
@@ -599,6 +629,17 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       .from('whatsapp_conversations')
       .upsert(convData, { onConflict: 'connection_id,contact_phone', ignoreDuplicates: false })
 
-    await Promise.allSettled([messageInsert, convUpsert])
-  } catch {}
+    const [msgResult, convResult] = await Promise.allSettled([messageInsert, convUpsert])
+
+    if (msgResult.status === 'rejected') {
+      console.error(`[WA] Failed to insert message:`, msgResult.reason)
+    }
+    if (convResult.status === 'rejected') {
+      console.error(`[WA] Failed to upsert conversation:`, convResult.reason)
+    }
+
+    console.log(`[WA] Message processed: ${direction} ${messageType} from ${contactPhone}`)
+  } catch (error) {
+    console.error(`[WA] Error handling message:`, error)
+  }
 }
