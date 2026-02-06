@@ -18,38 +18,60 @@ export async function GET(
       return NextResponse.json({ error: 'mediaId is required' }, { status: 400 })
     }
 
+    // Get token from query param or header
+    const url = new URL(request.url)
+    const tokenFromQuery = url.searchParams.get('token')
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    const token = tokenFromQuery || authHeader?.replace('Bearer ', '')
+
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // With whatsapp-web.js, media is downloaded at message time and stored in raw_payload
-    // Look up the message by wa_message_id to get the raw media data
-    const { data: message } = await supabaseAdmin
-      .from('whatsapp_messages')
-      .select('raw_payload, media_mime_type')
-      .eq('wa_message_id', mediaId)
-      .eq('user_id', user.id)
-      .single()
+    // The mediaId could be a storage path (userId/timestamp_id.ext) or a wa_message_id
+    // Try to detect based on format
+    const isStoragePath = mediaId.includes('/') || mediaId.includes('.')
 
-    if (!message) {
-      return NextResponse.json({ error: 'Media not found' }, { status: 404 })
+    if (isStoragePath) {
+      // Try to get from Supabase Storage first
+      const { data, error } = await supabaseAdmin.storage
+        .from('whatsapp-media')
+        .download(mediaId)
+
+      if (data && !error) {
+        const buffer = await data.arrayBuffer()
+
+        // Determine content type from extension
+        const ext = mediaId.split('.').pop()?.toLowerCase()
+        const contentType = ext === 'ogg' ? 'audio/ogg' :
+                           ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+                           ext === 'png' ? 'image/png' :
+                           ext === 'mp4' ? 'video/mp4' :
+                           ext === 'webp' ? 'image/webp' :
+                           'application/octet-stream'
+
+        return new NextResponse(new Uint8Array(buffer), {
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=86400'
+          }
+        })
+      }
     }
 
-    // Try to download media via the active client
+    // Fallback: Try to download media on-demand from WhatsApp client
     const client = getConnectedClient(user.id)
     if (!client) {
       return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
     }
 
-    // Get message from whatsapp-web.js by serialized ID
+    // Try to get message and download media
     try {
       const waMsg = await client.getMessageById(mediaId)
       if (waMsg && waMsg.hasMedia) {

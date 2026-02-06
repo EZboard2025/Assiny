@@ -518,6 +518,35 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     const msgTimestamp = new Date(msg.timestamp * 1000)
     const isLidContact = targetId.endsWith('@lid')
 
+    // Download and save media if present
+    let mediaId: string | null = null
+    if (msg.hasMedia && (messageType === 'audio' || messageType === 'image' || messageType === 'video' || messageType === 'document' || messageType === 'sticker')) {
+      try {
+        const media = await msg.downloadMedia()
+        if (media?.data) {
+          // Generate unique media ID
+          const ext = messageType === 'audio' ? 'ogg' :
+                      messageType === 'image' ? 'jpg' :
+                      messageType === 'video' ? 'mp4' :
+                      messageType === 'sticker' ? 'webp' : 'bin'
+          mediaId = `${state.userId}/${Date.now()}_${msg.id._serialized.slice(-8)}.${ext}`
+
+          // Convert base64 to buffer and upload to Supabase Storage
+          const buffer = Buffer.from(media.data, 'base64')
+          await supabaseAdmin.storage
+            .from('whatsapp-media')
+            .upload(mediaId, buffer, {
+              contentType: media.mimetype || mediaMimeType || 'application/octet-stream',
+              upsert: true
+            })
+
+          console.log(`[WA] Media saved: ${mediaId}`)
+        }
+      } catch (err) {
+        console.error('[WA] Failed to download/save media:', err)
+      }
+    }
+
     // Insert message and upsert conversation in parallel
     const messageInsert = supabaseAdmin
       .from('whatsapp_messages')
@@ -531,7 +560,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         direction,
         message_type: messageType,
         content,
-        media_id: null,
+        media_id: mediaId,
         media_mime_type: mediaMimeType,
         message_timestamp: msgTimestamp.toISOString(),
         status: fromMe ? 'sent' : 'delivered',
