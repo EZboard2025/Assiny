@@ -280,7 +280,7 @@ export default function FollowUpView() {
         } catch (e) {
           // Silent fail for polling
         }
-      }, 5000)
+      }, 30000) // Anti-ban: Reduced polling frequency (was 5s, now 30s)
     }
 
     return () => {
@@ -319,7 +319,7 @@ export default function FollowUpView() {
         } catch (e) {
           // Silent fail for polling
         }
-      }, 10000)
+      }, 30000) // Anti-ban: Reduced polling frequency (was 10s, now 30s)
     }
 
     return () => {

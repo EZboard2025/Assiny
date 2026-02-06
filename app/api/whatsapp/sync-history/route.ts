@@ -168,6 +168,9 @@ export async function POST(request: NextRequest) {
           console.error(`[Sync] Media download failed:`, e)
           // Media might not be available anymore - that's ok
         }
+
+        // Anti-ban: Delay between media downloads (1-2 seconds)
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000))
       }
 
       // Skip system messages

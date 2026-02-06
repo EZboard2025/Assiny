@@ -529,6 +529,9 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
           raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
         })
       } catch {}
+
+      // Anti-ban: Delay between media downloads (1-2 seconds)
+      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000))
     }
 
     // Upsert conversation

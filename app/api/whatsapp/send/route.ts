@@ -70,6 +70,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Anti-ban: Simulate typing before sending (humanized behavior)
+    try {
+      const chat = await client.getChatById(chatId)
+      await chat.sendStateTyping()
+    } catch {
+      // Ignore typing errors - some chat types don't support it
+    }
+
+    // Anti-ban: Random delay to simulate human typing (2-4 seconds)
+    const typingDelay = 2000 + Math.random() * 2000
+    await new Promise(resolve => setTimeout(resolve, typingDelay))
+
     // Send message via whatsapp-web.js
     const sentMsg = await client.sendMessage(chatId, message)
 
