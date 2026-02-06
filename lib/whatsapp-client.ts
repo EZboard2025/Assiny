@@ -522,8 +522,10 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     // Skip status broadcasts
     if (msg.from === 'status@broadcast' || msg.to === 'status@broadcast') return
 
-    const contact = await msg.getContact()
-    const contactName = contact?.pushname || contact?.name || null
+    // IMPORTANT: For sent messages, msg.getContact() returns the SENDER (ourselves)
+    // We need the OTHER party's contact, so use chat.getContact() for 1:1 chats
+    const contact = await chat.getContact()
+    const contactName = contact?.pushname || contact?.name || chat.name || null
 
     // Get the actual phone number - handle LID (Linked Device ID) format
     const rawTo = msg.to || ''
