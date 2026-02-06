@@ -6,6 +6,23 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Normalize phone number for matching (same logic as conversations)
+const normalizePhone = (phone: string): string => {
+  // Remove lid_ prefix
+  let normalized = phone.replace(/^lid_/, '')
+  // Remove all non-digits
+  normalized = normalized.replace(/\D/g, '')
+  // Remove Brazil country code (55) if present and number is long enough
+  if (normalized.startsWith('55') && normalized.length > 11) {
+    normalized = normalized.substring(2)
+  }
+  // Get last 9 digits (the core number without area code variations)
+  if (normalized.length > 9) {
+    normalized = normalized.slice(-9)
+  }
+  return normalized
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -31,19 +48,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch ALL messages for this user and contact (regardless of connection_id)
-    // This ensures we see full history even when connection is recreated
-    const { data: messages, error } = await supabaseAdmin
+    // Normalize the requested phone for comparison
+    const normalizedRequestPhone = normalizePhone(contactPhone)
+
+    // Fetch ALL messages for this user (we'll filter by normalized phone)
+    // This ensures we see full history even with different phone formats
+    const { data: allMessages, error } = await supabaseAdmin
       .from('whatsapp_messages')
       .select('*')
       .eq('user_id', user.id)
-      .eq('contact_phone', contactPhone)
       .order('message_timestamp', { ascending: true })
-      .limit(limit)
+
+    // Filter messages by normalized phone number
+    const messages = (allMessages || []).filter(msg => {
+      const normalizedMsgPhone = normalizePhone(msg.contact_phone || '')
+      return normalizedMsgPhone === normalizedRequestPhone
+    }).slice(0, limit)
 
     if (error) {
       throw new Error(`Failed to fetch messages: ${error.message}`)
     }
+
+    console.log(`[Messages API] User ${user.id}, requested phone: ${contactPhone}, normalized: ${normalizedRequestPhone}`)
+    console.log(`[Messages API] Total messages for user: ${allMessages?.length || 0}, filtered: ${messages.length}`)
 
     // If analysis format requested, return formatted text
     if (format === 'analysis') {
