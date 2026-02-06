@@ -34,8 +34,8 @@ export default function Sidebar({
     { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
     { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI },
-    { icon: MessageSquare, view: 'followup', label: 'WhatsApp IA+', show: true },
-    { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true },
+    { icon: MessageSquare, view: 'followup', label: 'WhatsApp IA+', show: true, disabled: true },
+    { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true, disabled: true },
     { icon: Link2, view: 'roleplay-links', label: 'Links Públicos', show: isAdmin || isGestor },
   ]
 
@@ -77,21 +77,25 @@ export default function Sidebar({
             if (!item.show) return null
 
             const isActive = currentView === item.view
+            const isDisabled = 'disabled' in item && item.disabled
             const Icon = item.icon
 
             return (
               <button
                 key={item.view}
-                onClick={() => onViewChange(item.view)}
+                onClick={() => !isDisabled && onViewChange(item.view)}
                 title={!isExpanded ? item.label : undefined}
+                disabled={isDisabled}
                 className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-left ${
-                  isActive
-                    ? 'bg-green-500/20 text-white'
-                    : 'text-gray-300 hover:text-white hover:bg-white/10'
+                  isDisabled
+                    ? 'opacity-40 cursor-not-allowed text-gray-500'
+                    : isActive
+                      ? 'bg-green-500/20 text-white'
+                      : 'text-gray-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {/* Active indicator */}
-                {isActive && (
+                {isActive && !isDisabled && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-green-500 rounded-r-full" />
                 )}
                 <Icon className="w-5 h-5 flex-shrink-0" />
