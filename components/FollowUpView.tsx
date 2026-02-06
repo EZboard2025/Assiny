@@ -221,6 +221,22 @@ export default function FollowUpView() {
     return () => stopPolling()
   }, [])
 
+  // Disconnect WhatsApp when page unloads/refreshes
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (connectionStatus === 'connected' && authToken) {
+        // Use sendBeacon for reliable delivery during page unload
+        navigator.sendBeacon('/api/whatsapp/disconnect', JSON.stringify({ token: authToken }))
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [connectionStatus, authToken])
+
   // Keep ref in sync with selectedConversation for polling
   useEffect(() => {
     selectedConvRef.current = selectedConversation

@@ -9,12 +9,24 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    // Get token from header or body (body is used by sendBeacon on page unload)
     const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
+    let token = authHeader?.replace('Bearer ', '')
+
+    // If no header, try to get from body (sendBeacon sends JSON body)
+    if (!token) {
+      try {
+        const body = await request.json()
+        token = body.token
+      } catch {
+        // Body might be empty or not JSON
+      }
+    }
+
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
 
     if (authError || !user) {
