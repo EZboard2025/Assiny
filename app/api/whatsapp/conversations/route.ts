@@ -22,18 +22,51 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch conversations ordered by most recent message
-    const { data: conversations, error } = await supabaseAdmin
+    const { data: rawConversations, error } = await supabaseAdmin
       .from('whatsapp_conversations')
       .select('*')
       .eq('user_id', user.id)
       .order('last_message_at', { ascending: false })
-      .limit(50)
+      .limit(100)
 
     if (error) {
       throw new Error(`Failed to fetch conversations: ${error.message}`)
     }
 
-    return NextResponse.json({ conversations: conversations || [] })
+    // Deduplicate by contact_phone - keep the one with most recent message
+    // This handles cases where same contact has multiple entries (e.g., different connection_ids)
+    const deduplicatedMap = new Map<string, any>()
+    for (const conv of rawConversations || []) {
+      const phone = conv.contact_phone
+      if (!deduplicatedMap.has(phone)) {
+        deduplicatedMap.set(phone, conv)
+      } else {
+        // Keep the one with most recent last_message_at
+        const existing = deduplicatedMap.get(phone)
+        const existingDate = existing.last_message_at ? new Date(existing.last_message_at) : new Date(0)
+        const currentDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(0)
+        if (currentDate > existingDate) {
+          deduplicatedMap.set(phone, conv)
+        }
+        // Merge data: use profile_pic_url and contact_name from whichever has it
+        if (!deduplicatedMap.get(phone).profile_pic_url && conv.profile_pic_url) {
+          deduplicatedMap.get(phone).profile_pic_url = conv.profile_pic_url
+        }
+        if (!deduplicatedMap.get(phone).contact_name && conv.contact_name) {
+          deduplicatedMap.get(phone).contact_name = conv.contact_name
+        }
+      }
+    }
+
+    const conversations = Array.from(deduplicatedMap.values())
+      .sort((a, b) => {
+        const dateA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
+        const dateB = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
+        return dateB - dateA
+      })
+      .slice(0, 50)
+
+    return NextResponse.json({ conversations })
 
   } catch (error: any) {
     console.error('Error fetching conversations:', error)

@@ -75,19 +75,30 @@ export async function GET(request: NextRequest) {
 
     // Return raw messages
     return NextResponse.json({
-      messages: (messages || []).map(msg => ({
-        id: msg.id,
-        waMessageId: msg.wa_message_id,
-        body: msg.content || '',
-        fromMe: msg.direction === 'outbound',
-        timestamp: msg.message_timestamp,
-        type: msg.message_type,
-        hasMedia: !!msg.media_id,
-        mediaId: msg.media_id,
-        mimetype: msg.media_mime_type,
-        contactName: msg.contact_name,
-        status: msg.status
-      }))
+      messages: (messages || []).map(msg => {
+        // Check if media exists - either from stored media_id or from raw_payload.hasMedia
+        const rawPayload = msg.raw_payload || {}
+        const hasStoredMedia = !!msg.media_id
+        const hadOriginalMedia = rawPayload.hasMedia === true
+        const isMediaType = ['image', 'audio', 'ptt', 'video', 'document', 'sticker'].includes(msg.message_type)
+
+        // Use stored media_id, or fallback to wa_message_id for on-demand loading
+        const mediaId = msg.media_id || (hadOriginalMedia && isMediaType ? msg.wa_message_id : null)
+
+        return {
+          id: msg.id,
+          waMessageId: msg.wa_message_id,
+          body: msg.content || '',
+          fromMe: msg.direction === 'outbound',
+          timestamp: msg.message_timestamp,
+          type: msg.message_type,
+          hasMedia: hasStoredMedia || hadOriginalMedia,
+          mediaId: mediaId,
+          mimetype: msg.media_mime_type,
+          contactName: msg.contact_name,
+          status: msg.status
+        }
+      })
     })
 
   } catch (error: any) {
