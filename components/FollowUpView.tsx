@@ -467,10 +467,51 @@ export default function FollowUpView() {
       if (data.messages) {
         setMessages(data.messages)
       }
+
+      // Try to sync more history from WhatsApp in background
+      // Only if we have few messages (less than 10)
+      if (connectionStatus === 'connected' && (!data.messages || data.messages.length < 10)) {
+        syncHistoryFromWhatsApp(contactPhone, data.messages?.length || 0)
+      }
     } catch (error) {
       console.error('Error loading messages:', error)
     } finally {
       setIsLoadingMessages(false)
+    }
+  }
+
+  // Sync historical messages from WhatsApp
+  const syncHistoryFromWhatsApp = async (contactPhone: string, currentCount: number) => {
+    if (!authToken) return
+
+    try {
+      console.log(`[Sync] Attempting to sync history for ${contactPhone} (current: ${currentCount} msgs)`)
+      const response = await fetch('/api/whatsapp/sync-history', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ contactPhone, limit: 50 })
+      })
+
+      const data = await response.json()
+
+      if (data.synced > 0) {
+        console.log(`[Sync] Synced ${data.synced} new messages, reloading...`)
+        // Reload messages to show the new ones
+        const reloadResponse = await fetch(
+          `/api/whatsapp/messages?contactPhone=${encodeURIComponent(contactPhone)}`,
+          { headers: { 'Authorization': `Bearer ${authToken}` } }
+        )
+        const reloadData = await reloadResponse.json()
+        if (reloadData.messages) {
+          setMessages(reloadData.messages)
+        }
+      }
+    } catch (error) {
+      // Silently fail - sync is optional enhancement
+      console.error('[Sync] Error syncing history:', error)
     }
   }
 
