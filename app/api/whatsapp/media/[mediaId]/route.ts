@@ -12,11 +12,14 @@ export async function GET(
   { params }: { params: Promise<{ mediaId: string }> }
 ) {
   try {
-    const { mediaId } = await params
+    const { mediaId: rawMediaId } = await params
 
-    if (!mediaId) {
+    if (!rawMediaId) {
       return NextResponse.json({ error: 'mediaId is required' }, { status: 400 })
     }
+
+    // Decode the mediaId in case it was URL-encoded (handles paths with slashes)
+    const mediaId = decodeURIComponent(rawMediaId)
 
     // Get token from query param or header
     const url = new URL(request.url)

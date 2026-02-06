@@ -665,7 +665,8 @@ export default function FollowUpView() {
   // Build media URL from mediaId using the proxy endpoint
   const getMediaSrc = (mediaId: string) => {
     if (!authToken) return ''
-    return `/api/whatsapp/media/${mediaId}?token=${encodeURIComponent(authToken)}`
+    // URL-encode the mediaId to handle paths with slashes (e.g., userId/timestamp.ogg)
+    return `/api/whatsapp/media/${encodeURIComponent(mediaId)}?token=${encodeURIComponent(authToken)}`
   }
 
   // Filter conversations by search
