@@ -33,27 +33,68 @@ export async function GET(request: NextRequest) {
       throw new Error(`Failed to fetch conversations: ${error.message}`)
     }
 
-    // Deduplicate by contact_phone - keep the one with most recent message
-    // This handles cases where same contact has multiple entries (e.g., different connection_ids)
+    // Normalize phone number for deduplication
+    const normalizePhone = (phone: string): string => {
+      // Remove lid_ prefix
+      let normalized = phone.replace(/^lid_/, '')
+      // Remove all non-digits
+      normalized = normalized.replace(/\D/g, '')
+      // Remove Brazil country code (55) if present and number is long enough
+      if (normalized.startsWith('55') && normalized.length > 11) {
+        normalized = normalized.substring(2)
+      }
+      // Get last 8-9 digits (the core number without area code variations)
+      if (normalized.length > 9) {
+        normalized = normalized.slice(-9)
+      }
+      return normalized
+    }
+
+    // Deduplicate by normalized phone AND by contact_name
+    // This handles cases where same contact has multiple entries with different phone formats
     const deduplicatedMap = new Map<string, any>()
+    const nameToPhoneMap = new Map<string, string>() // Track name -> normalized phone mapping
+
     for (const conv of rawConversations || []) {
       const phone = conv.contact_phone
-      if (!deduplicatedMap.has(phone)) {
-        deduplicatedMap.set(phone, conv)
+      const normalizedPhone = normalizePhone(phone)
+      const contactName = conv.contact_name?.toLowerCase().trim() || ''
+
+      // Check if we've seen this name before with a different phone
+      let dedupeKey = normalizedPhone
+      if (contactName && nameToPhoneMap.has(contactName)) {
+        // Use the existing phone key for this name
+        dedupeKey = nameToPhoneMap.get(contactName)!
+      } else if (contactName) {
+        // First time seeing this name, record the mapping
+        nameToPhoneMap.set(contactName, normalizedPhone)
+      }
+
+      if (!deduplicatedMap.has(dedupeKey)) {
+        deduplicatedMap.set(dedupeKey, { ...conv })
       } else {
         // Keep the one with most recent last_message_at
-        const existing = deduplicatedMap.get(phone)
+        const existing = deduplicatedMap.get(dedupeKey)
         const existingDate = existing.last_message_at ? new Date(existing.last_message_at) : new Date(0)
         const currentDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(0)
         if (currentDate > existingDate) {
-          deduplicatedMap.set(phone, conv)
-        }
-        // Merge data: use profile_pic_url and contact_name from whichever has it
-        if (!deduplicatedMap.get(phone).profile_pic_url && conv.profile_pic_url) {
-          deduplicatedMap.get(phone).profile_pic_url = conv.profile_pic_url
-        }
-        if (!deduplicatedMap.get(phone).contact_name && conv.contact_name) {
-          deduplicatedMap.get(phone).contact_name = conv.contact_name
+          // Keep new one but preserve merged data
+          const merged = { ...conv }
+          if (!merged.profile_pic_url && existing.profile_pic_url) {
+            merged.profile_pic_url = existing.profile_pic_url
+          }
+          if (!merged.contact_name && existing.contact_name) {
+            merged.contact_name = existing.contact_name
+          }
+          deduplicatedMap.set(dedupeKey, merged)
+        } else {
+          // Keep existing but merge data from current
+          if (!existing.profile_pic_url && conv.profile_pic_url) {
+            existing.profile_pic_url = conv.profile_pic_url
+          }
+          if (!existing.contact_name && conv.contact_name) {
+            existing.contact_name = conv.contact_name
+          }
         }
       }
     }
