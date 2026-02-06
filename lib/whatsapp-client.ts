@@ -424,8 +424,9 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
 
     const existingIds = new Set(existingMsgs?.map(m => m.wa_message_id) || [])
 
-    // Prepare batch insert
-    const messagesToInsert: any[] = []
+    // Prepare batch insert - separate media and non-media messages
+    const nonMediaMessages: any[] = []
+    const mediaMessages: { msg: any; extracted: { messageType: string; content: string; mediaMimeType: string | null } }[] = []
     let lastMessageAt: Date | null = null
     let lastMessagePreview = ''
 
@@ -439,7 +440,7 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
       const { messageType, content, mediaMimeType } = extracted
       const msgTimestamp = new Date(msg.timestamp * 1000)
 
-      messagesToInsert.push({
+      const baseMessage = {
         connection_id: state.connectionId,
         user_id: state.userId,
         company_id: state.companyId,
@@ -449,12 +450,19 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
         direction: msg.fromMe ? 'outbound' : 'inbound',
         message_type: messageType,
         content,
-        media_id: null,
+        media_id: null as string | null,
         media_mime_type: mediaMimeType,
         message_timestamp: msgTimestamp.toISOString(),
         status: msg.fromMe ? 'sent' : 'delivered',
         raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
-      })
+      }
+
+      // Separate media messages for individual processing
+      if (msg.hasMedia && ['audio', 'ptt', 'image', 'video', 'document', 'sticker'].includes(messageType)) {
+        mediaMessages.push({ msg, extracted })
+      } else {
+        nonMediaMessages.push(baseMessage)
+      }
 
       if (!lastMessageAt || msgTimestamp > lastMessageAt) {
         lastMessageAt = msgTimestamp
@@ -462,10 +470,64 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
       }
     }
 
-    // Batch insert messages
-    if (messagesToInsert.length > 0) {
+    // Batch insert non-media messages
+    if (nonMediaMessages.length > 0) {
       try {
-        await supabaseAdmin.from('whatsapp_messages').insert(messagesToInsert)
+        await supabaseAdmin.from('whatsapp_messages').insert(nonMediaMessages)
+      } catch {}
+    }
+
+    // Process media messages individually to download and save media
+    for (const { msg, extracted } of mediaMessages) {
+      const { messageType, content, mediaMimeType } = extracted
+      const msgTimestamp = new Date(msg.timestamp * 1000)
+      let mediaId: string | null = null
+
+      // Try to download and save media
+      try {
+        const media = await msg.downloadMedia()
+        if (media?.data) {
+          const ext = messageType === 'audio' || messageType === 'ptt' ? 'ogg' :
+                      messageType === 'image' ? 'jpg' :
+                      messageType === 'video' ? 'mp4' :
+                      messageType === 'sticker' ? 'webp' : 'bin'
+          mediaId = `${state.userId}/${Date.now()}_${msg.id._serialized.slice(-8)}.${ext}`
+
+          const buffer = Buffer.from(media.data, 'base64')
+          const { error: uploadError } = await supabaseAdmin.storage
+            .from('whatsapp-media')
+            .upload(mediaId, buffer, {
+              contentType: media.mimetype || mediaMimeType || 'application/octet-stream',
+              upsert: true
+            })
+
+          if (uploadError) {
+            console.error(`[WA Sync] Media upload failed:`, uploadError)
+            mediaId = null
+          }
+        }
+      } catch (e) {
+        // Media might not be available - that's ok
+      }
+
+      // Insert message with or without media
+      try {
+        await supabaseAdmin.from('whatsapp_messages').insert({
+          connection_id: state.connectionId,
+          user_id: state.userId,
+          company_id: state.companyId,
+          wa_message_id: msg.id._serialized,
+          contact_phone: contactPhone,
+          contact_name: contactName,
+          direction: msg.fromMe ? 'outbound' : 'inbound',
+          message_type: messageType,
+          content,
+          media_id: mediaId,
+          media_mime_type: mediaMimeType,
+          message_timestamp: msgTimestamp.toISOString(),
+          status: msg.fromMe ? 'sent' : 'delivered',
+          raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
+        })
       } catch {}
     }
 
@@ -492,7 +554,7 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
           last_message_at: latestTimestamp.toISOString(),
           last_message_preview: preview,
           unread_count: 0,
-          message_count: messagesToInsert.length + existingIds.size,
+          message_count: nonMediaMessages.length + mediaMessages.length + existingIds.size,
           updated_at: new Date().toISOString()
         }, { onConflict: 'connection_id,contact_phone' })
     }

@@ -126,6 +126,8 @@ export async function POST(request: NextRequest) {
       let content = msg.body || ''
       let mediaMimeType: string | null = null
 
+      let mediaId: string | null = null
+
       if (msg.hasMedia) {
         if (msg.type === 'image') messageType = 'image'
         else if (msg.type === 'audio' || msg.type === 'ptt') messageType = msg.type
@@ -133,14 +135,38 @@ export async function POST(request: NextRequest) {
         else if (msg.type === 'document') messageType = 'document'
         else if (msg.type === 'sticker') messageType = 'sticker'
 
-        // Try to get media info
+        // Try to download and save media to storage
         try {
           const media = await msg.downloadMedia()
-          if (media) {
+          if (media?.data) {
             mediaMimeType = media.mimetype
+
+            // Generate unique media ID with file extension
+            const ext = messageType === 'audio' || messageType === 'ptt' ? 'ogg' :
+                        messageType === 'image' ? 'jpg' :
+                        messageType === 'video' ? 'mp4' :
+                        messageType === 'sticker' ? 'webp' : 'bin'
+            mediaId = `${user.id}/${Date.now()}_${msg.id._serialized.slice(-8)}.${ext}`
+
+            // Convert base64 to buffer and upload to Supabase Storage
+            const buffer = Buffer.from(media.data, 'base64')
+            const { error: uploadError } = await supabaseAdmin.storage
+              .from('whatsapp-media')
+              .upload(mediaId, buffer, {
+                contentType: media.mimetype || 'application/octet-stream',
+                upsert: true
+              })
+
+            if (uploadError) {
+              console.error(`[Sync] Error uploading media:`, uploadError)
+              mediaId = null // Don't set media_id if upload failed
+            } else {
+              console.log(`[Sync] Media saved: ${mediaId}`)
+            }
           }
-        } catch {
-          // Media might not be available anymore
+        } catch (e) {
+          console.error(`[Sync] Media download failed:`, e)
+          // Media might not be available anymore - that's ok
         }
       }
 
@@ -164,6 +190,7 @@ export async function POST(request: NextRequest) {
           direction,
           message_type: messageType,
           content,
+          media_id: mediaId,
           media_mime_type: mediaMimeType,
           status: 'delivered',
           message_timestamp: new Date(msg.timestamp * 1000).toISOString(),
