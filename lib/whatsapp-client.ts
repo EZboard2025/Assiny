@@ -25,6 +25,9 @@ interface ClientState {
 // Store active clients by userId
 const clients = new Map<string, ClientState>()
 
+// Lock to prevent concurrent initialization for the same user
+const initializingUsers = new Set<string>()
+
 function getAuthPath(): string {
   return process.env.WWEBJS_AUTH_PATH || '.wwebjs_auth'
 }
@@ -49,6 +52,22 @@ export async function initializeClient(userId: string, companyId: string | null)
     } catch {}
     clients.delete(userId)
   }
+
+  // Prevent concurrent initialization for the same user
+  if (initializingUsers.has(userId)) {
+    console.log(`[WA] Already initializing for user ${userId}, waiting...`)
+    // Wait a bit and return current state
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    const state = clients.get(userId)
+    if (state) {
+      return { qrCode: state.qrCode, status: state.status }
+    }
+    return { qrCode: null, status: 'initializing' }
+  }
+
+  // Mark user as initializing
+  initializingUsers.add(userId)
+  console.log(`[WA] Starting initialization for user ${userId}`)
 
   const sessionId = `user_${userId.replace(/-/g, '').substring(0, 16)}`
 
@@ -107,6 +126,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.log(`[WA] Ready for user ${userId}`)
     state.status = 'connected'
     state.qrCode = null
+    initializingUsers.delete(userId) // Release lock on success
 
     // Get phone number
     const info = client.info
@@ -139,6 +159,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.log(`[WA] Disconnected for user ${userId}: ${reason}`)
     state.status = 'disconnected'
     state.error = reason
+    initializingUsers.delete(userId) // Release lock on disconnect
 
     if (state.connectionId) {
       await supabaseAdmin
@@ -153,6 +174,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.error(`[WA] Auth failure for user ${userId}: ${msg}`)
     state.status = 'error'
     state.error = msg
+    initializingUsers.delete(userId) // Release lock on failure
   })
 
   // Initialize the client (async, don't await)
@@ -160,6 +182,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.error(`[WA] Failed to initialize for user ${userId}:`, err)
     state.status = 'error'
     state.error = err.message
+    initializingUsers.delete(userId) // Release lock on failure
   })
 
   // Wait a bit for QR or immediate auth
@@ -170,6 +193,7 @@ export async function initializeClient(userId: string, companyId: string | null)
 
 export async function disconnectClient(userId: string): Promise<void> {
   const state = clients.get(userId)
+  initializingUsers.delete(userId) // Release lock if exists
   if (!state) return
 
   try {
