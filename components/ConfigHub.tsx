@@ -4166,7 +4166,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           type="text"
                           value={(newPersona as PersonaB2B).job_title || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, job_title: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Gerente de Compras, CEO, Diretor de TI"
                         />
                       </div>
@@ -4179,7 +4179,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           type="text"
                           value={(newPersona as PersonaB2B).company_type || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, company_type: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Startup de tecnologia com faturamento de R$500k/mês"
                         />
                       </div>
@@ -4191,7 +4191,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).context || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Responsável por decisões de compra, equipe de 10 pessoas, busca inovação"
                         />
                       </div>
@@ -4203,7 +4203,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).company_goals || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, company_goals: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Aumentar eficiência, reduzir custos, melhorar processos, escalar o negócio"
                         />
                       </div>
@@ -4215,7 +4215,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).business_challenges || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, business_challenges: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Processos manuais demorados, falta de integração, dificuldade em medir resultados"
                         />
                       </div>
@@ -4227,7 +4227,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2B).prior_knowledge || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
                         />
                       </div>
@@ -4243,7 +4243,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           type="text"
                           value={(newPersona as PersonaB2C).profession || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, profession: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40"
                           placeholder="Ex: Professor, Médico, Estudante"
                         />
                       </div>
@@ -4255,7 +4255,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).context || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, context: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Mãe de 2 filhos, mora em apartamento, trabalha home office"
                         />
                       </div>
@@ -4267,7 +4267,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).what_seeks || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, what_seeks: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Praticidade, economia de tempo, produtos de qualidade, bom atendimento"
                         />
                       </div>
@@ -4279,7 +4279,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).main_pains || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, main_pains: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Falta de tempo, dificuldade em encontrar produtos confiáveis, preços altos"
                         />
                       </div>
@@ -4291,7 +4291,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         <textarea
                           value={(newPersona as PersonaB2C).prior_knowledge || ''}
                           onChange={(e) => setNewPersona({ ...newPersona, prior_knowledge: e.target.value })}
-                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
+                          className="w-full px-4 py-3 bg-gray-100/50 border border-green-500/20 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/40 min-h-[80px]"
                           placeholder="Ex: Já conhece a empresa por indicação, viu anúncio online, não sabe nada ainda"
                         />
                       </div>
