@@ -170,11 +170,9 @@ export async function initializeClient(userId: string, companyId: string | null)
     handleIncomingMessage(state, msg, true)
   })
 
-  // Disconnected
+  // Disconnected - fully destroy client to prevent stale Puppeteer state
   client.on('disconnected', async (reason: string) => {
-    console.log(`[WA] Disconnected for user ${userId}: ${reason}`)
-    state.status = 'disconnected'
-    state.error = reason
+    console.log(`[WA] Disconnected for user ${userId}: ${reason}. Destroying client.`)
     initializingUsers.delete(userId)
 
     if (state.connectionId) {
@@ -183,6 +181,11 @@ export async function initializeClient(userId: string, companyId: string | null)
         .update({ status: 'disconnected' })
         .eq('id', state.connectionId)
     }
+
+    // Destroy the Puppeteer instance to prevent broken context issues
+    try { await client.destroy() } catch {}
+    clients.delete(userId)
+    console.log(`[WA] Client destroyed and removed for user ${userId}`)
   })
 
   // Auth failure
