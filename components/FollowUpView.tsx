@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon } from 'lucide-react'
 
 interface FollowUpAnalysis {
   notas: {
@@ -73,6 +73,19 @@ interface WhatsAppMessage {
 
 type ConnectionStatus = 'disconnected' | 'initializing' | 'qr_ready' | 'connecting' | 'connected'
 
+const EMOJI_LIST = [
+  '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊',
+  '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😗',
+  '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑',
+  '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑',
+  '😶', '😏', '😒', '🙄', '😬', '😔', '😪', '😴',
+  '👍', '👎', '👌', '🤌', '✌️', '🤞', '🤟', '🤘',
+  '👋', '🤚', '✋', '👊', '✊', '👏', '🙌', '🤝',
+  '🙏', '💪', '🫶', '❤️', '🧡', '💛', '💚', '💙',
+  '💜', '🖤', '🤍', '💯', '💥', '🔥', '⭐', '🎉',
+  '✅', '❌', '⚠️', '❓', '❗', '💬', '👀', '🎯',
+]
+
 export default function FollowUpView() {
   // WhatsApp state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
@@ -93,6 +106,21 @@ export default function FollowUpView() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const selectedConvRef = useRef<WhatsAppConversation | null>(null)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+
+  // Media send state
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const [selectedFile, setSelectedFile] = useState<{ file: File; type: 'image' | 'document'; previewUrl?: string } | null>(null)
+  const [mediaCaption, setMediaCaption] = useState('')
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null)
+  const voiceChunksRef = useRef<Blob[]>([])
+  const voiceStreamRef = useRef<MediaStream | null>(null)
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const attachMenuRef = useRef<HTMLDivElement>(null)
+  const emojiPickerRef = useRef<HTMLDivElement>(null)
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -230,6 +258,28 @@ export default function FollowUpView() {
   // Cleanup polling on unmount
   useEffect(() => {
     return () => stopPolling()
+  }, [])
+
+  // Click-outside handler for attachment menu and emoji picker
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) {
+        setShowAttachMenu(false)
+      }
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Cleanup voice recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      voiceStreamRef.current?.getTracks().forEach(t => t.stop())
+    }
   }, [])
 
   // Disconnect WhatsApp when page unloads/refreshes
@@ -635,8 +685,212 @@ export default function FollowUpView() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSendMessage()
+      if (selectedFile) {
+        handleSendMedia()
+      } else {
+        handleSendMessage()
+      }
     }
+  }
+
+  // ============================================
+  // Media send handlers
+  // ============================================
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const isImage = file.type.startsWith('image/')
+    const maxSize = isImage ? 16 * 1024 * 1024 : 100 * 1024 * 1024
+    if (file.size > maxSize) {
+      setError(`Arquivo muito grande. Limite: ${isImage ? '16MB' : '100MB'}`)
+      return
+    }
+
+    const previewUrl = isImage ? URL.createObjectURL(file) : undefined
+
+    setSelectedFile({ file, type: isImage ? 'image' : 'document', previewUrl })
+    setMediaCaption('')
+    e.target.value = ''
+  }
+
+  const clearSelectedFile = () => {
+    if (selectedFile?.previewUrl) {
+      URL.revokeObjectURL(selectedFile.previewUrl)
+    }
+    setSelectedFile(null)
+    setMediaCaption('')
+  }
+
+  const handleSendMedia = async () => {
+    if (!selectedConversation || !selectedFile || isSending) return
+
+    setIsSending(true)
+    const { file, type } = selectedFile
+    const caption = mediaCaption.trim()
+
+    const tempMsg: WhatsAppMessage = {
+      id: `temp_${Date.now()}`,
+      body: caption || (type === 'image' ? '[Imagem]' : file.name),
+      fromMe: true,
+      timestamp: new Date().toISOString(),
+      type: type,
+      hasMedia: true,
+      mediaId: selectedFile.previewUrl || null,
+      mimetype: file.type,
+    }
+    setMessages(prev => [...prev, tempMsg])
+    clearSelectedFile()
+
+    try {
+      const formData = new FormData()
+      formData.append('to', selectedConversation.contact_phone)
+      formData.append('file', file)
+      formData.append('type', type)
+      if (caption) formData.append('caption', caption)
+
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` },
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao enviar midia')
+      }
+
+      setMessages(prev => prev.map(msg =>
+        msg.id === tempMsg.id ? data.message : msg
+      ))
+    } catch (err) {
+      console.error('Error sending media:', err)
+      setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+      setError(err instanceof Error ? err.message : 'Erro ao enviar midia')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const insertEmoji = (emoji: string) => {
+    if (selectedFile) {
+      setMediaCaption(prev => prev + emoji)
+    } else {
+      setMessageInput(prev => prev + emoji)
+    }
+    setShowEmojiPicker(false)
+  }
+
+  // ============================================
+  // Voice recording
+  // ============================================
+
+  const startVoiceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      voiceStreamRef.current = stream
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm'
+      })
+      voiceRecorderRef.current = recorder
+      voiceChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) voiceChunksRef.current.push(e.data)
+      }
+
+      recorder.start(100)
+      setIsRecordingVoice(true)
+      setRecordingDuration(0)
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1)
+      }, 1000)
+    } catch {
+      setError('Nao foi possivel acessar o microfone')
+    }
+  }
+
+  const stopAndSendVoiceRecording = async () => {
+    if (!voiceRecorderRef.current || !selectedConversation) return
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+    setIsRecordingVoice(false)
+
+    const recorder = voiceRecorderRef.current
+    const audioBlob = await new Promise<Blob>((resolve) => {
+      recorder.onstop = () => {
+        resolve(new Blob(voiceChunksRef.current, { type: recorder.mimeType }))
+      }
+      recorder.stop()
+    })
+
+    voiceStreamRef.current?.getTracks().forEach(t => t.stop())
+    voiceStreamRef.current = null
+    voiceRecorderRef.current = null
+
+    if (audioBlob.size === 0) return
+
+    setIsSending(true)
+    const tempMsg: WhatsAppMessage = {
+      id: `temp_${Date.now()}`,
+      body: '[Áudio]',
+      fromMe: true,
+      timestamp: new Date().toISOString(),
+      type: 'ptt',
+      hasMedia: true,
+    }
+    setMessages(prev => [...prev, tempMsg])
+
+    try {
+      const formData = new FormData()
+      formData.append('to', selectedConversation.contact_phone)
+      formData.append('file', audioBlob, `voice_${Date.now()}.webm`)
+      formData.append('type', 'audio')
+
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` },
+        body: formData
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Erro ao enviar audio')
+
+      setMessages(prev => prev.map(msg =>
+        msg.id === tempMsg.id ? data.message : msg
+      ))
+    } catch (err) {
+      console.error('Error sending voice:', err)
+      setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+      setError(err instanceof Error ? err.message : 'Erro ao enviar audio')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const cancelVoiceRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+    if (voiceRecorderRef.current?.state === 'recording') {
+      voiceRecorderRef.current.stop()
+    }
+    voiceStreamRef.current?.getTracks().forEach(t => t.stop())
+    voiceStreamRef.current = null
+    voiceRecorderRef.current = null
+    voiceChunksRef.current = []
+    setIsRecordingVoice(false)
+    setRecordingDuration(0)
   }
 
   const selectConversation = (conv: WhatsAppConversation) => {
@@ -1264,36 +1518,152 @@ export default function FollowUpView() {
 
           {/* Message Input Bar */}
           <div className="px-4 py-3 bg-[#202c33] flex-shrink-0">
-            <div className="flex items-end gap-2">
-              <div className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2">
-                <textarea
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Digite uma mensagem"
-                  rows={1}
-                  className="w-full bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none resize-none max-h-[120px] overflow-y-auto"
-                  style={{ minHeight: '20px' }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement
-                    target.style.height = '20px'
-                    target.style.height = Math.min(target.scrollHeight, 120) + 'px'
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSendMessage}
-                disabled={!messageInput.trim() || isSending}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-              >
-                {isSending ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+            {/* File Preview Strip */}
+            {selectedFile && (
+              <div className="mb-2 p-2 bg-[#2a3942] rounded-lg flex items-center gap-3">
+                {selectedFile.type === 'image' && selectedFile.previewUrl ? (
+                  <img src={selectedFile.previewUrl} alt="Preview" className="w-16 h-16 rounded object-cover" />
                 ) : (
-                  <Send className="w-5 h-5" />
+                  <div className="w-12 h-12 bg-[#00a884]/20 rounded flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-[#00a884]" />
+                  </div>
                 )}
-              </button>
-            </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#e9edef] text-sm truncate">{selectedFile.file.name}</p>
+                  <p className="text-[#8696a0] text-xs">{(selectedFile.file.size / 1024).toFixed(0)} KB</p>
+                </div>
+                <button onClick={clearSelectedFile} className="p-1 hover:bg-[#111b21] rounded-full transition-colors">
+                  <X className="w-5 h-5 text-[#8696a0]" />
+                </button>
+              </div>
+            )}
+
+            {/* Voice Recording Mode */}
+            {isRecordingVoice ? (
+              <div className="flex items-center gap-3 h-[44px]">
+                <div className="flex items-center gap-2 flex-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                  <span className="text-red-400 text-sm font-mono">
+                    {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+                  </span>
+                  <div className="flex-1 flex items-center gap-0.5 px-2">
+                    {Array.from({ length: 20 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 bg-[#00a884] rounded-full animate-pulse"
+                        style={{ height: `${8 + Math.random() * 16}px`, animationDelay: `${i * 0.05}s` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <button onClick={cancelVoiceRecording} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </button>
+                <button onClick={stopAndSendVoiceRecording} className="w-10 h-10 flex items-center justify-center rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white transition-colors">
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              /* Normal Input Mode */
+              <div className="flex items-end gap-2">
+                {/* Emoji Button */}
+                <div className="relative" ref={emojiPickerRef}>
+                  <button
+                    onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowAttachMenu(false) }}
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
+                  >
+                    <Smile className="w-6 h-6 text-[#8696a0]" />
+                  </button>
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-12 left-0 bg-[#233138] rounded-xl shadow-lg p-3 w-[320px] max-h-[280px] overflow-y-auto z-50">
+                      <div className="grid grid-cols-8 gap-1">
+                        {EMOJI_LIST.map((emoji, i) => (
+                          <button
+                            key={i}
+                            onClick={() => insertEmoji(emoji)}
+                            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-[#182229] rounded transition-colors"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Attachment Button */}
+                <div className="relative" ref={attachMenuRef}>
+                  <button
+                    onClick={() => { setShowAttachMenu(!showAttachMenu); setShowEmojiPicker(false) }}
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
+                  >
+                    <Paperclip className="w-6 h-6 text-[#8696a0]" />
+                  </button>
+                  {showAttachMenu && (
+                    <div className="absolute bottom-12 left-0 bg-[#233138] rounded-xl shadow-lg py-2 w-[180px] z-50">
+                      <button
+                        onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = 'image/*'; fileInputRef.current.click() } setShowAttachMenu(false) }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors"
+                      >
+                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                          <ImageIcon className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-[#e9edef] text-sm">Fotos</span>
+                      </button>
+                      <button
+                        onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = '*/*'; fileInputRef.current.click() } setShowAttachMenu(false) }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors"
+                      >
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-[#e9edef] text-sm">Documento</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Text Input */}
+                <div className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2">
+                  <textarea
+                    value={selectedFile ? mediaCaption : messageInput}
+                    onChange={(e) => selectedFile ? setMediaCaption(e.target.value) : setMessageInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={selectedFile ? "Adicionar legenda..." : "Digite uma mensagem"}
+                    rows={1}
+                    className="w-full bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none resize-none max-h-[120px] overflow-y-auto"
+                    style={{ minHeight: '20px' }}
+                    onInput={(e) => {
+                      const target = e.target as HTMLTextAreaElement
+                      target.style.height = '20px'
+                      target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+                    }}
+                  />
+                </div>
+
+                {/* Mic / Send Button */}
+                {(messageInput.trim() || selectedFile) ? (
+                  <button
+                    onClick={selectedFile ? handleSendMedia : handleSendMessage}
+                    disabled={isSending || (!messageInput.trim() && !selectedFile)}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                  </button>
+                ) : (
+                  <button
+                    onClick={startVoiceRecording}
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
+                  >
+                    <Mic className="w-6 h-6 text-[#8696a0]" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Hidden file input */}
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
         </div>
 
         {/* Analysis Panel (slides in from right) */}

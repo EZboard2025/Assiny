@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getConnectedClient } from '@/lib/whatsapp-client'
+import { MessageMedia } from 'whatsapp-web.js'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,6 +9,20 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(request: NextRequest) {
+  const contentType = request.headers.get('content-type') || ''
+
+  if (contentType.includes('multipart/form-data')) {
+    return handleMediaMessage(request)
+  } else {
+    return handleTextMessage(request)
+  }
+}
+
+// ============================================
+// Text message (existing behavior)
+// ============================================
+
+async function handleTextMessage(request: NextRequest) {
   try {
     const body = await request.json()
     const { to, message } = body
@@ -19,74 +34,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, error: authErr } = await authenticateRequest(request)
+    if (authErr) return authErr
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get the connected WhatsApp client
-    const client = getConnectedClient(user.id)
+    const client = getConnectedClient(user!.id)
     if (!client) {
       return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
     }
 
-    let chatId: string
+    const chatId = await resolveChatId(to, user!.id)
 
-    // Handle LID contacts (stored with lid_ prefix)
-    if (to.startsWith('lid_')) {
-      // Extract the LID number and use @lid suffix
-      const lidNumber = to.replace('lid_', '')
-      chatId = `${lidNumber}@lid`
-      console.log(`[WA Send] LID contact detected, using: ${chatId}`)
-    } else if (to.includes('@')) {
-      // Already has a suffix, use as-is
-      chatId = to
-    } else {
-      // Regular phone number - first try to find original chat ID from recent message
-      const { data: recentMessage } = await supabaseAdmin
-        .from('whatsapp_messages')
-        .select('raw_payload')
-        .eq('user_id', user.id)
-        .eq('contact_phone', to)
-        .order('message_timestamp', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (recentMessage?.raw_payload?.original_chat_id) {
-        // Use the stored original chat ID
-        chatId = recentMessage.raw_payload.original_chat_id
-        console.log(`[WA Send] Using stored original_chat_id: ${chatId}`)
-      } else {
-        // No stored chat ID, use standard @c.us format
-        chatId = `${to.replace(/[^0-9]/g, '')}@c.us`
-        console.log(`[WA Send] Using @c.us format: ${chatId}`)
-      }
-    }
-
-    // Anti-ban: Simulate typing before sending (humanized behavior)
+    // Anti-ban: Simulate typing before sending
     try {
       const chat = await client.getChatById(chatId)
       await chat.sendStateTyping()
-    } catch {
-      // Ignore typing errors - some chat types don't support it
-    }
+    } catch {}
 
-    // Anti-ban: Random delay to simulate human typing (2-4 seconds)
+    // Anti-ban: Random delay (2-4 seconds)
     const typingDelay = 2000 + Math.random() * 2000
     await new Promise(resolve => setTimeout(resolve, typingDelay))
 
-    // Send message via whatsapp-web.js
     const sentMsg = await client.sendMessage(chatId, message)
 
-    // The message_create event handler will save it to the database
-    // But we return immediately with the sent message info
     return NextResponse.json({
       success: true,
       message: {
@@ -102,10 +71,160 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('Error sending message:', error)
+    console.error('Error sending text message:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to send message' },
       { status: 500 }
     )
   }
+}
+
+// ============================================
+// Media message (image, audio, document)
+// ============================================
+
+async function handleMediaMessage(request: NextRequest) {
+  try {
+    const formData = await request.formData()
+    const to = formData.get('to') as string
+    const file = formData.get('file') as File
+    const messageType = (formData.get('type') as string) || 'document'
+    const caption = formData.get('caption') as string | null
+
+    if (!to || !file) {
+      return NextResponse.json(
+        { error: 'to and file are required' },
+        { status: 400 }
+      )
+    }
+
+    // File size validation
+    const maxSize = messageType === 'document' ? 100 * 1024 * 1024 : 16 * 1024 * 1024
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: `Arquivo muito grande. Limite: ${messageType === 'document' ? '100MB' : '16MB'}` },
+        { status: 400 }
+      )
+    }
+
+    const { user, error: authErr } = await authenticateRequest(request)
+    if (authErr) return authErr
+
+    const client = getConnectedClient(user!.id)
+    if (!client) {
+      return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
+    }
+
+    const chatId = await resolveChatId(to, user!.id)
+
+    // Convert File to base64 for MessageMedia
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+
+    const media = new MessageMedia(
+      file.type || 'application/octet-stream',
+      base64,
+      file.name || `media_${Date.now()}`
+    )
+
+    // Anti-ban: Short delay for media (1-2s)
+    const typingDelay = 1000 + Math.random() * 1000
+    await new Promise(resolve => setTimeout(resolve, typingDelay))
+
+    // Send via whatsapp-web.js
+    const options: any = {}
+    if (caption?.trim()) {
+      options.caption = caption.trim()
+    }
+    if (messageType === 'audio') {
+      options.sendAudioAsVoice = true
+    }
+
+    const sentMsg = await client.sendMessage(chatId, media, options)
+
+    // Upload to Supabase Storage for consistent display
+    const ext = file.name?.split('.').pop() || 'bin'
+    const mediaId = `${user!.id}/${Date.now()}_sent.${ext}`
+
+    await supabaseAdmin.storage
+      .from('whatsapp-media')
+      .upload(mediaId, Buffer.from(arrayBuffer), {
+        contentType: file.type || 'application/octet-stream',
+        upsert: true
+      })
+
+    return NextResponse.json({
+      success: true,
+      message: {
+        id: sentMsg.id._serialized,
+        waMessageId: sentMsg.id._serialized,
+        body: caption?.trim() || (messageType === 'audio' ? '[Áudio]' : file.name || ''),
+        fromMe: true,
+        timestamp: new Date().toISOString(),
+        type: messageType === 'audio' ? 'ptt' : messageType,
+        hasMedia: true,
+        mediaId: mediaId,
+        mimetype: file.type,
+        status: 'sent'
+      }
+    })
+
+  } catch (error: any) {
+    console.error('Error sending media message:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to send media' },
+      { status: 500 }
+    )
+  }
+}
+
+// ============================================
+// Shared helpers
+// ============================================
+
+async function authenticateRequest(request: NextRequest): Promise<{ user: any; error: NextResponse | null }> {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader) {
+    return { user: null, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+
+  if (authError || !user) {
+    return { user: null, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+
+  return { user, error: null }
+}
+
+async function resolveChatId(to: string, userId: string): Promise<string> {
+  if (to.startsWith('lid_')) {
+    const lidNumber = to.replace('lid_', '')
+    console.log(`[WA Send] LID contact detected, using: ${lidNumber}@lid`)
+    return `${lidNumber}@lid`
+  }
+
+  if (to.includes('@')) {
+    return to
+  }
+
+  // Try to find original chat ID from recent message
+  const { data: recentMessage } = await supabaseAdmin
+    .from('whatsapp_messages')
+    .select('raw_payload')
+    .eq('user_id', userId)
+    .eq('contact_phone', to)
+    .order('message_timestamp', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (recentMessage?.raw_payload?.original_chat_id) {
+    console.log(`[WA Send] Using stored original_chat_id: ${recentMessage.raw_payload.original_chat_id}`)
+    return recentMessage.raw_payload.original_chat_id
+  }
+
+  const chatId = `${to.replace(/[^0-9]/g, '')}@c.us`
+  console.log(`[WA Send] Using @c.us format: ${chatId}`)
+  return chatId
 }
