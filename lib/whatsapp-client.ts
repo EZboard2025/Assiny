@@ -99,7 +99,7 @@ export async function initializeClient(userId: string, companyId: string | null)
         '--mute-audio',
         '--hide-scrollbars',
         // Memory optimization for multi-user support
-        '--js-flags=--max-old-space-size=128',
+        '--js-flags=--max-old-space-size=384',
         '--disable-software-rasterizer',
         '--disable-logging',
         '--disable-breakpad',
