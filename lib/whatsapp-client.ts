@@ -22,6 +22,7 @@ interface ClientState {
   error: string | null
   phoneNumber: string | null
   lastHeartbeat: number
+  destroyed: boolean  // Flag to abort running sync when client is destroyed
 }
 
 // Store active clients by userId
@@ -124,7 +125,8 @@ export async function initializeClient(userId: string, companyId: string | null)
     syncStatus: 'pending',
     error: null,
     phoneNumber: null,
-    lastHeartbeat: Date.now()
+    lastHeartbeat: Date.now(),
+    destroyed: false
   }
 
   clients.set(userId, state)
@@ -151,6 +153,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     readyTimeout = setTimeout(async () => {
       if (state.status === 'connecting') {
         console.error(`[WA] Ready timeout for user ${userId} - destroying stuck client`)
+        state.destroyed = true
         state.status = 'error'
         state.error = 'Conexao travou. Tente novamente.'
         initializingUsers.delete(userId)
@@ -172,8 +175,11 @@ export async function initializeClient(userId: string, companyId: string | null)
     }, 90000)
   })
 
-  // Ready event (fully connected)
+  // Ready event (fully connected) - guard against duplicate fires
+  let readyFired = false
   client.on('ready', async () => {
+    if (readyFired || state.destroyed) return
+    readyFired = true
     console.log(`[WA] Ready for user ${userId}`)
     if (readyTimeout) { clearTimeout(readyTimeout); readyTimeout = null }
     state.status = 'connected'
@@ -190,13 +196,15 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.log(`[WA] Waiting 10s before sync for user ${userId}...`)
     await new Promise(resolve => setTimeout(resolve, 10000))
 
+    if (state.destroyed) return  // Check again after delay
+
     // Sync in background (don't block)
     state.syncStatus = 'syncing'
     syncChatHistory(state).then(() => {
-      state.syncStatus = 'synced'
+      if (!state.destroyed) state.syncStatus = 'synced'
     }).catch(err => {
       console.error('[WA] Sync error:', err)
-      state.syncStatus = 'error'
+      if (!state.destroyed) state.syncStatus = 'error'
     })
   })
 
@@ -224,6 +232,7 @@ export async function initializeClient(userId: string, companyId: string | null)
   // Disconnected - fully destroy client to prevent stale Puppeteer state
   client.on('disconnected', async (reason: string) => {
     console.log(`[WA] Disconnected for user ${userId}: ${reason}. Destroying client.`)
+    state.destroyed = true  // Signal running sync to abort
     initializingUsers.delete(userId)
 
     if (state.connectionId) {
@@ -263,6 +272,9 @@ export async function disconnectClient(userId: string): Promise<void> {
   const state = clients.get(userId)
   initializingUsers.delete(userId)
   if (!state) return
+
+  // Signal running sync to abort immediately
+  state.destroyed = true
 
   // Remove from map immediately so UI sees disconnected state
   clients.delete(userId)
@@ -674,11 +686,13 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
 
 async function syncChatHistory(state: ClientState): Promise<void> {
   try {
+    if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
     const client = state.client
 
     // Retry getChats up to 3 times (it can timeout under memory pressure)
     let chats: any[] = []
     for (let attempt = 1; attempt <= 3; attempt++) {
+      if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
       try {
         console.log(`[WA] getChats attempt ${attempt}/3 for user ${state.userId}`)
         chats = await client.getChats()
@@ -693,6 +707,7 @@ async function syncChatHistory(state: ClientState): Promise<void> {
           await new Promise(resolve => setTimeout(resolve, 10000))
         }
       } catch (err: any) {
+        if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
         console.error(`[WA] getChats attempt ${attempt} failed:`, err.message || err)
         if (attempt < 3) {
           console.log(`[WA] Retrying getChats in 15s...`)
@@ -702,6 +717,8 @@ async function syncChatHistory(state: ClientState): Promise<void> {
         }
       }
     }
+
+    if (state.destroyed) return
 
     console.log(`[WA] Found ${chats.length} chats, syncing...`)
 
@@ -716,12 +733,14 @@ async function syncChatHistory(state: ClientState): Promise<void> {
     // Process chats in small batches of 2 to reduce memory pressure
     const batchSize = 2
     for (let i = 0; i < individualChats.length; i += batchSize) {
+      if (state.destroyed) { console.log(`[WA] Sync aborted mid-batch for user ${state.userId}`); return }
       const batch = individualChats.slice(i, i + batchSize)
       await Promise.allSettled(batch.map(chat => processSingleChat(chat, state)))
     }
 
     console.log(`[WA] Sync complete for user ${state.userId}`)
   } catch (error) {
+    if (state.destroyed) return  // Don't propagate errors for destroyed clients
     console.error('[WA] Error syncing:', error)
     throw error // Re-throw so caller can set syncStatus to 'error'
   }
