@@ -81,6 +81,9 @@ export async function initializeClient(userId: string, companyId: string | null)
       clientId: sessionId,
       dataPath: getAuthPath()
     }),
+    webVersionCache: {
+      type: 'none' // Always load latest WhatsApp Web version (prevents stale version issues)
+    },
     puppeteer: {
       headless: true,
       protocolTimeout: 180000, // 180s timeout for slow operations (getChats can be slow under memory pressure)
