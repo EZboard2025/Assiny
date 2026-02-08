@@ -693,63 +693,59 @@ async function syncChatHistory(state: ClientState): Promise<void> {
     if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
     const client = state.client
 
-    // Helper: getChats with a hard timeout (protocolTimeout alone can hang)
-    const getChatsWithTimeout = (timeoutMs: number): Promise<any[]> => {
-      return Promise.race([
-        client.getChats(),
-        new Promise<any[]>((_, reject) =>
-          setTimeout(() => reject(new Error(`getChats timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+    // LIGHTWEIGHT APPROACH: Get chat IDs directly from WhatsApp Web store
+    // instead of using client.getChats() which serializes every chat + group metadata (very slow)
+    console.log(`[WA] Getting chat list (lightweight) for user ${state.userId}`)
+
+    let chatIds: { id: string; name: string; isGroup: boolean }[] = []
+
+    try {
+      chatIds = await Promise.race([
+        client.pupPage!.evaluate(() => {
+          const chats = (window as any).Store.Chat.getModelsArray()
+          return chats.map((chat: any) => ({
+            id: chat.id._serialized,
+            name: chat.formattedTitle || chat.name || chat.id.user || '',
+            isGroup: chat.isGroup || chat.id._serialized.endsWith('@g.us')
+          }))
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Chat list fetch timed out after 30s')), 30000)
         )
       ])
-    }
-
-    // Retry getChats up to 2 times with 60s hard timeout per attempt
-    let chats: any[] = []
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
-      try {
-        console.log(`[WA] getChats attempt ${attempt}/2 for user ${state.userId}`)
-        chats = await getChatsWithTimeout(60000)
-
-        if (chats.length > 0) {
-          break // Got chats, proceed
-        }
-
-        // Got 0 chats - might be a stale state, wait and retry
-        if (attempt < 2) {
-          console.log(`[WA] getChats returned 0, retrying in 10s...`)
-          await new Promise(resolve => setTimeout(resolve, 10000))
-        }
-      } catch (err: any) {
-        if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
-        console.error(`[WA] getChats attempt ${attempt} failed:`, err.message || err)
-        if (attempt < 2) {
-          console.log(`[WA] Retrying getChats in 10s...`)
-          await new Promise(resolve => setTimeout(resolve, 10000))
-        } else {
-          throw err // Last attempt failed, propagate error
-        }
-      }
+    } catch (err: any) {
+      console.error(`[WA] Failed to get chat list:`, err.message || err)
+      throw err
     }
 
     if (state.destroyed) return
 
-    console.log(`[WA] Found ${chats.length} chats, syncing...`)
+    // Filter to individual chats only, limit to 30
+    const individualChatIds = chatIds.filter(c => !c.isGroup).slice(0, 30)
+    console.log(`[WA] Found ${chatIds.length} total chats, ${individualChatIds.length} individual. Syncing...`)
 
-    if (chats.length === 0) {
-      console.log(`[WA] No chats found after retries for user ${state.userId}`)
+    if (individualChatIds.length === 0) {
+      console.log(`[WA] No individual chats found for user ${state.userId}`)
       return
     }
 
-    // Only sync individual chats, limit to 30 for speed
-    const individualChats = chats.filter(chat => !chat.isGroup).slice(0, 30)
-
-    // Process chats in small batches of 2 to reduce memory pressure
-    const batchSize = 2
-    for (let i = 0; i < individualChats.length; i += batchSize) {
+    // Process chats one by one, fetching each chat object individually (lighter than getChats)
+    for (let i = 0; i < individualChatIds.length; i++) {
       if (state.destroyed) { console.log(`[WA] Sync aborted mid-batch for user ${state.userId}`); return }
-      const batch = individualChats.slice(i, i + batchSize)
-      await Promise.allSettled(batch.map(chat => processSingleChat(chat, state)))
+
+      try {
+        const chatInfo = individualChatIds[i]
+        const chat = await Promise.race([
+          client.getChatById(chatInfo.id),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`getChatById timed out for ${chatInfo.id}`)), 15000)
+          )
+        ])
+        await processSingleChat(chat, state)
+      } catch (chatErr: any) {
+        console.error(`[WA] Error processing chat ${individualChatIds[i].id}:`, chatErr.message || chatErr)
+        // Continue with next chat instead of failing the entire sync
+      }
     }
 
     console.log(`[WA] Sync complete for user ${state.userId}`)
