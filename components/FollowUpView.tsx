@@ -889,7 +889,7 @@ export default function FollowUpView() {
     setIsSending(true)
     const tempMsg: WhatsAppMessage = {
       id: `temp_${Date.now()}`,
-      body: '[Áudio]',
+      body: '',
       fromMe: true,
       timestamp: new Date().toISOString(),
       type: 'ptt',
@@ -1538,7 +1538,7 @@ export default function FollowUpView() {
                             </p>
                           )}
                           {/* Text body */}
-                          {msg.body && msg.type !== 'sticker' && msg.type !== 'document' && (
+                          {msg.body && msg.type !== 'sticker' && msg.type !== 'document' && msg.type !== 'audio' && msg.type !== 'ptt' && (
                             <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">{msg.body}</p>
                           )}
                           <div className="flex items-center justify-end gap-1 mt-1">
