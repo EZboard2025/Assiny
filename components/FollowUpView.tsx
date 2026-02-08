@@ -145,31 +145,58 @@ export default function FollowUpView() {
     return headers
   }
 
-  // Load auth token on mount
+  // Load auth token on mount (robust: handles subdomains, different browsers)
   useEffect(() => {
     const loadAuth = async () => {
       try {
         const { supabase } = await import('@/lib/supabase')
-        // Try getSession first, then getUser as fallback
+
+        // Strategy 1: getSession (works in most cases)
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) {
           setAuthToken(session.access_token)
           return
         }
-        // Fallback: getSession can return null on subdomains
+
+        // Strategy 2: refreshSession (forces token refresh from Supabase)
+        const { data: { session: refreshed } } = await supabase.auth.refreshSession()
+        if (refreshed?.access_token) {
+          setAuthToken(refreshed.access_token)
+          return
+        }
+
+        // Strategy 3: getUser validates the cookie, then retry getSession
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          // Re-fetch session after getUser validates the token
-          const { data: { session: refreshed } } = await supabase.auth.getSession()
-          if (refreshed?.access_token) {
-            setAuthToken(refreshed.access_token)
+          const { data: { session: retried } } = await supabase.auth.getSession()
+          if (retried?.access_token) {
+            setAuthToken(retried.access_token)
+            return
           }
         }
+
+        console.warn('[Auth] Could not retrieve auth token after all strategies')
       } catch (e) {
         console.error('Error loading auth:', e)
       }
     }
     loadAuth()
+
+    // Also listen for auth state changes (handles token refresh, login from other tabs)
+    let subscription: any
+    ;(async () => {
+      const { supabase } = await import('@/lib/supabase')
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.access_token) {
+          setAuthToken(session.access_token)
+        }
+      })
+      subscription = data.subscription
+    })()
+
+    return () => {
+      subscription?.unsubscribe()
+    }
   }, [])
 
   // Load saved analyses from Supabase on mount (with localStorage fallback)
@@ -445,9 +472,9 @@ export default function FollowUpView() {
       if (data.connected) {
         setConnectionStatus('connected')
         setPhoneNumber(data.phone_number || null)
-        if (conversations.length === 0) {
-          loadConversations()
-        }
+        loadConversations()
+        // Retry in case sync is still in progress
+        setTimeout(() => loadConversations(), 5000)
       } else {
         setConnectionStatus('disconnected')
       }
@@ -479,7 +506,11 @@ export default function FollowUpView() {
           setPhoneNumber(data.phoneNumber || null)
           setQrCode(null)
           setIsInitializing(false)
+          // Load conversations with retries (sync runs in background after connect)
           loadConversations()
+          setTimeout(() => loadConversations(), 5000)
+          setTimeout(() => loadConversations(), 15000)
+          setTimeout(() => loadConversations(), 30000)
         } else if (data.status === 'qr_ready' && data.qrcode) {
           setQrCode(data.qrcode)
           setConnectionStatus('qr_ready')
@@ -524,6 +555,8 @@ export default function FollowUpView() {
         setConnectionStatus('connected')
         setIsInitializing(false)
         loadConversations()
+        setTimeout(() => loadConversations(), 5000)
+        setTimeout(() => loadConversations(), 15000)
         return
       }
 
