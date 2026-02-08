@@ -576,19 +576,18 @@ export default function FollowUpView() {
   }
 
   const disconnectWhatsApp = async () => {
-    try {
-      await fetch('/api/whatsapp/disconnect', {
-        method: 'POST',
-        headers: getAuthHeaders()
-      })
-      setConnectionStatus('disconnected')
-      setPhoneNumber(null)
-      setConversations([])
-      setSelectedConversation(null)
-      setMessages([])
-    } catch (error) {
-      console.error('Error disconnecting:', error)
-    }
+    // Optimistic: reset UI immediately (don't wait for server)
+    setConnectionStatus('disconnected')
+    setPhoneNumber(null)
+    setConversations([])
+    setSelectedConversation(null)
+    setMessages([])
+
+    // Fire-and-forget: server cleanup happens in background
+    fetch('/api/whatsapp/disconnect', {
+      method: 'POST',
+      headers: getAuthHeaders()
+    }).catch(err => console.error('Error disconnecting:', err))
   }
 
   const loadConversations = async () => {

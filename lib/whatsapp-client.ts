@@ -225,9 +225,10 @@ export async function disconnectClient(userId: string): Promise<void> {
   initializingUsers.delete(userId)
   if (!state) return
 
-  try { await state.client.logout() } catch {}
-  try { await state.client.destroy() } catch {}
+  // Remove from map immediately so UI sees disconnected state
+  clients.delete(userId)
 
+  // Update DB immediately (don't wait for Puppeteer cleanup)
   if (state.connectionId) {
     await supabaseAdmin
       .from('whatsapp_connections')
@@ -235,7 +236,14 @@ export async function disconnectClient(userId: string): Promise<void> {
       .eq('id', state.connectionId)
   }
 
-  clients.delete(userId)
+  // Cleanup Puppeteer with timeout (logout/destroy can hang on bad browser state)
+  const cleanup = async () => {
+    try { await state.client.logout() } catch {}
+    try { await state.client.destroy() } catch {}
+  }
+  const timeout = new Promise<void>(resolve => setTimeout(resolve, 10000))
+  await Promise.race([cleanup(), timeout])
+  console.log(`[WA] Disconnect complete for user ${userId}`)
 }
 
 export function getConnectedClient(userId: string): Client | null {
