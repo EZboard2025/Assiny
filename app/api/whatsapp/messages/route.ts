@@ -51,26 +51,57 @@ export async function GET(request: NextRequest) {
     // Normalize the requested phone for comparison
     const normalizedRequestPhone = normalizePhone(contactPhone)
 
-    // Fetch ALL messages for this user (we'll filter by normalized phone)
-    // This ensures we see full history even with different phone formats
-    const { data: allMessages, error } = await supabaseAdmin
-      .from('whatsapp_messages')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('message_timestamp', { ascending: true })
+    // Query messages filtered at DB level for efficiency
+    // Use the last 9 digits suffix match to handle phone format variations
+    let messages: any[] = []
+    let error: any = null
 
-    // Filter messages by normalized phone number
-    const messages = (allMessages || []).filter(msg => {
-      const normalizedMsgPhone = normalizePhone(msg.contact_phone || '')
-      return normalizedMsgPhone === normalizedRequestPhone
-    }).slice(0, limit)
+    if (contactPhone.startsWith('lid_')) {
+      // LID contacts: exact match on contact_phone
+      const result = await supabaseAdmin
+        .from('whatsapp_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('contact_phone', contactPhone)
+        .order('message_timestamp', { ascending: true })
+        .limit(limit)
+      messages = result.data || []
+      error = result.error
+    } else {
+      // Regular contacts: suffix match on last 9 digits
+      const result = await supabaseAdmin
+        .from('whatsapp_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .like('contact_phone', `%${normalizedRequestPhone}`)
+        .order('message_timestamp', { ascending: true })
+        .limit(limit)
+      messages = result.data || []
+      error = result.error
+
+      // If no results with suffix match, also check lid_ contacts by resolving phone
+      if (messages.length === 0) {
+        const lidResult = await supabaseAdmin
+          .from('whatsapp_messages')
+          .select('*')
+          .eq('user_id', user.id)
+          .like('contact_phone', 'lid_%')
+          .order('message_timestamp', { ascending: true })
+
+        if (lidResult.data) {
+          messages = lidResult.data.filter(msg => {
+            const normalizedMsgPhone = normalizePhone(msg.contact_phone || '')
+            return normalizedMsgPhone === normalizedRequestPhone
+          }).slice(0, limit)
+        }
+      }
+    }
 
     if (error) {
       throw new Error(`Failed to fetch messages: ${error.message}`)
     }
 
-    console.log(`[Messages API] User ${user.id}, requested phone: ${contactPhone}, normalized: ${normalizedRequestPhone}`)
-    console.log(`[Messages API] Total messages for user: ${allMessages?.length || 0}, filtered: ${messages.length}`)
+    console.log(`[Messages API] User ${user.id}, phone: ${contactPhone}, normalized: ${normalizedRequestPhone}, found: ${messages.length}`)
 
     // If analysis format requested, return formatted text
     if (format === 'analysis') {

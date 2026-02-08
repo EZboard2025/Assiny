@@ -89,14 +89,26 @@ export async function initializeClient(userId: string, companyId: string | null)
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--disable-gpu',
-        // Removed --single-process and --no-zygote to allow multiple instances
         '--disable-extensions',
         '--disable-background-networking',
         '--disable-default-apps',
         '--disable-sync',
         '--disable-translate',
         '--mute-audio',
-        '--hide-scrollbars'
+        '--hide-scrollbars',
+        // Memory optimization for multi-user support
+        '--js-flags=--max-old-space-size=128',
+        '--disable-software-rasterizer',
+        '--disable-logging',
+        '--disable-breakpad',
+        '--disable-component-update',
+        '--disable-domain-reliability',
+        '--disable-features=AudioServiceOutOfProcess',
+        '--renderer-process-limit=1',
+        '--disable-hang-monitor',
+        '--disable-ipc-flooding-protection',
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows'
       ]
     }
   })
@@ -476,8 +488,8 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
 
     const { contactPhone, isLidContact } = resolved
 
-    // Fetch only last 30 messages (faster initial sync)
-    const messages = await chat.fetchMessages({ limit: 30 })
+    // Fetch only last 15 messages per chat (fast initial sync, reduces memory pressure)
+    const messages = await chat.fetchMessages({ limit: 15 })
     if (messages.length === 0) return
 
     // Get existing message IDs in bulk
@@ -535,68 +547,32 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
       }
     }
 
-    // Batch insert non-media messages
-    if (nonMediaMessages.length > 0) {
+    // Insert all messages in batch (skip media downloads during sync for speed)
+    // Media files will be downloaded on-demand when user opens the conversation
+    const allInsertMessages = [
+      ...nonMediaMessages,
+      ...mediaMessages.map(({ msg, extracted }) => ({
+        connection_id: state.connectionId,
+        user_id: state.userId,
+        company_id: state.companyId,
+        wa_message_id: msg.id._serialized,
+        contact_phone: contactPhone,
+        contact_name: contactName,
+        direction: msg.fromMe ? 'outbound' : 'inbound',
+        message_type: extracted.messageType,
+        content: extracted.content,
+        media_id: null,
+        media_mime_type: extracted.mediaMimeType,
+        message_timestamp: new Date(msg.timestamp * 1000).toISOString(),
+        status: msg.fromMe ? 'sent' : 'delivered',
+        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
+      }))
+    ]
+
+    if (allInsertMessages.length > 0) {
       try {
-        await supabaseAdmin.from('whatsapp_messages').insert(nonMediaMessages)
+        await supabaseAdmin.from('whatsapp_messages').insert(allInsertMessages)
       } catch {}
-    }
-
-    // Process media messages individually to download and save media
-    for (const { msg, extracted } of mediaMessages) {
-      const { messageType, content, mediaMimeType } = extracted
-      const msgTimestamp = new Date(msg.timestamp * 1000)
-      let mediaId: string | null = null
-
-      // Try to download and save media
-      try {
-        const media = await msg.downloadMedia()
-        if (media?.data) {
-          const ext = messageType === 'audio' || messageType === 'ptt' ? 'ogg' :
-                      messageType === 'image' ? 'jpg' :
-                      messageType === 'video' ? 'mp4' :
-                      messageType === 'sticker' ? 'webp' : 'bin'
-          mediaId = `${state.userId}/${Date.now()}_${msg.id._serialized.slice(-8)}.${ext}`
-
-          const buffer = Buffer.from(media.data, 'base64')
-          const { error: uploadError } = await supabaseAdmin.storage
-            .from('whatsapp-media')
-            .upload(mediaId, buffer, {
-              contentType: media.mimetype || mediaMimeType || 'application/octet-stream',
-              upsert: true
-            })
-
-          if (uploadError) {
-            console.error(`[WA Sync] Media upload failed:`, uploadError)
-            mediaId = null
-          }
-        }
-      } catch (e) {
-        // Media might not be available - that's ok
-      }
-
-      // Insert message with or without media
-      try {
-        await supabaseAdmin.from('whatsapp_messages').insert({
-          connection_id: state.connectionId,
-          user_id: state.userId,
-          company_id: state.companyId,
-          wa_message_id: msg.id._serialized,
-          contact_phone: contactPhone,
-          contact_name: contactName,
-          direction: msg.fromMe ? 'outbound' : 'inbound',
-          message_type: messageType,
-          content,
-          media_id: mediaId,
-          media_mime_type: mediaMimeType,
-          message_timestamp: msgTimestamp.toISOString(),
-          status: msg.fromMe ? 'sent' : 'delivered',
-          raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
-        })
-      } catch {}
-
-      // Anti-ban: Delay between media downloads (1-2 seconds)
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000))
     }
 
     // Upsert conversation
@@ -636,11 +612,12 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
     console.log(`[WA] Found ${chats.length} chats, syncing...`)
 
-    // Only sync individual chats, limit to 50 for speed
-    const individualChats = chats.filter(chat => !chat.isGroup).slice(0, 50)
+    // Only sync individual chats, limit to 30 for speed
+    const individualChats = chats.filter(chat => !chat.isGroup).slice(0, 30)
 
-    // Process chats in parallel batches of 5
-    const batchSize = 5
+    // Process chats in small batches of 2 to reduce memory pressure
+    // This allows multiple users to initialize concurrently without overloading the server
+    const batchSize = 2
     for (let i = 0; i < individualChats.length; i += batchSize) {
       const batch = individualChats.slice(i, i + batchSize)
       await Promise.allSettled(batch.map(chat => processSingleChat(chat, state)))
