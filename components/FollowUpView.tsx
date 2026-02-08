@@ -1473,7 +1473,7 @@ export default function FollowUpView() {
                           msg.fromMe
                             ? 'bg-[#005c4b] rounded-tr-none'
                             : 'bg-[#202c33] rounded-tl-none'
-                        }`}>
+                        } ${msg.id.startsWith('temp_') ? 'opacity-60' : ''}`}>
                           {/* Image */}
                           {msg.hasMedia && msg.mediaId && (msg.type === 'image' || msg.mimetype?.startsWith('image/')) && msg.type !== 'sticker' && (
                             <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
@@ -1548,7 +1548,11 @@ export default function FollowUpView() {
                                 minute: '2-digit'
                               })}
                             </span>
-                            {msg.fromMe && (
+                            {msg.fromMe && msg.id.startsWith('temp_') ? (
+                              <svg className="w-3.5 h-3.5 text-[#8696a0] animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" strokeDasharray="50" strokeDashoffset="15" />
+                              </svg>
+                            ) : msg.fromMe && (
                               <svg className={`w-4 h-4 ${msg.status === 'read' ? 'text-[#53bdeb]' : 'text-[#8696a0]'}`} viewBox="0 0 16 15" fill="currentColor">
                                 <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
                               </svg>
