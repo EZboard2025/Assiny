@@ -140,15 +140,42 @@ export async function initializeClient(userId: string, companyId: string | null)
     state.status = 'qr_ready'
   })
 
-  // Authentication event
+  // Authentication event - start a timeout for ready
+  let readyTimeout: NodeJS.Timeout | null = null
   client.on('authenticated', () => {
     console.log(`[WA] Authenticated for user ${userId}`)
     state.status = 'connecting'
+
+    // If ready doesn't fire within 90s, the session is likely corrupted
+    if (readyTimeout) clearTimeout(readyTimeout)
+    readyTimeout = setTimeout(async () => {
+      if (state.status === 'connecting') {
+        console.error(`[WA] Ready timeout for user ${userId} - destroying stuck client`)
+        state.status = 'error'
+        state.error = 'Conexao travou. Tente novamente.'
+        initializingUsers.delete(userId)
+        try { await client.destroy() } catch {}
+        clients.delete(userId)
+
+        // Delete cached session to prevent re-corruption
+        try {
+          const sessionPath = `${getAuthPath()}/session-user_${userId.replace(/-/g, '').substring(0, 16)}`
+          const fs = await import('fs')
+          if (fs.existsSync(sessionPath)) {
+            fs.rmSync(sessionPath, { recursive: true, force: true })
+            console.log(`[WA] Cleared corrupted session cache for user ${userId}`)
+          }
+        } catch (e) {
+          console.error(`[WA] Error clearing session cache:`, e)
+        }
+      }
+    }, 90000)
   })
 
   // Ready event (fully connected)
   client.on('ready', async () => {
     console.log(`[WA] Ready for user ${userId}`)
+    if (readyTimeout) { clearTimeout(readyTimeout); readyTimeout = null }
     state.status = 'connected'
     state.qrCode = null
     state.lastHeartbeat = Date.now()
