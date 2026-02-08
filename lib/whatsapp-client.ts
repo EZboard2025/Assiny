@@ -318,8 +318,9 @@ export async function triggerSync(userId: string): Promise<{ success: boolean; e
   const state = clients.get(userId)
   if (!state) return { success: false, error: 'Client not connected' }
   if (state.status !== 'connected') return { success: false, error: 'Client not in connected state' }
-  if (state.syncStatus === 'syncing') return { success: false, error: 'Sync already in progress' }
 
+  // Allow retry even if previous sync is stuck (reset from 'syncing' state)
+  // The getChats timeout ensures old syncs won't run forever
   state.syncStatus = 'syncing'
   try {
     await syncChatHistory(state)
@@ -692,29 +693,39 @@ async function syncChatHistory(state: ClientState): Promise<void> {
     if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
     const client = state.client
 
-    // Retry getChats up to 3 times (it can timeout under memory pressure)
+    // Helper: getChats with a hard timeout (protocolTimeout alone can hang)
+    const getChatsWithTimeout = (timeoutMs: number): Promise<any[]> => {
+      return Promise.race([
+        client.getChats(),
+        new Promise<any[]>((_, reject) =>
+          setTimeout(() => reject(new Error(`getChats timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+        )
+      ])
+    }
+
+    // Retry getChats up to 2 times with 60s hard timeout per attempt
     let chats: any[] = []
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
       try {
-        console.log(`[WA] getChats attempt ${attempt}/3 for user ${state.userId}`)
-        chats = await client.getChats()
+        console.log(`[WA] getChats attempt ${attempt}/2 for user ${state.userId}`)
+        chats = await getChatsWithTimeout(60000)
 
         if (chats.length > 0) {
           break // Got chats, proceed
         }
 
         // Got 0 chats - might be a stale state, wait and retry
-        if (attempt < 3) {
+        if (attempt < 2) {
           console.log(`[WA] getChats returned 0, retrying in 10s...`)
           await new Promise(resolve => setTimeout(resolve, 10000))
         }
       } catch (err: any) {
         if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
         console.error(`[WA] getChats attempt ${attempt} failed:`, err.message || err)
-        if (attempt < 3) {
-          console.log(`[WA] Retrying getChats in 15s...`)
-          await new Promise(resolve => setTimeout(resolve, 15000))
+        if (attempt < 2) {
+          console.log(`[WA] Retrying getChats in 10s...`)
+          await new Promise(resolve => setTimeout(resolve, 10000))
         } else {
           throw err // Last attempt failed, propagate error
         }
