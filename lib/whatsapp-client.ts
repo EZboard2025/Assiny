@@ -20,6 +20,7 @@ interface ClientState {
   status: 'initializing' | 'qr_ready' | 'connecting' | 'connected' | 'disconnected' | 'error'
   error: string | null
   phoneNumber: string | null
+  lastHeartbeat: number
 }
 
 // Store active clients by userId
@@ -108,7 +109,8 @@ export async function initializeClient(userId: string, companyId: string | null)
     qrCode: null,
     status: 'initializing',
     error: null,
-    phoneNumber: null
+    phoneNumber: null,
+    lastHeartbeat: Date.now()
   }
 
   clients.set(userId, state)
@@ -135,6 +137,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.log(`[WA] Ready for user ${userId}`)
     state.status = 'connected'
     state.qrCode = null
+    state.lastHeartbeat = Date.now()
     initializingUsers.delete(userId)
 
     const info = client.info
@@ -225,6 +228,65 @@ export function getConnectedClient(userId: string): Client | null {
   if (!state || state.status !== 'connected') return null
   return state.client
 }
+
+export function updateHeartbeat(userId: string): boolean {
+  const state = clients.get(userId)
+  if (!state) return false
+  state.lastHeartbeat = Date.now()
+  return true
+}
+
+// ============================================
+// TTL Reaper: Auto-disconnect stale clients
+// ============================================
+
+const TTL_CHECK_INTERVAL_MS = 30_000  // Check every 30s
+const TTL_THRESHOLD_MS = 60_000       // Disconnect if no heartbeat for 60s
+
+const reaperInterval = setInterval(async () => {
+  const now = Date.now()
+
+  for (const [userId, state] of clients.entries()) {
+    const elapsed = now - state.lastHeartbeat
+
+    if (elapsed > TTL_THRESHOLD_MS) {
+      console.log(
+        `[WA TTL] Client for user ${userId} expired (last heartbeat ${Math.round(elapsed / 1000)}s ago, status=${state.status}). Auto-disconnecting...`
+      )
+      try {
+        await disconnectClient(userId)
+      } catch (err) {
+        console.error(`[WA TTL] Error disconnecting user ${userId}:`, err)
+        clients.delete(userId)
+      }
+    }
+  }
+}, TTL_CHECK_INTERVAL_MS)
+
+// Prevent the interval from keeping Node.js alive during shutdown
+if (reaperInterval.unref) {
+  reaperInterval.unref()
+}
+
+// Clean up orphaned DB connections on server restart
+;(async () => {
+  try {
+    const { count } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active')
+
+    if (count && count > 0) {
+      console.log(`[WA Startup] Found ${count} orphaned active connections, marking as disconnected`)
+      await supabaseAdmin
+        .from('whatsapp_connections')
+        .update({ status: 'disconnected' })
+        .eq('status', 'active')
+    }
+  } catch (err) {
+    console.error('[WA Startup] Error cleaning orphaned connections:', err)
+  }
+})()
 
 // ============================================
 // Internal helpers

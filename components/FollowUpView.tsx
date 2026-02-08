@@ -118,9 +118,20 @@ export default function FollowUpView() {
     const loadAuth = async () => {
       try {
         const { supabase } = await import('@/lib/supabase')
+        // Try getSession first, then getUser as fallback
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) {
           setAuthToken(session.access_token)
+          return
+        }
+        // Fallback: getSession can return null on subdomains
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Re-fetch session after getUser validates the token
+          const { data: { session: refreshed } } = await supabase.auth.getSession()
+          if (refreshed?.access_token) {
+            setAuthToken(refreshed.access_token)
+          }
         }
       } catch (e) {
         console.error('Error loading auth:', e)
@@ -234,6 +245,45 @@ export default function FollowUpView() {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [connectionStatus, authToken])
+
+  // Heartbeat: keep server-side WhatsApp session alive
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
+    if (connectionStatus === 'connected' && authToken) {
+      // Send initial heartbeat immediately
+      fetch('/api/whatsapp/heartbeat', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      }).catch(() => {})
+
+      interval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/whatsapp/heartbeat', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+
+          if (response.status === 404) {
+            // Server lost our session (restart, crash, TTL expired)
+            console.warn('[Heartbeat] Server has no active client, resetting connection state')
+            setConnectionStatus('disconnected')
+            setPhoneNumber(null)
+            setConversations([])
+            setSelectedConversation(null)
+            setMessages([])
+          }
+        } catch {
+          // Network error - server TTL will handle cleanup if heartbeats consistently fail
+          console.warn('[Heartbeat] Failed to send heartbeat')
+        }
+      }, 20000) // Every 20 seconds
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
     }
   }, [connectionStatus, authToken])
 
@@ -393,6 +443,10 @@ export default function FollowUpView() {
   }
 
   const connectWhatsApp = async () => {
+    if (!authToken) {
+      setError('Sessão expirada. Recarregue a página.')
+      return
+    }
     setIsInitializing(true)
     setError(null)
     setConnectionStatus('initializing')
@@ -756,13 +810,18 @@ export default function FollowUpView() {
         </p>
         <button
           onClick={connectWhatsApp}
-          disabled={isInitializing}
+          disabled={isInitializing || !authToken}
           className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-6 py-3 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
         >
           {isInitializing ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
               Iniciando...
+            </>
+          ) : !authToken ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Carregando...
             </>
           ) : (
             <>

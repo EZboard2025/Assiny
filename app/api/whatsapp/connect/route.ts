@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { initializeClient, getClientState } from '@/lib/whatsapp-client'
+import { initializeClient, getClientState, updateHeartbeat } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,6 +65,11 @@ export async function GET(request: NextRequest) {
     }
 
     const state = getClientState(user.id)
+
+    // Polling counts as activity - prevents TTL reaping during QR phase
+    if (state) {
+      updateHeartbeat(user.id)
+    }
 
     if (!state) {
       // Check if there's a connection in DB (might be from a previous server session)
