@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getConnectedClient } from '@/lib/whatsapp-client'
 import { MessageMedia } from 'whatsapp-web.js'
+import { execFile } from 'child_process'
+import { writeFileSync, readFileSync, unlinkSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -119,23 +123,29 @@ async function handleMediaMessage(request: NextRequest) {
 
     // Convert File to base64 for MessageMedia
     const arrayBuffer = await file.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    let mediaBuffer = Buffer.from(arrayBuffer)
+    let mediaMimetype = (file.type || 'application/octet-stream').split(';')[0].trim()
+    let mediaFilename = file.name || `media_${Date.now()}`
 
-    // Clean mimetype: remove codec params that can confuse whatsapp-web.js
-    let cleanMimetype = (file.type || 'application/octet-stream').split(';')[0].trim()
-
-    // For voice recordings from browser (webm), use audio/ogg which WhatsApp prefers
-    if (messageType === 'audio' && (cleanMimetype === 'audio/webm' || cleanMimetype === 'audio/ogg')) {
-      cleanMimetype = 'audio/ogg; codecs=opus'
+    // For audio: remux WebM/Opus → OGG/Opus via ffmpeg (whatsapp-web.js requires real OGG container)
+    if (messageType === 'audio') {
+      console.log(`[WA Send Media] Converting audio: ${mediaMimetype}, size=${file.size}`)
+      try {
+        const oggBuffer = await convertToOgg(mediaBuffer)
+        mediaBuffer = oggBuffer
+        mediaMimetype = 'audio/ogg; codecs=opus'
+        mediaFilename = mediaFilename.replace(/\.\w+$/, '.ogg')
+        console.log(`[WA Send Media] Converted to OGG: size=${oggBuffer.length}`)
+      } catch (convErr) {
+        console.error(`[WA Send Media] ffmpeg conversion failed:`, convErr)
+        return NextResponse.json({ error: 'Falha ao converter áudio' }, { status: 500 })
+      }
     }
 
-    console.log(`[WA Send Media] type=${messageType}, mimetype=${cleanMimetype}, size=${file.size}, name=${file.name}`)
+    console.log(`[WA Send Media] type=${messageType}, mimetype=${mediaMimetype}, size=${mediaBuffer.length}, name=${mediaFilename}`)
 
-    const media = new MessageMedia(
-      cleanMimetype,
-      base64,
-      file.name || `media_${Date.now()}`
-    )
+    const base64 = mediaBuffer.toString('base64')
+    const media = new MessageMedia(mediaMimetype, base64, mediaFilename)
 
     // Anti-ban: Short delay for media (1-2s)
     const typingDelay = 1000 + Math.random() * 1000
@@ -150,22 +160,16 @@ async function handleMediaMessage(request: NextRequest) {
       options.sendAudioAsVoice = true
     }
 
-    let sentMsg
-    try {
-      sentMsg = await client.sendMessage(chatId, media, options)
-    } catch (sendErr: any) {
-      console.error(`[WA Send Media] sendMessage failed:`, sendErr?.message || sendErr, JSON.stringify({ mimetype: cleanMimetype, fileSize: file.size, fileName: file.name, options }))
-      throw sendErr
-    }
+    const sentMsg = await client.sendMessage(chatId, media, options)
 
     // Upload to Supabase Storage for consistent display
-    const ext = file.name?.split('.').pop() || 'bin'
+    const ext = messageType === 'audio' ? 'ogg' : (file.name?.split('.').pop() || 'bin')
     const mediaId = `${user!.id}/${Date.now()}_sent.${ext}`
 
     await supabaseAdmin.storage
       .from('whatsapp-media')
-      .upload(mediaId, Buffer.from(arrayBuffer), {
-        contentType: file.type || 'application/octet-stream',
+      .upload(mediaId, mediaBuffer, {
+        contentType: mediaMimetype,
         upsert: true
       })
 
@@ -243,4 +247,43 @@ async function resolveChatId(to: string, userId: string): Promise<string> {
   const chatId = `${to.replace(/[^0-9]/g, '')}@c.us`
   console.log(`[WA Send] Using @c.us format: ${chatId}`)
   return chatId
+}
+
+// Remux WebM/Opus → OGG/Opus via ffmpeg (lossless, just changes container)
+function convertToOgg(inputBuffer: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const ts = Date.now()
+    const tmpIn = join(tmpdir(), `voice_in_${ts}.webm`)
+    const tmpOut = join(tmpdir(), `voice_out_${ts}.ogg`)
+
+    writeFileSync(tmpIn, inputBuffer)
+
+    execFile('ffmpeg', [
+      '-y', '-i', tmpIn,
+      '-vn',
+      '-c:a', 'libopus',
+      '-b:a', '48k',
+      '-ac', '1',
+      '-ar', '48000',
+      '-map_metadata', '-1',
+      tmpOut
+    ], { timeout: 15000 }, (err) => {
+      // Clean up input file
+      try { unlinkSync(tmpIn) } catch {}
+
+      if (err) {
+        try { unlinkSync(tmpOut) } catch {}
+        reject(err)
+        return
+      }
+
+      try {
+        const oggBuffer = readFileSync(tmpOut)
+        unlinkSync(tmpOut)
+        resolve(oggBuffer)
+      } catch (readErr) {
+        reject(readErr)
+      }
+    })
+  })
 }
