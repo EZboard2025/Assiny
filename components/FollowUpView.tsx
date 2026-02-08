@@ -133,6 +133,10 @@ export default function FollowUpView() {
   const [savedAnalyses, setSavedAnalyses] = useState<Record<string, { analysis: FollowUpAnalysis; date: string }>>({})
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(false)
 
+  // Sync status from backend
+  const [syncStatus, setSyncStatus] = useState<'pending' | 'syncing' | 'synced' | 'error' | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
+
   // Auth token for API calls
   const [authToken, setAuthToken] = useState<string | null>(null)
 
@@ -473,8 +477,11 @@ export default function FollowUpView() {
         setConnectionStatus('connected')
         setPhoneNumber(data.phone_number || null)
         loadConversations()
-        // Retry in case sync is still in progress
+        // Extended retries in case sync is still in progress
         setTimeout(() => loadConversations(), 5000)
+        setTimeout(() => loadConversations(), 15000)
+        setTimeout(() => loadConversations(), 30000)
+        setTimeout(() => loadConversations(), 60000)
       } else {
         setConnectionStatus('disconnected')
       }
@@ -506,11 +513,14 @@ export default function FollowUpView() {
           setPhoneNumber(data.phoneNumber || null)
           setQrCode(null)
           setIsInitializing(false)
-          // Load conversations with retries (sync runs in background after connect)
+          setSyncStatus(data.syncStatus || 'pending')
+          // Load conversations with extended retries (sync can take up to 2min)
           loadConversations()
           setTimeout(() => loadConversations(), 5000)
           setTimeout(() => loadConversations(), 15000)
           setTimeout(() => loadConversations(), 30000)
+          setTimeout(() => loadConversations(), 60000)
+          setTimeout(() => loadConversations(), 120000)
         } else if (data.status === 'qr_ready' && data.qrcode) {
           setQrCode(data.qrcode)
           setConnectionStatus('qr_ready')
@@ -522,6 +532,13 @@ export default function FollowUpView() {
           setError(data.error || 'Erro na conexao')
           setConnectionStatus('disconnected')
           setIsInitializing(false)
+        } else if (data.status === 'no_client' || data.status === 'disconnected_needs_reconnect') {
+          // Server lost the client (PM2 restart) - stop polling and reset
+          stopPolling()
+          setQrCode(null)
+          setIsInitializing(false)
+          setConnectionStatus('disconnected')
+          setError('Conexao perdida. Clique em Conectar novamente.')
         }
       } catch {
         // Silent fail for polling
@@ -557,6 +574,8 @@ export default function FollowUpView() {
         loadConversations()
         setTimeout(() => loadConversations(), 5000)
         setTimeout(() => loadConversations(), 15000)
+        setTimeout(() => loadConversations(), 30000)
+        setTimeout(() => loadConversations(), 60000)
         return
       }
 
@@ -588,6 +607,31 @@ export default function FollowUpView() {
       method: 'POST',
       headers: getAuthHeaders()
     }).catch(err => console.error('Error disconnecting:', err))
+  }
+
+  const triggerManualSync = async () => {
+    if (!authToken || isSyncing) return
+    setIsSyncing(true)
+    setSyncStatus('syncing')
+    try {
+      const response = await fetch('/api/whatsapp/sync', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      const data = await response.json()
+      if (data.success) {
+        setSyncStatus('synced')
+        loadConversations()
+      } else {
+        setSyncStatus('error')
+        console.error('Sync failed:', data.error)
+      }
+    } catch (error) {
+      setSyncStatus('error')
+      console.error('Error triggering sync:', error)
+    } finally {
+      setIsSyncing(false)
+    }
   }
 
   const loadConversations = async () => {
@@ -1248,11 +1292,17 @@ export default function FollowUpView() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={loadConversations}
+            onClick={() => {
+              loadConversations()
+              // If no conversations loaded, also trigger sync
+              if (conversations.length === 0) {
+                triggerManualSync()
+              }
+            }}
             className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-            title="Atualizar"
+            title={conversations.length === 0 ? 'Sincronizar conversas' : 'Atualizar'}
           >
-            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isLoadingConversations ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={disconnectWhatsApp}
@@ -1289,13 +1339,30 @@ export default function FollowUpView() {
             <MessageSquare className="w-12 h-12 text-[#364147] mx-auto mb-3" />
             <p className="text-[#8696a0] text-sm">
               {conversations.length === 0
-                ? 'Aguardando novas mensagens...'
+                ? (syncStatus === 'syncing' || isSyncing
+                    ? 'Sincronizando conversas...'
+                    : syncStatus === 'error'
+                    ? 'Erro ao sincronizar conversas'
+                    : 'Aguardando sincronizacao...')
                 : 'Nenhuma conversa encontrada'}
             </p>
             {conversations.length === 0 && (
-              <p className="text-[#8696a0] text-xs mt-2">
-                As conversas aparecerao aqui quando voce receber mensagens.
-              </p>
+              <>
+                {(syncStatus === 'syncing' || isSyncing) ? (
+                  <div className="flex items-center justify-center gap-2 mt-3">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#00a884]" />
+                    <p className="text-[#8696a0] text-xs">Isso pode levar alguns segundos...</p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={triggerManualSync}
+                    className="mt-3 px-4 py-2 bg-[#00a884] text-white text-sm rounded-lg hover:bg-[#00967d] transition-colors flex items-center gap-2 mx-auto"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Sincronizar Conversas
+                  </button>
+                )}
+              </>
             )}
           </div>
         ) : (

@@ -18,6 +18,7 @@ interface ClientState {
   connectionId: string | null
   qrCode: string | null
   status: 'initializing' | 'qr_ready' | 'connecting' | 'connected' | 'disconnected' | 'error'
+  syncStatus: 'pending' | 'syncing' | 'synced' | 'error'
   error: string | null
   phoneNumber: string | null
   lastHeartbeat: number
@@ -81,7 +82,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     }),
     puppeteer: {
       headless: true,
-      protocolTimeout: 60000, // 60s timeout for slow operations
+      protocolTimeout: 180000, // 180s timeout for slow operations (getChats can be slow under memory pressure)
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -120,6 +121,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     connectionId: null,
     qrCode: null,
     status: 'initializing',
+    syncStatus: 'pending',
     error: null,
     phoneNumber: null,
     lastHeartbeat: Date.now()
@@ -157,8 +159,18 @@ export async function initializeClient(userId: string, companyId: string | null)
 
     await upsertConnection(state)
 
+    // Wait for Chrome to fully settle before syncing (prevents getChats timeout)
+    console.log(`[WA] Waiting 10s before sync for user ${userId}...`)
+    await new Promise(resolve => setTimeout(resolve, 10000))
+
     // Sync in background (don't block)
-    syncChatHistory(state).catch(err => console.error('[WA] Sync error:', err))
+    state.syncStatus = 'syncing'
+    syncChatHistory(state).then(() => {
+      state.syncStatus = 'synced'
+    }).catch(err => {
+      console.error('[WA] Sync error:', err)
+      state.syncStatus = 'error'
+    })
   })
 
   // Message received
@@ -257,6 +269,24 @@ export function updateHeartbeat(userId: string): boolean {
   if (!state) return false
   state.lastHeartbeat = Date.now()
   return true
+}
+
+// Manual sync trigger (called from API when user clicks "Sync")
+export async function triggerSync(userId: string): Promise<{ success: boolean; error?: string }> {
+  const state = clients.get(userId)
+  if (!state) return { success: false, error: 'Client not connected' }
+  if (state.status !== 'connected') return { success: false, error: 'Client not in connected state' }
+  if (state.syncStatus === 'syncing') return { success: false, error: 'Sync already in progress' }
+
+  state.syncStatus = 'syncing'
+  try {
+    await syncChatHistory(state)
+    state.syncStatus = 'synced'
+    return { success: true }
+  } catch (err: any) {
+    state.syncStatus = 'error'
+    return { success: false, error: err.message || 'Sync failed' }
+  }
 }
 
 // ============================================
@@ -610,21 +640,53 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
           updated_at: new Date().toISOString()
         }, { onConflict: 'connection_id,contact_phone' })
     }
-  } catch {}
+  } catch (err: any) {
+    console.error(`[Sync] Error processing chat:`, err.message || err)
+  }
 }
 
 async function syncChatHistory(state: ClientState): Promise<void> {
   try {
     const client = state.client
-    const chats = await client.getChats()
+
+    // Retry getChats up to 3 times (it can timeout under memory pressure)
+    let chats: any[] = []
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`[WA] getChats attempt ${attempt}/3 for user ${state.userId}`)
+        chats = await client.getChats()
+
+        if (chats.length > 0) {
+          break // Got chats, proceed
+        }
+
+        // Got 0 chats - might be a stale state, wait and retry
+        if (attempt < 3) {
+          console.log(`[WA] getChats returned 0, retrying in 10s...`)
+          await new Promise(resolve => setTimeout(resolve, 10000))
+        }
+      } catch (err: any) {
+        console.error(`[WA] getChats attempt ${attempt} failed:`, err.message || err)
+        if (attempt < 3) {
+          console.log(`[WA] Retrying getChats in 15s...`)
+          await new Promise(resolve => setTimeout(resolve, 15000))
+        } else {
+          throw err // Last attempt failed, propagate error
+        }
+      }
+    }
 
     console.log(`[WA] Found ${chats.length} chats, syncing...`)
+
+    if (chats.length === 0) {
+      console.log(`[WA] No chats found after retries for user ${state.userId}`)
+      return
+    }
 
     // Only sync individual chats, limit to 30 for speed
     const individualChats = chats.filter(chat => !chat.isGroup).slice(0, 30)
 
     // Process chats in small batches of 2 to reduce memory pressure
-    // This allows multiple users to initialize concurrently without overloading the server
     const batchSize = 2
     for (let i = 0; i < individualChats.length; i += batchSize) {
       const batch = individualChats.slice(i, i + batchSize)
@@ -634,6 +696,7 @@ async function syncChatHistory(state: ClientState): Promise<void> {
     console.log(`[WA] Sync complete for user ${state.userId}`)
   } catch (error) {
     console.error('[WA] Error syncing:', error)
+    throw error // Re-throw so caller can set syncStatus to 'error'
   }
 }
 

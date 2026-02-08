@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
       status: state.status,
       qrcode: state.qrCode,
       phoneNumber: state.phoneNumber,
+      syncStatus: state.syncStatus,
       error: state.error
     })
 
