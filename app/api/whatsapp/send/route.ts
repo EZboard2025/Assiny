@@ -249,45 +249,60 @@ async function resolveChatId(to: string, userId: string): Promise<string> {
   return chatId
 }
 
-// Convert WebM/Opus → OGG/Opus via ffmpeg (re-encode for WhatsApp mobile compatibility)
+// Convert WebM/Opus → OGG/Opus via ffmpeg (two-stage for WhatsApp mobile compatibility)
+// WhatsApp mobile requires: OGG/Opus, 16kHz, mono, ~32kbps
 function convertToOgg(inputBuffer: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const ts = Date.now()
     const tmpIn = join(tmpdir(), `voice_in_${ts}.webm`)
+    const tmpWav = join(tmpdir(), `voice_mid_${ts}.wav`)
     const tmpOut = join(tmpdir(), `voice_out_${ts}.ogg`)
 
     writeFileSync(tmpIn, inputBuffer)
 
+    // Stage 1: Normalize to clean WAV (strips any corrupt metadata from browser recording)
     execFile('ffmpeg', [
       '-y', '-i', tmpIn,
-      '-vn',
-      '-c:a', 'libopus',
-      '-b:a', '128k',
-      '-vbr', 'on',
-      '-compression_level', '10',
-      '-frame_duration', '60',
-      '-application', 'voip',
-      '-ac', '1',
-      '-ar', '48000',
+      '-vn', '-ac', '1', '-ar', '16000',
+      '-c:a', 'pcm_s16le',
       '-map_metadata', '-1',
-      tmpOut
-    ], { timeout: 15000 }, (err) => {
-      // Clean up input file
+      tmpWav
+    ], { timeout: 15000 }, (err1) => {
       try { unlinkSync(tmpIn) } catch {}
 
-      if (err) {
-        try { unlinkSync(tmpOut) } catch {}
-        reject(err)
+      if (err1) {
+        try { unlinkSync(tmpWav) } catch {}
+        reject(err1)
         return
       }
 
-      try {
-        const oggBuffer = readFileSync(tmpOut)
-        unlinkSync(tmpOut)
-        resolve(oggBuffer)
-      } catch (readErr) {
-        reject(readErr)
-      }
+      // Stage 2: Encode to WhatsApp-compatible OGG/Opus
+      execFile('ffmpeg', [
+        '-y', '-i', tmpWav,
+        '-c:a', 'libopus',
+        '-b:a', '32k',
+        '-vbr', 'on',
+        '-compression_level', '10',
+        '-frame_duration', '60',
+        '-application', 'voip',
+        tmpOut
+      ], { timeout: 15000 }, (err2) => {
+        try { unlinkSync(tmpWav) } catch {}
+
+        if (err2) {
+          try { unlinkSync(tmpOut) } catch {}
+          reject(err2)
+          return
+        }
+
+        try {
+          const oggBuffer = readFileSync(tmpOut)
+          unlinkSync(tmpOut)
+          resolve(oggBuffer)
+        } catch (readErr) {
+          reject(readErr)
+        }
+      })
     })
   })
 }
