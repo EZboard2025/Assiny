@@ -261,10 +261,7 @@ function convertToOgg(inputBuffer: Buffer): Promise<Buffer> {
     execFile('ffmpeg', [
       '-y', '-i', tmpIn,
       '-vn',
-      '-c:a', 'libopus',
-      '-b:a', '48k',
-      '-ac', '1',
-      '-ar', '48000',
+      '-c:a', 'copy',
       '-map_metadata', '-1',
       tmpOut
     ], { timeout: 15000 }, (err) => {
