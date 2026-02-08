@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import ChatInterface, { ChatInterfaceHandle } from './ChatInterface'
@@ -44,6 +45,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onLogout }: DashboardProps) {
+  const router = useRouter()
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [showSalesDashboard, setShowSalesDashboard] = useState(false)
@@ -411,7 +413,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div className={`mb-8 flex flex-col lg:flex-row gap-4 items-stretch ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
             {/* Banner CTA with image */}
             <button
-              onClick={() => handleViewChange('roleplay')}
+              onClick={() => router.push('/roleplay')}
               className="group relative overflow-hidden rounded-2xl bg-green-800 p-5 text-left transition-all hover:shadow-xl hover:scale-[1.01] lg:w-[280px] flex-shrink-0 min-h-[100px]"
             >
               {/* Background Image */}
@@ -473,7 +475,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Simulação"
               subtitle="Treinamento ativo"
               description="Simule conversas reais de vendas com feedback SPIN."
-              onClick={() => handleViewChange('roleplay')}
+              onClick={() => router.push('/roleplay')}
             />
 
             <FeatureCard
@@ -481,7 +483,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Meu Perfil"
               subtitle="Desempenho"
               description="Acompanhe sua evolução e métricas SPIN."
-              onClick={() => handleViewChange('perfil')}
+              onClick={() => router.push('/profile')}
             />
 
             <FeatureCard
@@ -489,7 +491,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Análise Follow-up"
               subtitle="WhatsApp"
               description="Análise detalhada do seu follow-up."
-              onClick={() => handleViewChange('followup')}
+              onClick={() => router.push('/followup')}
               disabled
             />
 
@@ -499,7 +501,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 title="Roleplay Público"
                 subtitle="Links externos"
                 description="Links públicos para roleplays externos."
-                onClick={() => handleViewChange('roleplay-links')}
+                onClick={() => router.push('/roleplay-links')}
                 adminBadge
               />
             ) : (
@@ -513,7 +515,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 title="PDI"
                 subtitle="Plano de desenvolvimento"
                 description="Plano de 7 dias baseado na sua performance."
-                onClick={() => handleViewChange('pdi')}
+                onClick={() => router.push('/pdi-page')}
               />
             )}
 
@@ -522,7 +524,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Histórico"
               subtitle="Todas as sessões"
               description="Simulações, Follow-ups e análises de Meet."
-              onClick={() => handleViewChange('historico')}
+              onClick={() => router.push('/history')}
             />
 
             <FeatureCard
@@ -530,7 +532,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Análise Google Meet"
               subtitle="Transcrição em tempo real"
               description="Bot transcreve reuniões do Google Meet automaticamente."
-              onClick={() => handleViewChange('meet-analysis')}
+              onClick={() => router.push('/meet-analysis')}
               betaBadge
             />
 
