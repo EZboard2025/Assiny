@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Target, Trophy, Clock, ChevronRight, Star, TrendingUp, CheckCircle, XCircle, Play, Calendar, ArrowLeft } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface ChallengeConfig {
   title: string
@@ -56,12 +58,14 @@ interface Stats {
 }
 
 interface Props {
-  userId: string
-  onStartChallenge: (challenge: Challenge) => void
-  onBack: () => void
+  userId?: string
+  onStartChallenge?: (challenge: Challenge) => void
+  onBack?: () => void
 }
 
-export default function ChallengeHistoryView({ userId, onStartChallenge, onBack }: Props) {
+export default function ChallengeHistoryView({ userId: propUserId, onStartChallenge, onBack }: Props) {
+  const router = useRouter()
+  const [userId, setUserId] = useState<string | null>(propUserId || null)
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -69,8 +73,41 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
   const [filter, setFilter] = useState<'all' | 'completed' | 'pending'>('all')
 
   useEffect(() => {
-    fetchHistory()
+    const loadUserId = async () => {
+      if (propUserId) {
+        setUserId(propUserId)
+        return
+      }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+      }
+    }
+    loadUserId()
+  }, [propUserId])
+
+  useEffect(() => {
+    if (userId) {
+      fetchHistory()
+    }
   }, [userId])
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack()
+    } else {
+      router.push('/')
+    }
+  }
+
+  const handleStartChallenge = (challenge: Challenge) => {
+    if (onStartChallenge) {
+      handleStartChallenge(challenge)
+    } else {
+      sessionStorage.setItem('activeChallenge', JSON.stringify(challenge))
+      router.push('/roleplay')
+    }
+  }
 
   const fetchHistory = async () => {
     try {
@@ -450,7 +487,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
           {canDoChallenge(selectedChallenge) && (
             <div className="mt-6">
               <button
-                onClick={() => onStartChallenge(selectedChallenge)}
+                onClick={() => handleStartChallenge(selectedChallenge)}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg"
               >
                 <Play className="w-5 h-5" />
@@ -471,7 +508,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={onBack}
+              onClick={handleBack}
               className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -599,7 +636,7 @@ export default function ChallengeHistoryView({ userId, onStartChallenge, onBack 
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          onStartChallenge(challenge)
+                          handleStartChallenge(challenge)
                         }}
                         className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium rounded-lg hover:from-purple-500 hover:to-pink-500 transition-all flex items-center gap-1"
                       >
