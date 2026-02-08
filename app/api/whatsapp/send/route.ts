@@ -123,7 +123,7 @@ async function handleMediaMessage(request: NextRequest) {
 
     // Convert File to base64 for MessageMedia
     const arrayBuffer = await file.arrayBuffer()
-    let mediaBuffer = Buffer.from(arrayBuffer)
+    let mediaBuffer: Buffer = Buffer.from(arrayBuffer)
     let mediaMimetype = (file.type || 'application/octet-stream').split(';')[0].trim()
     let mediaFilename = file.name || `media_${Date.now()}`
 
