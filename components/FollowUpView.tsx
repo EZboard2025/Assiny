@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon } from 'lucide-react'
+import SalesCopilot from './SalesCopilot'
 
 interface FollowUpAnalysis {
   notas: {
@@ -1408,11 +1409,6 @@ export default function FollowUpView() {
                     <span className="text-[#e9edef] text-base truncate">
                       {conv.contact_name || formatPhone(conv.contact_phone)}
                     </span>
-                    {savedAnalyses[conv.contact_phone] && (
-                      <span className="flex-shrink-0 bg-[#00a884] text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-                        {savedAnalyses[conv.contact_phone].analysis.nota_final.toFixed(1)}
-                      </span>
-                    )}
                   </div>
                   <span className={`text-xs flex-shrink-0 ${conv.unread_count > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
                     {formatTime(conv.last_message_at)}
@@ -1452,7 +1448,7 @@ export default function FollowUpView() {
     return (
       <div className="flex-1 flex bg-[#0b141a] relative overflow-hidden">
         {/* Messages Column */}
-        <div className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ${showAnalysisPanel ? 'mr-[400px]' : ''}`}>
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Chat Header */}
           <div className="h-[60px] flex-shrink-0 bg-[#202c33] px-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1481,46 +1477,6 @@ export default function FollowUpView() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Analyze Button */}
-              <button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing || messages.length === 0}
-                className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Analisando...
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="w-4 h-4" />
-                    {analysis ? 'Re-analisar' : 'Analisar'}
-                  </>
-                )}
-              </button>
-
-              {/* Analysis Score Card */}
-              {analysis && !showAnalysisPanel && (
-                <button
-                  onClick={() => setShowAnalysisPanel(true)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-                    analysis.nota_final >= 8 ? 'bg-green-900/50 border border-green-700 hover:bg-green-900/70' :
-                    analysis.nota_final >= 6 ? 'bg-yellow-900/50 border border-yellow-700 hover:bg-yellow-900/70' :
-                    analysis.nota_final >= 4 ? 'bg-orange-900/50 border border-orange-700 hover:bg-orange-900/70' :
-                    'bg-red-900/50 border border-red-700 hover:bg-red-900/70'
-                  }`}
-                >
-                  <span className={`text-lg font-bold ${
-                    analysis.nota_final >= 8 ? 'text-green-400' :
-                    analysis.nota_final >= 6 ? 'text-yellow-400' :
-                    analysis.nota_final >= 4 ? 'text-orange-400' :
-                    'text-red-400'
-                  }`}>{analysis.nota_final.toFixed(1)}</span>
-                  <span className="text-[#8696a0] text-xs">Ver avaliacao</span>
-                  <ChevronRight className="w-4 h-4 text-[#8696a0]" />
-                </button>
-              )}
             </div>
           </div>
 
@@ -1817,32 +1773,6 @@ export default function FollowUpView() {
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
         </div>
 
-        {/* Analysis Panel (slides in from right) */}
-        {analysis && (
-          <div className={`absolute top-0 right-0 h-full w-[400px] bg-[#111b21] border-l border-[#222d34] flex flex-col transition-transform duration-300 ${showAnalysisPanel ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowAnalysisPanel(false)}
-                  className="p-1 hover:bg-[#2a3942] rounded-full transition-colors"
-                >
-                  <ChevronLeft className="w-5 h-5 text-[#aebac1]" />
-                </button>
-                <span className="text-[#e9edef] font-medium">Avaliacao</span>
-              </div>
-              <button
-                onClick={() => setShowAnalysisPanel(false)}
-                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-[#aebac1]" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              {renderAnalysisResults()}
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -1992,6 +1922,13 @@ export default function FollowUpView() {
         <>
           {renderChatSidebar()}
           {renderMainContent()}
+          <SalesCopilot
+            selectedConversation={selectedConversation}
+            messages={messages}
+            authToken={authToken}
+            companyData={companyData}
+            isVisible={connectionStatus === 'connected' && !!selectedConversation}
+          />
         </>
       ) : connectionStatus === 'initializing' || connectionStatus === 'qr_ready' || connectionStatus === 'connecting' ? (
         renderConnecting()

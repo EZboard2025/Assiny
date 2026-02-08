@@ -880,7 +880,86 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     }
 
     console.log(`[WA] Message processed: ${direction} ${messageType} from ${contactPhone}`)
+
+    // === COPILOT AUTO-LEARNING HOOKS (non-blocking) ===
+    if (messageType === 'text' && content) {
+      if (fromMe) {
+        // Seller sent a message → track it for outcome analysis
+        trackSellerMessage(state, contactPhone, contactName, content, msgTimestamp).catch((err: any) =>
+          console.error('[WA] trackSellerMessage error:', err.message || err)
+        )
+      } else {
+        // Client responded → trigger automatic outcome analysis
+        triggerOutcomeAnalysis(state, contactPhone, content).catch((err: any) =>
+          console.error('[WA] triggerOutcomeAnalysis error:', err.message || err)
+        )
+      }
+    }
   } catch (error) {
     console.error(`[WA] Error handling message:`, error)
   }
+}
+
+// === COPILOT AUTO-LEARNING FUNCTIONS ===
+
+async function trackSellerMessage(
+  state: ClientState,
+  contactPhone: string,
+  contactName: string | null,
+  content: string,
+  msgTimestamp: Date
+): Promise<void> {
+  // Fetch recent conversation context from DB
+  const { data: recentMsgs } = await supabaseAdmin
+    .from('whatsapp_messages')
+    .select('direction, content, message_timestamp')
+    .eq('contact_phone', contactPhone)
+    .eq('user_id', state.userId)
+    .order('message_timestamp', { ascending: false })
+    .limit(10)
+
+  const context = (recentMsgs || [])
+    .reverse()
+    .map((m: any) => {
+      const sender = m.direction === 'outbound' ? 'Vendedor' : (contactName || 'Cliente')
+      const time = new Date(m.message_timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      return `[${time}] ${sender}: ${m.content || '[mídia]'}`
+    })
+    .join('\n')
+
+  await supabaseAdmin
+    .from('seller_message_tracking')
+    .insert({
+      user_id: state.userId,
+      company_id: state.companyId,
+      contact_phone: contactPhone,
+      contact_name: contactName,
+      seller_message: content.slice(0, 2000),
+      conversation_context: context.slice(0, 5000),
+      message_timestamp: msgTimestamp.toISOString()
+    })
+
+  console.log(`[WA] Tracked seller message to ${contactPhone}`)
+}
+
+async function triggerOutcomeAnalysis(
+  state: ClientState,
+  contactPhone: string,
+  clientResponse: string
+): Promise<void> {
+  // Call analyze-outcome API internally (fire-and-forget)
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'
+
+  await fetch(`${baseUrl}/api/copilot/analyze-outcome`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contactPhone,
+      clientResponse: clientResponse.slice(0, 2000),
+      companyId: state.companyId,
+      userId: state.userId
+    })
+  })
+
+  console.log(`[WA] Triggered outcome analysis for ${contactPhone}`)
 }
