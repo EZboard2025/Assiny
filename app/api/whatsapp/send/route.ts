@@ -249,7 +249,7 @@ async function resolveChatId(to: string, userId: string): Promise<string> {
   return chatId
 }
 
-// Remux WebM/Opus → OGG/Opus via ffmpeg (lossless, just changes container)
+// Convert WebM/Opus → OGG/Opus via ffmpeg (re-encode for WhatsApp mobile compatibility)
 function convertToOgg(inputBuffer: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const ts = Date.now()
@@ -261,7 +261,14 @@ function convertToOgg(inputBuffer: Buffer): Promise<Buffer> {
     execFile('ffmpeg', [
       '-y', '-i', tmpIn,
       '-vn',
-      '-c:a', 'copy',
+      '-c:a', 'libopus',
+      '-b:a', '128k',
+      '-vbr', 'on',
+      '-compression_level', '10',
+      '-frame_duration', '60',
+      '-application', 'voip',
+      '-ac', '1',
+      '-ar', '48000',
       '-map_metadata', '-1',
       tmpOut
     ], { timeout: 15000 }, (err) => {
