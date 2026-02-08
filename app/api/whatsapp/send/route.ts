@@ -158,7 +158,7 @@ async function handleMediaMessage(request: NextRequest) {
       message: {
         id: sentMsg.id._serialized,
         waMessageId: sentMsg.id._serialized,
-        body: caption?.trim() || (messageType === 'audio' ? '[Áudio]' : file.name || ''),
+        body: caption?.trim() || '',
         fromMe: true,
         timestamp: new Date().toISOString(),
         type: messageType === 'audio' ? 'ptt' : messageType,

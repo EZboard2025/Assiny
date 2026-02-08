@@ -112,12 +112,16 @@ export default function FollowUpView() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [isRecordingVoice, setIsRecordingVoice] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
+  const [voiceVolumeBars, setVoiceVolumeBars] = useState<number[]>(new Array(30).fill(4))
   const [selectedFile, setSelectedFile] = useState<{ file: File; type: 'image' | 'document'; previewUrl?: string } | null>(null)
   const [mediaCaption, setMediaCaption] = useState('')
   const voiceRecorderRef = useRef<MediaRecorder | null>(null)
   const voiceChunksRef = useRef<Blob[]>([])
   const voiceStreamRef = useRef<MediaStream | null>(null)
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const voiceAnalyserRef = useRef<AnalyserNode | null>(null)
+  const voiceAnimFrameRef = useRef<number | null>(null)
+  const voiceAudioCtxRef = useRef<AudioContext | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const attachMenuRef = useRef<HTMLDivElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
@@ -278,6 +282,8 @@ export default function FollowUpView() {
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      if (voiceAnimFrameRef.current) cancelAnimationFrame(voiceAnimFrameRef.current)
+      voiceAudioCtxRef.current?.close().catch(() => {})
       voiceStreamRef.current?.getTracks().forEach(t => t.stop())
     }
   }, [])
@@ -732,7 +738,7 @@ export default function FollowUpView() {
 
     const tempMsg: WhatsAppMessage = {
       id: `temp_${Date.now()}`,
-      body: caption || (type === 'image' ? '[Imagem]' : file.name),
+      body: caption || '',
       fromMe: true,
       timestamp: new Date().toISOString(),
       type: type,
@@ -792,6 +798,33 @@ export default function FollowUpView() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       voiceStreamRef.current = stream
 
+      // Set up Web Audio API analyser for real-time volume
+      const audioCtx = new AudioContext()
+      const source = audioCtx.createMediaStreamSource(stream)
+      const analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 64
+      analyser.smoothingTimeConstant = 0.4
+      source.connect(analyser)
+      voiceAudioCtxRef.current = audioCtx
+      voiceAnalyserRef.current = analyser
+
+      // Animate volume bars from real mic input
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+      const updateBars = () => {
+        analyser.getByteFrequencyData(dataArray)
+        const bars: number[] = []
+        const binCount = dataArray.length
+        const barsCount = 30
+        for (let i = 0; i < barsCount; i++) {
+          const idx = Math.floor((i / barsCount) * binCount)
+          const val = dataArray[idx] / 255
+          bars.push(Math.max(3, val * 24))
+        }
+        setVoiceVolumeBars(bars)
+        voiceAnimFrameRef.current = requestAnimationFrame(updateBars)
+      }
+      voiceAnimFrameRef.current = requestAnimationFrame(updateBars)
+
       const recorder = new MediaRecorder(stream, {
         mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
@@ -816,6 +849,19 @@ export default function FollowUpView() {
     }
   }
 
+  const cleanupVoiceAnalyser = () => {
+    if (voiceAnimFrameRef.current) {
+      cancelAnimationFrame(voiceAnimFrameRef.current)
+      voiceAnimFrameRef.current = null
+    }
+    if (voiceAudioCtxRef.current) {
+      voiceAudioCtxRef.current.close().catch(() => {})
+      voiceAudioCtxRef.current = null
+    }
+    voiceAnalyserRef.current = null
+    setVoiceVolumeBars(new Array(30).fill(4))
+  }
+
   const stopAndSendVoiceRecording = async () => {
     if (!voiceRecorderRef.current || !selectedConversation) return
 
@@ -823,6 +869,7 @@ export default function FollowUpView() {
       clearInterval(recordingTimerRef.current)
       recordingTimerRef.current = null
     }
+    cleanupVoiceAnalyser()
     setIsRecordingVoice(false)
 
     const recorder = voiceRecorderRef.current
@@ -853,7 +900,8 @@ export default function FollowUpView() {
     try {
       const formData = new FormData()
       formData.append('to', selectedConversation.contact_phone)
-      formData.append('file', audioBlob, `voice_${Date.now()}.webm`)
+      const audioFile = new File([audioBlob], `voice_${Date.now()}.ogg`, { type: 'audio/ogg; codecs=opus' })
+      formData.append('file', audioFile)
       formData.append('type', 'audio')
 
       const response = await fetch('/api/whatsapp/send', {
@@ -882,6 +930,7 @@ export default function FollowUpView() {
       clearInterval(recordingTimerRef.current)
       recordingTimerRef.current = null
     }
+    cleanupVoiceAnalyser()
     if (voiceRecorderRef.current?.state === 'recording') {
       voiceRecorderRef.current.stop()
     }
@@ -1547,11 +1596,11 @@ export default function FollowUpView() {
                     {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
                   </span>
                   <div className="flex-1 flex items-center gap-0.5 px-2">
-                    {Array.from({ length: 20 }).map((_, i) => (
+                    {voiceVolumeBars.map((h, i) => (
                       <div
                         key={i}
-                        className="w-1 bg-[#00a884] rounded-full animate-pulse"
-                        style={{ height: `${8 + Math.random() * 16}px`, animationDelay: `${i * 0.05}s` }}
+                        className="w-1 bg-[#00a884] rounded-full transition-[height] duration-75"
+                        style={{ height: `${h}px` }}
                       />
                     ))}
                   </div>
