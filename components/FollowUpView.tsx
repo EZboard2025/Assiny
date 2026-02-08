@@ -900,8 +900,7 @@ export default function FollowUpView() {
     try {
       const formData = new FormData()
       formData.append('to', selectedConversation.contact_phone)
-      const audioFile = new File([audioBlob], `voice_${Date.now()}.ogg`, { type: 'audio/ogg; codecs=opus' })
-      formData.append('file', audioFile)
+      formData.append('file', audioBlob, `voice_${Date.now()}.ogg`)
       formData.append('type', 'audio')
 
       const response = await fetch('/api/whatsapp/send', {

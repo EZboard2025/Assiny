@@ -121,8 +121,18 @@ async function handleMediaMessage(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const base64 = Buffer.from(arrayBuffer).toString('base64')
 
+    // Clean mimetype: remove codec params that can confuse whatsapp-web.js
+    let cleanMimetype = (file.type || 'application/octet-stream').split(';')[0].trim()
+
+    // For voice recordings from browser (webm), use audio/ogg which WhatsApp prefers
+    if (messageType === 'audio' && (cleanMimetype === 'audio/webm' || cleanMimetype === 'audio/ogg')) {
+      cleanMimetype = 'audio/ogg; codecs=opus'
+    }
+
+    console.log(`[WA Send Media] type=${messageType}, mimetype=${cleanMimetype}, size=${file.size}, name=${file.name}`)
+
     const media = new MessageMedia(
-      file.type || 'application/octet-stream',
+      cleanMimetype,
       base64,
       file.name || `media_${Date.now()}`
     )
@@ -140,7 +150,13 @@ async function handleMediaMessage(request: NextRequest) {
       options.sendAudioAsVoice = true
     }
 
-    const sentMsg = await client.sendMessage(chatId, media, options)
+    let sentMsg
+    try {
+      sentMsg = await client.sendMessage(chatId, media, options)
+    } catch (sendErr: any) {
+      console.error(`[WA Send Media] sendMessage failed:`, sendErr?.message || sendErr, JSON.stringify({ mimetype: cleanMimetype, fileSize: file.size, fileName: file.name, options }))
+      throw sendErr
+    }
 
     // Upload to Supabase Storage for consistent display
     const ext = file.name?.split('.').pop() || 'bin'
