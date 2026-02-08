@@ -42,10 +42,13 @@ export async function POST(request: Request) {
         recording_config: {
           transcript: {
             provider: {
-              // Use Recall.ai native transcription
-              recallai_streaming: {
-                language_code: 'pt', // Portuguese
-                mode: 'prioritize_accuracy' // Better quality over speed
+              // Use Deepgram for better Portuguese transcription accuracy
+              deepgram_streaming: {
+                language: 'pt-BR',  // Brazilian Portuguese
+                model: 'nova-2',    // Best accuracy model
+                smart_format: true, // Auto-formatting (numbers, dates, etc.)
+                punctuate: true,    // Add punctuation
+                diarize: true       // Speaker identification
               }
             }
           },

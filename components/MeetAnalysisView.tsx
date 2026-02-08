@@ -122,6 +122,7 @@ export default function MeetAnalysisView() {
   const [session, setSession] = useState<MeetingSession | null>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [isEnding, setIsEnding] = useState(false)
   const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [showEvaluationModal, setShowEvaluationModal] = useState(false)
@@ -345,23 +346,22 @@ export default function MeetAnalysisView() {
       return prev
     })
 
-    // ALWAYS try to fetch from Recall.ai API to get complete transcript
-    console.log(`📡 Buscando transcrição completa da API (local tem ${localTranscriptLength} segmentos)...`)
-    try {
-      const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
-      const data = await response.json()
-      if (data.transcript && data.transcript.length > 0) {
-        // Use API transcript if it has more data than local
-        if (data.transcript.length >= localTranscriptLength) {
+    // Only fetch from API if we have NO local transcript (avoid getting old data)
+    if (localTranscriptLength === 0) {
+      console.log(`📡 Sem transcrição local, buscando da API...`)
+      try {
+        const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
+        const data = await response.json()
+        if (data.transcript && data.transcript.length > 0) {
           transcriptToEvaluate = data.transcript
           setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
-          console.log(`✅ Transcrição da API: ${data.transcript.length} segmentos (melhor que local: ${localTranscriptLength})`)
-        } else {
-          console.log(`📝 Mantendo transcrição local: ${localTranscriptLength} segmentos (API: ${data.transcript.length})`)
+          console.log(`✅ Transcrição da API: ${data.transcript.length} segmentos`)
         }
+      } catch (err) {
+        console.error('Error fetching final transcript:', err)
       }
-    } catch (err) {
-      console.error('Error fetching final transcript:', err)
+    } else {
+      console.log(`📝 Usando transcrição local: ${localTranscriptLength} segmentos`)
     }
 
     // Evaluate if we have transcript
@@ -387,6 +387,7 @@ export default function MeetAnalysisView() {
   const endSession = async () => {
     // Mark as triggered to prevent double-evaluation
     hasTriggeredAutoEvalRef.current = true
+    setIsEnding(true)
     stopPolling()
 
     if (session?.botId) {
@@ -413,25 +414,22 @@ export default function MeetAnalysisView() {
     let transcriptToEvaluate = session?.transcript || []
     const localTranscriptLength = transcriptToEvaluate.length
 
-    // ALWAYS try to fetch from Recall.ai API to get complete transcript
-    if (session?.botId) {
-      console.log(`📡 Buscando transcrição completa da API (local tem ${localTranscriptLength} segmentos)...`)
+    // Only fetch from API if we have NO local transcript (avoid getting old data)
+    if (session?.botId && localTranscriptLength === 0) {
+      console.log(`📡 Sem transcrição local, buscando da API...`)
       try {
         const response = await fetch(`/api/recall/webhook?botId=${session.botId}&fallback=true`)
         const data = await response.json()
         if (data.transcript && data.transcript.length > 0) {
-          // Use API transcript if it has more data than local
-          if (data.transcript.length >= localTranscriptLength) {
-            transcriptToEvaluate = data.transcript
-            setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
-            console.log(`✅ Transcrição da API: ${data.transcript.length} segmentos (melhor que local: ${localTranscriptLength})`)
-          } else {
-            console.log(`📝 Mantendo transcrição local: ${localTranscriptLength} segmentos (API: ${data.transcript.length})`)
-          }
+          transcriptToEvaluate = data.transcript
+          setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
+          console.log(`✅ Transcrição da API: ${data.transcript.length} segmentos`)
         }
       } catch (err) {
         console.error('Error fetching final transcript:', err)
       }
+    } else if (localTranscriptLength > 0) {
+      console.log(`📝 Usando transcrição local: ${localTranscriptLength} segmentos`)
     }
 
     // Only evaluate if there's a transcript
@@ -453,6 +451,8 @@ export default function MeetAnalysisView() {
         console.error('Error cleaning up transcript:', err)
       }
     }
+
+    setIsEnding(false)
   }
 
   // Save evaluation to database
@@ -759,10 +759,24 @@ export default function MeetAnalysisView() {
                   {session.status !== 'ended' && session.status !== 'error' && (
                     <button
                       onClick={endSession}
-                      className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors flex items-center gap-2 border border-red-200"
+                      disabled={isEnding}
+                      className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 border ${
+                        isEnding
+                          ? 'bg-amber-50 text-amber-600 border-amber-200 cursor-not-allowed'
+                          : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
+                      }`}
                     >
-                      <StopCircle className="w-4 h-4" />
-                      Encerrar
+                      {isEnding ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Encerrando...
+                        </>
+                      ) : (
+                        <>
+                          <StopCircle className="w-4 h-4" />
+                          Encerrar
+                        </>
+                      )}
                     </button>
                   )}
                   {(session.status === 'ended' || session.status === 'error') && (

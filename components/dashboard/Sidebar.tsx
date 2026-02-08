@@ -35,7 +35,7 @@ export default function Sidebar({
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
     { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI },
     { icon: MessageSquare, view: 'followup', label: 'WhatsApp IA+', show: true, disabled: true },
-    { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true, disabled: true },
+    { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true },
     { icon: Link2, view: 'roleplay-links', label: 'Links Públicos', show: isAdmin || isGestor },
   ]
 

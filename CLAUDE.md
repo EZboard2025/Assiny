@@ -1000,6 +1000,12 @@ NEXT_PUBLIC_SUPABASE_URL=https://vvqtgclprllryctavqal.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...  # For server-side operations
 OPENAI_API_KEY=sk-...             # For Assistant API
+
+# Google Meet Analysis (Recall.ai + Deepgram)
+RECALL_API_KEY=...                # Recall.ai API key
+RECALL_API_REGION=us-west-2       # Recall.ai region (us-west-2 for pay-as-you-go)
+# NOTE: Deepgram API key must be added in Recall.ai Dashboard, not here
+# Go to: https://app.recall.ai/dashboard → Integrations → Deepgram → Add API Key
 ```
 
 ## SQL Schema Setup Order
