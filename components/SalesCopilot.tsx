@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Send, Copy, ThumbsUp, ThumbsDown, Sparkles, Loader2 } from 'lucide-react'
+import { X, Send, Copy, ThumbsUp, ThumbsDown, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 
 interface WhatsAppConversation {
   id: string
@@ -98,29 +98,75 @@ export default function SalesCopilot({
   }, [authToken])
 
   const formatConversationContext = (): string => {
+    const now = new Date()
+    const clientName = selectedConversation?.contact_name || 'Cliente'
+
     let selected = [...messages]
     if (selected.length > 30) {
       selected = [...selected.slice(0, 5), ...selected.slice(-25)]
     }
-    return selected
-      .filter(m => m.type !== 'reaction' && m.type !== 'e2e_notification')
-      .map(m => {
-        const sender = m.fromMe ? 'Vendedor' : (selectedConversation?.contact_name || 'Cliente')
-        const time = new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        let content = m.body
-        if ((m.type === 'audio' || m.type === 'ptt') && m.transcription) {
-          content = `[Áudio transcrito]: ${m.transcription}`
-        } else if (!content && m.hasMedia) {
-          const mediaLabels: Record<string, string> = {
-            image: 'Imagem enviada', audio: 'Áudio', ptt: 'Áudio',
-            video: 'Vídeo', document: 'Documento', sticker: 'Sticker'
-          }
-          content = `[${mediaLabels[m.type] || m.type}]`
+
+    const filtered = selected.filter(m => m.type !== 'reaction' && m.type !== 'e2e_notification')
+
+    // Build conversation analysis header
+    let analysis = `DATA E HORA ATUAL: ${now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\n`
+
+    if (filtered.length > 0) {
+      const lastMsg = filtered[filtered.length - 1]
+      const lastMsgDate = new Date(lastMsg.timestamp)
+      const diffMs = now.getTime() - lastMsgDate.getTime()
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+      const timeAgo = diffDays > 0 ? `${diffDays} dia(s)` : diffHours > 0 ? `${diffHours} hora(s)` : 'menos de 1 hora'
+
+      analysis += `ULTIMA MENSAGEM: ${lastMsg.fromMe ? 'Vendedor' : clientName}, ha ${timeAgo}\n`
+
+      // Check if seller is being ghosted
+      const lastSellerIdx = [...filtered].reverse().findIndex(m => m.fromMe)
+      const lastClientIdx = [...filtered].reverse().findIndex(m => !m.fromMe)
+
+      if (lastSellerIdx !== -1 && (lastClientIdx === -1 || lastSellerIdx < lastClientIdx)) {
+        // Seller sent last - client hasn't responded
+        const sellerMsg = filtered[filtered.length - 1 - lastSellerIdx]
+        const sellerMsgDate = new Date(sellerMsg.timestamp)
+        const sellerDiffMs = now.getTime() - sellerMsgDate.getTime()
+        const sellerDiffHours = Math.floor(sellerDiffMs / (1000 * 60 * 60))
+        const sellerDiffDays = Math.floor(sellerDiffMs / (1000 * 60 * 60 * 24))
+
+        if (sellerDiffHours > 2) {
+          const vacuoTime = sellerDiffDays > 0 ? `${sellerDiffDays} dia(s)` : `${sellerDiffHours} hora(s)`
+          analysis += `SITUACAO: CLIENTE NAO RESPONDEU a ultima mensagem do vendedor (ha ${vacuoTime}). O vendedor esta tentando retomar contato.\n`
+        } else {
+          analysis += `SITUACAO: Vendedor mandou a ultima mensagem (recente). Aguardando resposta do cliente.\n`
         }
-        if (!content) content = `[${m.type}]`
-        return `[${time}] ${sender}: ${content}`
-      })
-      .join('\n')
+      } else if (lastClientIdx !== -1 && (lastSellerIdx === -1 || lastClientIdx < lastSellerIdx)) {
+        // Client sent last - seller needs to respond
+        analysis += `SITUACAO: Cliente respondeu e aguarda resposta do vendedor (lead QUENTE).\n`
+      }
+    }
+
+    // Format messages with dates
+    const lines = filtered.map(m => {
+      const sender = m.fromMe ? 'Vendedor' : clientName
+      const msgDate = new Date(m.timestamp)
+      const dateStr = msgDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+      const timeStr = msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      let content = m.body
+      if ((m.type === 'audio' || m.type === 'ptt') && m.transcription) {
+        content = `[Áudio transcrito]: ${m.transcription}`
+      } else if (!content && m.hasMedia) {
+        const mediaLabels: Record<string, string> = {
+          image: 'Imagem enviada', audio: 'Áudio', ptt: 'Áudio',
+          video: 'Vídeo', document: 'Documento', sticker: 'Sticker'
+        }
+        content = `[${mediaLabels[m.type] || m.type}]`
+      }
+      if (!content) content = `[${m.type}]`
+      return `[${dateStr} ${timeStr}] ${sender}: ${content}`
+    })
+
+    return analysis + '\n' + lines.join('\n')
   }
 
   const handleSend = async (messageText?: string) => {
@@ -212,6 +258,19 @@ export default function SalesCopilot({
     setTimeout(() => setCopiedId(null), 2000)
   }
 
+  const handleRegenerate = (aiMsgId: string) => {
+    // Find the user message that came before this AI message
+    const aiIndex = copilotMessages.findIndex(m => m.id === aiMsgId)
+    if (aiIndex <= 0) return
+
+    const userMsg = copilotMessages[aiIndex - 1]
+    if (userMsg?.role !== 'user') return
+
+    // Remove the AI message and resend the user question
+    setCopilotMessages(prev => prev.filter(m => m.id !== aiMsgId))
+    handleSend(userMsg.content)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -298,6 +357,14 @@ export default function SalesCopilot({
                       {copiedId === msg.id && (
                         <span className="text-[10px] text-green-400">Copiado!</span>
                       )}
+                      <button
+                        onClick={() => handleRegenerate(msg.id)}
+                        className="p-1 rounded hover:bg-white/10 transition-colors text-[#8696a0]"
+                        title="Gerar outra sugestão"
+                        disabled={isLoading}
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
 
                       {msg.feedbackId && (
                         <>
