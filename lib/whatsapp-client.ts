@@ -45,6 +45,18 @@ function getAuthPath(): string {
   return process.env.WWEBJS_AUTH_PATH || '.wwebjs_auth'
 }
 
+const NOTIFICATION_TYPES = new Set([
+  'e2e_notification', 'notification', 'notification_template',
+  'gp2', 'call_log', 'protocol', 'ciphertext', 'revoked',
+  'groups_v4_invite', 'broadcast_notification', 'group_notification', 'pin_in_chat'
+])
+
+function isNotificationMessage(msg: Message): boolean {
+  if ((msg as any)._data?.isNotification) return true
+  if (NOTIFICATION_TYPES.has(msg.type as string)) return true
+  return false
+}
+
 export function getClientState(userId: string): ClientState | null {
   return clients.get(userId) || null
 }
@@ -228,6 +240,8 @@ export async function initializeClient(userId: string, companyId: string | null)
 
   // Message received
   client.on('message', async (msg: Message) => {
+    // Early filter: skip all notification/system messages at event level
+    if (isNotificationMessage(msg)) return
     console.log(`[WA] Message received from ${msg.from}, status=${state.status}, connectionId=${state.connectionId}`)
     if (state.status !== 'connected' || !state.connectionId) {
       console.log(`[WA] Skipping message - not ready`)
@@ -239,6 +253,7 @@ export async function initializeClient(userId: string, companyId: string | null)
   // Message sent by us
   client.on('message_create', async (msg: Message) => {
     if (!msg.fromMe) return
+    if (isNotificationMessage(msg)) return
     console.log(`[WA] Message sent to ${msg.to}, status=${state.status}, connectionId=${state.connectionId}`)
     if (state.status !== 'connected' || !state.connectionId) {
       console.log(`[WA] Skipping outbound message - not ready`)
