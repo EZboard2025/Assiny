@@ -340,12 +340,15 @@ export async function triggerSync(userId: string): Promise<{ success: boolean; e
 // ============================================
 
 const TTL_CHECK_INTERVAL_MS = 30_000  // Check every 30s
-const TTL_THRESHOLD_MS = 60_000       // Disconnect if no heartbeat for 60s
+const TTL_THRESHOLD_MS = 180_000      // Disconnect if no heartbeat for 3 min (browser throttles bg tabs to ~1x/min)
 
 const reaperInterval = setInterval(async () => {
   const now = Date.now()
 
   for (const [userId, state] of clients.entries()) {
+    // Only reap connected clients — initializing/qr_ready/connecting don't receive heartbeats
+    if (state.status !== 'connected') continue
+
     const elapsed = now - state.lastHeartbeat
 
     if (elapsed > TTL_THRESHOLD_MS) {
