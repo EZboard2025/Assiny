@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         const textForEmbedding = `CONTEXTO:\n${msg.conversation_context.slice(0, 1500)}\n\nMENSAGEM DO VENDEDOR (sem resposta):\n${msg.seller_message}`
 
         const embeddingResponse = await openai.embeddings.create({
-          model: 'text-embedding-ada-002',
+          model: 'text-embedding-3-small',
           input: textForEmbedding.slice(0, 8000)
         })
         const embedding = embeddingResponse.data[0].embedding

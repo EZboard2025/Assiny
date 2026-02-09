@@ -36,38 +36,49 @@ export async function POST(req: NextRequest) {
 
     for (const msg of pendingMessages) {
       try {
-        // 2. Classify with GPT-4o-mini
+        // 2. Classify with GPT-4.1-mini
         const classificationResponse = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4.1-mini',
           messages: [
             {
               role: 'system',
-              content: `Você é um classificador de interações de vendas. Analise a interação vendedor→cliente e classifique o resultado.
+              content: `Você é um classificador expert de interações de vendas no WhatsApp. Analise a interação vendedor→cliente e classifique o resultado considerando:
+
+1. O TOM da resposta do cliente (entusiasmo, indiferença, irritação)
+2. A INTENÇÃO implícita (quer comprar, está avaliando, quer sair)
+3. Se o vendedor AGREGOU VALOR ou apenas cobrou resposta
+4. Se houve AVANÇO no funil de vendas
 
 Responda APENAS com JSON válido, sem markdown:
-{"outcome": "success|failure|partial", "reason": "explicação curta em português"}
+{"outcome": "success|failure|partial", "reason": "explicação curta em português", "quality_score": 1-10}
 
-Critérios:
-- success: cliente respondeu positivamente, aceitou, demonstrou interesse, avançou, agendou, confirmou
-- failure: cliente rejeitou, reclamou, demonstrou desinteresse, pediu para parar, bloqueou
-- partial: cliente respondeu mas sem compromisso claro (pediu mais info, disse "vou pensar", resposta neutra)`
+Critérios detalhados:
+- success (quality_score 7-10): cliente respondeu positivamente, aceitou proposta, demonstrou interesse genuíno, agendou reunião, pediu orçamento, confirmou compra, avançou no funil
+- failure (quality_score 1-3): cliente rejeitou explicitamente, reclamou, demonstrou desinteresse claro, pediu para parar, bloqueou, ignorou proposta de valor
+- partial (quality_score 4-6): cliente respondeu mas sem compromisso claro (pediu mais info, disse "vou pensar", resposta monossilábica neutra, mudou de assunto)
+
+IMPORTANTE: Avalie também a qualidade da abordagem do vendedor:
+- Ele trouxe valor novo ou só cobrou resposta?
+- O tom foi consultivo ou desesperado?
+- A mensagem era personalizada ou genérica?`
             },
             {
               role: 'user',
-              content: `CONTEXTO DA CONVERSA:\n${msg.conversation_context.slice(0, 1500)}\n\nVENDEDOR ENVIOU:\n${msg.seller_message}\n\nCLIENTE RESPONDEU:\n${clientResponse}`
+              content: `CONTEXTO DA CONVERSA:\n${msg.conversation_context.slice(0, 2000)}\n\nVENDEDOR ENVIOU:\n${msg.seller_message}\n\nCLIENTE RESPONDEU:\n${clientResponse}`
             }
           ],
-          max_tokens: 150,
+          max_tokens: 200,
           temperature: 0.1
         })
 
         const rawContent = classificationResponse.choices[0]?.message?.content || ''
-        let classification: { outcome: string; reason: string }
+        let classification: { outcome: string; reason: string; quality_score?: number }
 
         try {
-          classification = JSON.parse(rawContent.replace(/```json?\n?/g, '').replace(/```/g, '').trim())
+          const parsed = JSON.parse(rawContent.replace(/```json?\n?/g, '').replace(/```/g, '').trim())
+          classification = parsed
         } catch {
-          classification = { outcome: 'partial', reason: 'Não foi possível classificar automaticamente' }
+          classification = { outcome: 'partial', reason: 'Não foi possível classificar automaticamente', quality_score: 5 }
         }
 
         // 3. Update seller_message_tracking
@@ -83,10 +94,10 @@ Critérios:
 
         // 4. Save as example (only success or failure, not partial)
         if (classification.outcome === 'success' || classification.outcome === 'failure') {
-          const textForEmbedding = `CONTEXTO:\n${msg.conversation_context.slice(0, 1500)}\n\nMENSAGEM DO VENDEDOR:\n${msg.seller_message}\n\nRESPOSTA DO CLIENTE:\n${clientResponse.slice(0, 500)}`
+          const textForEmbedding = `CONTEXTO:\n${msg.conversation_context.slice(0, 2000)}\n\nMENSAGEM DO VENDEDOR:\n${msg.seller_message}\n\nRESPOSTA DO CLIENTE:\n${clientResponse.slice(0, 500)}\n\nRESULTADO: ${classification.reason}`
 
           const embeddingResponse = await openai.embeddings.create({
-            model: 'text-embedding-ada-002',
+            model: 'text-embedding-3-small',
             input: textForEmbedding.slice(0, 8000)
           })
           const embedding = embeddingResponse.data[0].embedding
@@ -94,7 +105,11 @@ Critérios:
           const tableName = classification.outcome === 'success'
             ? 'followup_examples_success'
             : 'followup_examples_failure'
-          const nota = classification.outcome === 'success' ? 7.5 : 3.0
+          // Dynamic score based on quality_score from GPT-4.1-mini analysis
+          const qualityScore = classification.quality_score || (classification.outcome === 'success' ? 7 : 3)
+          const nota = classification.outcome === 'success'
+            ? Math.min(10, Math.max(6, qualityScore))  // success: 6-10
+            : Math.min(4, Math.max(1, qualityScore))   // failure: 1-4
 
           await supabaseAdmin
             .from(tableName)
@@ -103,7 +118,7 @@ Critérios:
               user_id: msg.user_id,
               tipo_venda: 'WhatsApp',
               canal: 'WhatsApp',
-              content: `ABORDAGEM DO VENDEDOR:\n${msg.seller_message}\n\nCONTEXTO:\n${msg.conversation_context.slice(0, 1000)}\n\nRESULTADO: ${classification.reason}`,
+              content: `ABORDAGEM DO VENDEDOR:\n${msg.seller_message}\n\nCONTEXTO:\n${msg.conversation_context.slice(0, 1500)}\n\nRESPOSTA DO CLIENTE:\n${clientResponse.slice(0, 500)}\n\nRESULTADO: ${classification.reason}`,
               nota_original: nota,
               embedding,
               metadata: {
@@ -113,6 +128,7 @@ Critérios:
                 canal: 'WhatsApp',
                 outcome: classification.outcome,
                 reason: classification.reason,
+                quality_score: qualityScore,
                 tracking_id: msg.id
               }
             })

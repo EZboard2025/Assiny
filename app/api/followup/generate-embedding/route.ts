@@ -55,7 +55,7 @@ ${analysis.transcricao_filtrada}
 
     // 3. Gerar embedding usando OpenAI
     const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-ada-002',
+      model: 'text-embedding-3-small',
       input: textForEmbedding
     })
 

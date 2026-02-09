@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     // 3. Generate embedding for RAG search
     const embeddingText = `${userMessage}\n${conversationContext.slice(-500)}`
     const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-ada-002',
+      model: 'text-embedding-3-small',
       input: embeddingText.slice(0, 8000)
     })
     const queryEmbedding = embeddingResponse.data[0].embedding
@@ -282,9 +282,9 @@ CONTEXTO B2B:
     // Add current user message
     messages.push({ role: 'user', content: userMessage })
 
-    // 7. Call OpenAI GPT-4o
+    // 7. Call OpenAI GPT-4.1
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4.1',
       messages,
       max_tokens: 2000,
       temperature: 0.7
@@ -305,7 +305,7 @@ CONTEXTO B2B:
         conversation_context: conversationContext.slice(0, 5000),
         was_helpful: null,
         metadata: {
-          model: 'gpt-4o',
+          model: 'gpt-4.1',
           success_examples: successExamples.length,
           failure_examples: failureExamples.length,
           company_knowledge: companyKnowledge.length,

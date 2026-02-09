@@ -1254,10 +1254,10 @@ async function transcribeAudioMessage(
     const file = await toFile(mediaBuffer, 'audio.ogg', { type: 'audio/ogg' })
 
     const transcription = await openai.audio.transcriptions.create({
-      model: 'whisper-1',
+      model: 'gpt-4o-mini-transcribe',
       file,
       language: 'pt',
-      prompt: 'Transcrição de áudio de conversa de vendas no WhatsApp em português brasileiro.'
+      prompt: 'Transcrição de áudio de conversa de vendas no WhatsApp em português brasileiro. Nomes de produtos, empresas e termos comerciais devem ser transcritos com precisão.'
     })
 
     const text = transcription.text?.trim()
@@ -1284,21 +1284,28 @@ async function trackSellerMessage(
   content: string,
   msgTimestamp: Date
 ): Promise<void> {
-  // Fetch recent conversation context from DB
+  // Fetch recent conversation context from DB (including transcriptions for audio)
   const { data: recentMsgs } = await supabaseAdmin
     .from('whatsapp_messages')
-    .select('direction, content, message_timestamp')
+    .select('direction, content, message_timestamp, message_type, transcription')
     .eq('contact_phone', contactPhone)
     .eq('user_id', state.userId)
     .order('message_timestamp', { ascending: false })
-    .limit(10)
+    .limit(15)
 
   const context = (recentMsgs || [])
     .reverse()
     .map((m: any) => {
       const sender = m.direction === 'outbound' ? 'Vendedor' : (contactName || 'Cliente')
       const time = new Date(m.message_timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      return `[${time}] ${sender}: ${m.content || '[mídia]'}`
+      // Include audio transcriptions in context
+      let msgContent = m.content || ''
+      if ((m.message_type === 'audio' || m.message_type === 'ptt') && m.transcription) {
+        msgContent = `[Áudio]: ${m.transcription}`
+      } else if (!msgContent && m.message_type) {
+        msgContent = `[${m.message_type}]`
+      }
+      return `[${time}] ${sender}: ${msgContent}`
     })
     .join('\n')
 

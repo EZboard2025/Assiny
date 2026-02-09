@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const textForEmbedding = `CONTEXTO:\n${feedback.conversation_context.slice(0, 2000)}\n\nSUGESTÃO:\n${feedback.ai_suggestion}`
 
     const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-ada-002',
+      model: 'text-embedding-3-small',
       input: textForEmbedding.slice(0, 8000)
     })
     const embedding = embeddingResponse.data[0].embedding
