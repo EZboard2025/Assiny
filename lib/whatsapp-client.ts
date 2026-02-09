@@ -675,14 +675,14 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       contactName = chat.name || 'Grupo'
 
       try {
-        profilePicUrl = await chat.getProfilePicUrl?.() || null
+        profilePicUrl = await state.client.getProfilePicUrl(chatIdSerialized) || null
       } catch {}
     } else {
       const contact = await chat.getContact()
       contactName = contact?.pushname || contact?.name || chat.name || null
 
       try {
-        profilePicUrl = await contact?.getProfilePicUrl() || null
+        profilePicUrl = await state.client.getProfilePicUrl(chat.id._serialized) || null
       } catch {}
 
       const resolved = await resolveContactPhone(chatIdSerialized, contact, state)
@@ -923,6 +923,11 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       contactPhone = chat.id._serialized
       convContactName = chat.name || 'Grupo'
 
+      // Fetch group profile picture
+      try {
+        profilePicUrl = await state.client.getProfilePicUrl(chat.id._serialized) || null
+      } catch {}
+
       // For individual messages, resolve the sender's name
       if (fromMe) {
         contactName = 'Você'
@@ -947,7 +952,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
 
       if (!fromMe) {
         try {
-          profilePicUrl = await contact?.getProfilePicUrl() || null
+          profilePicUrl = await state.client.getProfilePicUrl(chat.id._serialized) || null
         } catch {}
       }
 
