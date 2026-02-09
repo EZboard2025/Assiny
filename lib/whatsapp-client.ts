@@ -48,6 +48,43 @@ function getAuthPath(): string {
   return process.env.WWEBJS_AUTH_PATH || '.wwebjs_auth'
 }
 
+// Clean up stale Chromium state left by abrupt process shutdown (PM2 restart)
+// This prevents "authenticated but never ready" by removing:
+// - SingletonLock (prevents new Chrome from opening profile)
+// - Service Worker cache (can intercept requests and cause stuck loading)
+// - Disk cache (stale assets)
+async function cleanupBrowserState(sessionId: string): Promise<void> {
+  try {
+    const fs = await import('fs')
+    const path = await import('path')
+    const sessionDir = path.join(getAuthPath(), `session-${sessionId}`)
+
+    if (!fs.existsSync(sessionDir)) return
+
+    // Remove SingletonLock — left behind after ungraceful Chrome shutdown
+    const singletonLock = path.join(sessionDir, 'SingletonLock')
+    if (fs.existsSync(singletonLock)) {
+      fs.rmSync(singletonLock, { force: true })
+      console.log(`[WA] Removed stale SingletonLock for ${sessionId}`)
+    }
+
+    // Remove browser cache dirs that cause stuck loading (keep auth session data intact)
+    const defaultDir = path.join(sessionDir, 'Default')
+    if (fs.existsSync(defaultDir)) {
+      const cacheDirs = ['Service Worker', 'Cache', 'Code Cache', 'GPUCache']
+      for (const dir of cacheDirs) {
+        const cachePath = path.join(defaultDir, dir)
+        if (fs.existsSync(cachePath)) {
+          fs.rmSync(cachePath, { recursive: true, force: true })
+        }
+      }
+      console.log(`[WA] Cleared browser cache for ${sessionId}`)
+    }
+  } catch (err) {
+    console.error(`[WA] Error cleaning browser state:`, err)
+  }
+}
+
 const NOTIFICATION_TYPES = new Set([
   'e2e_notification', 'notification', 'notification_template',
   'gp2', 'call_log', 'protocol', 'ciphertext', 'revoked',
@@ -65,6 +102,20 @@ export function getClientState(userId: string): ClientState | null {
 }
 
 export async function initializeClient(userId: string, companyId: string | null): Promise<{ qrCode: string | null; status: string }> {
+  // Kill any orphan Chromium processes left by previous PM2 crash
+  // Only kills processes not owned by any active client in our map
+  if (clients.size === 0) {
+    try {
+      const { execSync } = await import('child_process')
+      const result = execSync('pgrep -f "chromium.*--no-sandbox" || true', { encoding: 'utf8' }).trim()
+      if (result) {
+        console.log(`[WA] Killing orphan Chromium processes: ${result.split('\n').length} found`)
+        execSync('pkill -f "chromium.*--no-sandbox" || true')
+        await new Promise(resolve => setTimeout(resolve, 1000)) // Let processes die
+      }
+    } catch {}
+  }
+
   // If client already exists and is connected, return status
   const existing = clients.get(userId)
   if (existing) {
@@ -106,6 +157,9 @@ export async function initializeClient(userId: string, companyId: string | null)
   console.log(`[WA] Starting initialization for user ${userId}`)
 
   const sessionId = `user_${userId.replace(/-/g, '').substring(0, 16)}`
+
+  // Clean stale browser state left by PM2 restart / ungraceful shutdown
+  await cleanupBrowserState(sessionId)
 
   const client = new Client({
     authStrategy: new LocalAuth({
@@ -187,12 +241,13 @@ export async function initializeClient(userId: string, companyId: string | null)
     if (authFired) return
     authFired = true
 
-    // If ready doesn't fire within 90s, the client is stuck
+    // If ready doesn't fire within 45s, the client is stuck
+    // (when it works, ready fires in 2-5s after authenticated)
     readyTimeout = setTimeout(async () => {
       if (state.status === 'connecting') {
         const timeouts = (readyTimeoutCount.get(userId) || 0) + 1
         readyTimeoutCount.set(userId, timeouts)
-        console.error(`[WA] Ready timeout (90s) for user ${userId} - attempt #${timeouts}`)
+        console.error(`[WA] Ready timeout (45s) for user ${userId} - attempt #${timeouts}`)
 
         state.destroyed = true
         initializingUsers.delete(userId)
@@ -201,15 +256,27 @@ export async function initializeClient(userId: string, companyId: string | null)
         clients.delete(userId)
 
         if (timeouts < 2) {
-          // Auto-retry once (silently reinitialize)
-          console.log(`[WA] Auto-retrying initialization for user ${userId}`)
+          // Auto-retry: clear full session cache to force fresh QR
+          // If browser cache cleanup wasn't enough, the session itself is corrupted
+          console.log(`[WA] Auto-retrying with full session reset for user ${userId}`)
+          try {
+            const fs = await import('fs')
+            const path = await import('path')
+            const sessionPath = path.join(getAuthPath(), `session-${sessionId}`)
+            if (fs.existsSync(sessionPath)) {
+              fs.rmSync(sessionPath, { recursive: true, force: true })
+              console.log(`[WA] Cleared full session cache for fresh QR`)
+            }
+          } catch (e) {
+            console.error(`[WA] Error clearing session:`, e)
+          }
           try {
             await initializeClient(userId, companyId)
           } catch (retryErr) {
             console.error(`[WA] Auto-retry failed for user ${userId}:`, retryErr)
           }
         } else {
-          // Already retried — give up and show error
+          // Already retried with fresh QR — give up and show error
           console.error(`[WA] Giving up after ${timeouts} timeouts for user ${userId}`)
           readyTimeoutCount.delete(userId)
           // Briefly insert error state so frontend polling can detect it
@@ -226,7 +293,7 @@ export async function initializeClient(userId: string, companyId: string | null)
           }, 5000)
         }
       }
-    }, 90000)
+    }, 45000)
   })
 
   // Ready event (fully connected) - guard against duplicate fires
