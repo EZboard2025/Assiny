@@ -675,6 +675,13 @@ async function resolveContactPhone(chatId: string, contact: any, state: ClientSt
 async function processSingleChat(chat: any, state: ClientState, isGroup = false): Promise<void> {
   try {
     const chatIdSerialized = chat.id._serialized || ''
+
+    // Skip LID chats in processSingleChat as defense-in-depth
+    // (they should already be filtered in syncChatHistory, but just in case)
+    if (chatIdSerialized.endsWith('@lid')) {
+      return
+    }
+
     let contactPhone: string
     let contactName: string | null
     let profilePicUrl: string | null = null
@@ -879,10 +886,16 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
     if (state.destroyed) return
 
-    // Include both individual chats and groups, limit to 40
-    const filteredChats = chatIds.slice(0, 40)
+    // Filter OUT @lid chats — getChatById() on LID contacts crashes Puppeteer
+    // (causes "Invariant Violation" and "Execution context destroyed" errors)
+    // LID contacts still work for real-time messages, just skip them during sync
+    const safeChatIds = chatIds.filter(c => !c.id.endsWith('@lid'))
+    const skippedLid = chatIds.length - safeChatIds.length
+
+    // Include both individual chats and groups, limit to 25
+    const filteredChats = safeChatIds.slice(0, 25)
     const groupCount = filteredChats.filter(c => c.isGroup).length
-    console.log(`[WA] Found ${chatIds.length} total chats (${groupCount} groups). Syncing ${filteredChats.length}...`)
+    console.log(`[WA] Found ${chatIds.length} total chats (${skippedLid} LID skipped, ${groupCount} groups). Syncing ${filteredChats.length}...`)
 
     if (filteredChats.length === 0) {
       console.log(`[WA] No chats found for user ${state.userId}`)
@@ -890,8 +903,9 @@ async function syncChatHistory(state: ClientState): Promise<void> {
     }
 
     // Process chats one by one, fetching each chat object individually (lighter than getChats)
+    let contextDead = false
     for (let i = 0; i < filteredChats.length; i++) {
-      if (state.destroyed) { console.log(`[WA] Sync aborted mid-batch for user ${state.userId}`); return }
+      if (state.destroyed || contextDead) { console.log(`[WA] Sync aborted mid-batch for user ${state.userId}`); return }
 
       try {
         const chatInfo = filteredChats[i]
@@ -903,8 +917,14 @@ async function syncChatHistory(state: ClientState): Promise<void> {
         ])
         await processSingleChat(chat, state, chatInfo.isGroup)
       } catch (chatErr: any) {
-        console.error(`[WA] Error processing chat ${filteredChats[i].id}:`, chatErr.message || chatErr)
-        // Continue with next chat instead of failing the entire sync
+        const errMsg = chatErr.message || String(chatErr)
+        console.error(`[WA] Error processing chat ${filteredChats[i].id}:`, errMsg)
+
+        // If Puppeteer context is dead, stop processing remaining chats
+        if (errMsg.includes('Execution context was destroyed') || errMsg.includes('context destroyed') || errMsg.includes('Target closed')) {
+          console.error(`[WA] Puppeteer context dead during sync for user ${state.userId}. Stopping sync.`)
+          contextDead = true
+        }
       }
     }
 
