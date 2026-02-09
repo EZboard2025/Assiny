@@ -591,7 +591,17 @@ function extractMessageContent(msg: Message): { messageType: string; content: st
   } else if (msg.type === 'vcard' || msg.type === 'multi_vcard') {
     messageType = 'contact'
     content = msg.body || '[Contato]'
-  } else if (msg.type === 'e2e_notification' || (msg.type as string) === 'notification' || (msg.type as string) === 'notification_template') {
+  } else if (
+    msg.type === 'e2e_notification' ||
+    (msg.type as string) === 'notification' ||
+    (msg.type as string) === 'notification_template' ||
+    (msg.type as string) === 'gp2' ||           // Group participant add/remove/promote
+    (msg.type as string) === 'call_log' ||
+    (msg.type as string) === 'protocol' ||
+    (msg.type as string) === 'ciphertext' ||     // Encrypted placeholder (not yet decrypted)
+    (msg.type as string) === 'revoked' ||        // Deleted messages
+    (msg.type as string) === 'groups_v4_invite'  // Group invite links
+  ) {
     return null
   } else if ((msg.type as string) === 'interactive' || (msg.type as string) === 'button_reply' || (msg.type as string) === 'list_reply') {
     messageType = 'interactive'
@@ -720,9 +730,13 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       if (isGroup && !msg.fromMe) {
         try {
           const senderContact = await msg.getContact()
-          msgContactName = senderContact?.pushname || senderContact?.name || msg.author || contactName
+          const resolvedName = senderContact?.pushname || senderContact?.name || null
+          // Don't use raw author IDs (like "2377013243905270lid") as display names
+          const authorName = msg.author && !/^\d+(@|$)/.test(msg.author) ? msg.author : null
+          msgContactName = resolvedName || authorName || contactName
         } catch {
-          msgContactName = msg.author || contactName
+          const authorName = msg.author && !/^\d+(@|$)/.test(msg.author) ? msg.author : null
+          msgContactName = authorName || contactName
         }
       }
 
@@ -915,9 +929,15 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       } else {
         try {
           const senderContact = await msg.getContact()
-          contactName = senderContact?.pushname || senderContact?.name || (msg as any).author || convContactName
+          const resolvedName = senderContact?.pushname || senderContact?.name || null
+          // Don't use raw author IDs (like "2377013243905270lid") as display names
+          const author = (msg as any).author
+          const authorName = author && !/^\d+(@|$)/.test(author) ? author : null
+          contactName = resolvedName || authorName || convContactName
         } catch {
-          contactName = (msg as any).author || convContactName
+          const author = (msg as any).author
+          const authorName = author && !/^\d+(@|$)/.test(author) ? author : null
+          contactName = authorName || convContactName
         }
       }
     } else {

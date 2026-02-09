@@ -1575,7 +1575,7 @@ export default function FollowUpView() {
               <div className="space-y-1">
                 {messages
                   .filter(msg => {
-                    const hiddenTypes = ['reaction']
+                    const hiddenTypes = ['reaction', 'e2e_notification', 'notification', 'notification_template', 'gp2', 'call_log', 'protocol', 'ciphertext', 'revoked']
                     return !hiddenTypes.includes(msg.type)
                   })
                   .map((msg, idx, filtered) => {
@@ -1601,8 +1601,8 @@ export default function FollowUpView() {
                             ? 'bg-[#005c4b] rounded-tr-none'
                             : 'bg-[#202c33] rounded-tl-none'
                         } ${msg.id.startsWith('temp_') ? 'opacity-60' : ''}`}>
-                          {/* Group sender name */}
-                          {selectedConversation?.contact_phone.includes('@g.us') && !msg.fromMe && msg.contactName && (
+                          {/* Group sender name (hide raw LID/number IDs) */}
+                          {selectedConversation?.contact_phone.includes('@g.us') && !msg.fromMe && msg.contactName && !/^\d+(@|$)/.test(msg.contactName) && (
                             <p className="text-xs font-medium text-[#00a884] mb-1">{msg.contactName}</p>
                           )}
                           {/* Image */}
