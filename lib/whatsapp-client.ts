@@ -219,9 +219,25 @@ export async function initializeClient(userId: string, companyId: string | null)
 
   clients.set(userId, state)
 
+  // Auth/ready guards — declared before all event handlers so qr handler can reset them
+  let readyTimeout: NodeJS.Timeout | null = null
+  let authFired = false
+  let readyFired = false
+
   // QR Code event
+  // CRITICAL: QR can fire on an already-connected client when the session expires
+  // (e.g. logged out from phone, multi-device limit, server-side invalidation).
+  // We MUST reset auth/ready guards so the re-authentication flow works correctly.
   client.on('qr', async (qr: string) => {
-    console.log(`[WA] QR code generated for user ${userId}`)
+    console.log(`[WA] QR code generated for user ${userId}${authFired ? ' (re-auth needed, resetting guards)' : ''}`)
+
+    // Reset guards so authenticated handler will work again
+    if (authFired) {
+      authFired = false
+      readyFired = false
+      if (readyTimeout) { clearTimeout(readyTimeout); readyTimeout = null }
+    }
+
     try {
       state.qrCode = await QRCode.toDataURL(qr, { width: 256, margin: 2 })
     } catch {
@@ -231,8 +247,6 @@ export async function initializeClient(userId: string, companyId: string | null)
   })
 
   // Authentication event - start a timeout for ready (only once, ignore duplicate fires)
-  let readyTimeout: NodeJS.Timeout | null = null
-  let authFired = false
   client.on('authenticated', () => {
     console.log(`[WA] Authenticated for user ${userId}${authFired ? ' (duplicate, ignoring)' : ''}`)
     state.status = 'connecting'
@@ -297,7 +311,6 @@ export async function initializeClient(userId: string, companyId: string | null)
   })
 
   // Ready event (fully connected) - guard against duplicate fires
-  let readyFired = false
   client.on('ready', async () => {
     if (readyFired || state.destroyed) return
     readyFired = true
