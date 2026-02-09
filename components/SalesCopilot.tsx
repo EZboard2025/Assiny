@@ -25,6 +25,7 @@ interface WhatsAppMessage {
   mimetype?: string | null
   contactName?: string | null
   status?: string
+  transcription?: string | null
 }
 
 interface CopilotMessage {
@@ -107,7 +108,9 @@ export default function SalesCopilot({
         const sender = m.fromMe ? 'Vendedor' : (selectedConversation?.contact_name || 'Cliente')
         const time = new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
         let content = m.body
-        if (!content && m.hasMedia) {
+        if ((m.type === 'audio' || m.type === 'ptt') && m.transcription) {
+          content = `[Áudio transcrito]: ${m.transcription}`
+        } else if (!content && m.hasMedia) {
           const mediaLabels: Record<string, string> = {
             image: 'Imagem enviada', audio: 'Áudio', ptt: 'Áudio',
             video: 'Vídeo', document: 'Documento', sticker: 'Sticker'

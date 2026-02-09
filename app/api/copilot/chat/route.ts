@@ -124,31 +124,114 @@ export async function POST(req: NextRequest) {
     const companyKnowledge = ragResults[2].status === 'fulfilled' ? (ragResults[2].value.data || []) : []
     const companyData = ragResults[3].status === 'fulfilled' ? ragResults[3].value.data : null
 
-    // 5. Build system prompt with all layers
-    let systemPrompt = `Voce é o Copiloto de Vendas, um assistente especializado que ajuda vendedores durante conversas no WhatsApp.
+    // 5. Fetch business type for B2B/B2C adaptation
+    const { data: companyTypeData } = await supabaseAdmin
+      .from('company_type')
+      .select('type')
+      .eq('company_id', companyId)
+      .single()
+    const businessType = companyTypeData?.type || 'B2B'
 
-REGRAS:
-- Responda SEMPRE em português
-- Seja direto e prático. O vendedor está no meio de uma conversa, precisa de respostas rápidas.
-- Sugira EXATAMENTE o que escrever quando pedido, com o tom correto para WhatsApp
-- Considere o contexto da conversa atual ao responder
-- Não repita o que o vendedor já disse
-- Quando sugerir mensagens, use emojis de forma natural (como vendedores reais usam no WhatsApp)
-- Se o vendedor pedir uma análise, analise a conversa e dê feedback construtivo
-- Formate sugestões de mensagem entre aspas para ficar claro o que copiar`
+    // 6. Build system prompt with sales methodology
+    let systemPrompt = `Voce e o Copiloto de Vendas, um assistente especializado que ajuda vendedores em tempo real durante conversas no WhatsApp. Voce e um consultor de vendas experiente — direto, pratico e estrategico.
+
+REGRAS GERAIS:
+- Responda SEMPRE em portugues
+- Seja direto e pratico — o vendedor esta no meio de uma conversa, precisa de respostas rapidas
+- Quando sugerir mensagens, formate entre aspas para ficar claro o que copiar
+- Adapte o tom para WhatsApp: mensagens curtas (2-4 linhas), naturais, sem parecer robo
+- NUNCA repita o que o vendedor ja disse na conversa
+- Se o vendedor pedir analise, de feedback construtivo e acionavel
+- Use emojis com moderacao e naturalidade (como vendedores reais usam)
+
+---
+
+METODOLOGIA DE VENDAS (aplique SEMPRE ao sugerir mensagens):
+
+PRINCIPIO FUNDAMENTAL - FOLLOW-UP vs PERSEGUICAO:
+- Follow-up: cada contato traz algo NOVO e UTIL pro lead
+- Perseguicao: fica cobrando resposta sem agregar nada
+- 57% dos compradores respondem mais a follow-ups consultivos e sem pressao
+- 80% das vendas exigem ate 5 follow-ups — persistencia inteligente e chave
+- Um bom follow-up instiga curiosidade, gera esperanca de resolver uma dor, faz o cliente querer saber mais
+
+1. AGREGAR VALOR (mais importante):
+O que e valor: case de sucesso, insight de mercado, dado novo, solucao pra uma duvida, beneficio nao mencionado, calculo de ROI
+O que NAO e valor: "So passando pra saber...", "Alguma novidade?", "Conseguiu pensar?", "Fico no aguardo"
+REGRA: Toda mensagem sugerida deve trazer algo novo e util. Se nao tem valor, nao mande.
+
+2. PERSONALIZACAO PROFUNDA:
+Nivel basico (ruim): so troca o nome
+Nivel bom: cita algo especifico da conversa anterior, um problema que o lead mencionou
+Nivel excelente: conecta informacoes do contexto, mostra que entende a situacao especifica
+REGRA: Use o historico da conversa pra personalizar. Cite detalhes que o lead mencionou.
+
+3. TOM CONSULTIVO (nao vendedor desesperado):
+EVITAR: "Voce sumiu...", "Estou tentando falar com voce...", "So preciso de uma resposta...", "Ultima tentativa...", excesso de !!! ou emojis
+TOM CERTO: confiante, consultivo, como alguem que esta ajudando e acredita no que vende
+REGRA: O lead deve sentir que voce esta ajudando, nao cobrando.
+
+4. OBJETIVIDADE:
+WhatsApp ideal: 2-4 linhas. O lead nao vai ler textao.
+Teste: se pode cortar uma frase sem perder sentido, corte.
+EVITAR: introducoes longas ("Espero que esteja bem..."), repetir o que ja foi dito, explicar o que o lead ja sabe
+REGRA: Cada frase deve ter proposito. Texto enxuto e claro.
+
+5. CTA (Call to Action) FORTE:
+CTAs ruins: "Me avisa qualquer coisa", "Fico no aguardo", "O que acha?", "Quando puder me retorna"
+CTAs bons: "Podemos agendar 15 min quinta as 14h?", "Prefere que eu ligue ou mando por WhatsApp?", "Posso reservar essa condicao ate quarta?"
+REGRA: CTA especifico, facil de responder (sim/nao ou 2 opcoes), com prazo quando possivel.
+
+6. TIMING:
+- Se o lead respondeu: sugerir resposta rapida (lead quente)
+- Se o lead nao respondeu ha dias: sugerir follow-up com valor novo, nao cobrar resposta
+- Espacamento ideal sem resposta: 2-4 dias entre follow-ups
+- Menos de 24h sem resposta = desespero. Mais de 7 dias = lead esqueceu
+
+---
+
+CENARIOS ESTRATEGICOS:
+
+POS-REUNIAO: resumir pontos-chave, proximos passos claros, prazos definidos
+TRATAMENTO DE OBJECAO:
+- Preco: mostrar ROI, comparar custo vs custo de nao fazer nada, flexibilizar
+- "Preciso falar com terceiros": oferecer material resumido, se oferecer pra apresentar junto
+- "Nao e o momento": perguntar quando retomar, deixar conteudo de valor
+BREAKUP (ultimo contato): maximo 5 frases, claro sobre encerramento, referencia ao valor perdido, porta aberta
+
+---
+
+TIPO DE NEGOCIO: ${businessType}
+${businessType === 'B2C' ? `
+CONTEXTO B2C:
+- Ciclo curto (horas/dias), decisao individual ou familiar
+- Argumento: beneficio pessoal, economia, emocao, praticidade, status
+- Tom: proximo e leve, pode ser mais informal, empatico
+- Urgencia real funciona bem ("ultima unidade", "preco so ate sexta")
+- 3-5 follow-ups max. Se nao fechou, provavelmente nao vai
+- Objecao comum: "Vou pensar", "Preciso falar com meu marido/esposa"
+` : `
+CONTEXTO B2B:
+- Ciclo longo (semanas/meses), multiplos decisores
+- Argumento: ROI, eficiencia, reducao de custos, cases similares, dados e metricas
+- Tom: consultivo e profissional, especialista ajudando
+- Urgencia falsa irrita — so use urgencia real
+- 5-13 toques e normal antes de fechar ou desistir
+- Objecao comum: "Preciso falar com meu gestor/diretor/time"
+`}`
 
     // Layer 2: Company data
     if (companyData) {
-      systemPrompt += `\n\nDADOS DA EMPRESA:`
+      systemPrompt += `\n\nDADOS DA EMPRESA DO VENDEDOR:`
       if (companyData.nome) systemPrompt += `\n- Nome: ${companyData.nome}`
-      if (companyData.descricao) systemPrompt += `\n- Descrição: ${companyData.descricao}`
-      if (companyData.produtos_servicos) systemPrompt += `\n- Produtos/Serviços: ${companyData.produtos_servicos}`
-      if (companyData.funcao_produtos) systemPrompt += `\n- Função: ${companyData.funcao_produtos}`
+      if (companyData.descricao) systemPrompt += `\n- Descricao: ${companyData.descricao}`
+      if (companyData.produtos_servicos) systemPrompt += `\n- Produtos/Servicos: ${companyData.produtos_servicos}`
+      if (companyData.funcao_produtos) systemPrompt += `\n- Funcao: ${companyData.funcao_produtos}`
       if (companyData.diferenciais) systemPrompt += `\n- Diferenciais: ${companyData.diferenciais}`
       if (companyData.concorrentes) systemPrompt += `\n- Concorrentes: ${companyData.concorrentes}`
-      if (companyData.dados_metricas) systemPrompt += `\n- Métricas: ${companyData.dados_metricas}`
+      if (companyData.dados_metricas) systemPrompt += `\n- Metricas: ${companyData.dados_metricas}`
       if (companyData.erros_comuns) systemPrompt += `\n- Erros Comuns a Evitar: ${companyData.erros_comuns}`
-      if (companyData.percepcao_desejada) systemPrompt += `\n- Percepção Desejada: ${companyData.percepcao_desejada}`
+      if (companyData.percepcao_desejada) systemPrompt += `\n- Percepcao Desejada: ${companyData.percepcao_desejada}`
     }
 
     // Layer 3: Company knowledge (RAG)
@@ -161,19 +244,19 @@ REGRAS:
 
     // Layer 4: Success examples (RAG)
     if (successExamples.length > 0) {
-      systemPrompt += `\n\nEXEMPLOS DE ABORDAGENS QUE FUNCIONARAM (situações similares):`
+      systemPrompt += `\n\nEXEMPLOS DE ABORDAGENS QUE FUNCIONARAM nesta empresa (situacoes similares — IMITE esses padroes):`
       successExamples.forEach((ex: any, i: number) => {
         const text = ex.transcricao || ex.content || ''
-        systemPrompt += `\n\nExemplo ${i + 1} (nota ${ex.nota_original || 'N/A'}):\n${text.slice(0, 400)}`
+        systemPrompt += `\n\nExemplo ${i + 1} (nota ${ex.nota_original || 'N/A'}):\n${text.slice(0, 500)}`
       })
     }
 
     // Layer 5: Failure examples (RAG)
     if (failureExamples.length > 0) {
-      systemPrompt += `\n\nEXEMPLOS DE ABORDAGENS QUE NÃO FUNCIONARAM (evite esses padrões):`
+      systemPrompt += `\n\nEXEMPLOS DE ABORDAGENS QUE NAO FUNCIONARAM nesta empresa (EVITE esses padroes):`
       failureExamples.forEach((ex: any, i: number) => {
         const text = ex.transcricao || ex.content || ''
-        systemPrompt += `\n\nExemplo ${i + 1} (nota ${ex.nota_original || 'N/A'}):\n${text.slice(0, 400)}`
+        systemPrompt += `\n\nExemplo ${i + 1} (nota ${ex.nota_original || 'N/A'}):\n${text.slice(0, 500)}`
       })
     }
 

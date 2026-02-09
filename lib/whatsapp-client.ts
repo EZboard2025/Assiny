@@ -5,6 +5,9 @@
 import { Client, LocalAuth, Message } from 'whatsapp-web.js'
 import { createClient } from '@supabase/supabase-js'
 import QRCode from 'qrcode'
+import OpenAI, { toFile } from 'openai'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -823,6 +826,11 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
             })
 
           console.log(`[WA] Media saved: ${mediaId}`)
+
+          // Fire-and-forget: transcribe audio messages via Whisper
+          if (messageType === 'audio') {
+            transcribeAudioMessage(buffer, msg.id._serialized, state.userId).catch(() => {})
+          }
         }
       } catch (err) {
         console.error('[WA] Failed to download/save media:', err)
@@ -897,6 +905,38 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     }
   } catch (error) {
     console.error(`[WA] Error handling message:`, error)
+  }
+}
+
+// === AUDIO TRANSCRIPTION (Whisper) ===
+
+async function transcribeAudioMessage(
+  mediaBuffer: Buffer,
+  messageId: string,
+  userId: string
+): Promise<void> {
+  try {
+    const file = await toFile(mediaBuffer, 'audio.ogg', { type: 'audio/ogg' })
+
+    const transcription = await openai.audio.transcriptions.create({
+      model: 'whisper-1',
+      file,
+      language: 'pt',
+      prompt: 'Transcrição de áudio de conversa de vendas no WhatsApp em português brasileiro.'
+    })
+
+    const text = transcription.text?.trim()
+    if (!text) return
+
+    await supabaseAdmin
+      .from('whatsapp_messages')
+      .update({ transcription: text })
+      .eq('wa_message_id', messageId)
+      .eq('user_id', userId)
+
+    console.log(`[WA] Transcribed audio ${messageId}: ${text.substring(0, 80)}...`)
+  } catch (err: any) {
+    console.error(`[WA] Transcription failed for ${messageId}:`, err.message || err)
   }
 }
 

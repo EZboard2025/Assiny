@@ -139,7 +139,8 @@ export async function GET(request: NextRequest) {
           mediaId: mediaId,
           mimetype: msg.media_mime_type,
           contactName: msg.contact_name,
-          status: msg.status
+          status: msg.status,
+          transcription: msg.transcription || null
         }
       })
     })

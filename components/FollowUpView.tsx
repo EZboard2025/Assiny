@@ -70,6 +70,7 @@ interface WhatsAppMessage {
   mimetype?: string | null
   contactName?: string | null
   status?: string
+  transcription?: string | null
 }
 
 type ConnectionStatus = 'disconnected' | 'initializing' | 'qr_ready' | 'connecting' | 'connected'
