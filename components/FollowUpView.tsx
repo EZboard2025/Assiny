@@ -322,20 +322,41 @@ export default function FollowUpView() {
   }, [])
 
   // Disconnect WhatsApp when page unloads/refreshes
+  // Check for existing active connection on mount (survives page refresh)
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (connectionStatus === 'connected' && authToken) {
-        // Use sendBeacon for reliable delivery during page unload
-        navigator.sendBeacon('/api/whatsapp/disconnect', JSON.stringify({ token: authToken }))
+    if (!authToken) return
+
+    const checkExistingConnection = async () => {
+      try {
+        const response = await fetch('/api/whatsapp/status', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+        const data = await response.json()
+
+        if (data.connected && data.status === 'active') {
+          console.log('[WA] Reconnecting to existing session:', data.phone_number)
+          setConnectionStatus('connected')
+          setPhoneNumber(data.phone_number || null)
+
+          // Send heartbeat to reset TTL timer
+          fetch('/api/whatsapp/heartbeat', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }).catch(() => {})
+
+          // Load conversations
+          loadConversations()
+        }
+      } catch (err) {
+        console.warn('[WA] Could not check existing connection:', err)
       }
     }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
+    // Only check if currently disconnected (don't interfere if already connecting)
+    if (connectionStatus === 'disconnected') {
+      checkExistingConnection()
     }
-  }, [connectionStatus, authToken])
+  }, [authToken])
 
   // Heartbeat: keep server-side WhatsApp session alive
   useEffect(() => {
