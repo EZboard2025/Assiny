@@ -570,6 +570,12 @@ async function ensureValidConnectionId(state: ClientState): Promise<string | nul
 
 // Helper to extract message content
 function extractMessageContent(msg: Message): { messageType: string; content: string; mediaMimeType: string | null } | null {
+  // Universal catch-all: whatsapp-web.js marks all system/notification messages
+  // (group creation, subject changes, encryption notices, participant changes, etc.)
+  if ((msg as any)._data?.isNotification) {
+    return null
+  }
+
   let messageType = 'text'
   let mediaMimeType: string | null = null
   let content = msg.body || ''
@@ -611,7 +617,10 @@ function extractMessageContent(msg: Message): { messageType: string; content: st
     (msg.type as string) === 'protocol' ||
     (msg.type as string) === 'ciphertext' ||     // Encrypted placeholder (not yet decrypted)
     (msg.type as string) === 'revoked' ||        // Deleted messages
-    (msg.type as string) === 'groups_v4_invite'  // Group invite links
+    (msg.type as string) === 'groups_v4_invite' || // Group invite links
+    (msg.type as string) === 'broadcast_notification' ||
+    (msg.type as string) === 'group_notification' ||
+    (msg.type as string) === 'pin_in_chat'
   ) {
     return null
   } else if ((msg.type as string) === 'interactive' || (msg.type as string) === 'button_reply' || (msg.type as string) === 'list_reply') {
