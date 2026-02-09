@@ -38,6 +38,9 @@ const initializingUsers = new Set<string>()
 const lastInitAttempt = new Map<string, number>()
 const INIT_COOLDOWN_MS = 15_000 // Wait 15s between init attempts after failure
 
+// Track consecutive ready-timeouts per user (for auto-retry logic)
+const readyTimeoutCount = new Map<string, number>()
+
 // Cache for contact phone lookups (chatId -> contactPhone)
 const contactPhoneCache = new Map<string, string>()
 
@@ -173,35 +176,57 @@ export async function initializeClient(userId: string, companyId: string | null)
     state.status = 'qr_ready'
   })
 
-  // Authentication event - start a timeout for ready
+  // Authentication event - start a timeout for ready (only once, ignore duplicate fires)
   let readyTimeout: NodeJS.Timeout | null = null
+  let authFired = false
   client.on('authenticated', () => {
-    console.log(`[WA] Authenticated for user ${userId}`)
+    console.log(`[WA] Authenticated for user ${userId}${authFired ? ' (duplicate, ignoring)' : ''}`)
     state.status = 'connecting'
 
-    // If ready doesn't fire within 180s, the client is stuck (VPS with many chats can be slow)
-    if (readyTimeout) clearTimeout(readyTimeout)
+    // Only set timeout on first authenticated event — duplicates should not reset the timer
+    if (authFired) return
+    authFired = true
+
+    // If ready doesn't fire within 90s, the client is stuck
     readyTimeout = setTimeout(async () => {
       if (state.status === 'connecting') {
-        console.error(`[WA] Ready timeout for user ${userId} - destroying stuck client`)
+        const timeouts = (readyTimeoutCount.get(userId) || 0) + 1
+        readyTimeoutCount.set(userId, timeouts)
+        console.error(`[WA] Ready timeout (90s) for user ${userId} - attempt #${timeouts}`)
+
         state.destroyed = true
-        state.status = 'error'
-        state.error = 'Conexao travou. Tente novamente.'
         initializingUsers.delete(userId)
-        lastInitAttempt.delete(userId) // Clear cooldown so user can retry immediately
+        lastInitAttempt.delete(userId)
         try { await client.destroy() } catch {}
+        clients.delete(userId)
 
-        // Keep error state visible to polling for 5s before removing from map
-        setTimeout(() => {
-          const current = clients.get(userId)
-          if (current === state) clients.delete(userId)
-        }, 5000)
-
-        // Do NOT delete session cache — auth succeeded, the session is valid.
-        // Only clear cache on auth_failure events (actual corruption).
-        // This way, retry will use cached session and skip QR scan.
+        if (timeouts < 2) {
+          // Auto-retry once (silently reinitialize)
+          console.log(`[WA] Auto-retrying initialization for user ${userId}`)
+          try {
+            await initializeClient(userId, companyId)
+          } catch (retryErr) {
+            console.error(`[WA] Auto-retry failed for user ${userId}:`, retryErr)
+          }
+        } else {
+          // Already retried — give up and show error
+          console.error(`[WA] Giving up after ${timeouts} timeouts for user ${userId}`)
+          readyTimeoutCount.delete(userId)
+          // Briefly insert error state so frontend polling can detect it
+          const errorState: ClientState = {
+            client, userId, companyId, connectionId: null,
+            qrCode: null, status: 'error', syncStatus: 'pending',
+            error: 'Conexão travou. Tente novamente.', phoneNumber: null,
+            lastHeartbeat: 0, destroyed: true
+          }
+          clients.set(userId, errorState)
+          setTimeout(() => {
+            const current = clients.get(userId)
+            if (current === errorState) clients.delete(userId)
+          }, 5000)
+        }
       }
-    }, 180000)
+    }, 90000)
   })
 
   // Ready event (fully connected) - guard against duplicate fires
@@ -216,6 +241,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     state.lastHeartbeat = Date.now()
     initializingUsers.delete(userId)
     lastInitAttempt.delete(userId) // Clear backoff on successful connection
+    readyTimeoutCount.delete(userId) // Clear timeout counter on success
 
     const info = client.info
     state.phoneNumber = info?.wid?.user || null
