@@ -22,26 +22,33 @@ Assiny is a **multi-tenant SaaS** internal sales training platform with AI-power
 
 ## Tech Stack
 
-- **Next.js 14** with App Router and TypeScript
+- **Next.js 16** with App Router and TypeScript
 - **Supabase** for authentication, PostgreSQL database, and storage
 - **N8N** for workflow automation (TTS, transcription, evaluation, chat memory)
-- **OpenAI** Assistants API for roleplay chat, Whisper for transcription, Embeddings for documents
+- **OpenAI** GPT-4o for copilot/analysis, Assistants API for roleplay, Whisper for transcription, Embeddings (ada-002) for RAG
+- **whatsapp-web.js 1.34.6** + **Puppeteer** for WhatsApp integration (browser automation, not Cloud API)
 - **LangChain** Postgres Chat Memory for conversation persistence
 - **Tailwind CSS** for styling
 - **pgvector** extension for semantic document search
+- **Recall.ai** + **Deepgram** for Google Meet transcription analysis
 
 ## Development Commands
 
 ```bash
 # Development
-npm run dev          # Start dev server at localhost:3000
+npm run dev              # Start dev server at localhost:3000
+npm run dev:https        # HTTPS mode (for testing secure contexts)
+npm run dev:network      # Bind to 0.0.0.0 (remote device access)
 
 # Production
-npm run build        # Build for production
-npm run start        # Run production build
+npm run build            # Build for production
+npm run start            # Run production build
+npm run start:network    # Production with 0.0.0.0
 
 # Code quality
-npm run lint         # Run ESLint
+npm run lint             # Run ESLint
+
+# Note: postinstall runs `node scripts/patch-wwebjs.js` (patches whatsapp-web.js)
 ```
 
 ### Local Multi-Tenant Development
@@ -101,6 +108,38 @@ Add these lines:
    - Stored in `pdis` table with 1-week cooldown between generations
    - Displays diagnostics, SPIN radar chart, goals, actions, and next steps
 6. **History & Profile**: Users review past sessions with transcripts, metrics, and consolidated analytics
+7. **WhatsApp Integration** (`FollowUpView.tsx` + `lib/whatsapp-client.ts`):
+   - Uses **whatsapp-web.js** (browser automation via Puppeteer), NOT Meta's Cloud API
+   - Per-user client instances with QR code authentication and LocalAuth session caching
+   - Client lifecycle: `initializing` → `qr_ready` → `connecting` → `connected`
+   - Real-time message sync: messages saved to `whatsapp_messages` on receive/send
+   - Chat history sync: lightweight Store.Chat evaluation (not `getChats()`) for 40 most recent chats
+   - Media handling: images, audio, video, documents with Supabase Storage
+   - Audio voice messages: WebM→WAV→OGG/Opus conversion via ffmpeg (WhatsApp mobile requires OGG/Opus 16kHz mono)
+   - Anti-ban: typing simulation + random delays (2-4s text, 1-2s media) before sending
+   - TTL reaper: auto-disconnects stale clients after 3 min without heartbeat (soft reap preserves session)
+   - Browser health check: periodic `page.evaluate(() => 1)` detects broken Puppeteer contexts
+   - Audio transcription: Whisper auto-transcribes incoming voice messages
+8. **Sales Copilot AI** (`SalesCopilot.tsx` + `app/api/copilot/`):
+   - Floating AI chat panel for real-time WhatsApp conversation assistance
+   - RAG pipeline: embeddings → `match_followup_examples()` + `match_company_knowledge()` → GPT-4o
+   - Auto-learning: tracks all seller messages → classifies client responses (GPT-4o-mini) → saves as success/failure examples
+   - No-response detection: marks messages with no reply after 24h as failure
+   - Manual feedback loop: 👍/👎 on suggestions saves directly to success/failure example tables
+   - Costs 1 credit per message
+9. **Daily Challenges / Desafios** (`components/Challenge/`, `app/desafio/`):
+   - AI-generated personalized daily roleplay challenges targeting SPIN weaknesses
+   - One challenge per day (UNIQUE constraint on user_id + challenge_date)
+   - Tracks effectiveness over time (`challenge_effectiveness` table)
+   - Enabled per-company via `companies.daily_challenges_enabled`
+10. **Google Meet Analysis** (`app/api/meet/evaluate/`):
+    - Recall.ai API extracts meeting transcription, Deepgram for PT-BR accuracy
+    - Ultra-strict SPIN evaluation (scores 7-10 are rare; 5-6 = competent)
+    - Same output structure as roleplay evaluations
+11. **Follow-Up Analysis** (`app/api/followup/analyze/`):
+    - Evaluates WhatsApp follow-up messages with detailed scoring (6 criteria)
+    - Auto-saves high-scoring examples (≥7.5) to `followup_examples_success` with embeddings for RAG
+    - Costs 1 credit per analysis
 
 ### Database Schema
 
@@ -156,6 +195,28 @@ Add these lines:
   - 100% cleared and regenerated when company_data is updated
   - Uses `match_company_knowledge()` function for semantic search
   - Compatible with N8N Supabase Vector Store (uses standard table name)
+- `whatsapp_connections` - Per-user WhatsApp client sessions
+  - Columns: `user_id`, `company_id`, `phone_number_id`, `display_phone_number`, `status` (active/disconnected), `connected_at`
+  - FK integrity: messages reference `connection_id` — use UPDATE (not DELETE) on disconnect to preserve messages
+- `whatsapp_messages` - All WhatsApp messages (inbound + outbound)
+  - Columns: `connection_id`, `user_id`, `wa_message_id`, `contact_phone`, `contact_name`, `direction`, `message_type`, `content`, `media_id`, `message_timestamp`, `transcription`, `raw_payload` (JSONB)
+  - `raw_payload` stores: `original_chat_id`, `is_lid`, `is_group`, `hasMedia`
+  - RLS: users see only their own messages
+- `whatsapp_conversations` - Conversation summaries (one per contact per connection)
+  - UNIQUE constraint on `(connection_id, contact_phone)` for upsert
+  - Tracks `last_message_at`, `last_message_preview`, `unread_count`, `profile_pic_url`
+- `copilot_feedback` - Copilot interaction logs with optional 👍/👎 feedback
+  - `was_helpful` (boolean | null) — null = no feedback yet
+- `seller_message_tracking` - Auto-tracks all outbound seller messages for outcome analysis
+  - `outcome` (success | failure | partial | null) — null = pending analysis
+  - `saved_as_example` — whether it was already saved to followup_examples tables
+- `followup_analyses` - Follow-up message evaluations with detailed scoring
+- `followup_examples_success` / `followup_examples_failure` - RAG examples with embeddings (VECTOR 1536)
+  - Used by `match_followup_examples()` for semantic search in Copilot and Follow-Up Analysis
+- `daily_challenges` - Daily personalized roleplay challenges
+  - `challenge_config` (JSONB) with roleplay settings, success criteria, coaching tips
+  - UNIQUE on `(user_id, challenge_date)`
+- `challenge_effectiveness` - Tracks improvement for each target weakness over time
 - `knowledge_base` - SPIN/psychology content (category, title, content)
 - `customer_segments` - (Legacy, replaced by personas)
 - `company_type` - Business type configuration (B2B or B2C)
@@ -195,6 +256,29 @@ Add these lines:
   - Deletes all old embeddings, creates 8 new chunks
   - Uses OpenAI text-embedding-ada-002 model
 - `/api/company/search` - Semantic search test endpoint (for debugging)
+
+**WhatsApp:**
+- `/api/whatsapp/connect` - POST: Initialize client + QR code; GET: Poll status
+- `/api/whatsapp/status` - GET: Check connection status (in-memory + DB fallback)
+- `/api/whatsapp/disconnect` - POST: Logout and destroy client
+- `/api/whatsapp/heartbeat` - POST: Keep-alive signal (frontend sends every 20s)
+- `/api/whatsapp/conversations` - GET: List conversations (deduplicated by phone/name)
+- `/api/whatsapp/messages` - GET: Fetch messages for a contact (supports phone normalization, LID contacts, groups)
+- `/api/whatsapp/send` - POST: Send text or media messages (multipart/form-data for media)
+- `/api/whatsapp/sync` - POST: Manually trigger chat sync
+- `/api/whatsapp/media/[mediaId]` - GET: Download media from Supabase Storage
+
+**Copilot:**
+- `/api/copilot/chat` - POST: AI suggestion with RAG pipeline (1 credit)
+- `/api/copilot/feedback` - POST: 👍/👎 feedback → saves to success/failure examples with embedding
+- `/api/copilot/analyze-outcome` - POST: Auto-classify client response (GPT-4o-mini, non-blocking)
+- `/api/copilot/check-no-response` - POST: Detect seller messages with no reply >24h → mark as failure
+
+**Follow-Up:**
+- `/api/followup/analyze` - POST: Evaluate follow-up message with detailed scoring (1 credit)
+
+**Meet:**
+- `/api/meet/evaluate` - POST: SPIN evaluation of meeting transcription (ultra-strict scoring)
 
 **Other:**
 - `/api/evaluate-quality` - Quality evaluation endpoint
@@ -391,7 +475,32 @@ if (Array.isArray(result) && result[0]?.output) {
     - Próximos Passos (final guidance)
   - Empty state shows placeholder structure before generation
 
+- `FollowUpView.tsx` - **WhatsApp chat interface** (largest component, ~2000+ lines)
+  - Full WhatsApp-style chat UI with dark theme (`#111b21`)
+  - Connection flow: disconnected → initializing → qr_ready → connecting → connected
+  - Left sidebar (400px): conversation list with search, profile pics, unread badges
+  - Main content: message thread with media support (images, audio player, documents)
+  - Input bar: text input, emoji picker, voice recording, file attachment
+  - Polls `/api/whatsapp/connect` every 2s during initialization
+  - Heartbeat every 20s when connected
+  - Renders `SalesCopilot` as floating overlay when conversation is selected
+  - `loadConversations(showSpinner)` — only first call shows full spinner; retries are silent
+
+- `SalesCopilot.tsx` - **AI assistant floating panel** for WhatsApp conversations
+  - 400px slide-in panel from right, z-[60], WhatsApp dark theme
+  - Quick suggestions: "O que responder?", "Analise conversa", "Como fechar?", "Sugira follow-up"
+  - Context formatting: last 30 messages with smart truncation (5 first + 25 last if >30)
+  - Resets on conversation change
+  - Copy button + feedback (👍/👎) on each AI response
+
 **Libraries:**
+- `lib/whatsapp-client.ts` - **WhatsApp client singleton** (server-side only)
+  - Manages per-user Puppeteer/WhatsApp instances
+  - Exports: `initializeClient()`, `disconnectClient()`, `getClientState()`, `getConnectedClient()`, `updateHeartbeat()`, `triggerSync()`
+  - Internal: `syncChatHistory()`, `handleIncomingMessage()`, `reapClient()`, `checkBrowserHealth()`, `ensureValidConnectionId()`
+  - TTL reaper runs on `setInterval` — auto-disconnects stale clients
+  - Copilot hooks: `trackSellerMessage()`, `triggerOutcomeAnalysis()` (fire-and-forget, non-blocking)
+- `lib/whatsapp-api.ts` - WhatsApp utility functions (`jidToPhone`, `phoneToJid`, `formatPhoneDisplay`)
 - `lib/roleplay.ts` - Session CRUD operations
 - `lib/config.ts` - Configuration management (personas, objections, etc.)
   - All functions use `getCompanyId()` for subdomain-based company detection
@@ -401,6 +510,7 @@ if (Array.isArray(result) && result[0]?.output) {
   - `getCompanyIdFromSubdomain()` - Detects company from URL subdomain
   - `getCompanyId()` - Smart function that prioritizes subdomain over user's company
   - Used throughout the app for data isolation
+- `lib/types/plans.ts` - Credit/plan system types and configuration constants
 
 ## Important Patterns
 
@@ -897,6 +1007,77 @@ The persona evaluation results display in a side panel (500px width) that slides
 - Compact design with small fonts (10px-14px) to fit all content without scroll issues
 - Color-coded sections: green (positive), orange (needs work), blue (suggestions), purple (SPIN)
 
+### WhatsApp Client Lifecycle Pattern
+
+**Key files:** `lib/whatsapp-client.ts` (server singleton), `components/FollowUpView.tsx` (UI), `app/api/whatsapp/connect/route.ts`
+
+**Connection flow:**
+1. User clicks "Conectar" → POST `/api/whatsapp/connect` → `initializeClient()` creates Puppeteer client
+2. Client emits `qr` → QR code shown in UI (polling every 2s via GET `/api/whatsapp/connect`)
+3. User scans QR → `authenticated` event → status becomes `connecting`
+4. WhatsApp loads chats → `ready` event → status becomes `connected` (timeout: 180s)
+5. Sync: lightweight `Store.Chat.getModelsArray()` eval → process 40 chats → save to DB
+6. Real-time: `message` and `message_create` events → `handleIncomingMessage()` → save to DB + Supabase Storage
+
+**Heartbeat & TTL:**
+- Frontend sends heartbeat every 20s to `/api/whatsapp/heartbeat`
+- TTL reaper checks every 30s, threshold 180s
+- Soft reap (`reapClient`): destroys Puppeteer but preserves LocalAuth session (no QR needed on retry)
+- Hard disconnect (`disconnectClient`): calls `client.logout()` + `client.destroy()` (requires new QR)
+
+**Phone number normalization (critical for matching):**
+- LID contacts: `lid_` prefix + LID number (WhatsApp's internal ID format)
+- Groups: use `@g.us` serialized ID as-is (no normalization)
+- Regular contacts: strip country code (55), take last 9 digits for suffix matching
+- The `normalizePhone()` function exists in both `conversations/route.ts` and `messages/route.ts`
+
+**Connection record management:**
+- On disconnect: UPDATE `whatsapp_connections.status = 'disconnected'` (NOT DELETE — preserves FK integrity)
+- On connect: upsert connection record, reuse existing if present
+- `ensureValidConnectionId()`: validates connection_id before every DB insert (prevents FK violations)
+
+**Group support:**
+- Groups identified by `@g.us` suffix in chat ID
+- Group messages: `contactPhone` = group serialized ID, sender resolved per-message
+- Notification types filtered: `gp2`, `call_log`, `protocol`, `ciphertext`, `revoked`, `groups_v4_invite`
+- LID sender name sanitization: regex `/^\d+(@|$)/` prevents raw IDs as display names
+
+**Voice message conversion (ffmpeg):**
+- Browser records WebM/Opus → two-stage ffmpeg conversion:
+  1. WebM → WAV (clean metadata, strip browser artifacts)
+  2. WAV → OGG/Opus (16kHz, mono, 32kbps, libopus)
+- WhatsApp mobile requires real OGG/Opus container (48kHz works on Web but fails on mobile)
+- `sendAudioAsVoice: true` sets PTT flag but does NOT convert format
+
+### Credit / Plan System
+
+**Plans** (defined in `lib/types/plans.ts`):
+| Plan | Sellers | Monthly Credits | Price |
+|------|---------|----------------|-------|
+| Individual | 1 | 20 | R$129 |
+| Team | 20 | 400 | R$1.999 |
+| Business | 50 | 1000 | R$4.999 |
+| Enterprise | Unlimited | Unlimited | Custom |
+
+**Credit costs:** Copilot chat = 1, Follow-up analysis = 1
+
+**Columns on `companies` table:** `training_plan`, `monthly_credits_used`, `extra_monthly_credits`, `monthly_credits_reset_at`
+
+**Pattern:** API routes check credits BEFORE processing. Monthly reset detected by comparing `monthly_credits_reset_at` month/year to current date.
+
+### Copilot Auto-Learning Pattern
+
+**Two learning sources (both feed into RAG):**
+
+1. **Automatic (all conversations):** In `handleIncomingMessage()` of `whatsapp-client.ts`:
+   - Outbound message → `trackSellerMessage()` → saves to `seller_message_tracking` (outcome=null)
+   - Inbound response → `triggerOutcomeAnalysis()` → POST `/api/copilot/analyze-outcome` → GPT-4o-mini classifies success/failure/partial → generates embedding → saves to `followup_examples_success` or `failure`
+   - No response after 24h → `/api/copilot/check-no-response` → marks as failure
+
+2. **Manual feedback:** User clicks 👍/👎 on Copilot suggestion → POST `/api/copilot/feedback` → saves directly to success/failure examples with embedding
+
+**Result:** `match_followup_examples()` returns increasingly accurate results as examples accumulate.
+
 ## Common Issues
 
 1. **Evaluation shows N/A or scores are undefined**:
@@ -990,6 +1171,34 @@ The persona evaluation results display in a side panel (500px width) that slides
    - Development: Manually remove from `/etc/hosts`
    - Production: Manually remove DNS record
    - SSL certificate renewal will fail for deleted subdomains (expected)
+
+17. **WhatsApp "Conexao perdida" after QR scan**:
+   - Ready timeout (180s) may fire before WhatsApp finishes loading chats
+   - VPS memory pressure causes slow Puppeteer execution
+   - Session cache is preserved on timeout (retry uses cached session, no new QR needed)
+   - Init cooldown (15s) is cleared after timeout — user can retry immediately
+   - Check PM2 logs: `pm2 logs assiny --lines 200`
+
+18. **WhatsApp FK violation errors (`whatsapp_messages_connection_id_fkey`)**:
+   - Caused by messages referencing a deleted connection record
+   - Fix: `disconnectClient` uses UPDATE (not DELETE) on `whatsapp_connections`
+   - `ensureValidConnectionId()` validates connection before every insert
+
+19. **WhatsApp voice messages play on Web but not on mobile**:
+   - Mobile requires OGG/Opus container at 16kHz, mono, 32kbps
+   - 48kHz/128kbps plays on Web but shows "unavailable" on mobile
+   - Must use two-stage ffmpeg conversion: WebM → WAV → OGG/Opus
+   - ffmpeg must be installed on VPS (`apt install ffmpeg`)
+
+20. **WhatsApp group notification messages appearing in chat**:
+   - Types `gp2`, `call_log`, `protocol`, `ciphertext`, `revoked`, `groups_v4_invite` must be filtered
+   - Filtered in `extractMessageContent()` in `lib/whatsapp-client.ts`
+   - Also filtered in frontend: FollowUpView message display filter
+
+21. **WhatsApp Puppeteer "Execution context destroyed" errors**:
+   - Browser context crashes silently without firing `disconnected` event
+   - Periodic health check (`checkBrowserHealth`) detects broken contexts via `page.evaluate(() => 1)`
+   - On failure, soft-reaps client (preserves session for reconnection)
 
 ## Environment Variables
 
