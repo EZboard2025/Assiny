@@ -36,7 +36,7 @@ const initializingUsers = new Set<string>()
 
 // Backoff tracker: prevent rapid re-initialization loops (init → timeout → destroy → init)
 const lastInitAttempt = new Map<string, number>()
-const INIT_COOLDOWN_MS = 30_000 // Wait 30s between init attempts after failure
+const INIT_COOLDOWN_MS = 15_000 // Wait 15s between init attempts after failure
 
 // Cache for contact phone lookups (chatId -> contactPhone)
 const contactPhoneCache = new Map<string, string>()
@@ -167,7 +167,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.log(`[WA] Authenticated for user ${userId}`)
     state.status = 'connecting'
 
-    // If ready doesn't fire within 90s, the session is likely corrupted
+    // If ready doesn't fire within 180s, the client is stuck (VPS with many chats can be slow)
     if (readyTimeout) clearTimeout(readyTimeout)
     readyTimeout = setTimeout(async () => {
       if (state.status === 'connecting') {
@@ -176,22 +176,20 @@ export async function initializeClient(userId: string, companyId: string | null)
         state.status = 'error'
         state.error = 'Conexao travou. Tente novamente.'
         initializingUsers.delete(userId)
+        lastInitAttempt.delete(userId) // Clear cooldown so user can retry immediately
         try { await client.destroy() } catch {}
-        clients.delete(userId)
 
-        // Delete cached session to prevent re-corruption
-        try {
-          const sessionPath = `${getAuthPath()}/session-user_${userId.replace(/-/g, '').substring(0, 16)}`
-          const fs = await import('fs')
-          if (fs.existsSync(sessionPath)) {
-            fs.rmSync(sessionPath, { recursive: true, force: true })
-            console.log(`[WA] Cleared corrupted session cache for user ${userId}`)
-          }
-        } catch (e) {
-          console.error(`[WA] Error clearing session cache:`, e)
-        }
+        // Keep error state visible to polling for 5s before removing from map
+        setTimeout(() => {
+          const current = clients.get(userId)
+          if (current === state) clients.delete(userId)
+        }, 5000)
+
+        // Do NOT delete session cache — auth succeeded, the session is valid.
+        // Only clear cache on auth_failure events (actual corruption).
+        // This way, retry will use cached session and skip QR scan.
       }
-    }, 90000)
+    }, 180000)
   })
 
   // Ready event (fully connected) - guard against duplicate fires
@@ -268,12 +266,25 @@ export async function initializeClient(userId: string, companyId: string | null)
     console.log(`[WA] Client destroyed and removed for user ${userId}`)
   })
 
-  // Auth failure
-  client.on('auth_failure', (msg: string) => {
+  // Auth failure - session is truly corrupted, clear cache so next attempt gets fresh QR
+  client.on('auth_failure', async (msg: string) => {
     console.error(`[WA] Auth failure for user ${userId}: ${msg}`)
     state.status = 'error'
     state.error = msg
     initializingUsers.delete(userId)
+    lastInitAttempt.delete(userId)
+
+    // Delete cached session — auth_failure means it's truly corrupted
+    try {
+      const sessionPath = `${getAuthPath()}/session-user_${userId.replace(/-/g, '').substring(0, 16)}`
+      const fs = await import('fs')
+      if (fs.existsSync(sessionPath)) {
+        fs.rmSync(sessionPath, { recursive: true, force: true })
+        console.log(`[WA] Cleared corrupted session cache for user ${userId} (auth_failure)`)
+      }
+    } catch (e) {
+      console.error(`[WA] Error clearing session cache:`, e)
+    }
   })
 
   // Initialize the client

@@ -1319,8 +1319,9 @@ export default function FollowUpView() {
         ) : connectionStatus === 'connecting' ? (
           <>
             <Loader2 className="w-12 h-12 animate-spin text-[#00a884] mx-auto mb-4" />
-            <h2 className="text-[#e9edef] text-xl mb-2">Conectando...</h2>
-            <p className="text-[#8696a0] text-sm">QR Code escaneado. Autenticando...</p>
+            <h2 className="text-[#e9edef] text-xl mb-2">Conectando ao WhatsApp...</h2>
+            <p className="text-[#8696a0] text-sm">Carregando suas conversas. Pode levar ate 3 minutos.</p>
+            <p className="text-[#8696a0] text-xs mt-2">Mantenha esta pagina aberta.</p>
           </>
         ) : (
           <>
