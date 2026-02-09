@@ -556,24 +556,36 @@ async function resolveContactPhone(chatId: string, contact: any, state: ClientSt
 }
 
 // Process a single chat (for parallel processing)
-async function processSingleChat(chat: any, state: ClientState): Promise<void> {
+async function processSingleChat(chat: any, state: ClientState, isGroup = false): Promise<void> {
   try {
-    const contact = await chat.getContact()
-    const contactName = contact?.pushname || contact?.name || chat.name || null
     const chatIdSerialized = chat.id._serialized || ''
-
-    // Fetch profile picture URL
+    let contactPhone: string
+    let contactName: string | null
     let profilePicUrl: string | null = null
-    try {
-      profilePicUrl = await contact?.getProfilePicUrl() || null
-    } catch {
-      // Profile pic may not be available (privacy settings)
+    let isLidContact = false
+
+    if (isGroup) {
+      // For groups: use group ID as contact_phone, group name as contact_name
+      contactPhone = chatIdSerialized
+      contactName = chat.name || 'Grupo'
+
+      try {
+        profilePicUrl = await chat.getProfilePicUrl?.() || null
+      } catch {}
+    } else {
+      const contact = await chat.getContact()
+      contactName = contact?.pushname || contact?.name || chat.name || null
+
+      try {
+        profilePicUrl = await contact?.getProfilePicUrl() || null
+      } catch {}
+
+      const resolved = await resolveContactPhone(chatIdSerialized, contact, state)
+      if (!resolved) return
+
+      contactPhone = resolved.contactPhone
+      isLidContact = resolved.isLidContact
     }
-
-    const resolved = await resolveContactPhone(chatIdSerialized, contact, state)
-    if (!resolved) return
-
-    const { contactPhone, isLidContact } = resolved
 
     // Fetch only last 15 messages per chat (fast initial sync, reduces memory pressure)
     const messages = await chat.fetchMessages({ limit: 15 })
@@ -604,13 +616,24 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
       const { messageType, content, mediaMimeType } = extracted
       const msgTimestamp = new Date(msg.timestamp * 1000)
 
+      // For groups, resolve sender name for non-fromMe messages
+      let msgContactName = contactName
+      if (isGroup && !msg.fromMe) {
+        try {
+          const senderContact = await msg.getContact()
+          msgContactName = senderContact?.pushname || senderContact?.name || msg.author || contactName
+        } catch {
+          msgContactName = msg.author || contactName
+        }
+      }
+
       const baseMessage = {
         connection_id: state.connectionId,
         user_id: state.userId,
         company_id: state.companyId,
         wa_message_id: msg.id._serialized,
         contact_phone: contactPhone,
-        contact_name: contactName,
+        contact_name: msgContactName,
         direction: msg.fromMe ? 'outbound' : 'inbound',
         message_type: messageType,
         content,
@@ -618,7 +641,7 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
         media_mime_type: mediaMimeType,
         message_timestamp: msgTimestamp.toISOString(),
         status: msg.fromMe ? 'sent' : 'delivered',
-        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
+        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact, is_group: isGroup }
       }
 
       // Separate media messages for individual processing
@@ -638,22 +661,28 @@ async function processSingleChat(chat: any, state: ClientState): Promise<void> {
     // Media files will be downloaded on-demand when user opens the conversation
     const allInsertMessages = [
       ...nonMediaMessages,
-      ...mediaMessages.map(({ msg, extracted }) => ({
-        connection_id: state.connectionId,
-        user_id: state.userId,
-        company_id: state.companyId,
-        wa_message_id: msg.id._serialized,
-        contact_phone: contactPhone,
-        contact_name: contactName,
-        direction: msg.fromMe ? 'outbound' : 'inbound',
-        message_type: extracted.messageType,
-        content: extracted.content,
-        media_id: null,
-        media_mime_type: extracted.mediaMimeType,
-        message_timestamp: new Date(msg.timestamp * 1000).toISOString(),
-        status: msg.fromMe ? 'sent' : 'delivered',
-        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact }
-      }))
+      ...mediaMessages.map(({ msg, extracted }) => {
+        let msgContactName = contactName
+        if (isGroup && !msg.fromMe) {
+          msgContactName = msg.author || contactName
+        }
+        return {
+          connection_id: state.connectionId,
+          user_id: state.userId,
+          company_id: state.companyId,
+          wa_message_id: msg.id._serialized,
+          contact_phone: contactPhone,
+          contact_name: msgContactName,
+          direction: msg.fromMe ? 'outbound' : 'inbound',
+          message_type: extracted.messageType,
+          content: extracted.content,
+          media_id: null,
+          media_mime_type: extracted.mediaMimeType,
+          message_timestamp: new Date(msg.timestamp * 1000).toISOString(),
+          status: msg.fromMe ? 'sent' : 'delivered',
+          raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chatIdSerialized, is_lid: isLidContact, is_group: isGroup }
+        }
+      })
     ]
 
     if (allInsertMessages.length > 0) {
@@ -726,30 +755,31 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
     if (state.destroyed) return
 
-    // Filter to individual chats only, limit to 30
-    const individualChatIds = chatIds.filter(c => !c.isGroup).slice(0, 30)
-    console.log(`[WA] Found ${chatIds.length} total chats, ${individualChatIds.length} individual. Syncing...`)
+    // Include both individual chats and groups, limit to 40
+    const filteredChats = chatIds.slice(0, 40)
+    const groupCount = filteredChats.filter(c => c.isGroup).length
+    console.log(`[WA] Found ${chatIds.length} total chats (${groupCount} groups). Syncing ${filteredChats.length}...`)
 
-    if (individualChatIds.length === 0) {
-      console.log(`[WA] No individual chats found for user ${state.userId}`)
+    if (filteredChats.length === 0) {
+      console.log(`[WA] No chats found for user ${state.userId}`)
       return
     }
 
     // Process chats one by one, fetching each chat object individually (lighter than getChats)
-    for (let i = 0; i < individualChatIds.length; i++) {
+    for (let i = 0; i < filteredChats.length; i++) {
       if (state.destroyed) { console.log(`[WA] Sync aborted mid-batch for user ${state.userId}`); return }
 
       try {
-        const chatInfo = individualChatIds[i]
+        const chatInfo = filteredChats[i]
         const chat = await Promise.race([
           client.getChatById(chatInfo.id),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error(`getChatById timed out for ${chatInfo.id}`)), 15000)
           )
         ])
-        await processSingleChat(chat, state)
+        await processSingleChat(chat, state, chatInfo.isGroup)
       } catch (chatErr: any) {
-        console.error(`[WA] Error processing chat ${individualChatIds[i].id}:`, chatErr.message || chatErr)
+        console.error(`[WA] Error processing chat ${filteredChats[i].id}:`, chatErr.message || chatErr)
         // Continue with next chat instead of failing the entire sync
       }
     }
@@ -766,37 +796,52 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
   try {
     console.log(`[WA] Processing message: type=${msg.type}, fromMe=${fromMe}, body=${msg.body?.substring(0, 50) || '[no body]'}`)
     const chat = await msg.getChat()
-    if (chat.isGroup) {
-      console.log(`[WA] Skipping group message`)
-      return
-    }
     if (msg.from === 'status@broadcast' || msg.to === 'status@broadcast') return
 
-    const contact = await chat.getContact()
-    const contactName = contact?.pushname || contact?.name || chat.name || null
-
-    // Fetch profile picture URL (only for inbound messages to avoid delay)
+    const isGroup = chat.isGroup || false
+    let contactPhone: string
+    let contactName: string | null
+    let convContactName: string | null  // Name for the conversation record (group name for groups)
     let profilePicUrl: string | null = null
-    if (!fromMe) {
-      try {
-        profilePicUrl = await contact?.getProfilePicUrl() || null
-      } catch {
-        // Profile pic may not be available
+    let isLidContact = false
+
+    if (isGroup) {
+      // For groups: use group ID as contact_phone, group name as conversation name
+      contactPhone = chat.id._serialized
+      convContactName = chat.name || 'Grupo'
+
+      // For individual messages, resolve the sender's name
+      if (fromMe) {
+        contactName = 'Você'
+      } else {
+        try {
+          const senderContact = await msg.getContact()
+          contactName = senderContact?.pushname || senderContact?.name || (msg as any).author || convContactName
+        } catch {
+          contactName = (msg as any).author || convContactName
+        }
       }
-    }
+    } else {
+      const contact = await chat.getContact()
+      contactName = contact?.pushname || contact?.name || chat.name || null
+      convContactName = contactName
 
-    const targetId = fromMe ? (msg.to || '') : (msg.from || '')
+      if (!fromMe) {
+        try {
+          profilePicUrl = await contact?.getProfilePicUrl() || null
+        } catch {}
+      }
 
-    // Check cache first for contact phone
-    let contactPhone = contactPhoneCache.get(targetId)
-
-    if (!contactPhone) {
-      const resolved = await resolveContactPhone(targetId, contact, state)
+      const targetId = fromMe ? (msg.to || '') : (msg.from || '')
+      let resolved = contactPhoneCache.get(targetId)
+        ? { contactPhone: contactPhoneCache.get(targetId)!, isLidContact: targetId.endsWith('@lid') }
+        : await resolveContactPhone(targetId, contact, state)
       if (!resolved) return
       contactPhone = resolved.contactPhone
-    }
+      isLidContact = resolved.isLidContact
 
-    if (!contactPhone || contactPhone === state.phoneNumber) return
+      if (!contactPhone || contactPhone === state.phoneNumber) return
+    }
 
     const extracted = extractMessageContent(msg)
     if (!extracted) return
@@ -804,7 +849,6 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     const { messageType, content, mediaMimeType } = extracted
     const direction = fromMe ? 'outbound' : 'inbound'
     const msgTimestamp = new Date(msg.timestamp * 1000)
-    const isLidContact = targetId.endsWith('@lid')
 
     // Download and save media if present
     let mediaId: string | null = null
@@ -812,14 +856,12 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       try {
         const media = await msg.downloadMedia()
         if (media?.data) {
-          // Generate unique media ID
           const ext = messageType === 'audio' ? 'ogg' :
                       messageType === 'image' ? 'jpg' :
                       messageType === 'video' ? 'mp4' :
                       messageType === 'sticker' ? 'webp' : 'bin'
           mediaId = `${state.userId}/${Date.now()}_${msg.id._serialized.slice(-8)}.${ext}`
 
-          // Convert base64 to buffer and upload to Supabase Storage
           const buffer = Buffer.from(media.data, 'base64')
           await supabaseAdmin.storage
             .from('whatsapp-media')
@@ -830,7 +872,6 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
 
           console.log(`[WA] Media saved: ${mediaId}`)
 
-          // Fire-and-forget: transcribe audio messages via Whisper
           if (messageType === 'audio') {
             transcribeAudioMessage(buffer, msg.id._serialized, state.userId).catch(() => {})
           }
@@ -857,7 +898,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         media_mime_type: mediaMimeType,
         message_timestamp: msgTimestamp.toISOString(),
         status: fromMe ? 'sent' : 'delivered',
-        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: targetId, is_lid: isLidContact }
+        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chat.id._serialized, is_lid: isLidContact, is_group: isGroup }
       })
 
     const messagePreview = content?.substring(0, 100) || `[${messageType}]`
@@ -866,14 +907,13 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       user_id: state.userId,
       company_id: state.companyId,
       contact_phone: contactPhone,
-      contact_name: contactName,
+      contact_name: convContactName,
       last_message_at: msgTimestamp.toISOString(),
       last_message_preview: messagePreview,
       unread_count: direction === 'inbound' ? 1 : 0,
       message_count: 1,
       updated_at: new Date().toISOString()
     }
-    // Only include profile_pic_url if we fetched it (inbound messages)
     if (profilePicUrl) {
       convData.profile_pic_url = profilePicUrl
     }
@@ -892,8 +932,8 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
 
     console.log(`[WA] Message processed: ${direction} ${messageType} from ${contactPhone}`)
 
-    // === COPILOT AUTO-LEARNING HOOKS (non-blocking) ===
-    if (messageType === 'text' && content) {
+    // === COPILOT AUTO-LEARNING HOOKS (non-blocking, skip groups) ===
+    if (messageType === 'text' && content && !isGroup) {
       if (fromMe) {
         // Seller sent a message → track it for outcome analysis
         trackSellerMessage(state, contactPhone, contactName, content, msgTimestamp).catch((err: any) =>

@@ -33,8 +33,11 @@ export async function GET(request: NextRequest) {
       throw new Error(`Failed to fetch conversations: ${error.message}`)
     }
 
-    // Normalize phone number for deduplication
+    // Normalize phone number for deduplication (skip groups — they use @g.us IDs)
+    const isGroupPhone = (phone: string) => phone.includes('@g.us')
     const normalizePhone = (phone: string): string => {
+      // Groups use their serialized ID as-is (no normalization)
+      if (isGroupPhone(phone)) return phone
       // Remove lid_ prefix
       let normalized = phone.replace(/^lid_/, '')
       // Remove all non-digits
@@ -60,13 +63,11 @@ export async function GET(request: NextRequest) {
       const normalizedPhone = normalizePhone(phone)
       const contactName = conv.contact_name?.toLowerCase().trim() || ''
 
-      // Check if we've seen this name before with a different phone
+      // Check if we've seen this name before with a different phone (skip groups — multiple groups can share names)
       let dedupeKey = normalizedPhone
-      if (contactName && nameToPhoneMap.has(contactName)) {
-        // Use the existing phone key for this name
+      if (!isGroupPhone(phone) && contactName && nameToPhoneMap.has(contactName)) {
         dedupeKey = nameToPhoneMap.get(contactName)!
-      } else if (contactName) {
-        // First time seeing this name, record the mapping
+      } else if (!isGroupPhone(phone) && contactName) {
         nameToPhoneMap.set(contactName, normalizedPhone)
       }
 

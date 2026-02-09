@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users } from 'lucide-react'
 import SalesCopilot from './SalesCopilot'
 
 interface FollowUpAnalysis {
@@ -1445,6 +1445,9 @@ export default function FollowUpView() {
               <div className="flex-1 min-w-0 border-b border-[#222d34] py-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 min-w-0">
+                    {conv.contact_phone.includes('@g.us') && (
+                      <Users className="w-4 h-4 text-[#8696a0] flex-shrink-0" />
+                    )}
                     <span className="text-[#e9edef] text-base truncate">
                       {conv.contact_name || formatPhone(conv.contact_phone)}
                     </span>
@@ -1509,9 +1512,14 @@ export default function FollowUpView() {
                 </span>
               </div>
               <div>
-                <h3 className="text-[#e9edef] font-medium">{displayName}</h3>
+                <div className="flex items-center gap-2">
+                  {selectedConversation.contact_phone.includes('@g.us') && (
+                    <Users className="w-4 h-4 text-[#8696a0] flex-shrink-0" />
+                  )}
+                  <h3 className="text-[#e9edef] font-medium">{displayName}</h3>
+                </div>
                 <p className="text-[#8696a0] text-xs">
-                  {selectedConversation.contact_name ? formatPhone(selectedConversation.contact_phone) : ''}
+                  {selectedConversation.contact_phone.includes('@g.us') ? 'Grupo' : selectedConversation.contact_name ? formatPhone(selectedConversation.contact_phone) : ''}
                 </p>
               </div>
             </div>
@@ -1568,6 +1576,10 @@ export default function FollowUpView() {
                             ? 'bg-[#005c4b] rounded-tr-none'
                             : 'bg-[#202c33] rounded-tl-none'
                         } ${msg.id.startsWith('temp_') ? 'opacity-60' : ''}`}>
+                          {/* Group sender name */}
+                          {selectedConversation?.contact_phone.includes('@g.us') && !msg.fromMe && msg.contactName && (
+                            <p className="text-xs font-medium text-[#00a884] mb-1">{msg.contactName}</p>
+                          )}
                           {/* Image */}
                           {msg.hasMedia && msg.mediaId && (msg.type === 'image' || msg.mimetype?.startsWith('image/')) && msg.type !== 'sticker' && (
                             <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
