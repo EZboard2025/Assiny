@@ -50,14 +50,15 @@ export async function GET(request: NextRequest) {
 
     // Normalize the requested phone for comparison
     const normalizedRequestPhone = normalizePhone(contactPhone)
+    const isGroup = contactPhone.includes('@g.us')
 
     // Query messages filtered at DB level for efficiency
     // Use the last 9 digits suffix match to handle phone format variations
     let messages: any[] = []
     let error: any = null
 
-    if (contactPhone.startsWith('lid_')) {
-      // LID contacts: exact match on contact_phone
+    if (isGroup || contactPhone.startsWith('lid_')) {
+      // Groups and LID contacts: exact match on contact_phone
       const result = await supabaseAdmin
         .from('whatsapp_messages')
         .select('*')
