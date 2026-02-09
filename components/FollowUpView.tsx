@@ -334,25 +334,42 @@ export default function FollowUpView() {
         const data = await response.json()
 
         if (data.connected && data.status === 'active') {
+          // Client is connected — restore UI
           console.log('[WA] Reconnecting to existing session:', data.phone_number)
           setConnectionStatus('connected')
           setPhoneNumber(data.phone_number || null)
 
-          // Send heartbeat to reset TTL timer
           fetch('/api/whatsapp/heartbeat', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${authToken}` }
           }).catch(() => {})
 
-          // Load conversations
           loadConversations()
+        } else if (data.status === 'qr_ready' && data.qrCode) {
+          // QR pending — show it and start polling
+          console.log('[WA] Resuming QR code session')
+          setQrCode(data.qrCode)
+          setConnectionStatus('qr_ready')
+          setIsInitializing(true)
+          startPolling()
+        } else if (data.status === 'initializing' || data.status === 'connecting') {
+          // Still initializing — show loading and start polling
+          console.log('[WA] Resuming initialization:', data.status)
+          setConnectionStatus(data.status as ConnectionStatus)
+          setIsInitializing(true)
+          startPolling()
+        } else if (data.status === 'error') {
+          // Stale error — show error and let user retry
+          console.warn('[WA] Server has stale error client:', data.error)
+          setError(data.error || 'Erro na conexão anterior. Tente novamente.')
+          setConnectionStatus('disconnected')
         }
+        // else: disconnected — stay on connect screen (default)
       } catch (err) {
         console.warn('[WA] Could not check existing connection:', err)
       }
     }
 
-    // Only check if currently disconnected (don't interfere if already connecting)
     if (connectionStatus === 'disconnected') {
       checkExistingConnection()
     }

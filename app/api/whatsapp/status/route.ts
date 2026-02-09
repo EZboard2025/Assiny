@@ -21,17 +21,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check in-memory client first
+    // Check in-memory client first (includes all states)
     const clientState = getClientState(user.id)
-    if (clientState && clientState.status === 'connected') {
+    if (clientState) {
+      if (clientState.status === 'connected') {
+        return NextResponse.json({
+          connected: true,
+          status: 'active',
+          phone_number: clientState.phoneNumber
+        })
+      }
+
+      // Return intermediate states so frontend can resume
       return NextResponse.json({
-        connected: true,
-        status: 'active',
-        phone_number: clientState.phoneNumber
+        connected: false,
+        status: clientState.status,
+        qrCode: clientState.qrCode,
+        error: clientState.error
       })
     }
 
-    // Fall back to database
+    // No in-memory client - check database for stale records
     const { data: connection } = await supabaseAdmin
       .from('whatsapp_connections')
       .select('id, display_phone_number, status, connected_at, last_webhook_at')
@@ -48,12 +58,16 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // DB says active but no in-memory client = stale record (server restarted)
+    // Mark as disconnected so UI doesn't get confused
+    await supabaseAdmin
+      .from('whatsapp_connections')
+      .update({ status: 'disconnected' })
+      .eq('id', connection.id)
+
     return NextResponse.json({
-      connected: true,
-      status: connection.status,
-      phone_number: connection.display_phone_number,
-      connected_at: connection.connected_at,
-      last_webhook_at: connection.last_webhook_at
+      connected: false,
+      status: 'disconnected'
     })
 
   } catch (error: any) {
