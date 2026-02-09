@@ -285,11 +285,11 @@ export async function disconnectClient(userId: string): Promise<void> {
   // Remove from map immediately so UI sees disconnected state
   clients.delete(userId)
 
-  // Update DB immediately (don't wait for Puppeteer cleanup)
+  // Mark connection as disconnected (NOT delete — preserves messages and FK integrity)
   if (state.connectionId) {
     await supabaseAdmin
       .from('whatsapp_connections')
-      .delete()
+      .update({ status: 'disconnected' })
       .eq('id', state.connectionId)
   }
 
@@ -303,6 +303,29 @@ export async function disconnectClient(userId: string): Promise<void> {
   console.log(`[WA] Disconnect complete for user ${userId}`)
 }
 
+// Soft reap: destroy Puppeteer but preserve session for auto-reconnection
+// Used by TTL reaper when browser tab goes inactive — user can come back without re-scanning QR
+async function reapClient(userId: string): Promise<void> {
+  const state = clients.get(userId)
+  if (!state) return
+
+  state.destroyed = true
+  clients.delete(userId)
+  initializingUsers.delete(userId)
+
+  // Mark connection as disconnected (preserve messages)
+  if (state.connectionId) {
+    await supabaseAdmin
+      .from('whatsapp_connections')
+      .update({ status: 'disconnected' })
+      .eq('id', state.connectionId)
+  }
+
+  // Destroy Puppeteer but do NOT logout — LocalAuth session stays on disk
+  try { await state.client.destroy() } catch {}
+  console.log(`[WA TTL] Client reaped for user ${userId} (session preserved for reconnection)`)
+}
+
 export function getConnectedClient(userId: string): Client | null {
   const state = clients.get(userId)
   if (!state || state.status !== 'connected') return null
@@ -313,7 +336,31 @@ export function updateHeartbeat(userId: string): boolean {
   const state = clients.get(userId)
   if (!state) return false
   state.lastHeartbeat = Date.now()
+
+  // Periodic Puppeteer health check (every ~5th heartbeat ≈ every 100s)
+  // Detects broken browser contexts that don't fire the 'disconnected' event
+  if (state.status === 'connected' && Math.random() < 0.2) {
+    checkBrowserHealth(state).catch(() => {})
+  }
+
   return true
+}
+
+async function checkBrowserHealth(state: ClientState): Promise<void> {
+  try {
+    const page = state.client.pupPage
+    if (!page || page.isClosed()) {
+      throw new Error('Page closed')
+    }
+    // Simple eval to verify the execution context is alive
+    await Promise.race([
+      page.evaluate(() => 1),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Health check timeout')), 5000))
+    ])
+  } catch (err: any) {
+    console.error(`[WA Health] Browser context broken for user ${state.userId}: ${err.message}. Reaping...`)
+    try { await reapClient(state.userId) } catch {}
+  }
 }
 
 // Manual sync trigger (called from API when user clicks "Sync")
@@ -353,12 +400,12 @@ const reaperInterval = setInterval(async () => {
 
     if (elapsed > TTL_THRESHOLD_MS) {
       console.log(
-        `[WA TTL] Client for user ${userId} expired (last heartbeat ${Math.round(elapsed / 1000)}s ago, status=${state.status}). Auto-disconnecting...`
+        `[WA TTL] Client for user ${userId} expired (last heartbeat ${Math.round(elapsed / 1000)}s ago). Reaping (session preserved)...`
       )
       try {
-        await disconnectClient(userId)
+        await reapClient(userId)
       } catch (err) {
-        console.error(`[WA TTL] Error disconnecting user ${userId}:`, err)
+        console.error(`[WA TTL] Error reaping user ${userId}:`, err)
         clients.delete(userId)
       }
     }
