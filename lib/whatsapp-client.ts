@@ -34,6 +34,10 @@ const clients = new Map<string, ClientState>()
 // Lock to prevent concurrent initialization for the same user
 const initializingUsers = new Set<string>()
 
+// Backoff tracker: prevent rapid re-initialization loops (init → timeout → destroy → init)
+const lastInitAttempt = new Map<string, number>()
+const INIT_COOLDOWN_MS = 30_000 // Wait 30s between init attempts after failure
+
 // Cache for contact phone lookups (chatId -> contactPhone)
 const contactPhoneCache = new Map<string, string>()
 
@@ -72,6 +76,15 @@ export async function initializeClient(userId: string, companyId: string | null)
     }
     return { qrCode: null, status: 'initializing' }
   }
+
+  // Backoff: prevent rapid re-init loops (init → timeout → destroy → init)
+  const lastAttempt = lastInitAttempt.get(userId)
+  if (lastAttempt && Date.now() - lastAttempt < INIT_COOLDOWN_MS) {
+    const waitSec = Math.ceil((INIT_COOLDOWN_MS - (Date.now() - lastAttempt)) / 1000)
+    console.log(`[WA] Init cooldown active for user ${userId}, ${waitSec}s remaining`)
+    return { qrCode: null, status: 'initializing' }
+  }
+  lastInitAttempt.set(userId, Date.now())
 
   // Mark user as initializing
   initializingUsers.add(userId)
@@ -192,6 +205,7 @@ export async function initializeClient(userId: string, companyId: string | null)
     state.qrCode = null
     state.lastHeartbeat = Date.now()
     initializingUsers.delete(userId)
+    lastInitAttempt.delete(userId) // Clear backoff on successful connection
 
     const info = client.info
     state.phoneNumber = info?.wid?.user || null
@@ -509,6 +523,40 @@ async function upsertConnection(state: ClientState): Promise<void> {
   }
 }
 
+// Helper to ensure connection_id is valid (refreshes from DB if stale)
+async function ensureValidConnectionId(state: ClientState): Promise<string | null> {
+  if (!state.connectionId) return null
+
+  // Quick check: does the connection record still exist?
+  const { data } = await supabaseAdmin
+    .from('whatsapp_connections')
+    .select('id')
+    .eq('id', state.connectionId)
+    .single()
+
+  if (data) return state.connectionId
+
+  // Connection was deleted — look up by user_id and re-use or create
+  console.warn(`[WA] Connection ${state.connectionId} no longer exists for user ${state.userId}. Refreshing...`)
+  const { data: existing } = await supabaseAdmin
+    .from('whatsapp_connections')
+    .select('id')
+    .eq('user_id', state.userId)
+    .order('connected_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (existing) {
+    state.connectionId = existing.id
+    console.log(`[WA] Refreshed connection_id to ${state.connectionId}`)
+    return state.connectionId
+  }
+
+  // No connection at all — re-create one
+  await upsertConnection(state)
+  return state.connectionId
+}
+
 // Helper to extract message content
 function extractMessageContent(msg: Message): { messageType: string; content: string; mediaMimeType: string | null } | null {
   let messageType = 'text'
@@ -634,6 +682,10 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       isLidContact = resolved.isLidContact
     }
 
+    // Ensure connection_id is still valid before inserting anything
+    const validConnId = await ensureValidConnectionId(state)
+    if (!validConnId) return
+
     // Fetch only last 15 messages per chat (fast initial sync, reduces memory pressure)
     const messages = await chat.fetchMessages({ limit: 15 })
     if (messages.length === 0) return
@@ -675,7 +727,7 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       }
 
       const baseMessage = {
-        connection_id: state.connectionId,
+        connection_id: validConnId,
         user_id: state.userId,
         company_id: state.companyId,
         wa_message_id: msg.id._serialized,
@@ -714,7 +766,7 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
           msgContactName = msg.author || contactName
         }
         return {
-          connection_id: state.connectionId,
+          connection_id: validConnId,
           user_id: state.userId,
           company_id: state.companyId,
           wa_message_id: msg.id._serialized,
@@ -752,7 +804,7 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       await supabaseAdmin
         .from('whatsapp_conversations')
         .upsert({
-          connection_id: state.connectionId,
+          connection_id: validConnId,
           user_id: state.userId,
           company_id: state.companyId,
           contact_phone: contactPhone,
@@ -928,11 +980,18 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       }
     }
 
+    // Ensure connection_id is still valid (prevents FK violations after reconnection)
+    const validConnId = await ensureValidConnectionId(state)
+    if (!validConnId) {
+      console.error(`[WA] No valid connection_id for user ${state.userId}, dropping message`)
+      return
+    }
+
     // Insert message and upsert conversation in parallel
     const messageInsert = supabaseAdmin
       .from('whatsapp_messages')
       .insert({
-        connection_id: state.connectionId,
+        connection_id: validConnId,
         user_id: state.userId,
         company_id: state.companyId,
         wa_message_id: msg.id._serialized,
@@ -950,7 +1009,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
 
     const messagePreview = content?.substring(0, 100) || `[${messageType}]`
     const convData: any = {
-      connection_id: state.connectionId,
+      connection_id: validConnId,
       user_id: state.userId,
       company_id: state.companyId,
       contact_phone: contactPhone,

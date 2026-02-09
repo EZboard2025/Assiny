@@ -97,6 +97,7 @@ export default function FollowUpView() {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isInitializing, setIsInitializing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [qrCode, setQrCode] = useState<string | null>(null)
@@ -359,7 +360,7 @@ export default function FollowUpView() {
             headers: { 'Authorization': `Bearer ${authToken}` }
           }).catch(() => {})
 
-          loadConversations()
+          loadConversations(true)
         } else if (data.status === 'qr_ready' && data.qrCode) {
           // QR pending — show it and start polling
           console.log('[WA] Resuming QR code session')
@@ -531,8 +532,8 @@ export default function FollowUpView() {
       if (data.connected) {
         setConnectionStatus('connected')
         setPhoneNumber(data.phone_number || null)
-        loadConversations()
-        // Extended retries in case sync is still in progress
+        loadConversations(true)
+        // Extended retries in case sync is still in progress (silent — no spinner)
         setTimeout(() => loadConversations(), 5000)
         setTimeout(() => loadConversations(), 15000)
         setTimeout(() => loadConversations(), 30000)
@@ -570,7 +571,7 @@ export default function FollowUpView() {
           setIsInitializing(false)
           setSyncStatus(data.syncStatus || 'pending')
           // Load conversations with extended retries (sync can take up to 2min)
-          loadConversations()
+          loadConversations(true)
           setTimeout(() => loadConversations(), 5000)
           setTimeout(() => loadConversations(), 15000)
           setTimeout(() => loadConversations(), 30000)
@@ -626,7 +627,7 @@ export default function FollowUpView() {
       if (data.status === 'connected') {
         setConnectionStatus('connected')
         setIsInitializing(false)
-        loadConversations()
+        loadConversations(true)
         setTimeout(() => loadConversations(), 5000)
         setTimeout(() => loadConversations(), 15000)
         setTimeout(() => loadConversations(), 30000)
@@ -689,10 +690,11 @@ export default function FollowUpView() {
     }
   }
 
-  const loadConversations = async () => {
+  const loadConversations = async (showSpinner = false) => {
     if (!authToken) return
 
-    setIsLoadingConversations(true)
+    // Only show loading spinner on first load — subsequent refreshes update silently
+    if (showSpinner) setIsLoadingConversations(true)
     try {
       const response = await fetch('/api/whatsapp/conversations', {
         headers: { 'Authorization': `Bearer ${authToken}` }
@@ -705,7 +707,7 @@ export default function FollowUpView() {
     } catch (error) {
       console.error('Error loading conversations:', error)
     } finally {
-      setIsLoadingConversations(false)
+      if (showSpinner) setIsLoadingConversations(false)
     }
   }
 
@@ -1354,17 +1356,18 @@ export default function FollowUpView() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              loadConversations()
-              // If no conversations loaded, also trigger sync
+            onClick={async () => {
+              setIsRefreshing(true)
               if (conversations.length === 0) {
                 triggerManualSync()
               }
+              await loadConversations()
+              setIsRefreshing(false)
             }}
             className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
             title={conversations.length === 0 ? 'Sincronizar conversas' : 'Atualizar'}
           >
-            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isRefreshing || isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={disconnectWhatsApp}
