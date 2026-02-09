@@ -151,6 +151,21 @@ export default function FollowUpView() {
     return headers
   }
 
+  // Helper: detect WhatsApp disconnection from API errors and reset UI
+  const handleDisconnectedError = (response: Response, errorMessage?: string): boolean => {
+    const isDisconnected = response.status === 404 ||
+      (!!errorMessage && /not connected|no.?client/i.test(errorMessage))
+    if (isDisconnected) {
+      setConnectionStatus('disconnected')
+      setPhoneNumber(null)
+      setSelectedConversation(null)
+      setMessages([])
+      setConversations([])
+      setError(null)
+    }
+    return isDisconnected
+  }
+
   // Load auth token on mount (robust: handles subdomains, different browsers)
   useEffect(() => {
     const loadAuth = async () => {
@@ -739,6 +754,8 @@ export default function FollowUpView() {
 
       const data = await response.json()
 
+      if (!response.ok && handleDisconnectedError(response, data.error)) return
+
       if (data.synced > 0) {
         console.log(`[Sync] Synced ${data.synced} new messages, reloading...`)
         // Reload messages to show the new ones
@@ -788,6 +805,7 @@ export default function FollowUpView() {
       const data = await response.json()
 
       if (!response.ok) {
+        if (handleDisconnectedError(response, data.error)) return
         throw new Error(data.error || 'Erro ao enviar mensagem')
       }
 
@@ -881,6 +899,7 @@ export default function FollowUpView() {
       const data = await response.json()
 
       if (!response.ok) {
+        if (handleDisconnectedError(response, data.error)) return
         throw new Error(data.error || 'Erro ao enviar midia')
       }
 
@@ -1026,7 +1045,10 @@ export default function FollowUpView() {
       })
 
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Erro ao enviar audio')
+      if (!response.ok) {
+        if (handleDisconnectedError(response, data.error)) return
+        throw new Error(data.error || 'Erro ao enviar audio')
+      }
 
       setMessages(prev => prev.map(msg =>
         msg.id === tempMsg.id ? data.message : msg
