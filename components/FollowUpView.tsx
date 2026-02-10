@@ -139,6 +139,20 @@ export default function FollowUpView() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<FollowUpAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Helper: detect disconnection from API 404 responses and redirect to QR screen
+  const handleApiDisconnect = (response: Response) => {
+    if (response.status === 404) {
+      setConnectionStatus('disconnected')
+      setPhoneNumber(null)
+      setConversations([])
+      setSelectedConversation(null)
+      setMessages([])
+      setError('WhatsApp desconectado. Reconecte para continuar.')
+      return true
+    }
+    return false
+  }
   const [savedAnalyses, setSavedAnalyses] = useState<Record<string, { analysis: FollowUpAnalysis; date: string }>>({})
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(false)
 
@@ -847,6 +861,11 @@ export default function FollowUpView() {
         })
       })
 
+      if (handleApiDisconnect(response)) {
+        setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+        return
+      }
+
       const data = await response.json()
 
       if (!response.ok) {
@@ -940,6 +959,11 @@ export default function FollowUpView() {
         body: formData
       })
 
+      if (handleApiDisconnect(response)) {
+        setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+        return
+      }
+
       const data = await response.json()
 
       if (!response.ok) {
@@ -999,6 +1023,11 @@ export default function FollowUpView() {
           contactPhone: contact.contact_phone
         })
       })
+
+      if (handleApiDisconnect(response)) {
+        setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+        return
+      }
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Erro ao enviar contato')
@@ -1134,6 +1163,11 @@ export default function FollowUpView() {
         headers: { 'Authorization': `Bearer ${authToken}` },
         body: formData
       })
+
+      if (handleApiDisconnect(response)) {
+        setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+        return
+      }
 
       const data = await response.json()
       if (!response.ok) {
