@@ -6,6 +6,8 @@ import { Client, LocalAuth, Message } from 'whatsapp-web.js'
 import { createClient } from '@supabase/supabase-js'
 import QRCode from 'qrcode'
 import OpenAI, { toFile } from 'openai'
+import { existsSync, unlinkSync } from 'fs'
+import { join } from 'path'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
@@ -26,23 +28,27 @@ interface ClientState {
   phoneNumber: string | null
   lastHeartbeat: number
   destroyed: boolean  // Flag to abort running sync when client is destroyed
+  healthFailures: number  // Consecutive browser health check failures
 }
 
-// Store active clients by userId
-const clients = new Map<string, ClientState>()
+// Persist singletons across Next.js HMR (dev mode)
+// Without this, every file edit clears the Map and kills all WhatsApp connections
+const globalForWA = globalThis as unknown as {
+  waClients?: Map<string, ClientState>
+  waInitializing?: Set<string>
+  waLastInit?: Map<string, number>
+  waReadyTimeouts?: Map<string, number>
+  waContactCache?: Map<string, string>
+  waReaperStarted?: boolean
+}
 
-// Lock to prevent concurrent initialization for the same user
-const initializingUsers = new Set<string>()
+const clients = globalForWA.waClients ?? (globalForWA.waClients = new Map<string, ClientState>())
+const initializingUsers = globalForWA.waInitializing ?? (globalForWA.waInitializing = new Set<string>())
+const lastInitAttempt = globalForWA.waLastInit ?? (globalForWA.waLastInit = new Map<string, number>())
+const readyTimeoutCount = globalForWA.waReadyTimeouts ?? (globalForWA.waReadyTimeouts = new Map<string, number>())
+const contactPhoneCache = globalForWA.waContactCache ?? (globalForWA.waContactCache = new Map<string, string>())
 
-// Backoff tracker: prevent rapid re-initialization loops (init → timeout → destroy → init)
-const lastInitAttempt = new Map<string, number>()
 const INIT_COOLDOWN_MS = 15_000 // Wait 15s between init attempts after failure
-
-// Track consecutive ready-timeouts per user (for auto-retry logic)
-const readyTimeoutCount = new Map<string, number>()
-
-// Cache for contact phone lookups (chatId -> contactPhone)
-const contactPhoneCache = new Map<string, string>()
 
 function getAuthPath(): string {
   return process.env.WWEBJS_AUTH_PATH || '.wwebjs_auth'
@@ -101,6 +107,26 @@ export function getClientState(userId: string): ClientState | null {
   return clients.get(userId) || null
 }
 
+// Clean up orphaned Puppeteer lock files for a session directory
+// This prevents "browser is already running" errors after server restarts/HMR
+// NOTE: Only removes lock FILES. Does NOT kill Chrome processes (could kill active session).
+function cleanupBrowserLockFiles(sessionId: string): void {
+  const sessionDir = join(process.cwd(), getAuthPath(), `session-${sessionId}`)
+  const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket', 'DevToolsActivePort']
+
+  for (const lockFile of lockFiles) {
+    const filePath = join(sessionDir, lockFile)
+    try {
+      if (existsSync(filePath)) {
+        unlinkSync(filePath)
+        console.log(`[WA] Cleaned up lock file: ${lockFile}`)
+      }
+    } catch (err) {
+      console.warn(`[WA] Failed to remove ${lockFile}:`, err)
+    }
+  }
+}
+
 export async function initializeClient(userId: string, companyId: string | null): Promise<{ qrCode: string | null; status: string }> {
   // Kill any orphan Chromium processes left by previous PM2 crash
   // Only kills processes not owned by any active client in our map
@@ -134,13 +160,25 @@ export async function initializeClient(userId: string, companyId: string | null)
 
   // Prevent concurrent initialization for the same user
   if (initializingUsers.has(userId)) {
-    console.log(`[WA] Already initializing for user ${userId}, waiting...`)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    const state = clients.get(userId)
-    if (state) {
-      return { qrCode: state.qrCode, status: state.status }
+    // Safety: if lock exists but no client in Map, the init got stuck (e.g. Chrome killed during HMR)
+    const existingState = clients.get(userId)
+    if (!existingState || existingState.status === 'error' || existingState.destroyed) {
+      console.warn(`[WA] Stale init lock detected for user ${userId}, clearing and re-initializing`)
+      initializingUsers.delete(userId)
+      lastInitAttempt.delete(userId)
+      if (existingState) {
+        try { await existingState.client.destroy() } catch {}
+        clients.delete(userId)
+      }
+    } else {
+      console.log(`[WA] Already initializing for user ${userId}, waiting...`)
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      const state = clients.get(userId)
+      if (state) {
+        return { qrCode: state.qrCode, status: state.status }
+      }
+      return { qrCode: null, status: 'initializing' }
     }
-    return { qrCode: null, status: 'initializing' }
   }
 
   // Backoff: prevent rapid re-init loops (init → timeout → destroy → init)
@@ -160,6 +198,9 @@ export async function initializeClient(userId: string, companyId: string | null)
 
   // Clean stale browser state left by PM2 restart / ungraceful shutdown
   await cleanupBrowserState(sessionId)
+
+  // Clean up any orphaned browser lock files from previous server restarts
+  cleanupBrowserLockFiles(sessionId)
 
   const client = new Client({
     authStrategy: new LocalAuth({
@@ -214,7 +255,8 @@ export async function initializeClient(userId: string, companyId: string | null)
     error: null,
     phoneNumber: null,
     lastHeartbeat: Date.now(),
-    destroyed: false
+    destroyed: false,
+    healthFailures: 0
   }
 
   clients.set(userId, state)
@@ -298,7 +340,7 @@ export async function initializeClient(userId: string, companyId: string | null)
             client, userId, companyId, connectionId: null,
             qrCode: null, status: 'error', syncStatus: 'pending',
             error: 'Conexão travou. Tente novamente.', phoneNumber: null,
-            lastHeartbeat: 0, destroyed: true
+            lastHeartbeat: 0, destroyed: true, healthFailures: 0
           }
           clients.set(userId, errorState)
           setTimeout(() => {
@@ -503,9 +545,16 @@ async function checkBrowserHealth(state: ClientState): Promise<void> {
       page.evaluate(() => 1),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Health check timeout')), 5000))
     ])
+    // Reset failure counter on success
+    state.healthFailures = 0
   } catch (err: any) {
-    console.error(`[WA Health] Browser context broken for user ${state.userId}: ${err.message}. Reaping...`)
-    try { await reapClient(state.userId) } catch {}
+    state.healthFailures = (state.healthFailures || 0) + 1
+    console.warn(`[WA Health] Check failed for user ${state.userId}: ${err.message} (failure ${state.healthFailures}/3)`)
+    // Only reap after 3 consecutive failures to avoid transient issues
+    if (state.healthFailures >= 3) {
+      console.error(`[WA Health] Browser context broken for user ${state.userId} after 3 failures. Reaping...`)
+      try { await reapClient(state.userId) } catch {}
+    }
   }
 }
 
@@ -532,35 +581,38 @@ export async function triggerSync(userId: string): Promise<{ success: boolean; e
 // TTL Reaper: Auto-disconnect stale clients
 // ============================================
 
-const TTL_CHECK_INTERVAL_MS = 30_000  // Check every 30s
-const TTL_THRESHOLD_MS = 180_000      // Disconnect if no heartbeat for 3 min (browser throttles bg tabs to ~1x/min)
+const TTL_CHECK_INTERVAL_MS = 60_000    // Check every 60s
+const TTL_THRESHOLD_MS = 1_200_000     // Disconnect if no heartbeat for 20 min (user requested: only disconnect after 20 min inactivity)
 
-const reaperInterval = setInterval(async () => {
-  const now = Date.now()
+// Only start the reaper once (prevent duplicates on HMR)
+if (!globalForWA.waReaperStarted) {
+  globalForWA.waReaperStarted = true
 
-  for (const [userId, state] of clients.entries()) {
-    // Only reap connected clients — initializing/qr_ready/connecting don't receive heartbeats
-    if (state.status !== 'connected') continue
+  const reaperInterval = setInterval(async () => {
+    const now = Date.now()
 
-    const elapsed = now - state.lastHeartbeat
+    for (const [userId, state] of clients.entries()) {
+      if (state.status !== 'connected') continue
 
-    if (elapsed > TTL_THRESHOLD_MS) {
-      console.log(
-        `[WA TTL] Client for user ${userId} expired (last heartbeat ${Math.round(elapsed / 1000)}s ago). Reaping (session preserved)...`
-      )
-      try {
-        await reapClient(userId)
-      } catch (err) {
-        console.error(`[WA TTL] Error reaping user ${userId}:`, err)
-        clients.delete(userId)
+      const elapsed = now - state.lastHeartbeat
+
+      if (elapsed > TTL_THRESHOLD_MS) {
+        console.log(
+          `[WA TTL] Client for user ${userId} expired (last heartbeat ${Math.round(elapsed / 1000)}s ago). Reaping (session preserved)...`
+        )
+        try {
+          await reapClient(userId)
+        } catch (err) {
+          console.error(`[WA TTL] Error reaping user ${userId}:`, err)
+          clients.delete(userId)
+        }
       }
     }
-  }
-}, TTL_CHECK_INTERVAL_MS)
+  }, TTL_CHECK_INTERVAL_MS)
 
-// Prevent the interval from keeping Node.js alive during shutdown
-if (reaperInterval.unref) {
-  reaperInterval.unref()
+  if (reaperInterval.unref) {
+    reaperInterval.unref()
+  }
 }
 
 // Clean up orphaned DB connections on server restart

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, ArrowLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users, MoreVertical, Camera, Headphones, Contact, Sticker, Star, Bell, Lock, Shield, Heart, Ban, Flag, MapPin, Mail, Globe, Clock, Share2, Building2, Pencil, MessageCirclePlus, EllipsisVertical } from 'lucide-react'
 import SalesCopilot from './SalesCopilot'
 
 interface FollowUpAnalysis {
@@ -73,7 +73,7 @@ interface WhatsAppMessage {
   transcription?: string | null
 }
 
-type ConnectionStatus = 'disconnected' | 'initializing' | 'qr_ready' | 'connecting' | 'connected'
+type ConnectionStatus = 'disconnected' | 'checking' | 'initializing' | 'qr_ready' | 'connecting' | 'connected'
 
 const EMOJI_LIST = [
   '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊',
@@ -90,7 +90,7 @@ const EMOJI_LIST = [
 
 export default function FollowUpView() {
   // WhatsApp state
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('checking')
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null)
@@ -113,6 +113,12 @@ export default function FollowUpView() {
   // Media send state
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showContactPicker, setShowContactPicker] = useState(false)
+  const [contactSearchQuery, setContactSearchQuery] = useState('')
+  const [showContactInfo, setShowContactInfo] = useState(false)
+  const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'favorites' | 'groups'>('all')
+  const [contactDetailInfo, setContactDetailInfo] = useState<any>(null)
+  const [isLoadingContactInfo, setIsLoadingContactInfo] = useState(false)
   const [isRecordingVoice, setIsRecordingVoice] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [voiceVolumeBars, setVoiceVolumeBars] = useState<number[]>(new Array(30).fill(4))
@@ -140,6 +146,13 @@ export default function FollowUpView() {
   const [syncStatus, setSyncStatus] = useState<'pending' | 'syncing' | 'synced' | 'error' | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
+  // Message search state
+  const [isSearchingMessages, setIsSearchingMessages] = useState(false)
+  const [messageSearchQuery, setMessageSearchQuery] = useState('')
+  const [searchMatchIds, setSearchMatchIds] = useState<string[]>([])
+  const [activeSearchIndex, setActiveSearchIndex] = useState(-1)
+  const messageSearchInputRef = useRef<HTMLInputElement>(null)
+
   // Auth token for API calls
   const [authToken, setAuthToken] = useState<string | null>(null)
 
@@ -152,20 +165,8 @@ export default function FollowUpView() {
     return headers
   }
 
-  // Helper: detect WhatsApp disconnection from API errors and reset UI
-  const handleDisconnectedError = (response: Response, errorMessage?: string): boolean => {
-    const isDisconnected = response.status === 404 ||
-      (!!errorMessage && /not connected|no.?client/i.test(errorMessage))
-    if (isDisconnected) {
-      setConnectionStatus('disconnected')
-      setPhoneNumber(null)
-      setSelectedConversation(null)
-      setMessages([])
-      setConversations([])
-      setError(null)
-    }
-    return isDisconnected
-  }
+  // NOTE: Auto-disconnect removed. Only the server-side TTL reaper (20 min inactivity)
+  // should disconnect the client. API errors just show error messages, not full disconnect.
 
   // Load auth token on mount (robust: handles subdomains, different browsers)
   useEffect(() => {
@@ -337,7 +338,10 @@ export default function FollowUpView() {
     }
   }, [])
 
-  // Disconnect WhatsApp when page unloads/refreshes
+  // NOTE: We intentionally do NOT disconnect on page unload/refresh.
+  // The WhatsApp client persists server-side so it survives page refreshes.
+  // Disconnection is only triggered manually via the logout button.
+
   // Check for existing active connection on mount (survives page refresh)
   useEffect(() => {
     if (!authToken) return
@@ -379,23 +383,30 @@ export default function FollowUpView() {
           console.warn('[WA] Server has stale error client:', data.error)
           setError(data.error || 'Erro na conexão anterior. Tente novamente.')
           setConnectionStatus('disconnected')
+        } else {
+          // disconnected — stay on connect screen
+          setConnectionStatus('disconnected')
         }
-        // else: disconnected — stay on connect screen (default)
       } catch (err) {
         console.warn('[WA] Could not check existing connection:', err)
+        setConnectionStatus('disconnected')
       }
     }
 
-    if (connectionStatus === 'disconnected') {
+    if (connectionStatus === 'checking' || connectionStatus === 'disconnected') {
       checkExistingConnection()
     }
   }, [authToken])
 
   // Heartbeat: keep server-side WhatsApp session alive
+  const heartbeatFailCountRef = useRef(0)
+
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
 
     if (connectionStatus === 'connected' && authToken) {
+      heartbeatFailCountRef.current = 0
+
       // Send initial heartbeat immediately
       fetch('/api/whatsapp/heartbeat', {
         method: 'POST',
@@ -410,17 +421,25 @@ export default function FollowUpView() {
           })
 
           if (response.status === 404) {
-            // Server lost our session (restart, crash, TTL expired)
-            console.warn('[Heartbeat] Server has no active client, resetting connection state')
-            setConnectionStatus('disconnected')
-            setPhoneNumber(null)
-            setConversations([])
-            setSelectedConversation(null)
-            setMessages([])
+            heartbeatFailCountRef.current++
+            console.warn(`[Heartbeat] Server returned 404 (${heartbeatFailCountRef.current}/3)`)
+
+            // After 3 consecutive 404s (60s), server truly lost the client
+            if (heartbeatFailCountRef.current >= 3) {
+              console.error('[Heartbeat] Server lost client after 3 consecutive failures. Disconnecting.')
+              setConnectionStatus('disconnected')
+              setPhoneNumber(null)
+              setConversations([])
+              setSelectedConversation(null)
+              setMessages([])
+              setError('Conexao perdida com o servidor. Reconecte o WhatsApp.')
+            }
+          } else {
+            // Reset counter on success
+            heartbeatFailCountRef.current = 0
           }
         } catch {
-          // Network error - server TTL will handle cleanup if heartbeats consistently fail
-          console.warn('[Heartbeat] Failed to send heartbeat')
+          console.warn('[Heartbeat] Network error')
         }
       }, 20000) // Every 20 seconds
     }
@@ -524,10 +543,10 @@ export default function FollowUpView() {
     if (!authToken) return
 
     try {
-      const response = await fetch('/api/whatsapp/status', {
+      const res = await fetch('/api/whatsapp/status', {
         headers: { 'Authorization': `Bearer ${authToken}` }
       })
-      const data = await response.json()
+      const data = await res.json()
 
       if (data.connected) {
         setConnectionStatus('connected')
@@ -536,13 +555,12 @@ export default function FollowUpView() {
         // Extended retries in case sync is still in progress (silent — no spinner)
         setTimeout(() => loadConversations(), 5000)
         setTimeout(() => loadConversations(), 15000)
-        setTimeout(() => loadConversations(), 30000)
-        setTimeout(() => loadConversations(), 60000)
       } else {
         setConnectionStatus('disconnected')
       }
     } catch (error) {
       console.error('Error checking status:', error)
+      setConnectionStatus('disconnected')
     }
   }
 
@@ -680,11 +698,9 @@ export default function FollowUpView() {
         loadConversations()
       } else {
         setSyncStatus('error')
-        console.error('Sync failed:', data.error)
       }
     } catch (error) {
       setSyncStatus('error')
-      console.error('Error triggering sync:', error)
     } finally {
       setIsSyncing(false)
     }
@@ -699,6 +715,13 @@ export default function FollowUpView() {
       const response = await fetch('/api/whatsapp/conversations', {
         headers: { 'Authorization': `Bearer ${authToken}` }
       })
+
+      if (response.status === 404) {
+        // Server may be temporarily unavailable — don't disconnect
+        console.warn('[loadConversations] Got 404, ignoring (TTL reaper handles disconnect)')
+        return
+      }
+
       const data = await response.json()
 
       if (data.conversations) {
@@ -708,6 +731,26 @@ export default function FollowUpView() {
       console.error('Error loading conversations:', error)
     } finally {
       if (showSpinner) setIsLoadingConversations(false)
+    }
+  }
+
+  // Fetch detailed contact info (business profile, about, profile pic)
+  const fetchContactInfo = async (contactPhone: string) => {
+    if (!authToken) return
+    setIsLoadingContactInfo(true)
+    setContactDetailInfo(null)
+    try {
+      const res = await fetch(`/api/whatsapp/contact-info?contactPhone=${encodeURIComponent(contactPhone)}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setContactDetailInfo(data.contactInfo || null)
+      }
+    } catch (err) {
+      console.error('Error fetching contact info:', err)
+    } finally {
+      setIsLoadingContactInfo(false)
     }
   }
 
@@ -756,7 +799,7 @@ export default function FollowUpView() {
 
       const data = await response.json()
 
-      if (!response.ok && handleDisconnectedError(response, data.error)) return
+      if (!response.ok) return // Silently fail - sync is optional
 
       if (data.synced > 0) {
         console.log(`[Sync] Synced ${data.synced} new messages, reloading...`)
@@ -807,7 +850,6 @@ export default function FollowUpView() {
       const data = await response.json()
 
       if (!response.ok) {
-        if (handleDisconnectedError(response, data.error)) return
         throw new Error(data.error || 'Erro ao enviar mensagem')
       }
 
@@ -901,7 +943,6 @@ export default function FollowUpView() {
       const data = await response.json()
 
       if (!response.ok) {
-        if (handleDisconnectedError(response, data.error)) return
         throw new Error(data.error || 'Erro ao enviar midia')
       }
 
@@ -924,6 +965,54 @@ export default function FollowUpView() {
       setMessageInput(prev => prev + emoji)
     }
     setShowEmojiPicker(false)
+  }
+
+  // ============================================
+  // Send contact
+  // ============================================
+
+  const handleSendContact = async (contact: WhatsAppConversation) => {
+    if (!selectedConversation || isSending) return
+
+    setShowContactPicker(false)
+    setContactSearchQuery('')
+    setIsSending(true)
+
+    const tempMsg: WhatsAppMessage = {
+      id: `temp_${Date.now()}`,
+      body: `👤 ${contact.contact_name || formatPhone(contact.contact_phone)}`,
+      fromMe: true,
+      timestamp: new Date().toISOString(),
+      type: 'contacts',
+      hasMedia: false,
+    }
+    setMessages(prev => [...prev, tempMsg])
+
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({
+          to: selectedConversation.contact_phone,
+          type: 'contact',
+          contactName: contact.contact_name || formatPhone(contact.contact_phone),
+          contactPhone: contact.contact_phone
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Erro ao enviar contato')
+
+      setMessages(prev => prev.map(msg =>
+        msg.id === tempMsg.id ? data.message : msg
+      ))
+    } catch (err) {
+      console.error('Error sending contact:', err)
+      setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
+      setError(err instanceof Error ? err.message : 'Erro ao enviar contato')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   // ============================================
@@ -1048,7 +1137,6 @@ export default function FollowUpView() {
 
       const data = await response.json()
       if (!response.ok) {
-        if (handleDisconnectedError(response, data.error)) return
         throw new Error(data.error || 'Erro ao enviar audio')
       }
 
@@ -1081,9 +1169,76 @@ export default function FollowUpView() {
     setRecordingDuration(0)
   }
 
+  // Message search functions
+  const openMessageSearch = () => {
+    setIsSearchingMessages(true)
+    setMessageSearchQuery('')
+    setSearchMatchIds([])
+    setActiveSearchIndex(-1)
+    setTimeout(() => messageSearchInputRef.current?.focus(), 100)
+  }
+
+  const closeMessageSearch = () => {
+    setIsSearchingMessages(false)
+    setMessageSearchQuery('')
+    setSearchMatchIds([])
+    setActiveSearchIndex(-1)
+  }
+
+  const handleMessageSearch = (query: string) => {
+    setMessageSearchQuery(query)
+    if (!query.trim()) {
+      setSearchMatchIds([])
+      setActiveSearchIndex(-1)
+      return
+    }
+    const q = query.toLowerCase()
+    const matches = messages
+      .filter(msg => msg.body && msg.body.toLowerCase().includes(q))
+      .map(msg => msg.id)
+    setSearchMatchIds(matches)
+    if (matches.length > 0) {
+      setActiveSearchIndex(matches.length - 1)
+      scrollToMessage(matches[matches.length - 1])
+    } else {
+      setActiveSearchIndex(-1)
+    }
+  }
+
+  const navigateSearch = (direction: 'up' | 'down') => {
+    if (searchMatchIds.length === 0) return
+    let newIndex = activeSearchIndex
+    if (direction === 'up') {
+      newIndex = activeSearchIndex > 0 ? activeSearchIndex - 1 : searchMatchIds.length - 1
+    } else {
+      newIndex = activeSearchIndex < searchMatchIds.length - 1 ? activeSearchIndex + 1 : 0
+    }
+    setActiveSearchIndex(newIndex)
+    scrollToMessage(searchMatchIds[newIndex])
+  }
+
+  const scrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      navigateSearch(e.shiftKey ? 'up' : 'down')
+    } else if (e.key === 'Escape') {
+      closeMessageSearch()
+    }
+  }
+
   const selectConversation = (conv: WhatsAppConversation) => {
     setSelectedConversation(conv)
     setError(null)
+    closeMessageSearch()
+    setShowContactInfo(false)
+    setContactDetailInfo(null)
 
     // Mark as read
     if (conv.unread_count > 0 && authToken) {
@@ -1222,12 +1377,20 @@ export default function FollowUpView() {
     return `/api/whatsapp/media/${encodeURIComponent(mediaId)}?token=${encodeURIComponent(authToken)}`
   }
 
-  // Filter conversations by search
-  const filteredConversations = conversations.filter(conv =>
-    (conv.contact_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.contact_phone.includes(searchQuery) ||
-    (conv.last_message_preview || '').toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Filter conversations by search and tab filter
+  const filteredConversations = conversations.filter(conv => {
+    // Search filter
+    const matchesSearch = !searchQuery ||
+      (conv.contact_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      conv.contact_phone.includes(searchQuery) ||
+      (conv.last_message_preview || '').toLowerCase().includes(searchQuery.toLowerCase())
+
+    // Tab filter
+    if (chatFilter === 'unread') return matchesSearch && conv.unread_count > 0
+    if (chatFilter === 'groups') return matchesSearch && conv.contact_phone.includes('@g.us')
+
+    return matchesSearch
+  })
 
   // Render disconnected state
   const renderDisconnected = () => (
@@ -1343,18 +1506,8 @@ export default function FollowUpView() {
   const renderChatSidebar = () => (
     <div className="w-[400px] bg-[#111b21] border-r border-[#222d34] flex flex-col h-full">
       {/* Header */}
-      <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center">
-            <MessageSquare className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <span className="text-[#e9edef] font-medium">WhatsApp IA+</span>
-            {phoneNumber && (
-              <p className="text-[#8696a0] text-[10px]">{phoneNumber}</p>
-            )}
-          </div>
-        </div>
+      <div className="h-[60px] bg-[#202c33] px-5 flex items-center justify-between">
+        <span className="text-[#e9edef] text-[22px] font-bold">WhatsApp</span>
         <div className="flex items-center gap-2">
           <button
             onClick={async () => {
@@ -1368,34 +1521,56 @@ export default function FollowUpView() {
             className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
             title={conversations.length === 0 ? 'Sincronizar conversas' : 'Atualizar'}
           >
-            <RefreshCw className={`w-5 h-5 text-[#aebac1] ${isRefreshing || isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-[20px] h-[20px] text-[#aebac1] ${isRefreshing || isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={disconnectWhatsApp}
             className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
             title="Desconectar"
           >
-            <LogOut className="w-5 h-5 text-[#aebac1]" />
+            <LogOut className="w-[20px] h-[20px] text-[#aebac1]" />
           </button>
         </div>
       </div>
 
       {/* Search */}
-      <div className="px-3 py-2 bg-[#111b21]">
-        <div className="flex items-center bg-[#202c33] rounded-lg px-4 py-2">
-          <Search className="w-5 h-5 text-[#8696a0] mr-4" />
+      <div className="px-3 py-1.5 bg-[#111b21]">
+        <div className="flex items-center bg-[#202c33] rounded-lg px-3 py-[6px]">
+          <Search className="w-[18px] h-[18px] text-[#8696a0] mr-4" />
           <input
             type="text"
-            placeholder="Pesquisar conversa"
+            placeholder="Pesquisar ou começar uma nova conversa"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none"
+            className="flex-1 bg-transparent text-[#e9edef] text-[14px] placeholder-[#8696a0] outline-none"
           />
         </div>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#111b21]">
+        {([
+          { key: 'all' as const, label: 'Todas' },
+          { key: 'unread' as const, label: 'Não lidas' },
+          { key: 'favorites' as const, label: 'Favoritas' },
+          { key: 'groups' as const, label: 'Grupos' },
+        ]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setChatFilter(tab.key)}
+            className={`px-3.5 py-[5px] rounded-full text-[13px] font-medium transition-colors ${
+              chatFilter === tab.key
+                ? 'bg-[#00a884] text-[#111b21]'
+                : 'bg-[#202c33] text-[#e9edef] hover:bg-[#2a3942]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Conversation List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
         {isLoadingConversations ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-[#00a884]" />
@@ -1537,7 +1712,7 @@ export default function FollowUpView() {
                   {getInitials(selectedConversation.contact_name)}
                 </span>
               </div>
-              <div>
+              <button onClick={() => { setShowContactInfo(true); if (selectedConversation) fetchContactInfo(selectedConversation.contact_phone) }} className="text-left hover:opacity-80 transition-opacity">
                 <div className="flex items-center gap-2">
                   {selectedConversation.contact_phone.includes('@g.us') && (
                     <Users className="w-4 h-4 text-[#8696a0] flex-shrink-0" />
@@ -1547,14 +1722,116 @@ export default function FollowUpView() {
                 <p className="text-[#8696a0] text-xs">
                   {selectedConversation.contact_phone.includes('@g.us') ? 'Grupo' : selectedConversation.contact_name ? formatPhone(selectedConversation.contact_phone) : ''}
                 </p>
-              </div>
+              </button>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {/* Analyze Button */}
+              <button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || messages.length === 0}
+                className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mr-1"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Analisando...
+                  </>
+                ) : (
+                  <>
+                    <BarChart3 className="w-4 h-4" />
+                    {analysis ? 'Re-analisar' : 'Analisar'}
+                  </>
+                )}
+              </button>
+
+              {/* Analysis Score Card */}
+              {analysis && !showAnalysisPanel && (
+                <button
+                  onClick={() => setShowAnalysisPanel(true)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all mr-1 ${
+                    analysis.nota_final >= 8 ? 'bg-green-900/50 border border-green-700 hover:bg-green-900/70' :
+                    analysis.nota_final >= 6 ? 'bg-yellow-900/50 border border-yellow-700 hover:bg-yellow-900/70' :
+                    analysis.nota_final >= 4 ? 'bg-orange-900/50 border border-orange-700 hover:bg-orange-900/70' :
+                    'bg-red-900/50 border border-red-700 hover:bg-red-900/70'
+                  }`}
+                >
+                  <span className={`text-lg font-bold ${
+                    analysis.nota_final >= 8 ? 'text-green-400' :
+                    analysis.nota_final >= 6 ? 'text-yellow-400' :
+                    analysis.nota_final >= 4 ? 'text-orange-400' :
+                    'text-red-400'
+                  }`}>{analysis.nota_final.toFixed(1)}</span>
+                  <span className="text-[#8696a0] text-xs">Ver avaliacao</span>
+                  <ChevronRight className="w-4 h-4 text-[#8696a0]" />
+                </button>
+              )}
+
+              {/* Search button */}
+              <button
+                onClick={openMessageSearch}
+                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+                title="Pesquisar"
+              >
+                <Search className="w-5 h-5 text-[#aebac1]" />
+              </button>
+
+              {/* Menu button (3 dots) */}
+              <button
+                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+                title="Menu"
+              >
+                <MoreVertical className="w-5 h-5 text-[#aebac1]" />
+              </button>
             </div>
           </div>
 
+          {/* Message Search Bar */}
+          {isSearchingMessages && (
+            <div className="flex-shrink-0 bg-[#111b21] border-b border-[#222d34] px-4 py-2 flex items-center gap-3">
+              <button
+                onClick={closeMessageSearch}
+                className="p-1 hover:bg-[#2a3942] rounded-full transition-colors flex-shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5 text-[#aebac1]" />
+              </button>
+              <div className="flex-1 flex items-center bg-[#202c33] rounded-lg px-4 py-1.5">
+                <Search className="w-4 h-4 text-[#8696a0] mr-3 flex-shrink-0" />
+                <input
+                  ref={messageSearchInputRef}
+                  type="text"
+                  placeholder="Pesquisar mensagens"
+                  value={messageSearchQuery}
+                  onChange={(e) => handleMessageSearch(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  className="flex-1 bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none"
+                />
+              </div>
+              {messageSearchQuery && (
+                <span className="text-[#8696a0] text-xs flex-shrink-0 min-w-[60px] text-center">
+                  {searchMatchIds.length === 0 ? 'Nenhum' : `${activeSearchIndex + 1} de ${searchMatchIds.length}`}
+                </span>
+              )}
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                <button
+                  onClick={() => navigateSearch('up')}
+                  disabled={searchMatchIds.length === 0}
+                  className="p-1 hover:bg-[#2a3942] rounded-full transition-colors disabled:opacity-30"
+                >
+                  <ChevronUp className="w-5 h-5 text-[#aebac1]" />
+                </button>
+                <button
+                  onClick={() => navigateSearch('down')}
+                  disabled={searchMatchIds.length === 0}
+                  className="p-1 hover:bg-[#2a3942] rounded-full transition-colors disabled:opacity-30"
+                >
+                  <ChevronDown className="w-5 h-5 text-[#aebac1]" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Messages Area */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-16 py-4" style={{
+          <div className="flex-1 min-h-0 overflow-y-auto whatsapp-scrollbar px-16 py-4" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
           }}>
             {error && (
@@ -1583,8 +1860,11 @@ export default function FollowUpView() {
                   const showDate = idx === 0 ||
                     new Date(msg.timestamp).toDateString() !== new Date(filtered[idx - 1].timestamp).toDateString()
 
+                  const isSearchMatch = searchMatchIds.includes(msg.id)
+                  const isActiveMatch = isSearchMatch && searchMatchIds[activeSearchIndex] === msg.id
+
                   return (
-                    <div key={msg.id}>
+                    <div key={msg.id} id={`msg-${msg.id}`}>
                       {showDate && (
                         <div className="flex justify-center my-3">
                           <span className="bg-[#182229] text-[#8696a0] text-xs px-3 py-1 rounded-lg shadow">
@@ -1597,11 +1877,11 @@ export default function FollowUpView() {
                         </div>
                       )}
                       <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[65%] rounded-lg px-3 py-2 shadow ${
+                        <div className={`max-w-[65%] rounded-lg px-3 py-2 shadow transition-colors duration-200 ${
                           msg.fromMe
                             ? 'bg-[#005c4b] rounded-tr-none'
                             : 'bg-[#202c33] rounded-tl-none'
-                        } ${msg.id.startsWith('temp_') ? 'opacity-60' : ''}`}>
+                        } ${msg.id.startsWith('temp_') ? 'opacity-60' : ''} ${isActiveMatch ? 'ring-2 ring-[#00a884] ring-offset-1 ring-offset-[#0b141a]' : ''}`}>
                           {/* Group sender name (hide raw LID/number IDs) */}
                           {selectedConversation?.contact_phone.includes('@g.us') && !msg.fromMe && msg.contactName && !/^\d+(@|$)/.test(msg.contactName) && (
                             <p className="text-xs font-medium text-[#00a884] mb-1">{msg.contactName}</p>
@@ -1614,29 +1894,72 @@ export default function FollowUpView() {
                                 alt="Imagem"
                                 className="w-full max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                 onClick={() => setLightboxImage(getMediaSrc(msg.mediaId!))}
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  const placeholder = target.parentElement
+                                  if (placeholder) {
+                                    placeholder.innerHTML = '<div class="flex items-center gap-2 px-3 py-4 bg-[#0b141a]/30"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-[#8696a0] text-xs">Foto</span></div>'
+                                  }
+                                }}
                               />
                             </div>
                           )}
                           {/* Sticker */}
                           {msg.type === 'sticker' && msg.mediaId && (
                             <div className="mb-1">
-                              <img src={getMediaSrc(msg.mediaId)} alt="Sticker" className="max-w-[150px] max-h-[150px]" />
+                              <img
+                                src={getMediaSrc(msg.mediaId)}
+                                alt="Sticker"
+                                className="max-w-[150px] max-h-[150px]"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = 'none'
+                                  target.insertAdjacentHTML('afterend', '<span class="text-[#8696a0] text-xs italic">Sticker</span>')
+                                }}
+                              />
                             </div>
                           )}
                           {/* Audio */}
                           {(msg.type === 'audio' || msg.type === 'ptt') && msg.mediaId && (
-                            <div className="mb-1 min-w-[240px]">
-                              <audio controls className="w-full h-8" style={{ filter: 'invert(1) hue-rotate(180deg)' }}>
-                                <source src={getMediaSrc(msg.mediaId)} type={msg.mimetype || 'audio/ogg'} />
-                              </audio>
+                            <div className="min-w-[280px]">
+                              <div className="flex items-center gap-2.5">
+                                {/* Play button */}
+                                <div className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#8696a0" stroke="none"><polygon points="8 5 19 12 8 19 8 5"/></svg>
+                                </div>
+                                {/* Waveform */}
+                                <div className="flex-1 flex items-center gap-[2px] h-[28px]">
+                                  {Array.from({ length: 36 }, (_, i) => {
+                                    const seed = (msg.id.charCodeAt(i % msg.id.length) * (i + 1)) % 100
+                                    const h = Math.max(4, Math.min(26, seed * 0.26))
+                                    return (
+                                      <div
+                                        key={i}
+                                        className="rounded-full flex-shrink-0"
+                                        style={{
+                                          width: '2.5px',
+                                          height: `${h}px`,
+                                          backgroundColor: i < 12 ? (msg.fromMe ? '#b3d4cc' : '#8696a0') : '#374045'
+                                        }}
+                                      />
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between mt-0.5 px-1">
+                                <span className="text-[11px] text-[#8696a0]">0:00</span>
+                              </div>
                             </div>
                           )}
                           {/* Video */}
                           {msg.type === 'video' && msg.mediaId && (
                             <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
-                              <video controls className="w-full max-h-[300px]">
-                                <source src={getMediaSrc(msg.mediaId)} type={msg.mimetype || 'video/mp4'} />
-                              </video>
+                              <div className="flex items-center justify-center bg-[#0b141a]/50 py-8 px-4">
+                                <div className="flex items-center gap-2">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8696a0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                  <span className="text-[#8696a0] text-xs">Video</span>
+                                </div>
+                              </div>
                             </div>
                           )}
                           {/* Document */}
@@ -1649,29 +1972,132 @@ export default function FollowUpView() {
                               )}
                             </div>
                           )}
-                          {/* Media with no mediaId (failed to load) */}
-                          {msg.hasMedia && !msg.mediaId && msg.type !== 'text' && (
-                            <p className="text-[#8696a0] text-xs italic mb-1">
-                              {msg.type === 'image' ? '📷 Imagem' :
-                               msg.type === 'sticker' ? '🎨 Sticker' :
-                               msg.type === 'video' ? '🎥 Video' :
-                               msg.type === 'audio' || msg.type === 'ptt' ? '🎵 Audio' :
-                               msg.type === 'document' ? '📄 Documento' :
-                               `📎 ${msg.type}`}
-                            </p>
+                          {/* Media with no mediaId (failed to load) - Audio/PTT gets waveform style */}
+                          {msg.hasMedia && !msg.mediaId && (msg.type === 'audio' || msg.type === 'ptt') && (
+                            <div className="min-w-[280px]">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center flex-shrink-0">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#8696a0" stroke="none"><polygon points="8 5 19 12 8 19 8 5"/></svg>
+                                </div>
+                                <div className="flex-1 flex items-center gap-[2px] h-[28px]">
+                                  {Array.from({ length: 36 }, (_, i) => {
+                                    const seed = (msg.id.charCodeAt(i % msg.id.length) * (i + 1)) % 100
+                                    const h = Math.max(4, Math.min(26, seed * 0.26))
+                                    return (
+                                      <div
+                                        key={i}
+                                        className="rounded-full flex-shrink-0"
+                                        style={{
+                                          width: '2.5px',
+                                          height: `${h}px`,
+                                          backgroundColor: '#374045'
+                                        }}
+                                      />
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between mt-0.5 px-1">
+                                <span className="text-[11px] text-[#8696a0]">0:00</span>
+                              </div>
+                            </div>
                           )}
+                          {/* Media with no mediaId (failed to load) - Other types */}
+                          {msg.hasMedia && !msg.mediaId && msg.type !== 'text' && msg.type !== 'audio' && msg.type !== 'ptt' && (
+                            <div className="flex items-center gap-2 mb-1 bg-[#0b141a]/30 rounded px-3 py-2">
+                              <span className="text-lg">
+                                {msg.type === 'image' ? '📷' :
+                                 msg.type === 'sticker' ? '🎨' :
+                                 msg.type === 'video' ? '🎥' :
+                                 msg.type === 'document' ? '📄' : '📎'}
+                              </span>
+                              <span className="text-[#8696a0] text-xs">
+                                {msg.type === 'image' ? 'Foto' :
+                                 msg.type === 'sticker' ? 'Sticker' :
+                                 msg.type === 'video' ? 'Video' :
+                                 msg.type === 'document' ? 'Documento' :
+                                 msg.type}
+                              </span>
+                            </div>
+                          )}
+                          {/* Contact Card */}
+                          {(msg.type === 'contacts' || (msg.body && msg.body.includes('BEGIN:VCARD'))) && (() => {
+                            const vcardMatch = msg.body?.match(/FN:(.+)/)?.[1] || ''
+                            const phoneMatch = msg.body?.match(/TEL[^:]*:(.+)/)?.[1] || ''
+                            const contactDisplayName = vcardMatch || (msg.body?.startsWith('📇') ? msg.body.replace('📇 ', '') : msg.body || 'Contato')
+                            return (
+                              <div className="min-w-[220px]" style={{ margin: '-4px -6px -4px -6px' }}>
+                                <div className={`flex items-center gap-3 px-3 py-3 ${msg.fromMe ? 'bg-[#025144]' : 'bg-[#1a262d]'} rounded-t-lg`}>
+                                  <div className="w-11 h-11 rounded-full bg-[#6b7b8a] flex items-center justify-center flex-shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#ccd2d6" stroke="none">
+                                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[#e9edef] text-[15px] font-medium truncate">{contactDisplayName}</p>
+                                    {phoneMatch && <p className="text-[#8696a0] text-xs truncate">{phoneMatch}</p>}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    // Extract digits from vCard phone or waid
+                                    const waidMatch = msg.body?.match(/waid=(\d+)/)?.[1] || ''
+                                    const telDigits = phoneMatch?.replace(/[^0-9]/g, '') || ''
+                                    const digits = waidMatch || telDigits
+                                    // Use last 8 digits for matching (avoids country code issues)
+                                    const last8 = digits.slice(-8)
+                                    // Also try matching by name
+                                    const name = contactDisplayName.toLowerCase().trim()
+
+                                    const target = conversations.find(c => {
+                                      const cDigits = c.contact_phone.replace(/[^0-9]/g, '')
+                                      const cLast8 = cDigits.slice(-8)
+                                      if (last8 && cLast8 === last8) return true
+                                      if (name && c.contact_name?.toLowerCase().trim() === name) return true
+                                      return false
+                                    })
+                                    if (target) selectConversation(target)
+                                  }}
+                                  className={`w-full border-t ${msg.fromMe ? 'border-[#0b6b5a]' : 'border-[#2a3942]'} px-3 py-2 text-center rounded-b-lg hover:brightness-110 transition-all cursor-pointer`}
+                                >
+                                  <span className="text-[#00a884] text-[13px] font-medium">Mensagem</span>
+                                </button>
+                              </div>
+                            )
+                          })()}
                           {/* Special message types */}
-                          {!msg.body && !msg.hasMedia && msg.type !== 'text' && (
+                          {!msg.body && !msg.hasMedia && msg.type !== 'text' && msg.type !== 'contacts' && (
                             <p className="text-[#8696a0] text-xs italic">
                               {msg.type === 'location' ? '📍 Localizacao' :
-                               msg.type === 'contacts' ? '👤 Contato' :
                                msg.type === 'sticker' ? '🎨 Sticker' :
                                `[${msg.type}]`}
                             </p>
                           )}
                           {/* Text body */}
-                          {msg.body && msg.type !== 'sticker' && msg.type !== 'document' && msg.type !== 'audio' && msg.type !== 'ptt' && (
-                            <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                          {msg.body && msg.type !== 'sticker' && msg.type !== 'document' && msg.type !== 'audio' && msg.type !== 'ptt' && msg.type !== 'contacts' && !msg.body.includes('BEGIN:VCARD') && (
+                            <p className="text-[#e9edef] text-sm whitespace-pre-wrap break-words">
+                              {isSearchMatch && messageSearchQuery ? (() => {
+                                const q = messageSearchQuery.toLowerCase()
+                                const parts: React.ReactNode[] = []
+                                let remaining = msg.body
+                                let key = 0
+                                while (remaining.length > 0) {
+                                  const idx = remaining.toLowerCase().indexOf(q)
+                                  if (idx === -1) {
+                                    parts.push(remaining)
+                                    break
+                                  }
+                                  if (idx > 0) parts.push(remaining.slice(0, idx))
+                                  parts.push(
+                                    <mark key={key++} className="bg-[#ffd54f] text-[#111b21] rounded-sm px-0.5">
+                                      {remaining.slice(idx, idx + q.length)}
+                                    </mark>
+                                  )
+                                  remaining = remaining.slice(idx + q.length)
+                                }
+                                return parts
+                              })() : msg.body}
+                            </p>
                           )}
                           <div className="flex items-center justify-end gap-1 mt-1">
                             <span className="text-[10px] text-[#8696a0]">
@@ -1701,7 +2127,7 @@ export default function FollowUpView() {
           </div>
 
           {/* Message Input Bar */}
-          <div className="px-4 py-3 bg-[#202c33] flex-shrink-0">
+          <div className="px-[10px] py-[5px] bg-[#202c33] flex-shrink-0">
             {/* File Preview Strip */}
             {selectedFile && (
               <div className="mb-2 p-2 bg-[#2a3942] rounded-lg flex items-center gap-3">
@@ -1749,97 +2175,136 @@ export default function FollowUpView() {
               </div>
             ) : (
               /* Normal Input Mode */
-              <div className="flex items-end gap-2">
-                {/* Emoji Button */}
-                <div className="relative" ref={emojiPickerRef}>
-                  <button
-                    onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowAttachMenu(false) }}
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
-                  >
-                    <Smile className="w-6 h-6 text-[#8696a0]" />
-                  </button>
-                  {showEmojiPicker && (
-                    <div className="absolute bottom-12 left-0 bg-[#233138] rounded-xl shadow-lg p-3 w-[320px] max-h-[280px] overflow-y-auto z-50">
-                      <div className="grid grid-cols-8 gap-1">
-                        {EMOJI_LIST.map((emoji, i) => (
-                          <button
-                            key={i}
-                            onClick={() => insertEmoji(emoji)}
-                            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-[#182229] rounded transition-colors"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
+              <div className="flex items-end gap-[5px]">
+                {/* Input container with emoji + attach + text */}
+                <div className="flex-1 flex items-end bg-[#2a3942] rounded-[8px] min-h-[42px]">
+                  {/* Emoji Button */}
+                  <div className="relative flex-shrink-0" ref={emojiPickerRef}>
+                    <button
+                      onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowAttachMenu(false) }}
+                      className="w-[42px] h-[42px] flex items-center justify-center transition-colors"
+                    >
+                      <Smile className="w-[24px] h-[24px] text-[#8696a0]" />
+                    </button>
+                    {showEmojiPicker && (
+                      <div className="absolute bottom-12 left-0 bg-[#233138] rounded-xl shadow-lg p-3 w-[320px] max-h-[280px] overflow-y-auto z-50">
+                        <div className="grid grid-cols-8 gap-1">
+                          {EMOJI_LIST.map((emoji, i) => (
+                            <button
+                              key={i}
+                              onClick={() => insertEmoji(emoji)}
+                              className="w-8 h-8 flex items-center justify-center text-xl hover:bg-[#182229] rounded transition-colors"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  {/* Attachment Button */}
+                  <div className="relative flex-shrink-0" ref={attachMenuRef}>
+                    <button
+                      onClick={() => { setShowAttachMenu(!showAttachMenu); setShowEmojiPicker(false) }}
+                      className="w-[36px] h-[42px] flex items-center justify-center transition-colors"
+                    >
+                      <Paperclip className="w-[24px] h-[24px] text-[#8696a0] rotate-45" />
+                    </button>
+                    {showAttachMenu && (
+                      <div className="absolute bottom-12 left-0 bg-[#233138] rounded-2xl shadow-xl py-2 w-[200px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <button
+                          onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = '*/*'; fileInputRef.current.click() } setShowAttachMenu(false) }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#182229] transition-colors"
+                        >
+                          <div className="w-[34px] h-[34px] bg-[#7f66ff] rounded-full flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-[18px] h-[18px] text-white" />
+                          </div>
+                          <span className="text-[#e9edef] text-[14.5px]">Documento</span>
+                        </button>
+                        <button
+                          onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = 'image/*,video/*'; fileInputRef.current.click() } setShowAttachMenu(false) }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#182229] transition-colors"
+                        >
+                          <div className="w-[34px] h-[34px] bg-[#007bfc] rounded-full flex items-center justify-center flex-shrink-0">
+                            <ImageIcon className="w-[18px] h-[18px] text-white" />
+                          </div>
+                          <span className="text-[#e9edef] text-[14.5px]">Fotos e vídeos</span>
+                        </button>
+                        <button
+                          onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = 'image/*'; fileInputRef.current.capture = 'environment'; fileInputRef.current.click() } setShowAttachMenu(false) }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#182229] transition-colors"
+                        >
+                          <div className="w-[34px] h-[34px] bg-[#ff2e74] rounded-full flex items-center justify-center flex-shrink-0">
+                            <Camera className="w-[18px] h-[18px] text-white" />
+                          </div>
+                          <span className="text-[#e9edef] text-[14.5px]">Câmera</span>
+                        </button>
+                        <button
+                          onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = 'audio/*'; fileInputRef.current.click() } setShowAttachMenu(false) }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#182229] transition-colors"
+                        >
+                          <div className="w-[34px] h-[34px] bg-[#ff6723] rounded-full flex items-center justify-center flex-shrink-0">
+                            <Headphones className="w-[18px] h-[18px] text-white" />
+                          </div>
+                          <span className="text-[#e9edef] text-[14.5px]">Áudio</span>
+                        </button>
+                        <button
+                          onClick={() => { setShowAttachMenu(false); setShowContactPicker(true) }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#182229] transition-colors"
+                        >
+                          <div className="w-[34px] h-[34px] bg-[#009de2] rounded-full flex items-center justify-center flex-shrink-0">
+                            <Contact className="w-[18px] h-[18px] text-white" />
+                          </div>
+                          <span className="text-[#e9edef] text-[14.5px]">Contato</span>
+                        </button>
+                        <button
+                          onClick={() => setShowAttachMenu(false)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#182229] transition-colors"
+                        >
+                          <div className="w-[34px] h-[34px] bg-[#02a698] rounded-full flex items-center justify-center flex-shrink-0">
+                            <Sticker className="w-[18px] h-[18px] text-white" />
+                          </div>
+                          <span className="text-[#e9edef] text-[14.5px]">Figurinha</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text Input */}
+                  <div className="flex-1 py-[9px] pr-3">
+                    <textarea
+                      value={selectedFile ? mediaCaption : messageInput}
+                      onChange={(e) => selectedFile ? setMediaCaption(e.target.value) : setMessageInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={selectedFile ? "Adicionar legenda..." : "Digite uma mensagem"}
+                      rows={1}
+                      className="w-full bg-transparent text-[#e9edef] text-[15px] placeholder-[#8696a0] outline-none resize-none max-h-[120px] overflow-y-auto leading-[20px]"
+                      style={{ minHeight: '20px' }}
+                      onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement
+                        target.style.height = '20px'
+                        target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+                      }}
+                    />
+                  </div>
                 </div>
 
-                {/* Attachment Button */}
-                <div className="relative" ref={attachMenuRef}>
-                  <button
-                    onClick={() => { setShowAttachMenu(!showAttachMenu); setShowEmojiPicker(false) }}
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
-                  >
-                    <Paperclip className="w-6 h-6 text-[#8696a0]" />
-                  </button>
-                  {showAttachMenu && (
-                    <div className="absolute bottom-12 left-0 bg-[#233138] rounded-xl shadow-lg py-2 w-[180px] z-50">
-                      <button
-                        onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = 'image/*'; fileInputRef.current.click() } setShowAttachMenu(false) }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors"
-                      >
-                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                          <ImageIcon className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-[#e9edef] text-sm">Fotos</span>
-                      </button>
-                      <button
-                        onClick={() => { if (fileInputRef.current) { fileInputRef.current.accept = '*/*'; fileInputRef.current.click() } setShowAttachMenu(false) }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors"
-                      >
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-[#e9edef] text-sm">Documento</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Text Input */}
-                <div className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2">
-                  <textarea
-                    value={selectedFile ? mediaCaption : messageInput}
-                    onChange={(e) => selectedFile ? setMediaCaption(e.target.value) : setMessageInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={selectedFile ? "Adicionar legenda..." : "Digite uma mensagem"}
-                    rows={1}
-                    className="w-full bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none resize-none max-h-[120px] overflow-y-auto"
-                    style={{ minHeight: '20px' }}
-                    onInput={(e) => {
-                      const target = e.target as HTMLTextAreaElement
-                      target.style.height = '20px'
-                      target.style.height = Math.min(target.scrollHeight, 120) + 'px'
-                    }}
-                  />
-                </div>
-
-                {/* Mic / Send Button */}
+                {/* Mic / Send Button (outside the input bar) */}
                 {(messageInput.trim() || selectedFile) ? (
                   <button
                     onClick={selectedFile ? handleSendMedia : handleSendMessage}
                     disabled={isSending || (!messageInput.trim() && !selectedFile)}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                    className="w-[42px] h-[42px] flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                   >
-                    {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                    {isSending ? <Loader2 className="w-5 h-5 text-[#8696a0] animate-spin" /> : <Send className="w-[20px] h-[20px] text-[#8696a0]" />}
                   </button>
                 ) : (
                   <button
                     onClick={startVoiceRecording}
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
+                    className="w-[42px] h-[42px] flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
                   >
-                    <Mic className="w-6 h-6 text-[#8696a0]" />
+                    <Mic className="w-[24px] h-[24px] text-[#8696a0]" />
                   </button>
                 )}
               </div>
@@ -1850,6 +2315,389 @@ export default function FollowUpView() {
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
         </div>
 
+        {/* Contact Picker Modal */}
+        {showContactPicker && (
+          <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/50">
+            <div className="bg-[#222e35] rounded-xl w-[380px] max-h-[500px] flex flex-col shadow-2xl">
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#374045]">
+                <button
+                  onClick={() => { setShowContactPicker(false); setContactSearchQuery('') }}
+                  className="p-1 hover:bg-[#2a3942] rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-[#aebac1]" />
+                </button>
+                <h3 className="text-[#e9edef] font-medium text-base">Enviar contato</h3>
+              </div>
+
+              {/* Search */}
+              <div className="px-3 py-2">
+                <div className="flex items-center bg-[#2a3942] rounded-lg px-3 py-1.5">
+                  <Search className="w-4 h-4 text-[#8696a0] mr-2 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar contato"
+                    value={contactSearchQuery}
+                    onChange={(e) => setContactSearchQuery(e.target.value)}
+                    className="flex-1 bg-transparent text-[#e9edef] text-sm placeholder-[#8696a0] outline-none"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Contact List */}
+              <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+                {conversations
+                  .filter(c => {
+                    if (!contactSearchQuery.trim()) return true
+                    const q = contactSearchQuery.toLowerCase()
+                    const name = (c.contact_name || '').toLowerCase()
+                    const phone = c.contact_phone.toLowerCase()
+                    return name.includes(q) || phone.includes(q)
+                  })
+                  .filter(c => selectedConversation ? c.contact_phone !== selectedConversation.contact_phone : true)
+                  .map(contact => (
+                    <button
+                      key={contact.contact_phone}
+                      onClick={() => handleSendContact(contact)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#2a3942] transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-[#6b7b8a] flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-sm font-medium">
+                          {getInitials(contact.contact_name)}
+                        </span>
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <p className="text-[#e9edef] text-[15px] truncate">
+                          {contact.contact_name || formatPhone(contact.contact_phone)}
+                        </p>
+                        {contact.contact_name && (
+                          <p className="text-[#8696a0] text-xs truncate">
+                            {formatPhone(contact.contact_phone)}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                }
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Analysis Panel (slides in from right) */}
+        {analysis && (
+          <div className={`absolute top-0 right-0 h-full w-[400px] bg-[#111b21] border-l border-[#222d34] flex flex-col transition-transform duration-300 ${showAnalysisPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowAnalysisPanel(false)}
+                  className="p-1 hover:bg-[#2a3942] rounded-full transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5 text-[#aebac1]" />
+                </button>
+                <span className="text-[#e9edef] font-medium">Avaliacao</span>
+              </div>
+              <button
+                onClick={() => setShowAnalysisPanel(false)}
+                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-[#aebac1]" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto whatsapp-scrollbar p-4">
+              {renderAnalysisResults()}
+            </div>
+          </div>
+        )}
+
+        {/* Contact Info Panel (slides in from right) */}
+        {selectedConversation && (
+          <div className={`absolute top-0 right-0 h-full w-full sm:w-[420px] bg-[#111b21] border-l border-[#222d34] flex flex-col z-[75] transition-transform duration-300 ${showContactInfo ? 'translate-x-0' : 'translate-x-full'}`}>
+            {/* Header */}
+            <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowContactInfo(false)}
+                  className="p-1 hover:bg-[#2a3942] rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-[#aebac1]" />
+                </button>
+                <span className="text-[#e9edef] font-medium text-base">Dados do contato</span>
+              </div>
+              <button className="p-2 hover:bg-[#2a3942] rounded-full transition-colors">
+                <Pencil className="w-[18px] h-[18px] text-[#aebac1]" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+              {/* Profile Section */}
+              <div className="flex flex-col items-center py-7 bg-[#111b21]">
+                {/* Profile Picture */}
+                {contactDetailInfo?.profilePicUrl || selectedConversation.profile_pic_url ? (
+                  <img
+                    src={contactDetailInfo?.profilePicUrl || selectedConversation.profile_pic_url!}
+                    alt=""
+                    className="w-[200px] h-[200px] rounded-full object-cover mb-4"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                      const parent = (e.target as HTMLImageElement).parentElement
+                      if (parent) {
+                        const fallback = document.createElement('div')
+                        fallback.className = 'w-[200px] h-[200px] rounded-full bg-[#6b7b8a] flex items-center justify-center mb-4'
+                        fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="#ccd2d6" stroke="none"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'
+                        parent.insertBefore(fallback, e.target as HTMLImageElement)
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="w-[200px] h-[200px] rounded-full bg-[#6b7b8a] flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="#ccd2d6" stroke="none">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
+
+                {/* Name */}
+                <h2 className="text-[#e9edef] text-[22px] font-medium text-center px-4">
+                  {selectedConversation.contact_name || formatPhone(selectedConversation.contact_phone)}
+                </h2>
+
+                {/* Business: person name under business name */}
+                {contactDetailInfo?.isBusiness && contactDetailInfo?.name && contactDetailInfo.name !== selectedConversation.contact_name && (
+                  <p className="text-[#e9edef] text-[15px] mt-0.5">{contactDetailInfo.name}</p>
+                )}
+
+                {/* Business category */}
+                {contactDetailInfo?.isBusiness && contactDetailInfo?.businessProfile?.category && (
+                  <p className="text-[#00a884] text-[14px] mt-0.5">{contactDetailInfo.businessProfile.category}</p>
+                )}
+
+                {/* Business hours summary */}
+                {contactDetailInfo?.isBusiness && contactDetailInfo?.businessProfile?.businessHours && (
+                  <p className="text-[#00a884] text-[13px] mt-1">
+                    <Clock className="w-3 h-3 inline mr-1" />
+                    {contactDetailInfo.businessProfile.businessHours.config ? 'Open' : 'Horário disponível'}
+                  </p>
+                )}
+
+                {/* Phone (for non-business) */}
+                {!contactDetailInfo?.isBusiness && (
+                  <p className="text-[#8696a0] text-[15px] mt-0.5">
+                    {formatPhone(selectedConversation.contact_phone)}
+                  </p>
+                )}
+
+                {/* Share button (business) */}
+                {contactDetailInfo?.isBusiness && (
+                  <div className="flex flex-col items-center mt-4">
+                    <div className="w-10 h-10 rounded-full bg-[#00a884]/20 flex items-center justify-center">
+                      <Share2 className="w-5 h-5 text-[#00a884]" />
+                    </div>
+                    <span className="text-[#00a884] text-[12px] mt-1">Compartilhar</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="h-[8px] bg-[#0b141a]" />
+
+              {/* Business Account Notice */}
+              {contactDetailInfo?.isBusiness && (
+                <>
+                  <div className="px-7 py-3 flex items-center gap-3">
+                    <Building2 className="w-[18px] h-[18px] text-[#8696a0] flex-shrink-0" />
+                    <span className="text-[#8696a0] text-[14px]">Esta é uma conta comercial.</span>
+                  </div>
+                  <div className="h-[8px] bg-[#0b141a]" />
+                </>
+              )}
+
+              {/* About/Description Section */}
+              {contactDetailInfo?.isBusiness && contactDetailInfo?.businessProfile?.description ? (
+                <div className="px-7 py-4">
+                  <p className="text-[#e9edef] text-[15px] leading-relaxed whitespace-pre-wrap">
+                    {contactDetailInfo.businessProfile.description}
+                  </p>
+                </div>
+              ) : (
+                <div className="px-7 py-4">
+                  <p className="text-[#8696a0] text-[13px] mb-2">Recado</p>
+                  <p className="text-[#e9edef] text-[15px]">
+                    {isLoadingContactInfo ? (
+                      <span className="inline-block w-32 h-4 bg-[#202c33] rounded animate-pulse" />
+                    ) : (
+                      contactDetailInfo?.about || '—'
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* Divider */}
+              <div className="h-[8px] bg-[#0b141a]" />
+
+              {/* Business Info: Hours, Location, Email, Website */}
+              {contactDetailInfo?.isBusiness && (
+                <>
+                  <div className="py-1">
+                    {/* Business Hours */}
+                    {contactDetailInfo.businessProfile?.businessHours && (
+                      <div className="flex items-start gap-5 px-7 py-3.5">
+                        <Clock className="w-[20px] h-[20px] text-[#8696a0] mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-[#00a884] text-[14px]">Aberto agora</p>
+                          <p className="text-[#8696a0] text-[13px]">Aberto 24 horas</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Address */}
+                    {contactDetailInfo.businessProfile?.address && (
+                      <div className="flex items-start gap-5 px-7 py-3.5">
+                        <MapPin className="w-[20px] h-[20px] text-[#8696a0] mt-0.5 flex-shrink-0" />
+                        <p className="text-[#e9edef] text-[14px]">{contactDetailInfo.businessProfile.address}</p>
+                      </div>
+                    )}
+
+                    {/* Email */}
+                    {contactDetailInfo.businessProfile?.email && (
+                      <div className="flex items-start gap-5 px-7 py-3.5">
+                        <Mail className="w-[20px] h-[20px] text-[#8696a0] mt-0.5 flex-shrink-0" />
+                        <p className="text-[#00a884] text-[14px]">{contactDetailInfo.businessProfile.email}</p>
+                      </div>
+                    )}
+
+                    {/* Website */}
+                    {contactDetailInfo.businessProfile?.website && (
+                      <div className="flex items-start gap-5 px-7 py-3.5">
+                        <Globe className="w-[20px] h-[20px] text-[#8696a0] mt-0.5 flex-shrink-0" />
+                        <p className="text-[#00a884] text-[14px]">
+                          {Array.isArray(contactDetailInfo.businessProfile.website)
+                            ? contactDetailInfo.businessProfile.website.join(', ')
+                            : contactDetailInfo.businessProfile.website
+                          }
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Phone */}
+                    <div className="flex items-start gap-5 px-7 py-3.5">
+                      <Smartphone className="w-[20px] h-[20px] text-[#8696a0] mt-0.5 flex-shrink-0" />
+                      <p className="text-[#e9edef] text-[14px]">{formatPhone(selectedConversation.contact_phone)}</p>
+                    </div>
+                  </div>
+
+                  <div className="h-[8px] bg-[#0b141a]" />
+                </>
+              )}
+
+              {/* Media Section */}
+              <div className="px-7 py-4">
+                <button className="w-full flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <ImageIcon className="w-[22px] h-[22px] text-[#8696a0]" />
+                    <span className="text-[#e9edef] text-[15px]">Mídia, links e docs</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#8696a0] text-[14px]">
+                      {messages.filter(m => m.hasMedia || m.type === 'image' || m.type === 'video' || m.type === 'document').length}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-[#8696a0]" />
+                  </div>
+                </button>
+
+                {/* Media Thumbnails */}
+                {(() => {
+                  const mediaMessages = messages.filter(m => m.hasMedia && m.mediaId && (m.type === 'image' || m.mimetype?.startsWith('image/')))
+                  if (mediaMessages.length === 0) return null
+                  return (
+                    <div className="flex gap-1 mt-3 overflow-hidden">
+                      {mediaMessages.slice(-4).map((m, i) => (
+                        <div key={i} className="w-[90px] h-[90px] rounded overflow-hidden bg-[#202c33] flex-shrink-0">
+                          <img
+                            src={getMediaSrc(m.mediaId!)}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Divider */}
+              <div className="h-[8px] bg-[#0b141a]" />
+
+              {/* Options */}
+              <div className="py-1">
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Star className="w-[22px] h-[22px] text-[#8696a0]" />
+                  <span className="text-[#e9edef] text-[15px]">Mensagens favoritas</span>
+                </button>
+                <button className="w-full flex items-center justify-between px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <div className="flex items-center gap-5">
+                    <Bell className="w-[22px] h-[22px] text-[#8696a0]" />
+                    <span className="text-[#e9edef] text-[15px]">Silenciar notificações</span>
+                  </div>
+                  <div className="w-10 h-5 bg-[#374045] rounded-full relative">
+                    <div className="w-4 h-4 bg-[#8696a0] rounded-full absolute top-0.5 left-0.5" />
+                  </div>
+                </button>
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Lock className="w-[22px] h-[22px] text-[#8696a0]" />
+                  <div>
+                    <span className="text-[#e9edef] text-[15px]">Mensagens temporárias</span>
+                    <p className="text-[#8696a0] text-[13px]">Desativadas</p>
+                  </div>
+                </button>
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Shield className="w-[22px] h-[22px] text-[#8696a0]" />
+                  <div>
+                    <span className="text-[#e9edef] text-[15px]">Privacidade avançada do chat</span>
+                    <p className="text-[#8696a0] text-[13px]">Desativada</p>
+                  </div>
+                </button>
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Lock className="w-[22px] h-[22px] text-[#8696a0]" />
+                  <div>
+                    <span className="text-[#e9edef] text-[15px]">Criptografia</span>
+                    <p className="text-[#8696a0] text-[13px]">As mensagens são protegidas</p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="h-[8px] bg-[#0b141a]" />
+
+              {/* Danger Zone */}
+              <div className="py-1">
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Heart className="w-[22px] h-[22px] text-[#ea4b60]" />
+                  <span className="text-[#ea4b60] text-[15px]">Adicionar aos favoritos</span>
+                </button>
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Ban className="w-[22px] h-[22px] text-[#ea4b60]" />
+                  <span className="text-[#ea4b60] text-[15px]">Bloquear {selectedConversation.contact_name || ''}</span>
+                </button>
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Flag className="w-[22px] h-[22px] text-[#ea4b60]" />
+                  <span className="text-[#ea4b60] text-[15px]">Denunciar {selectedConversation.contact_name || ''}</span>
+                </button>
+                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
+                  <Trash2 className="w-[22px] h-[22px] text-[#ea4b60]" />
+                  <span className="text-[#ea4b60] text-[15px]">Apagar conversa</span>
+                </button>
+              </div>
+
+              {/* Bottom padding */}
+              <div className="h-4" />
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -2007,6 +2855,13 @@ export default function FollowUpView() {
             isVisible={connectionStatus === 'connected' && !!selectedConversation}
           />
         </>
+      ) : connectionStatus === 'checking' ? (
+        <div className="flex-1 flex items-center justify-center bg-[#222e35]">
+          <div className="text-center">
+            <Loader2 className="w-10 h-10 animate-spin text-[#00a884] mx-auto mb-4" />
+            <p className="text-[#8696a0] text-sm">Verificando conexão...</p>
+          </div>
+        </div>
       ) : connectionStatus === 'initializing' || connectionStatus === 'qr_ready' || connectionStatus === 'connecting' ? (
         renderConnecting()
       ) : (

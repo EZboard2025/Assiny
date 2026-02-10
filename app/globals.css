@@ -72,6 +72,37 @@
     background: rgba(156, 163, 175, 0.7);
   }
 
+  /* WhatsApp-style scrollbar - thin, subtle, shows on hover */
+  .whatsapp-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .whatsapp-scrollbar:hover {
+    scrollbar-color: rgba(134, 150, 160, 0.5) transparent;
+  }
+
+  .whatsapp-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .whatsapp-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .whatsapp-scrollbar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+  }
+
+  .whatsapp-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: rgba(134, 150, 160, 0.4);
+  }
+
+  .whatsapp-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(134, 150, 160, 0.6);
+  }
+
   .glow-purple {
     box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2);
   }

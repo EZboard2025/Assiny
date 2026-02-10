@@ -286,7 +286,7 @@ export default function SalesCopilot({
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center z-[60] transition-all hover:scale-110"
+          className="fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center z-[60] transition-all hover:scale-110"
           title="Copiloto de Vendas"
         >
           <Sparkles className="w-7 h-7 text-white" />

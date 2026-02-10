@@ -147,39 +147,18 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
   }, [userId])
 
-  // Fetch performance data from user_performance_summaries with fallback to roleplay_sessions
+  // Fetch performance data directly from roleplay_sessions (same as PerfilView)
   const fetchPerformanceData = async (uid: string) => {
     setPerformanceLoading(true)
     try {
       const { supabase } = await import('@/lib/supabase')
 
-      // First try to get pre-calculated summary
-      const { data, error } = await supabase
-        .from('user_performance_summaries')
-        .select('overall_average, total_sessions, spin_s_average, spin_p_average, spin_i_average, spin_n_average')
-        .eq('user_id', uid)
-        .single()
-
-      if (data && data.total_sessions > 0) {
-        setPerformanceData({
-          overallAverage: data.overall_average || 0,
-          totalSessions: data.total_sessions || 0,
-          spinScores: {
-            S: data.spin_s_average || 0,
-            P: data.spin_p_average || 0,
-            I: data.spin_i_average || 0,
-            N: data.spin_n_average || 0
-          }
-        })
-        return
-      }
-
-      // Fallback: Calculate directly from roleplay_sessions
-      console.log('📊 Calculating performance from roleplay_sessions...')
+      // Calculate directly from roleplay_sessions (matching PerfilView logic)
       const { data: sessions, error: sessionsError } = await supabase
         .from('roleplay_sessions')
-        .select('evaluation')
+        .select('evaluation, status')
         .eq('user_id', uid)
+        .eq('status', 'completed')
         .not('evaluation', 'is', null)
 
       if (sessionsError) {
@@ -556,7 +535,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Tela de carregamento enquanto dados do usuário são carregados
   if (userDataLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="relative mb-6">
             <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-green-500 animate-spin mx-auto" />
@@ -574,7 +553,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex">
+    <div className="min-h-screen bg-white text-gray-900 flex">
       {/* Sidebar */}
       <Sidebar
         currentView={currentView}

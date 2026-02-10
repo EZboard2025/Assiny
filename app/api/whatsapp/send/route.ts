@@ -18,7 +18,11 @@ export async function POST(request: NextRequest) {
   if (contentType.includes('multipart/form-data')) {
     return handleMediaMessage(request)
   } else {
-    return handleTextMessage(request)
+    const body = await request.json()
+    if (body.type === 'contact') {
+      return handleContactMessage(request, body)
+    }
+    return handleTextMessage(request, body)
   }
 }
 
@@ -26,9 +30,8 @@ export async function POST(request: NextRequest) {
 // Text message (existing behavior)
 // ============================================
 
-async function handleTextMessage(request: NextRequest) {
+async function handleTextMessage(request: NextRequest, body: any) {
   try {
-    const body = await request.json()
     const { to, message } = body
 
     if (!to || !message) {
@@ -41,24 +44,28 @@ async function handleTextMessage(request: NextRequest) {
     const { user, error: authErr } = await authenticateRequest(request)
     if (authErr) return authErr
 
+    console.log(`[WA Send] Attempting to send text to: ${to}`)
+
     const client = getConnectedClient(user!.id)
     if (!client) {
+      console.error(`[WA Send] No connected client for user ${user!.id}`)
       return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
     }
 
-    const chatId = await resolveChatId(to, user!.id)
+    console.log(`[WA Send] Resolving chatId for: ${to}`)
+    const chatId = await Promise.race([
+      resolveChatId(to, user!.id),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('resolveChatId timeout (5s)')), 5000))
+    ])
+    console.log(`[WA Send] Resolved chatId: ${chatId}`)
 
-    // Anti-ban: Simulate typing before sending
-    try {
-      const chat = await client.getChatById(chatId)
-      await chat.sendStateTyping()
-    } catch {}
-
-    // Anti-ban: Random delay (2-4 seconds)
-    const typingDelay = 2000 + Math.random() * 2000
-    await new Promise(resolve => setTimeout(resolve, typingDelay))
-
-    const sentMsg = await client.sendMessage(chatId, message)
+    // Send directly (no typing indicator or delay for now - debugging)
+    console.log(`[WA Send] Sending message to ${chatId}...`)
+    const sentMsg = await Promise.race([
+      client.sendMessage(chatId, message),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sendMessage timeout (15s)')), 15000))
+    ])
+    console.log(`[WA Send] Message sent! ID: ${sentMsg.id._serialized}`)
 
     return NextResponse.json({
       success: true,
@@ -193,6 +200,64 @@ async function handleMediaMessage(request: NextRequest) {
     console.error('Error sending media message:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to send media' },
+      { status: 500 }
+    )
+  }
+}
+
+// ============================================
+// Contact message (vCard)
+// ============================================
+
+async function handleContactMessage(request: NextRequest, body: any) {
+  try {
+    const { to, contactName, contactPhone } = body
+
+    if (!to || !contactName || !contactPhone) {
+      return NextResponse.json(
+        { error: 'to, contactName and contactPhone are required' },
+        { status: 400 }
+      )
+    }
+
+    const { user, error: authErr } = await authenticateRequest(request)
+    if (authErr) return authErr
+
+    const client = getConnectedClient(user!.id)
+    if (!client) {
+      return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
+    }
+
+    const chatId = await resolveChatId(to, user!.id)
+
+    // Build vCard
+    const cleanPhone = contactPhone.replace(/[^0-9+]/g, '')
+    const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${contactName}\nTEL;type=CELL;type=VOICE;waid=${cleanPhone.replace('+', '')}:${cleanPhone}\nEND:VCARD`
+
+    // Anti-ban delay
+    const delay = 1000 + Math.random() * 1000
+    await new Promise(resolve => setTimeout(resolve, delay))
+
+    const sentMsg = await client.sendMessage(chatId, vcard, { parseVCards: true })
+
+    return NextResponse.json({
+      success: true,
+      message: {
+        id: sentMsg.id._serialized,
+        waMessageId: sentMsg.id._serialized,
+        body: `📇 ${contactName}`,
+        fromMe: true,
+        timestamp: new Date().toISOString(),
+        type: 'contacts',
+        hasMedia: false,
+        status: 'sent'
+      }
+    })
+
+  } catch (error: any) {
+    console.error('Error sending contact:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to send contact' },
       { status: 500 }
     )
   }
