@@ -58,7 +58,11 @@ function getClassificacaoLabel(classificacao: string): string {
   return labels[classificacao] || classificacao
 }
 
-export default function ManagerDashboard() {
+interface ManagerDashboardProps {
+  embedded?: boolean
+}
+
+export default function ManagerDashboard({ embedded = false }: ManagerDashboardProps) {
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [sellers, setSellers] = useState<Seller[]>([])
@@ -132,35 +136,9 @@ export default function ManagerDashboard() {
     return evals.reduce((sum, e) => sum + e.nota_final, 0) / evals.length
   }
 
-  return (
-    <div className="min-h-screen py-8 px-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/')}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-500" />
-              </button>
-              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dashboard do Gestor</h1>
-                <p className="text-gray-500 text-sm">Acompanhe o desempenho da sua equipe</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-lg">
-              <span className="text-sm font-semibold text-green-600">{evaluations.length}</span>
-              <span className="text-xs text-green-600">avaliações</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
+  const content = (
+    <>
+      {/* Filters */}
         <div className="bg-white rounded-xl p-4 border border-gray-200 mb-6 shadow-sm">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
@@ -404,6 +382,39 @@ export default function ManagerDashboard() {
             </div>
           )}
         </div>
+    </>
+  )
+
+  if (embedded) return content
+
+  return (
+    <div className="min-h-screen py-8 px-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-500" />
+              </button>
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard do Gestor</h1>
+                <p className="text-gray-500 text-sm">Acompanhe o desempenho da sua equipe</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-lg">
+              <span className="text-sm font-semibold text-green-600">{evaluations.length}</span>
+              <span className="text-xs text-green-600">avaliações</span>
+            </div>
+          </div>
+        </div>
+        {content}
       </div>
     </div>
   )

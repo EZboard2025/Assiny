@@ -1,12 +1,12 @@
 'use client'
 
 import DashboardLayout from '@/components/DashboardLayout'
-import ManagerDashboard from '@/components/ManagerDashboard'
+import UnifiedManagerPage from '@/components/UnifiedManagerPage'
 
 export default function ManagerPage() {
   return (
     <DashboardLayout>
-      <ManagerDashboard />
+      <UnifiedManagerPage />
     </DashboardLayout>
   )
 }

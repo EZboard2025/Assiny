@@ -10,7 +10,6 @@ import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
-import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
 import FollowUpHistoryView from './FollowUpHistoryView'
 import MeetAnalysisView from './MeetAnalysisView'
@@ -48,7 +47,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const router = useRouter()
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
-  const [showSalesDashboard, setShowSalesDashboard] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis' | 'challenge-history'>('home')
   const [mounted, setMounted] = useState(false)
@@ -514,24 +512,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               betaBadge
             />
 
-            {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') &&
-             userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
-              <FeatureCard
-                icon={Users}
-                title="Dashboard Vendedores"
-                subtitle="Performance da equipe"
-                description="Métricas e evolução dos vendedores."
-                onClick={() => setShowSalesDashboard(true)}
-                adminBadge
-              />
-            )}
-
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <FeatureCard
                 icon={BarChart3}
-                title="Dashboard Gestor"
+                title="Dashboard da Equipe"
                 subtitle="Acompanhe sua equipe"
-                description="Avaliações automáticas das conversas dos vendedores."
+                description="Avaliações e performance dos vendedores."
                 onClick={() => router.push('/manager')}
                 adminBadge
               />
@@ -622,11 +608,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           setShowConfigHub(false)
           refetchConfig()
         }} />
-      )}
-
-      {/* Sales Dashboard Modal */}
-      {showSalesDashboard && (
-        <SalesDashboard onClose={() => setShowSalesDashboard(false)} />
       )}
 
       {/* Configuration Required Overlay */}
