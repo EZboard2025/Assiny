@@ -214,7 +214,8 @@ interface ComprehensiveData {
 }
 
 interface SalesDashboardProps {
-  onClose: () => void
+  onClose?: () => void
+  embedded?: boolean
 }
 
 interface Playbook {
@@ -225,7 +226,7 @@ interface Playbook {
   is_active: boolean
 }
 
-export default function SalesDashboard({ onClose }: SalesDashboardProps) {
+export default function SalesDashboard({ onClose, embedded = false }: SalesDashboardProps) {
   const [initialLoading, setInitialLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(false)
   const [sellers, setSellers] = useState<SellerPerformance[]>([])
@@ -571,6 +572,16 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
   const topPerformer = sellers.length > 0 ? sellers[0] : null
 
   if (initialLoading) {
+    if (embedded) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="w-10 h-10 text-green-500 animate-spin mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">Carregando dados dos vendedores...</p>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="fixed inset-0 z-[100] bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -582,22 +593,24 @@ export default function SalesDashboard({ onClose }: SalesDashboardProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gray-50 overflow-y-auto">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 transition-colors text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Voltar ao Dashboard
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            Dashboard dos Vendedores
-          </h1>
-          <p className="text-gray-500 text-sm">Visão completa do desempenho de toda a equipe</p>
-        </div>
+    <div className={embedded ? '' : 'fixed inset-0 z-[100] bg-gray-50 overflow-y-auto'}>
+      <div className={embedded ? '' : 'max-w-7xl mx-auto px-6 py-8'}>
+        {/* Header - only in overlay mode */}
+        {!embedded && (
+          <div className="mb-8">
+            <button
+              onClick={onClose}
+              className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 transition-colors text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Voltar ao Dashboard
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              Dashboard dos Vendedores
+            </h1>
+            <p className="text-gray-500 text-sm">Visão completa do desempenho de toda a equipe</p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

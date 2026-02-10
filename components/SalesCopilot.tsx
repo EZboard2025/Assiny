@@ -172,6 +172,20 @@ export default function SalesCopilot({
     return () => clearInterval(interval)
   }, [authToken])
 
+  // Periodic round evaluation (every 15 min)
+  useEffect(() => {
+    if (!authToken) return
+    const evaluate = () => {
+      fetch('/api/copilot/evaluate-rounds', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      }).catch(() => {})
+    }
+    evaluate()
+    const interval = setInterval(evaluate, 15 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [authToken])
+
   const formatConversationContext = (): string => {
     const now = new Date()
     const clientName = selectedConversation?.contact_name || 'Cliente'

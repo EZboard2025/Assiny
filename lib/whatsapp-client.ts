@@ -1336,6 +1336,73 @@ async function transcribeAudioMessage(
 
 // === COPILOT AUTO-LEARNING FUNCTIONS ===
 
+// Classify a contact as 'client' or 'personal' using GPT-4.1-mini
+async function classifyContact(
+  userId: string,
+  contactPhone: string,
+  conversationContext: string
+): Promise<'client' | 'personal'> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Analise esta conversa de WhatsApp entre um vendedor e um contato.
+Classifique se o contato é um CLIENTE/LEAD de vendas ou um CONTATO PESSOAL.
+
+Responda APENAS com JSON válido, sem markdown:
+{"type": "client", "reason": "explicação curta"}
+ou
+{"type": "personal", "reason": "explicação curta"}
+
+Critérios:
+- client: conversa sobre produtos/serviços, negociações, propostas, follow-up de vendas, agendamento de reuniões de negócio, pedidos, orçamentos, qualquer interação comercial
+- personal: conversa informal, assuntos pessoais, colegas de trabalho (sem contexto de venda), família, amigos, conversas internas da empresa`
+          },
+          {
+            role: 'user',
+            content: `CONVERSA:\n${conversationContext.slice(0, 3000)}`
+          }
+        ],
+        max_tokens: 100,
+        temperature: 0.1
+      })
+    })
+
+    const data = await response.json()
+    const rawContent = data.choices?.[0]?.message?.content || ''
+
+    let classification: { type: string; reason: string }
+    try {
+      classification = JSON.parse(rawContent.replace(/```json?\n?/g, '').replace(/```/g, '').trim())
+    } catch {
+      classification = { type: 'client', reason: 'Classification parse error' }
+    }
+
+    const contactType = classification.type === 'personal' ? 'personal' : 'client'
+
+    // Save to whatsapp_conversations
+    await supabaseAdmin
+      .from('whatsapp_conversations')
+      .update({ contact_type: contactType })
+      .eq('contact_phone', contactPhone)
+      .eq('user_id', userId)
+
+    console.log(`[WA] Contact classified: ${contactPhone} → ${contactType} (${classification.reason})`)
+    return contactType
+  } catch (err: any) {
+    console.error(`[WA] classifyContact error for ${contactPhone}:`, err.message || err)
+    return 'client' // Default to client on error (safer to track than to miss)
+  }
+}
+
 async function trackSellerMessage(
   state: ClientState,
   contactPhone: string,
@@ -1357,7 +1424,6 @@ async function trackSellerMessage(
     .map((m: any) => {
       const sender = m.direction === 'outbound' ? 'Vendedor' : (contactName || 'Cliente')
       const time = new Date(m.message_timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      // Include audio transcriptions in context
       let msgContent = m.content || ''
       if ((m.message_type === 'audio' || m.message_type === 'ptt') && m.transcription) {
         msgContent = `[Áudio]: ${m.transcription}`
@@ -1367,6 +1433,27 @@ async function trackSellerMessage(
       return `[${time}] ${sender}: ${msgContent}`
     })
     .join('\n')
+
+  // Check contact type before tracking (auto-classify if unknown)
+  const { data: conv } = await supabaseAdmin
+    .from('whatsapp_conversations')
+    .select('contact_type')
+    .eq('contact_phone', contactPhone)
+    .eq('user_id', state.userId)
+    .limit(1)
+    .single()
+
+  let contactType = conv?.contact_type || 'unknown'
+
+  if (contactType === 'unknown') {
+    // Classify using the context we already fetched
+    contactType = await classifyContact(state.userId, contactPhone, context)
+  }
+
+  if (contactType === 'personal') {
+    console.log(`[WA] Skipping tracking for personal contact: ${contactPhone}`)
+    return
+  }
 
   await supabaseAdmin
     .from('seller_message_tracking')
@@ -1388,6 +1475,21 @@ async function triggerOutcomeAnalysis(
   contactPhone: string,
   clientResponse: string
 ): Promise<void> {
+  // Check contact type before triggering analysis
+  const { data: conv } = await supabaseAdmin
+    .from('whatsapp_conversations')
+    .select('contact_type')
+    .eq('contact_phone', contactPhone)
+    .eq('user_id', state.userId)
+    .limit(1)
+    .single()
+
+  const contactType = conv?.contact_type || 'unknown'
+  if (contactType !== 'client') {
+    console.log(`[WA] Skipping outcome analysis for ${contactType} contact: ${contactPhone}`)
+    return
+  }
+
   // Call analyze-outcome API internally (fire-and-forget)
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'
 

@@ -144,6 +144,20 @@ REGRAS GERAIS:
 - Se o vendedor pedir analise, de feedback construtivo e acionavel
 - Use emojis com moderacao e naturalidade (como vendedores reais usam)
 
+CLASSIFICACAO DA RESPOSTA (OBRIGATORIO - SEMPRE):
+Comece TODA resposta com exatamente uma destas tags na primeira linha sozinha:
+[SUGESTAO] - quando voce sugere uma mensagem para o vendedor copiar e enviar ao cliente (inclui follow-ups, respostas, mensagens de fechamento, qualquer texto para enviar)
+[ANALISE] - quando voce analisa a conversa, da feedback, avalia a performance do vendedor, explica comportamento do cliente
+[OUTRO] - qualquer outra coisa: cumprimentos, duvidas gerais, perguntas sobre o copiloto, respostas que nao se encaixam nas categorias acima
+A tag sera removida automaticamente. NUNCA esqueca de incluir a tag.
+
+FORMATACAO (MUITO IMPORTANTE):
+- NAO use markdown: nada de **negrito**, *italico*, ### titulos, --- separadores
+- NAO use travessoes (—) para listas. Use quebras de linha simples
+- Escreva em texto corrido natural, como se estivesse falando com o vendedor
+- Para listar pontos, use numeracao simples (1, 2, 3) ou quebre em paragrafos curtos
+- Mantenha a resposta PROPORCIONAL ao tamanho da conversa: conversa curta (1-5 msgs) = resposta curta (3-5 linhas). Conversa longa (20+ msgs) = pode detalhar mais
+
 ---
 
 METODOLOGIA DE VENDAS (aplique SEMPRE ao sugerir mensagens):
@@ -290,32 +304,42 @@ CONTEXTO B2B:
       temperature: 0.7
     })
 
-    const suggestion = completion.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma sugestão.'
+    const rawResponse = completion.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma sugestão.'
 
-    // 8. Save copilot_feedback record (was_helpful=null initially)
-    const { data: feedbackRecord } = await supabaseAdmin
-      .from('copilot_feedback')
-      .insert({
-        user_id: user.id,
-        company_id: companyId,
-        contact_phone: contactPhone,
-        contact_name: contactName || null,
-        user_question: userMessage,
-        ai_suggestion: suggestion,
-        conversation_context: conversationContext.slice(0, 5000),
-        was_helpful: null,
-        metadata: {
-          model: 'gpt-4.1',
-          success_examples: successExamples.length,
-          failure_examples: failureExamples.length,
-          company_knowledge: companyKnowledge.length,
-          tokens: completion.usage?.total_tokens || 0
-        }
-      })
-      .select('id')
-      .single()
+    // 8. Parse classification tag from AI response
+    // AI prefixes every response with [SUGESTAO], [ANALISE], or [OUTRO]
+    const isSuggestion = rawResponse.trimStart().startsWith('[SUGESTAO]')
+    const suggestion = rawResponse.replace(/^\s*\[(SUGESTAO|ANALISE|OUTRO)\]\s*/, '')
 
-    // 9. Consume 1 credit
+    // 9. Save copilot_feedback record ONLY for suggestion messages
+    let feedbackRecord: { id: string } | null = null
+
+    if (isSuggestion) {
+      const { data } = await supabaseAdmin
+        .from('copilot_feedback')
+        .insert({
+          user_id: user.id,
+          company_id: companyId,
+          contact_phone: contactPhone,
+          contact_name: contactName || null,
+          user_question: userMessage,
+          ai_suggestion: suggestion,
+          conversation_context: conversationContext.slice(0, 5000),
+          was_helpful: null,
+          metadata: {
+            model: 'gpt-4.1',
+            success_examples: successExamples.length,
+            failure_examples: failureExamples.length,
+            company_knowledge: companyKnowledge.length,
+            tokens: completion.usage?.total_tokens || 0
+          }
+        })
+        .select('id')
+        .single()
+      feedbackRecord = data
+    }
+
+    // 10. Consume 1 credit
     if (companyCredits) {
       await supabaseAdmin
         .from('companies')

@@ -41,6 +41,28 @@ export async function GET(req: NextRequest) {
 
     for (const msg of expiredMessages) {
       try {
+        // Check if contact is personal (skip ML for non-clients)
+        const { data: conv } = await supabaseAdmin
+          .from('whatsapp_conversations')
+          .select('contact_type')
+          .eq('contact_phone', msg.contact_phone)
+          .eq('user_id', msg.user_id)
+          .limit(1)
+          .single()
+
+        if (conv?.contact_type === 'personal') {
+          // Mark as analyzed but don't save as example
+          await supabaseAdmin
+            .from('seller_message_tracking')
+            .update({
+              outcome: 'skipped',
+              outcome_reason: 'Contato pessoal - excluído do ML',
+              analyzed_at: new Date().toISOString()
+            })
+            .eq('id', msg.id)
+          continue
+        }
+
         // Double-check: did the client actually respond? (check whatsapp_messages)
         const { data: inboundMessages } = await supabaseAdmin
           .from('whatsapp_messages')

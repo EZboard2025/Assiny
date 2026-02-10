@@ -10,7 +10,6 @@ import RoleplayView from './RoleplayView'
 import HistoricoView from './HistoricoView'
 import PerfilView from './PerfilView'
 import PDIView from './PDIView'
-import SalesDashboard from './SalesDashboard'
 import FollowUpView from './FollowUpView'
 import FollowUpHistoryView from './FollowUpHistoryView'
 import MeetAnalysisView from './MeetAnalysisView'
@@ -23,7 +22,7 @@ import StreakIndicator from './dashboard/StreakIndicator'
 import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
 import ChallengeHistoryView from './dashboard/ChallengeHistoryView'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
-import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video, MessageSquareMore, BarChart3 } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -48,7 +47,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const router = useRouter()
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
-  const [showSalesDashboard, setShowSalesDashboard] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis' | 'challenge-history'>('home')
   const [mounted, setMounted] = useState(false)
@@ -466,12 +464,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             />
 
             <FeatureCard
-              icon={FileSearch}
-              title="Análise Follow-up"
-              subtitle="WhatsApp"
-              description="Análise detalhada do seu follow-up."
+              icon={MessageSquareMore}
+              title="WhatsApp IA"
+              subtitle="Copiloto de Vendas"
+              description="Copiloto com IA para suas conversas no WhatsApp."
               onClick={() => router.push('/followup')}
-              disabled
             />
 
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') ? (
@@ -515,14 +512,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               betaBadge
             />
 
-            {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') &&
-             userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
+            {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <FeatureCard
-                icon={Users}
-                title="Dashboard Vendedores"
-                subtitle="Performance da equipe"
-                description="Métricas e evolução dos vendedores."
-                onClick={() => setShowSalesDashboard(true)}
+                icon={BarChart3}
+                title="Gestão"
+                subtitle="Equipe e avaliações"
+                description="Avaliações e performance dos vendedores."
+                onClick={() => router.push('/manager')}
                 adminBadge
               />
             )}
@@ -612,11 +608,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           setShowConfigHub(false)
           refetchConfig()
         }} />
-      )}
-
-      {/* Sales Dashboard Modal */}
-      {showSalesDashboard && (
-        <SalesDashboard onClose={() => setShowSalesDashboard(false)} />
       )}
 
       {/* Configuration Required Overlay */}
