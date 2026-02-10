@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { ArrowLeft, TrendingUp, MessageSquare, Users } from 'lucide-react'
 import ManagerDashboard from './ManagerDashboard'
 import SalesDashboard from './SalesDashboard'
@@ -12,32 +11,6 @@ type TabType = 'whatsapp' | 'performance'
 export default function UnifiedManagerPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('whatsapp')
-  const [userRole, setUserRole] = useState<string | null>(null)
-
-  useEffect(() => {
-    loadUserRole()
-  }, [])
-
-  const loadUserRole = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('role')
-        .eq('user_id', user.id)
-        .single()
-
-      if (employee) {
-        setUserRole(employee.role)
-      }
-    } catch (err) {
-      console.error('Error loading user role:', err)
-    }
-  }
-
-  const showPerformanceTab = userRole === 'admin' || userRole === 'gestor'
 
   return (
     <div className="min-h-screen py-8 px-6">
@@ -63,36 +36,34 @@ export default function UnifiedManagerPage() {
           </div>
 
           {/* Tabs */}
-          {showPerformanceTab && (
-            <div className="mt-6 flex items-center gap-1 bg-gray-100 p-1 rounded-xl inline-flex">
-              <button
-                onClick={() => setActiveTab('whatsapp')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  activeTab === 'whatsapp'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                Avaliações WhatsApp
-              </button>
-              <button
-                onClick={() => setActiveTab('performance')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  activeTab === 'performance'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                Performance Vendedores
-              </button>
-            </div>
-          )}
+          <div className="mt-6 flex items-center gap-1 bg-gray-100 p-1 rounded-xl inline-flex">
+            <button
+              onClick={() => setActiveTab('whatsapp')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'whatsapp'
+                  ? 'bg-white text-green-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Avaliações WhatsApp
+            </button>
+            <button
+              onClick={() => setActiveTab('performance')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'performance'
+                  ? 'bg-white text-green-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Performance Vendedores
+            </button>
+          </div>
         </div>
 
         {/* Tab content */}
-        {activeTab === 'whatsapp' || !showPerformanceTab ? (
+        {activeTab === 'whatsapp' ? (
           <ManagerDashboard embedded />
         ) : (
           <SalesDashboard embedded />
