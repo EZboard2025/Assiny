@@ -299,21 +299,23 @@ CONTEXTO B2B:
 
     const suggestion = completion.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma sugestão.'
 
-    // 8. Save copilot_feedback record ONLY for suggestion messages (not analysis)
-    // Analysis requests don't impact the follow-up ML pipeline
+    // 8. Save copilot_feedback record ONLY for follow-up/suggestion messages
+    // Only messages asking for a reply to send get feedback (thumbs up/down)
+    // Analysis, strategy, or general questions don't impact the ML pipeline
     const lowerMessage = userMessage.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    const isAnalysis = [
-      'analise', 'analisa', 'analisar',
-      'avalie', 'avalia', 'avaliar', 'avaliacao',
-      'o que acha', 'o que achou',
-      'como estou', 'como esta minha',
-      'critique', 'critica',
-      'de um feedback', 'me de feedback'
+    const isSuggestion = [
+      'responder', 'resposta',
+      'sugira', 'sugerir', 'sugestao',
+      'follow-up', 'followup', 'follow up',
+      'fechar', 'fechamento',
+      'mandar', 'enviar', 'escrever', 'dizer',
+      'o que falar', 'o que mandar', 'o que enviar',
+      'mensagem para', 'manda pra', 'manda pro'
     ].some(pattern => lowerMessage.includes(pattern))
 
     let feedbackRecord: { id: string } | null = null
 
-    if (!isAnalysis) {
+    if (isSuggestion) {
       const { data } = await supabaseAdmin
         .from('copilot_feedback')
         .insert({
