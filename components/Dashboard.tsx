@@ -514,18 +514,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               betaBadge
             />
 
-            {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') &&
-             userRole?.toLowerCase() === 'admin' && trainingPlan !== PlanType.INDIVIDUAL && (
-              <FeatureCard
-                icon={Users}
-                title="Dashboard Vendedores"
-                subtitle="Performance da equipe"
-                description="Métricas e evolução dos vendedores."
-                onClick={() => setShowSalesDashboard(true)}
-                adminBadge
-              />
-            )}
-
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <FeatureCard
                 icon={BarChart3}
