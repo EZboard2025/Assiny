@@ -467,11 +467,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
             <FeatureCard
               icon={FileSearch}
-              title="Análise Follow-up"
-              subtitle="WhatsApp"
-              description="Análise detalhada do seu follow-up."
+              title="WhatsApp IA"
+              subtitle="Copiloto de Vendas"
+              description="Copiloto com IA para suas conversas no WhatsApp."
               onClick={() => router.push('/followup')}
-              disabled
             />
 
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') ? (
