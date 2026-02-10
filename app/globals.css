@@ -315,4 +315,130 @@
   .animate-shimmer {
     animation: shimmer 2s infinite;
   }
+
+  /* Copilot foil button - green with holographic shimmer */
+  .copilot-foil-btn {
+    background: linear-gradient(135deg, #00a884 0%, #25d366 50%, #00a884 100%);
+    transition: all 0.2s ease;
+  }
+
+  .copilot-foil-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.35) 45%,
+      rgba(255, 255, 255, 0.1) 55%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: foilShine 2.5s ease-in-out infinite;
+  }
+
+  .copilot-foil-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px rgba(0, 168, 132, 0.5);
+  }
+
+  @keyframes foilShine {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Gemini-style sparkle thinking ring */
+  .copilot-thinking-ring {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .copilot-thinking-ring::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0deg,
+      #00a884,
+      #25d366,
+      #00d4aa,
+      #0088cc,
+      #00a884,
+      transparent 60%
+    );
+    animation: copilotSpin 1.2s linear infinite;
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  }
+
+  .copilot-thinking-ring::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 180deg,
+      #00a884,
+      #25d366,
+      #00d4aa,
+      transparent 50%
+    );
+    animation: copilotSpin 1.8s linear infinite reverse;
+    opacity: 0.3;
+    filter: blur(3px);
+    mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 2px));
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 2px));
+  }
+
+  @keyframes copilotSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Sparkle icon pulse during thinking */
+  .copilot-sparkle-thinking {
+    animation: sparklePulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes sparklePulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+
+  /* Fade in for AI messages */
+  .copilot-msg-fade-in {
+    animation: copilotMsgFade 0.3s ease-out forwards;
+  }
+
+  @keyframes copilotMsgFade {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Gemini-style chunk reveal - gradient wipe from left to right */
+  .copilot-chunk-reveal {
+    display: inline;
+    -webkit-mask-image: linear-gradient(to right, #000 30%, transparent 70%);
+    mask-image: linear-gradient(to right, #000 30%, transparent 70%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+    animation: chunkWipe 1.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  }
+
+  @keyframes chunkWipe {
+    to {
+      -webkit-mask-position: 0% 0;
+      mask-position: 0% 0;
+    }
+  }
+
+  /* Already-revealed chunks stay fully visible */
+  .copilot-chunk-done {
+    opacity: 1;
+  }
 }

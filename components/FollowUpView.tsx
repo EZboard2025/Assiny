@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, ArrowLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users, MoreVertical, Camera, Headphones, Contact, Sticker, Star, Bell, Lock, Shield, Heart, Ban, Flag, MapPin, Mail, Globe, Clock, Share2, Building2, Pencil, MessageCirclePlus, EllipsisVertical } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, ArrowLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users, MoreVertical, Camera, Headphones, Contact, Sticker, Star, Bell, Lock, Shield, Heart, Ban, Flag, MapPin, Mail, Globe, Clock, Share2, Building2, Pencil, MessageCirclePlus, EllipsisVertical, Sparkles } from 'lucide-react'
 import SalesCopilot from './SalesCopilot'
 
 interface FollowUpAnalysis {
@@ -91,6 +91,7 @@ const EMOJI_LIST = [
 export default function FollowUpView() {
   // WhatsApp state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('checking')
+  const [copilotOpen, setCopilotOpen] = useState(true)
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null)
@@ -421,18 +422,41 @@ export default function FollowUpView() {
           })
 
           if (response.status === 404) {
-            heartbeatFailCountRef.current++
-            console.warn(`[Heartbeat] Server returned 404 (${heartbeatFailCountRef.current}/3)`)
-
-            // After 3 consecutive 404s (60s), server truly lost the client
-            if (heartbeatFailCountRef.current >= 3) {
-              console.error('[Heartbeat] Server lost client after 3 consecutive failures. Disconnecting.')
-              setConnectionStatus('disconnected')
-              setPhoneNumber(null)
-              setConversations([])
-              setSelectedConversation(null)
-              setMessages([])
-              setError('Conexao perdida com o servidor. Reconecte o WhatsApp.')
+            // Server has no client — try silent auto-reconnect using cached LocalAuth session
+            console.warn('[Heartbeat] Server returned 404 — attempting silent auto-reconnect...')
+            try {
+              const reconnectRes = await fetch('/api/whatsapp/connect', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' }
+              })
+              const reconnectData = await reconnectRes.json()
+              if (reconnectData.status === 'connected') {
+                console.log('[Heartbeat] Auto-reconnect succeeded!')
+                heartbeatFailCountRef.current = 0
+              } else if (reconnectData.status === 'qr_ready' || reconnectData.status === 'initializing' || reconnectData.status === 'connecting') {
+                // Needs QR or still connecting — wait for next heartbeat
+                heartbeatFailCountRef.current++
+                console.log(`[Heartbeat] Reconnect in progress: ${reconnectData.status} (${heartbeatFailCountRef.current}/3)`)
+                if (heartbeatFailCountRef.current >= 3) {
+                  setConnectionStatus('disconnected')
+                  setPhoneNumber(null)
+                  setError('Conexao perdida. Reconecte o WhatsApp.')
+                }
+              } else {
+                heartbeatFailCountRef.current++
+                if (heartbeatFailCountRef.current >= 2) {
+                  setConnectionStatus('disconnected')
+                  setPhoneNumber(null)
+                  setError('Conexao perdida. Reconecte o WhatsApp.')
+                }
+              }
+            } catch {
+              heartbeatFailCountRef.current++
+              if (heartbeatFailCountRef.current >= 2) {
+                setConnectionStatus('disconnected')
+                setPhoneNumber(null)
+                setError('Conexao perdida. Reconecte o WhatsApp.')
+              }
             }
           } else {
             // Reset counter on success
@@ -819,11 +843,11 @@ export default function FollowUpView() {
     }
   }
 
-  const handleSendMessage = async () => {
-    if (!selectedConversation || !messageInput.trim() || isSending) return
+  const handleSendMessage = async (directText?: string) => {
+    const text = directText?.trim() || messageInput.trim()
+    if (!selectedConversation || !text || isSending) return
 
-    const text = messageInput.trim()
-    setMessageInput('')
+    if (!directText) setMessageInput('')
     setIsSending(true)
 
     // Optimistic update
@@ -838,7 +862,7 @@ export default function FollowUpView() {
     setMessages(prev => [...prev, tempMsg])
 
     try {
-      const response = await fetch('/api/whatsapp/send', {
+      let response = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -847,7 +871,49 @@ export default function FollowUpView() {
         })
       })
 
-      const data = await response.json()
+      let data = await response.json()
+
+      // Auto-reconnect: if server lost the client OR browser died (detached frame), reconnect and retry once
+      const needsReconnect = (response.status === 404 && data.error === 'WhatsApp not connected') ||
+        (response.status === 500 && typeof data.error === 'string' && (
+          data.error.includes('detached') || data.error.includes('Protocol error') ||
+          data.error.includes('Session closed') || data.error.includes('Target closed')
+        ))
+      if (needsReconnect) {
+        console.warn('[Send] Server lost client — auto-reconnecting and retrying...')
+        try {
+          const reconnectRes = await fetch('/api/whatsapp/connect', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' }
+          })
+          const reconnectData = await reconnectRes.json()
+
+          if (reconnectData.status === 'connected') {
+            console.log('[Send] Auto-reconnect succeeded, retrying send...')
+            // Retry the send
+            response = await fetch('/api/whatsapp/send', {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                to: selectedConversation.contact_phone,
+                message: text
+              })
+            })
+            data = await response.json()
+          } else {
+            // Needs QR or still initializing — can't auto-recover
+            setConnectionStatus('disconnected')
+            throw new Error('Conexao perdida. Reconecte o WhatsApp.')
+          }
+        } catch (reconnectErr) {
+          if (reconnectErr instanceof Error && reconnectErr.message.includes('Conexao perdida')) {
+            throw reconnectErr
+          }
+          console.error('[Send] Auto-reconnect failed:', reconnectErr)
+          setConnectionStatus('disconnected')
+          throw new Error('Conexao perdida. Reconecte o WhatsApp.')
+        }
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Erro ao enviar mensagem')
@@ -934,13 +1000,53 @@ export default function FollowUpView() {
       formData.append('type', type)
       if (caption) formData.append('caption', caption)
 
-      const response = await fetch('/api/whatsapp/send', {
+      let response = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${authToken}` },
         body: formData
       })
 
-      const data = await response.json()
+      let data = await response.json()
+
+      // Auto-reconnect: if server lost the client OR browser died (detached frame), reconnect and retry once
+      const needsReconnect = (response.status === 404 && data.error === 'WhatsApp not connected') ||
+        (response.status === 500 && typeof data.error === 'string' && (
+          data.error.includes('detached') || data.error.includes('Protocol error') ||
+          data.error.includes('Session closed') || data.error.includes('Target closed')
+        ))
+      if (needsReconnect) {
+        console.warn('[Send Media] Server lost client — auto-reconnecting and retrying...')
+        try {
+          const reconnectRes = await fetch('/api/whatsapp/connect', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' }
+          })
+          const reconnectData = await reconnectRes.json()
+
+          if (reconnectData.status === 'connected') {
+            console.log('[Send Media] Auto-reconnect succeeded, retrying send...')
+            const retryFormData = new FormData()
+            retryFormData.append('to', selectedConversation.contact_phone)
+            retryFormData.append('file', file)
+            retryFormData.append('type', type)
+            if (caption) retryFormData.append('caption', caption)
+
+            response = await fetch('/api/whatsapp/send', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${authToken}` },
+              body: retryFormData
+            })
+            data = await response.json()
+          } else {
+            setConnectionStatus('disconnected')
+            throw new Error('Conexao perdida. Reconecte o WhatsApp.')
+          }
+        } catch (reconnectErr) {
+          if (reconnectErr instanceof Error && reconnectErr.message.includes('Conexao perdida')) throw reconnectErr
+          setConnectionStatus('disconnected')
+          throw new Error('Conexao perdida. Reconecte o WhatsApp.')
+        }
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Erro ao enviar midia')
@@ -989,18 +1095,48 @@ export default function FollowUpView() {
     setMessages(prev => [...prev, tempMsg])
 
     try {
-      const response = await fetch('/api/whatsapp/send', {
+      const contactPayload = {
+        to: selectedConversation.contact_phone,
+        type: 'contact',
+        contactName: contact.contact_name || formatPhone(contact.contact_phone),
+        contactPhone: contact.contact_phone
+      }
+
+      let response = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({
-          to: selectedConversation.contact_phone,
-          type: 'contact',
-          contactName: contact.contact_name || formatPhone(contact.contact_phone),
-          contactPhone: contact.contact_phone
-        })
+        body: JSON.stringify(contactPayload)
       })
 
-      const data = await response.json()
+      let data = await response.json()
+
+      // Auto-reconnect on "not connected"
+      if (response.status === 404 && data.error === 'WhatsApp not connected') {
+        console.warn('[Send Contact] Server lost client — auto-reconnecting...')
+        try {
+          const reconnectRes = await fetch('/api/whatsapp/connect', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' }
+          })
+          const reconnectData = await reconnectRes.json()
+          if (reconnectData.status === 'connected') {
+            response = await fetch('/api/whatsapp/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+              body: JSON.stringify(contactPayload)
+            })
+            data = await response.json()
+          } else {
+            setConnectionStatus('disconnected')
+            throw new Error('Conexao perdida. Reconecte o WhatsApp.')
+          }
+        } catch (reconnectErr) {
+          if (reconnectErr instanceof Error && reconnectErr.message.includes('Conexao perdida')) throw reconnectErr
+          setConnectionStatus('disconnected')
+          throw new Error('Conexao perdida. Reconecte o WhatsApp.')
+        }
+      }
+
       if (!response.ok) throw new Error(data.error || 'Erro ao enviar contato')
 
       setMessages(prev => prev.map(msg =>
@@ -1552,7 +1688,6 @@ export default function FollowUpView() {
         {([
           { key: 'all' as const, label: 'Todas' },
           { key: 'unread' as const, label: 'Não lidas' },
-          { key: 'favorites' as const, label: 'Favoritas' },
           { key: 'groups' as const, label: 'Grupos' },
         ]).map(tab => (
           <button
@@ -1775,13 +1910,6 @@ export default function FollowUpView() {
                 <Search className="w-5 h-5 text-[#aebac1]" />
               </button>
 
-              {/* Menu button (3 dots) */}
-              <button
-                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-                title="Menu"
-              >
-                <MoreVertical className="w-5 h-5 text-[#aebac1]" />
-              </button>
             </div>
           </div>
 
@@ -2307,6 +2435,17 @@ export default function FollowUpView() {
                     <Mic className="w-[24px] h-[24px] text-[#8696a0]" />
                   </button>
                 )}
+
+                {/* Copilot toggle button */}
+                {!copilotOpen && (
+                  <button
+                    onClick={() => setCopilotOpen(true)}
+                    className="copilot-foil-btn w-[42px] h-[42px] flex items-center justify-center rounded-full flex-shrink-0 relative overflow-hidden"
+                    title="Abrir Copiloto de Vendas"
+                  >
+                    <Sparkles className="w-5 h-5 text-white relative z-10" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -2348,6 +2487,7 @@ export default function FollowUpView() {
               {/* Contact List */}
               <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
                 {conversations
+                  .filter(c => !c.contact_phone.includes('@g.us'))
                   .filter(c => {
                     if (!contactSearchQuery.trim()) return true
                     const q = contactSearchQuery.toLowerCase()
@@ -2629,69 +2769,6 @@ export default function FollowUpView() {
                 })()}
               </div>
 
-              {/* Divider */}
-              <div className="h-[8px] bg-[#0b141a]" />
-
-              {/* Options */}
-              <div className="py-1">
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Star className="w-[22px] h-[22px] text-[#8696a0]" />
-                  <span className="text-[#e9edef] text-[15px]">Mensagens favoritas</span>
-                </button>
-                <button className="w-full flex items-center justify-between px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <div className="flex items-center gap-5">
-                    <Bell className="w-[22px] h-[22px] text-[#8696a0]" />
-                    <span className="text-[#e9edef] text-[15px]">Silenciar notificações</span>
-                  </div>
-                  <div className="w-10 h-5 bg-[#374045] rounded-full relative">
-                    <div className="w-4 h-4 bg-[#8696a0] rounded-full absolute top-0.5 left-0.5" />
-                  </div>
-                </button>
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Lock className="w-[22px] h-[22px] text-[#8696a0]" />
-                  <div>
-                    <span className="text-[#e9edef] text-[15px]">Mensagens temporárias</span>
-                    <p className="text-[#8696a0] text-[13px]">Desativadas</p>
-                  </div>
-                </button>
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Shield className="w-[22px] h-[22px] text-[#8696a0]" />
-                  <div>
-                    <span className="text-[#e9edef] text-[15px]">Privacidade avançada do chat</span>
-                    <p className="text-[#8696a0] text-[13px]">Desativada</p>
-                  </div>
-                </button>
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Lock className="w-[22px] h-[22px] text-[#8696a0]" />
-                  <div>
-                    <span className="text-[#e9edef] text-[15px]">Criptografia</span>
-                    <p className="text-[#8696a0] text-[13px]">As mensagens são protegidas</p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Divider */}
-              <div className="h-[8px] bg-[#0b141a]" />
-
-              {/* Danger Zone */}
-              <div className="py-1">
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Heart className="w-[22px] h-[22px] text-[#ea4b60]" />
-                  <span className="text-[#ea4b60] text-[15px]">Adicionar aos favoritos</span>
-                </button>
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Ban className="w-[22px] h-[22px] text-[#ea4b60]" />
-                  <span className="text-[#ea4b60] text-[15px]">Bloquear {selectedConversation.contact_name || ''}</span>
-                </button>
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Flag className="w-[22px] h-[22px] text-[#ea4b60]" />
-                  <span className="text-[#ea4b60] text-[15px]">Denunciar {selectedConversation.contact_name || ''}</span>
-                </button>
-                <button className="w-full flex items-center gap-5 px-7 py-3.5 hover:bg-[#202c33] transition-colors">
-                  <Trash2 className="w-[22px] h-[22px] text-[#ea4b60]" />
-                  <span className="text-[#ea4b60] text-[15px]">Apagar conversa</span>
-                </button>
-              </div>
 
               {/* Bottom padding */}
               <div className="h-4" />
@@ -2853,6 +2930,9 @@ export default function FollowUpView() {
             authToken={authToken}
             companyData={companyData}
             isVisible={connectionStatus === 'connected' && !!selectedConversation}
+            isOpen={copilotOpen}
+            onClose={() => setCopilotOpen(false)}
+            onSendToChat={(text) => handleSendMessage(text)}
           />
         </>
       ) : connectionStatus === 'checking' ? (

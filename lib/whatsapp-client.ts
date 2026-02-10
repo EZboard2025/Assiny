@@ -516,7 +516,14 @@ async function reapClient(userId: string): Promise<void> {
 
 export function getConnectedClient(userId: string): Client | null {
   const state = clients.get(userId)
-  if (!state || state.status !== 'connected') return null
+  if (!state) {
+    console.error(`[WA] getConnectedClient: No client in Map for user ${userId}. Map has ${clients.size} entries: [${Array.from(clients.keys()).join(', ')}]`)
+    return null
+  }
+  if (state.status !== 'connected') {
+    console.error(`[WA] getConnectedClient: Client exists but status='${state.status}' for user ${userId}`)
+    return null
+  }
   return state.client
 }
 

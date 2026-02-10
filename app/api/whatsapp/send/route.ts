@@ -59,7 +59,14 @@ async function handleTextMessage(request: NextRequest, body: any) {
     ])
     console.log(`[WA Send] Resolved chatId: ${chatId}`)
 
-    // Send directly (no typing indicator or delay for now - debugging)
+    // Anti-ban: simulate typing + short delay before sending
+    try {
+      const chat = await client.getChatById(chatId)
+      await chat.sendStateTyping()
+    } catch {}
+    const typingDelay = 2000 + Math.random() * 2000
+    await new Promise(resolve => setTimeout(resolve, typingDelay))
+
     console.log(`[WA Send] Sending message to ${chatId}...`)
     const sentMsg = await Promise.race([
       client.sendMessage(chatId, message),
