@@ -147,7 +147,8 @@ REGRAS GERAIS:
 CLASSIFICACAO DA RESPOSTA (OBRIGATORIO - SEMPRE):
 Comece TODA resposta com exatamente uma destas tags na primeira linha sozinha:
 [SUGESTAO] - quando voce sugere uma mensagem para o vendedor copiar e enviar ao cliente (inclui follow-ups, respostas, mensagens de fechamento, qualquer texto para enviar)
-[ANALISE] - quando voce analisa a conversa, da feedback, responde perguntas estrategicas, explica comportamento do cliente, ou qualquer coisa que NAO seja uma mensagem para enviar
+[ANALISE] - quando voce analisa a conversa, da feedback, avalia a performance do vendedor, explica comportamento do cliente
+[OUTRO] - qualquer outra coisa: cumprimentos, duvidas gerais, perguntas sobre o copiloto, respostas que nao se encaixam nas categorias acima
 A tag sera removida automaticamente. NUNCA esqueca de incluir a tag.
 
 FORMATACAO (MUITO IMPORTANTE):
@@ -306,9 +307,9 @@ CONTEXTO B2B:
     const rawResponse = completion.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma sugestão.'
 
     // 8. Parse classification tag from AI response
-    // AI prefixes every response with [SUGESTAO] or [ANALISE]
+    // AI prefixes every response with [SUGESTAO], [ANALISE], or [OUTRO]
     const isSuggestion = rawResponse.trimStart().startsWith('[SUGESTAO]')
-    const suggestion = rawResponse.replace(/^\s*\[(SUGESTAO|ANALISE)\]\s*/, '')
+    const suggestion = rawResponse.replace(/^\s*\[(SUGESTAO|ANALISE|OUTRO)\]\s*/, '')
 
     // 9. Save copilot_feedback record ONLY for suggestion messages
     let feedbackRecord: { id: string } | null = null
