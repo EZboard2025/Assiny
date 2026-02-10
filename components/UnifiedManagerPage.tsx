@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeft, TrendingUp, MessageSquare, Users } from 'lucide-react'
-import { usePlanLimits } from '@/hooks/usePlanLimits'
-import { PlanType } from '@/lib/types/plans'
 import ManagerDashboard from './ManagerDashboard'
 import SalesDashboard from './SalesDashboard'
 
@@ -13,7 +11,6 @@ type TabType = 'whatsapp' | 'performance'
 
 export default function UnifiedManagerPage() {
   const router = useRouter()
-  const { trainingPlan } = usePlanLimits()
   const [activeTab, setActiveTab] = useState<TabType>('whatsapp')
   const [userRole, setUserRole] = useState<string | null>(null)
 
@@ -40,7 +37,7 @@ export default function UnifiedManagerPage() {
     }
   }
 
-  const showPerformanceTab = userRole === 'admin' && trainingPlan !== null && trainingPlan !== PlanType.INDIVIDUAL
+  const showPerformanceTab = userRole === 'admin' || userRole === 'gestor'
 
   return (
     <div className="min-h-screen py-8 px-6">
