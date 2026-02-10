@@ -2,71 +2,60 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, TrendingUp, MessageSquare, Users } from 'lucide-react'
-import ManagerDashboard from './ManagerDashboard'
-import SalesDashboard from './SalesDashboard'
+import { ArrowLeft, TrendingUp } from 'lucide-react'
+import SellerGrid from './manager/SellerGrid'
+import SellerDetailView from './manager/SellerDetailView'
+import type { SellerPerformance } from './manager/SellerGrid'
 
-type TabType = 'whatsapp' | 'performance'
+type ViewState =
+  | { type: 'grid' }
+  | { type: 'detail'; seller: SellerPerformance; whatsappSummary: { count: number; avg: number } }
 
 export default function UnifiedManagerPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<TabType>('whatsapp')
+  const [view, setView] = useState<ViewState>({ type: 'grid' })
 
   return (
     <div className="min-h-screen py-8 px-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/')}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-500" />
-              </button>
-              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dashboard da Equipe</h1>
-                <p className="text-gray-500 text-sm">Acompanhe o desempenho da sua equipe</p>
-              </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => view.type === 'detail' ? setView({ type: 'grid' }) : router.push('/')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-500" />
+            </button>
+            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="mt-6 flex items-center gap-1 bg-gray-100 p-1 rounded-xl inline-flex">
-            <button
-              onClick={() => setActiveTab('whatsapp')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'whatsapp'
-                  ? 'bg-white text-green-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              Avaliações WhatsApp
-            </button>
-            <button
-              onClick={() => setActiveTab('performance')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'performance'
-                  ? 'bg-white text-green-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              Performance Vendedores
-            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {view.type === 'grid' ? 'Dashboard da Equipe' : view.seller.user_name}
+              </h1>
+              <p className="text-gray-500 text-sm">
+                {view.type === 'grid'
+                  ? 'Clique em um vendedor para ver todos os dados'
+                  : 'Visão completa do vendedor'}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Tab content */}
-        {activeTab === 'whatsapp' ? (
-          <ManagerDashboard embedded />
+        {/* Content */}
+        {view.type === 'grid' ? (
+          <SellerGrid
+            onSelectSeller={(seller, whatsappSummary) =>
+              setView({ type: 'detail', seller, whatsappSummary })
+            }
+          />
         ) : (
-          <SalesDashboard embedded />
+          <SellerDetailView
+            seller={view.seller}
+            whatsappSummary={view.whatsappSummary}
+            onBack={() => setView({ type: 'grid' })}
+          />
         )}
       </div>
     </div>
