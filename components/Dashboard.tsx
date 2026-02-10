@@ -515,8 +515,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
               <FeatureCard
                 icon={BarChart3}
-                title="Dashboard da Equipe"
-                subtitle="Acompanhe sua equipe"
+                title="Gestão"
+                subtitle="Equipe e avaliações"
                 description="Avaliações e performance dos vendedores."
                 onClick={() => router.push('/manager')}
                 adminBadge
