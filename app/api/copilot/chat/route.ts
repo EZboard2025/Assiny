@@ -144,6 +144,12 @@ REGRAS GERAIS:
 - Se o vendedor pedir analise, de feedback construtivo e acionavel
 - Use emojis com moderacao e naturalidade (como vendedores reais usam)
 
+CLASSIFICACAO DA RESPOSTA (OBRIGATORIO - SEMPRE):
+Comece TODA resposta com exatamente uma destas tags na primeira linha sozinha:
+[SUGESTAO] - quando voce sugere uma mensagem para o vendedor copiar e enviar ao cliente (inclui follow-ups, respostas, mensagens de fechamento, qualquer texto para enviar)
+[ANALISE] - quando voce analisa a conversa, da feedback, responde perguntas estrategicas, explica comportamento do cliente, ou qualquer coisa que NAO seja uma mensagem para enviar
+A tag sera removida automaticamente. NUNCA esqueca de incluir a tag.
+
 FORMATACAO (MUITO IMPORTANTE):
 - NAO use markdown: nada de **negrito**, *italico*, ### titulos, --- separadores
 - NAO use travessoes (—) para listas. Use quebras de linha simples
@@ -297,22 +303,14 @@ CONTEXTO B2B:
       temperature: 0.7
     })
 
-    const suggestion = completion.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma sugestão.'
+    const rawResponse = completion.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma sugestão.'
 
-    // 8. Save copilot_feedback record ONLY for follow-up/suggestion messages
-    // Only messages asking for a reply to send get feedback (thumbs up/down)
-    // Analysis, strategy, or general questions don't impact the ML pipeline
-    const lowerMessage = userMessage.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    const isSuggestion = [
-      'responder', 'resposta',
-      'sugira', 'sugerir', 'sugestao',
-      'follow-up', 'followup', 'follow up',
-      'fechar', 'fechamento',
-      'mandar', 'enviar', 'escrever', 'dizer',
-      'o que falar', 'o que mandar', 'o que enviar',
-      'mensagem para', 'manda pra', 'manda pro'
-    ].some(pattern => lowerMessage.includes(pattern))
+    // 8. Parse classification tag from AI response
+    // AI prefixes every response with [SUGESTAO] or [ANALISE]
+    const isSuggestion = rawResponse.trimStart().startsWith('[SUGESTAO]')
+    const suggestion = rawResponse.replace(/^\s*\[(SUGESTAO|ANALISE)\]\s*/, '')
 
+    // 9. Save copilot_feedback record ONLY for suggestion messages
     let feedbackRecord: { id: string } | null = null
 
     if (isSuggestion) {
@@ -340,7 +338,7 @@ CONTEXTO B2B:
       feedbackRecord = data
     }
 
-    // 9. Consume 1 credit
+    // 10. Consume 1 credit
     if (companyCredits) {
       await supabaseAdmin
         .from('companies')
