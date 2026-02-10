@@ -1759,46 +1759,8 @@ export default function FollowUpView() {
               </button>
             </div>
             <div className="flex items-center gap-1">
-              {/* Analyze Button */}
-              <button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing || messages.length === 0}
-                className="bg-[#00a884] hover:bg-[#06cf9c] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mr-1"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Analisando...
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="w-4 h-4" />
-                    {analysis ? 'Re-analisar' : 'Analisar'}
-                  </>
-                )}
-              </button>
-
-              {/* Analysis Score Card */}
-              {analysis && !showAnalysisPanel && (
-                <button
-                  onClick={() => setShowAnalysisPanel(true)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all mr-1 ${
-                    analysis.nota_final >= 8 ? 'bg-green-900/50 border border-green-700 hover:bg-green-900/70' :
-                    analysis.nota_final >= 6 ? 'bg-yellow-900/50 border border-yellow-700 hover:bg-yellow-900/70' :
-                    analysis.nota_final >= 4 ? 'bg-orange-900/50 border border-orange-700 hover:bg-orange-900/70' :
-                    'bg-red-900/50 border border-red-700 hover:bg-red-900/70'
-                  }`}
-                >
-                  <span className={`text-lg font-bold ${
-                    analysis.nota_final >= 8 ? 'text-green-400' :
-                    analysis.nota_final >= 6 ? 'text-yellow-400' :
-                    analysis.nota_final >= 4 ? 'text-orange-400' :
-                    'text-red-400'
-                  }`}>{analysis.nota_final.toFixed(1)}</span>
-                  <span className="text-[#8696a0] text-xs">Ver avaliacao</span>
-                  <ChevronRight className="w-4 h-4 text-[#8696a0]" />
-                </button>
-              )}
+              {/* Analyze Button - hidden (replaced by Copilot) */}
+              {/* Analysis Score Card - hidden (replaced by Copilot) */}
 
               {/* Search button */}
               <button
