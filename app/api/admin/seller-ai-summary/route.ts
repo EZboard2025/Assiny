@@ -587,14 +587,13 @@ Sua tarefa é fazer uma análise PROFUNDA e COMPLETA, identificando:
 ${playbook ? '6. APTIDÃO AO PLAYBOOK: Avalie o quanto o vendedor está aderente ao playbook da empresa' : ''}
 
 ESTILO DE ESCRITA (MUITO IMPORTANTE):
-- Escreva de forma CONVERSACIONAL e FLUIDA, como um coach de vendas falando com um gestor
-- NÃO coloque números no meio das frases - quando precisar citar dados, use frases separadas ou coloque em contexto natural
-- EVITE jargões técnicos desnecessários - use linguagem simples e direta
-- Em vez de "A média SPIN S foi 7.5/10", escreva "O vendedor demonstra boa habilidade em fazer perguntas de situação"
-- Em vez de "Score de 4.2/10 em Implicação", escreva "Há dificuldade em explorar as consequências dos problemas do cliente"
-- Use descrições qualitativas (excelente, bom, precisa melhorar) em vez de focar em números específicos
-- Organize os textos em parágrafos fluidos, não em listas técnicas
-- O objetivo é que qualquer pessoa leiga consiga entender a análise facilmente
+- Seja CONCISO e DIRETO - o gestor tem pouco tempo para ler
+- Escreva como um coach de vendas falando com um gestor, linguagem simples
+- NÃO coloque números soltos no texto - use descrições qualitativas (excelente, bom, precisa melhorar)
+- O summary deve ter NO MÁXIMO 4-5 frases curtas que vão direto ao ponto
+- Highlights, concerns e recommendations devem ser frases CURTAS (máx 15 palavras cada)
+- EVITE repetição - cada item deve trazer uma informação NOVA
+- Priorize INSIGHTS ACIONÁVEIS sobre descrições genéricas
 
 IMPORTANTE:
 - Identifique PADRÕES nos dados históricos
@@ -608,36 +607,36 @@ ${playbook ? '- Para a APTIDÃO AO PLAYBOOK: Compare as práticas do vendedor co
 
 Responda APENAS em JSON válido com a seguinte estrutura:
 {
-  "summary": "Análise completa de 3-4 parágrafos FLUIDOS e CONVERSACIONAIS sobre a performance do vendedor. Escreva como um coach falando com o gestor, sem números espalhados pelo texto. Inclua: contexto geral, como o vendedor tem evoluído, análise qualitativa de cada área SPIN (sem ficar citando scores), e uma conclusão sobre o estado atual.",
-  "highlights": ["5-7 destaques positivos escritos de forma clara e direta, sem jargões. Ex: 'Consegue criar rapport rapidamente com os clientes' em vez de 'Score de rapport 8.2/10'"],
-  "concerns": ["5-7 pontos de atenção escritos de forma clara, focando no impacto prático. Ex: 'Perde oportunidades de aprofundar nas dores do cliente' em vez de 'Score P de 4.5/10'"],
-  "recommendations": ["5-7 recomendações PRÁTICAS escritas como ações claras. Ex: 'Antes de cada call, preparar 3 perguntas sobre os problemas do cliente' em vez de 'Melhorar score P'"],
+  "summary": "Resumo CONCISO de NO MÁXIMO 4-5 frases curtas e diretas. Vá direto ao ponto: qual o nível atual do vendedor, principal evolução recente, maior problema, e o que fazer agora. NÃO escreva parágrafos longos.",
+  "highlights": ["3-4 destaques positivos em frases CURTAS (máx 15 palavras). Ex: 'Cria rapport rápido e adapta discurso ao perfil do cliente'"],
+  "concerns": ["3-4 pontos de atenção em frases CURTAS (máx 15 palavras). Ex: 'Não aprofunda nas consequências dos problemas do cliente'"],
+  "recommendations": ["3-4 ações práticas em frases CURTAS (máx 15 palavras). Ex: 'Preparar 3 perguntas sobre consequências antes de cada conversa'"],
   "performance_level": "excelente | bom | regular | precisa_atencao | critico",
-  "priority_action": "A ação MAIS importante que o vendedor deve tomar AGORA, escrita de forma clara e prática como um conselho de coach",
+  "priority_action": "UMA frase curta e prática: a ação mais importante agora. Máx 20 palavras.",
   "spin_analysis": {
-    "S": "Análise em 2-3 frases sobre como o vendedor faz perguntas de Situação, escrita de forma conversacional",
-    "P": "Análise em 2-3 frases sobre como o vendedor identifica Problemas, escrita de forma conversacional",
-    "I": "Análise em 2-3 frases sobre como o vendedor explora Implicações, escrita de forma conversacional",
-    "N": "Análise em 2-3 frases sobre como o vendedor trabalha Necessidades, escrita de forma conversacional"
+    "S": "1 frase sobre perguntas de Situação",
+    "P": "1 frase sobre identificação de Problemas",
+    "I": "1 frase sobre exploração de Implicações",
+    "N": "1 frase sobre Necessidades de solução"
   },
-  "evolution_trend": "Descrição da tendência de evolução de forma narrativa, como 'O vendedor tem mostrado melhora consistente...' ou 'Nos últimos treinos, houve uma queda...'",
-  "coaching_focus": "Principal área para o gestor focar, escrita como uma recomendação prática de coaching",
-  "real_calls_summary": "Resumo de 2-3 parágrafos CONVERSACIONAIS focado EXCLUSIVAMENTE na performance em REUNIÕES REAIS (Meet). NÃO inclua follow-ups, roleplay ou desafios. Escreva de forma fluida como um coach analisando as calls do vendedor. Se não houver reuniões avaliadas, diga simplesmente que o vendedor ainda não tem reuniões Meet avaliadas."${playbook ? `,
+  "evolution_trend": "1 frase sobre a tendência de evolução",
+  "coaching_focus": "1 frase sobre onde o gestor deve focar o coaching",
+  "real_calls_summary": "2-3 frases CURTAS sobre performance em reuniões reais. Se não houver, diga que ainda não tem reuniões avaliadas."${playbook ? `,
   "playbook_aptitude": {
     "score": 0.0,
     "percentage": 0,
     "level": "exemplary | compliant | partial | non_compliant",
-    "summary": "Resumo de 2-3 parágrafos CONVERSACIONAIS analisando a aderência do vendedor ao playbook. Explique de forma fluida como o vendedor está seguindo as práticas definidas, onde ele se destaca e onde precisa melhorar. Baseie-se nos dados de ANÁLISE DE ADERÊNCIA AO PLAYBOOK fornecidos.",
+    "summary": "2-3 frases CURTAS sobre aderência ao playbook: o que segue bem, o que não segue, e o impacto.",
     "dimension_analysis": {
-      "opening": "Análise conversacional da performance na abertura de calls (se avaliado)",
-      "closing": "Análise conversacional da performance no fechamento (se avaliado)",
-      "conduct": "Análise conversacional da conduta e comportamento (se avaliado)",
-      "required_scripts": "Análise conversacional do uso de scripts obrigatórios (se avaliado)",
-      "process": "Análise conversacional do seguimento do processo de vendas (se avaliado)"
+      "opening": "1 frase sobre abertura (se avaliado)",
+      "closing": "1 frase sobre fechamento (se avaliado)",
+      "conduct": "1 frase sobre conduta (se avaliado)",
+      "required_scripts": "1 frase sobre scripts (se avaliado)",
+      "process": "1 frase sobre processo (se avaliado)"
     },
-    "strengths": ["3-5 práticas do playbook que o vendedor executa bem, escritas de forma clara"],
-    "gaps": ["3-5 práticas do playbook que o vendedor NÃO está seguindo ou precisa melhorar"],
-    "priority_actions": ["2-3 ações prioritárias para melhorar aderência ao playbook"]
+    "strengths": ["2-3 práticas do playbook que executa bem, frases curtas"],
+    "gaps": ["2-3 práticas que não segue, frases curtas"],
+    "priority_actions": ["1-2 ações prioritárias para melhorar aderência"]
   }` : ''}
 }`
         },
@@ -647,7 +646,7 @@ Responda APENAS em JSON válido com a seguinte estrutura:
         }
       ],
       temperature: 0.7,
-      max_tokens: 4000
+      max_tokens: 2500
     })
 
     const aiContent = response.choices[0]?.message?.content

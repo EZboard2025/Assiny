@@ -303,14 +303,6 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
                   </div>
                 </div>
 
-                {/* Badge and trend */}
-                <div className="flex items-center gap-2 mb-4">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>
-                    {badge.text}
-                  </span>
-                  {getTrendIcon(seller.trend)}
-                </div>
-
                 {/* Bottom stats grid */}
                 <div className="grid grid-cols-4 gap-2 mt-4">
                   <div className="text-center p-2 bg-gray-50 rounded-lg">

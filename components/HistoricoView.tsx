@@ -306,17 +306,6 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
                 Simulações
               </button>
               <button
-                onClick={() => setHistoryType('followups')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  historyType === 'followups'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <MessageCircle className="w-4 h-4" />
-                Follow-ups
-              </button>
-              <button
                 onClick={() => setHistoryType('meet')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   historyType === 'meet'
@@ -343,9 +332,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
         </div>
 
         {/* Render content based on selected history type */}
-        {historyType === 'followups' ? (
-          <FollowUpHistoryView />
-        ) : historyType === 'meet' ? (
+        {historyType === 'meet' ? (
           <MeetHistoryContent />
         ) : historyType === 'desafios' ? (
           <ChallengeHistoryContent onStartChallenge={onStartChallenge} />
