@@ -474,7 +474,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           </p>
         </div>
         <div className="bg-white rounded-xl p-4 text-center border border-gray-200">
-          <p className="text-[10px] text-gray-500 font-medium uppercase mb-1">Avaliacoes WA</p>
+          <p className="text-[10px] text-gray-500 font-medium uppercase mb-1">Conversas WhatsApp Avaliadas</p>
           <p className="text-2xl font-bold text-gray-900">{whatsappSummary.count}</p>
         </div>
       </div>
@@ -778,7 +778,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         <div className="flex items-center justify-between mb-4">
           <h4 className="font-semibold text-gray-900 flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-green-600" />
-            Avaliacoes WhatsApp
+            Conversas de WhatsApp Avaliadas
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
               {whatsappEvals.length}
             </span>

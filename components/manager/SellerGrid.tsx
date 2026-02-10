@@ -322,7 +322,7 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
                     <p className="text-sm font-bold text-gray-900">{spinAvg > 0 ? spinAvg.toFixed(1) : '-'}</p>
                   </div>
                   <div className="text-center p-2 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] text-gray-500 font-medium">Aval. WA</p>
+                    <p className="text-[10px] text-gray-500 font-medium">Conv. WhatsApp</p>
                     <p className="text-sm font-bold text-gray-900">{waData.count}</p>
                   </div>
                   <div className="text-center p-2 bg-gray-50 rounded-lg">
