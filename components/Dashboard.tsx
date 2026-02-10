@@ -23,7 +23,7 @@ import StreakIndicator from './dashboard/StreakIndicator'
 import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
 import ChallengeHistoryView from './dashboard/ChallengeHistoryView'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
-import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video, MessageSquareMore } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video, MessageSquareMore, BarChart3 } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -522,6 +522,17 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 subtitle="Performance da equipe"
                 description="Métricas e evolução dos vendedores."
                 onClick={() => setShowSalesDashboard(true)}
+                adminBadge
+              />
+            )}
+
+            {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
+              <FeatureCard
+                icon={BarChart3}
+                title="Dashboard Gestor"
+                subtitle="Acompanhe sua equipe"
+                description="Avaliações automáticas das conversas dos vendedores."
+                onClick={() => router.push('/manager')}
                 adminBadge
               />
             )}
