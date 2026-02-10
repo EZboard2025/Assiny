@@ -299,28 +299,44 @@ CONTEXTO B2B:
 
     const suggestion = completion.choices[0]?.message?.content || 'Desculpe, não consegui gerar uma sugestão.'
 
-    // 8. Save copilot_feedback record (was_helpful=null initially)
-    const { data: feedbackRecord } = await supabaseAdmin
-      .from('copilot_feedback')
-      .insert({
-        user_id: user.id,
-        company_id: companyId,
-        contact_phone: contactPhone,
-        contact_name: contactName || null,
-        user_question: userMessage,
-        ai_suggestion: suggestion,
-        conversation_context: conversationContext.slice(0, 5000),
-        was_helpful: null,
-        metadata: {
-          model: 'gpt-4.1',
-          success_examples: successExamples.length,
-          failure_examples: failureExamples.length,
-          company_knowledge: companyKnowledge.length,
-          tokens: completion.usage?.total_tokens || 0
-        }
-      })
-      .select('id')
-      .single()
+    // 8. Save copilot_feedback record ONLY for suggestion messages (not analysis)
+    // Analysis requests don't impact the follow-up ML pipeline
+    const lowerMessage = userMessage.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const isAnalysis = [
+      'analise', 'analisa', 'analisar',
+      'avalie', 'avalia', 'avaliar', 'avaliacao',
+      'o que acha', 'o que achou',
+      'como estou', 'como esta minha',
+      'critique', 'critica',
+      'de um feedback', 'me de feedback'
+    ].some(pattern => lowerMessage.includes(pattern))
+
+    let feedbackRecord: { id: string } | null = null
+
+    if (!isAnalysis) {
+      const { data } = await supabaseAdmin
+        .from('copilot_feedback')
+        .insert({
+          user_id: user.id,
+          company_id: companyId,
+          contact_phone: contactPhone,
+          contact_name: contactName || null,
+          user_question: userMessage,
+          ai_suggestion: suggestion,
+          conversation_context: conversationContext.slice(0, 5000),
+          was_helpful: null,
+          metadata: {
+            model: 'gpt-4.1',
+            success_examples: successExamples.length,
+            failure_examples: failureExamples.length,
+            company_knowledge: companyKnowledge.length,
+            tokens: completion.usage?.total_tokens || 0
+          }
+        })
+        .select('id')
+        .single()
+      feedbackRecord = data
+    }
 
     // 9. Consume 1 credit
     if (companyCredits) {
