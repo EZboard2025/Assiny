@@ -1519,12 +1519,24 @@ export default function FollowUpView() {
             <h2 className="text-[#e9edef] text-xl mb-2">Conectando ao WhatsApp...</h2>
             <p className="text-[#8696a0] text-sm">Carregando suas conversas. Pode levar ate 3 minutos.</p>
             <p className="text-[#8696a0] text-xs mt-2">Mantenha esta pagina aberta.</p>
+            <button
+              onClick={disconnectWhatsApp}
+              className="mt-4 text-[#8696a0] hover:text-[#e9edef] text-sm transition-colors"
+            >
+              Cancelar
+            </button>
           </>
         ) : (
           <>
             <Loader2 className="w-12 h-12 animate-spin text-[#00a884] mx-auto mb-4" />
             <h2 className="text-[#e9edef] text-xl mb-2">Inicializando...</h2>
             <p className="text-[#8696a0] text-sm">Preparando o QR Code. Aguarde...</p>
+            <button
+              onClick={() => setConnectionStatus('disconnected')}
+              className="mt-4 text-[#8696a0] hover:text-[#e9edef] text-sm transition-colors"
+            >
+              Cancelar
+            </button>
           </>
         )}
         {error && (
