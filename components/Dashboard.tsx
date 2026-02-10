@@ -23,7 +23,7 @@ import StreakIndicator from './dashboard/StreakIndicator'
 import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
 import ChallengeHistoryView from './dashboard/ChallengeHistoryView'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
-import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video, MessageSquareMore } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
@@ -466,7 +466,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             />
 
             <FeatureCard
-              icon={FileSearch}
+              icon={MessageSquareMore}
               title="WhatsApp IA"
               subtitle="Copiloto de Vendas"
               description="Copiloto com IA para suas conversas no WhatsApp."
