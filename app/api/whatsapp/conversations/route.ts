@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 50)
 
     // Enrich conversations with last message sender info
+    // Only need 1 per phone — limit to ~2x conversation count for safety
     const contactPhones = conversations.map((c: any) => c.contact_phone)
     if (contactPhones.length > 0) {
       const { data: latestMsgs } = await supabaseAdmin
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id)
         .in('contact_phone', contactPhones)
         .order('message_timestamp', { ascending: false })
-        .limit(500)
+        .limit(Math.max(contactPhones.length * 2, 50))
 
       // Build map: first occurrence per phone = latest message
       const latestByPhone = new Map<string, { direction: string; contact_name: string | null }>()

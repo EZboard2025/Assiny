@@ -708,9 +708,8 @@ export default function FollowUpView() {
         setConnectionStatus('connected')
         setPhoneNumber(data.phone_number || null)
         loadConversations(true)
-        // Extended retries in case sync is still in progress (silent — no spinner)
-        setTimeout(() => loadConversations(), 5000)
-        setTimeout(() => loadConversations(), 15000)
+        // One retry in case sync is still in progress (silent — no spinner)
+        setTimeout(() => loadConversations(), 10000)
       } else {
         setConnectionStatus('disconnected')
       }
@@ -744,13 +743,10 @@ export default function FollowUpView() {
           setQrCode(null)
           setIsInitializing(false)
           setSyncStatus(data.syncStatus || 'pending')
-          // Load conversations with extended retries (sync can take up to 2min)
+          // Load conversations: initial + 2 retries while sync completes
           loadConversations(true)
-          setTimeout(() => loadConversations(), 5000)
-          setTimeout(() => loadConversations(), 15000)
-          setTimeout(() => loadConversations(), 30000)
-          setTimeout(() => loadConversations(), 60000)
-          setTimeout(() => loadConversations(), 120000)
+          setTimeout(() => loadConversations(), 8000)
+          setTimeout(() => loadConversations(), 25000)
         } else if (data.status === 'qr_ready' && data.qrcode) {
           setQrCode(data.qrcode)
           setConnectionStatus('qr_ready')
@@ -802,10 +798,8 @@ export default function FollowUpView() {
         setConnectionStatus('connected')
         setIsInitializing(false)
         loadConversations(true)
-        setTimeout(() => loadConversations(), 5000)
-        setTimeout(() => loadConversations(), 15000)
-        setTimeout(() => loadConversations(), 30000)
-        setTimeout(() => loadConversations(), 60000)
+        setTimeout(() => loadConversations(), 8000)
+        setTimeout(() => loadConversations(), 25000)
         return
       }
 
