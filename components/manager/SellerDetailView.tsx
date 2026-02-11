@@ -165,6 +165,8 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   const [whatsappEvals, setWhatsappEvals] = useState<WhatsAppEvaluation[]>([])
   const [whatsappDays, setWhatsappDays] = useState(7)
   const [selectedWAEval, setSelectedWAEval] = useState<WhatsAppEvaluation | null>(null)
+  const [waAiSummary, setWaAiSummary] = useState<{ summary: string; strongest_criteria: string; weakest_criteria: string; tip: string } | null>(null)
+  const [waAiLoading, setWaAiLoading] = useState(false)
 
   // Modal states
   const [selectedFollowUp, setSelectedFollowUp] = useState<any>(null)
@@ -193,10 +195,10 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         loadPlaybook()
       ])
 
-      // Auto-generate AI summary if needed
+      // Auto-generate AI summary in background (non-blocking)
       if (!savedAnalysis) {
         console.log(`Auto-gerando analise IA para vendedor ${seller.user_id} (sem analise anterior)`)
-        await generateAISummary(false)
+        generateAISummary(false).catch(console.error)
       } else if (compData) {
         const currentTotal =
           (compData.meets?.total || 0) +
@@ -213,7 +215,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
         if (delta >= 10) {
           console.log(`Auto-regenerando analise IA (delta >= 10)`)
-          await generateAISummary(true)
+          generateAISummary(true).catch(console.error)
         }
       }
     } catch (error) {
@@ -234,10 +236,64 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
       if (response.ok) {
         const data = await response.json()
-        setWhatsappEvals(data.evaluations || [])
+        const evals = data.evaluations || []
+        setWhatsappEvals(evals)
+
+        if (evals.length === 0) {
+          setWaAiSummary(null)
+          return
+        }
+
+        // Check cache: regenerate only every 4 new evaluations
+        const cacheKey = `wa_ai_summary_${seller.user_id}_${whatsappDays}`
+        try {
+          const cached = localStorage.getItem(cacheKey)
+          if (cached) {
+            const parsed = JSON.parse(cached)
+            const delta = evals.length - (parsed.evalCount || 0)
+            if (delta < 4 && delta >= 0) {
+              console.log(`WhatsApp AI summary cache hit (delta ${delta} < 4)`)
+              setWaAiSummary(parsed.data)
+              return
+            }
+            console.log(`WhatsApp AI summary stale (delta ${delta} >= 4), regenerating`)
+          }
+        } catch { /* ignore parse errors */ }
+
+        generateWaAiSummary(evals).catch(console.error)
       }
     } catch (error) {
       console.error('Erro ao carregar avaliacoes WhatsApp:', error)
+    }
+  }
+
+  const generateWaAiSummary = async (evals: WhatsAppEvaluation[]) => {
+    try {
+      setWaAiLoading(true)
+      const response = await fetch('/api/admin/seller-whatsapp-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sellerName: seller.user_name,
+          evaluations: evals,
+          playbook: playbook || null
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setWaAiSummary(data)
+
+        // Cache with eval count
+        const cacheKey = `wa_ai_summary_${seller.user_id}_${whatsappDays}`
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ data, evalCount: evals.length }))
+        } catch { /* ignore storage errors */ }
+      }
+    } catch (error) {
+      console.error('Erro ao gerar resumo IA WhatsApp:', error)
+    } finally {
+      setWaAiLoading(false)
     }
   }
 
@@ -474,7 +530,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           </p>
         </div>
         <div className="bg-white rounded-xl p-4 text-center border border-gray-200">
-          <p className="text-[10px] text-gray-500 font-medium uppercase mb-1">Avaliacoes WA</p>
+          <p className="text-[10px] text-gray-500 font-medium uppercase mb-1">Conversas WhatsApp Avaliadas</p>
           <p className="text-2xl font-bold text-gray-900">{whatsappSummary.count}</p>
         </div>
       </div>
@@ -679,25 +735,6 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
       {/* Action Buttons */}
       <div className="flex gap-2">
-        {aiSummary && (
-          <button
-            onClick={() => generateAISummary(true)}
-            disabled={aiSummaryLoading}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
-          >
-            {aiSummaryLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Regenerando...
-              </>
-            ) : (
-              <>
-                <Brain className="w-4 h-4" />
-                Regenerar Analise IA
-              </>
-            )}
-          </button>
-        )}
         <button
           onClick={() => setSelectedSellerForPDI({ userId: seller.user_id, userName: seller.user_name })}
           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
@@ -778,7 +815,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         <div className="flex items-center justify-between mb-4">
           <h4 className="font-semibold text-gray-900 flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-green-600" />
-            Avaliacoes WhatsApp
+            Conversas de WhatsApp Avaliadas
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
               {whatsappEvals.length}
             </span>
@@ -798,6 +835,67 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
         {whatsappEvals.length > 0 ? (
           <>
+            {/* Overview: Average + Criteria Bars + AI Summary */}
+            <div className="mb-4 pb-4 border-b border-gray-100">
+              {/* Score + Criteria bars row */}
+              <div className="flex items-start gap-5 mb-4">
+                {/* Average score */}
+                <div className="flex flex-col items-center justify-center bg-gray-50 rounded-xl px-5 py-4 min-w-[100px]">
+                  {(() => {
+                    const avg = whatsappEvals.reduce((s, e) => s + e.nota_final, 0) / whatsappEvals.length
+                    return (
+                      <>
+                        <span className={`text-3xl font-bold ${getWAScoreColor(avg)}`}>{avg.toFixed(1)}</span>
+                        <span className="text-xs text-gray-500 mt-1">Media Geral</span>
+                      </>
+                    )
+                  })()}
+                </div>
+
+                {/* Criteria averages */}
+                <div className="flex-1 space-y-1.5">
+                  {(() => {
+                    const criteriaLabels: Record<string, string> = {
+                      cta: 'CTA', timing: 'Timing', objetividade: 'Objetividade',
+                      personalizacao: 'Personalização', tom_consultivo: 'Tom Consultivo', valor_agregado: 'Valor Agregado'
+                    }
+                    const criteriaAvgs: Record<string, { sum: number; count: number }> = {}
+                    whatsappEvals.forEach(ev => {
+                      if (ev.avaliacao?.notas) {
+                        Object.entries(ev.avaliacao.notas as Record<string, { nota: number }>).forEach(([key, val]) => {
+                          if (!criteriaAvgs[key]) criteriaAvgs[key] = { sum: 0, count: 0 }
+                          criteriaAvgs[key].sum += val.nota
+                          criteriaAvgs[key].count += 1
+                        })
+                      }
+                    })
+                    return Object.entries(criteriaAvgs).map(([key, { sum, count }]) => {
+                      const avg = sum / count
+                      return (
+                        <div key={key} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 w-28 shrink-0 text-right">{criteriaLabels[key] || key}</span>
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${getWAScoreBarColor(avg)}`} style={{ width: `${(avg / 10) * 100}%` }} />
+                          </div>
+                          <span className="text-xs font-semibold text-gray-600 w-7 text-right">{avg.toFixed(1)}</span>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+
+              {/* AI Summary */}
+              {waAiLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="w-3 h-3 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                  Gerando analise...
+                </div>
+              ) : waAiSummary ? (
+                <p className="text-sm text-gray-600 leading-relaxed">{waAiSummary.summary}</p>
+              ) : null}
+            </div>
+
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {whatsappEvals.map((ev) => (
                 <button
@@ -807,14 +905,9 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
                     selectedWAEval?.id === ev.id ? 'bg-green-50 border-l-2 border-l-green-500 border-green-200' : 'border-gray-100'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900">
-                      {ev.contact_name || ev.contact_phone}
-                    </span>
-                    <span className="text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded">
-                      Round {ev.round_number}
-                    </span>
-                  </div>
+                  <span className="text-sm font-medium text-gray-900">
+                    {ev.contact_name || ev.contact_phone}
+                  </span>
                   <div className="flex items-center gap-3">
                     <span className={`text-sm font-semibold px-2.5 py-1 rounded-lg border ${getWAScoreBg(ev.nota_final)} ${getWAScoreColor(ev.nota_final)}`}>
                       {ev.nota_final.toFixed(1)} {getClassificacaoLabel(ev.classificacao)}
@@ -830,117 +923,85 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
             {/* Inline detail panel for selected WA eval */}
             {selectedWAEval && (
-              <div className="bg-gray-50 rounded-xl p-5 mt-3 border border-gray-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h5 className="font-semibold text-gray-900 text-sm">
-                    {selectedWAEval.contact_name || selectedWAEval.contact_phone} — Round {selectedWAEval.round_number}
-                  </h5>
-                  <button
-                    onClick={() => setSelectedWAEval(null)}
-                    className="text-gray-400 hover:text-gray-600 text-xs font-medium px-2 py-1 rounded hover:bg-gray-100 transition-colors"
-                  >
+              <div className="bg-white rounded-xl p-5 mt-3 border border-gray-200">
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-gray-900">
+                      {selectedWAEval.contact_name || selectedWAEval.contact_phone}
+                    </span>
+                    <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${getWAScoreBg(selectedWAEval.nota_final)} ${getWAScoreColor(selectedWAEval.nota_final)}`}>
+                      {selectedWAEval.nota_final.toFixed(1)}/10
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {selectedWAEval.message_count} mensagens &middot; {new Date(selectedWAEval.round_start).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} {new Date(selectedWAEval.round_start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <button onClick={() => setSelectedWAEval(null)} className="text-gray-400 hover:text-gray-600 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-50">
                     Fechar
                   </button>
                 </div>
 
-                {/* Score */}
-                <div className={`text-center py-4 rounded-xl mb-5 border ${getWAScoreBg(selectedWAEval.nota_final)}`}>
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className={`text-4xl font-bold ${getWAScoreColor(selectedWAEval.nota_final)}`}>
-                      {selectedWAEval.nota_final.toFixed(1)}
-                    </span>
-                    <span className="text-gray-400 text-lg">/10</span>
-                  </div>
-                  <div className={`text-sm font-medium mt-1 ${getWAScoreColor(selectedWAEval.nota_final)}`}>
-                    {getClassificacaoLabel(selectedWAEval.classificacao)}
-                  </div>
-                </div>
-
-                {/* Criteria scores */}
+                {/* Criteria scores - horizontal bar style */}
                 {selectedWAEval.avaliacao?.notas && (
-                  <div className="mb-5">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Notas por Criterio</p>
-                    <div className="space-y-3">
-                      {Object.entries(selectedWAEval.avaliacao.notas as Record<string, { nota: number; peso: number; comentario: string }>).map(([key, val]) => {
-                        const labels: Record<string, string> = {
-                          valor_agregado: 'Valor Agregado',
-                          personalizacao: 'Personalizacao',
-                          tom_consultivo: 'Tom Consultivo',
-                          objetividade: 'Objetividade',
-                          cta: 'CTA',
-                          timing: 'Timing'
-                        }
-                        return (
-                          <div key={key} className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">{labels[key] || key}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${getWAScoreBarColor(val.nota)}`}
-                                  style={{ width: `${(val.nota / 10) * 100}%` }}
-                                />
-                              </div>
-                              <span className={`font-semibold w-8 text-right ${getWAScoreColor(val.nota)}`}>
-                                {val.nota?.toFixed(1)}
-                              </span>
-                            </div>
+                  <div className="space-y-2 mb-5">
+                    {Object.entries(selectedWAEval.avaliacao.notas as Record<string, { nota: number; peso: number; comentario: string }>).map(([key, val]) => {
+                      const labels: Record<string, string> = {
+                        valor_agregado: 'Valor Agregado', personalizacao: 'Personalização', tom_consultivo: 'Tom Consultivo',
+                        objetividade: 'Objetividade', cta: 'CTA', timing: 'Timing'
+                      }
+                      return (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className="text-sm text-gray-600 w-32 shrink-0">{labels[key] || key}</span>
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${getWAScoreBarColor(val.nota)}`}
+                              style={{ width: `${(val.nota / 10) * 100}%` }}
+                            />
                           </div>
-                        )
-                      })}
-                    </div>
+                          <span className="text-sm font-semibold text-gray-700 w-8 text-right">{val.nota?.toFixed(1)}</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
-                {/* Positive points */}
-                {selectedWAEval.avaliacao?.pontos_positivos?.length > 0 && (
-                  <div className="mb-4">
-                    <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-                      <h4 className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wider">Pontos Positivos</h4>
-                      <ul className="space-y-1.5">
+                {/* Feedback */}
+                <div className="space-y-3">
+                  {selectedWAEval.avaliacao?.pontos_positivos?.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Pontos Positivos</h4>
+                      <ul className="space-y-1">
                         {selectedWAEval.avaliacao.pontos_positivos.map((p: string, i: number) => (
-                          <li key={i} className="text-xs text-gray-700 flex gap-2">
-                            <span className="text-green-600 shrink-0">+</span>
+                          <li key={i} className="text-sm text-gray-700 flex gap-2">
+                            <span className="text-green-500 shrink-0 mt-0.5">&#10003;</span>
                             <span>{p}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                  </div>
-                )}
-
-                {/* Points to improve */}
-                {selectedWAEval.avaliacao?.pontos_melhorar?.length > 0 && (
-                  <div className="mb-4">
-                    <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
-                      <h4 className="text-xs font-semibold text-orange-700 mb-2 uppercase tracking-wider">Pontos a Melhorar</h4>
-                      <ul className="space-y-1.5">
+                  )}
+                  {selectedWAEval.avaliacao?.pontos_melhorar?.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Pontos a Melhorar</h4>
+                      <ul className="space-y-1">
                         {selectedWAEval.avaliacao.pontos_melhorar.map((p: any, i: number) => (
-                          <li key={i} className="text-xs text-gray-700 flex gap-1.5">
-                            <span className="text-orange-600 shrink-0">-</span>
+                          <li key={i} className="text-sm text-gray-700 flex gap-2">
+                            <span className="text-gray-400 shrink-0 mt-0.5">&bull;</span>
                             <span>{typeof p === 'string' ? p : `${p.problema}: ${p.como_resolver}`}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Main tip */}
-                {selectedWAEval.avaliacao?.dica_principal && (
-                  <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-                    <h4 className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wider">Dica Principal</h4>
-                    <p className="text-xs text-gray-700 leading-relaxed">{selectedWAEval.avaliacao.dica_principal}</p>
-                  </div>
-                )}
-
-                {/* Metadata */}
-                <div className="mt-5 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
-                  <p>{selectedWAEval.message_count} mensagens no round</p>
-                  <p>
-                    Periodo: {new Date(selectedWAEval.round_start).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    {' — '}
-                    {new Date(selectedWAEval.round_end).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  {/* Main tip */}
+                  {selectedWAEval.avaliacao?.dica_principal && (
+                    <div className="bg-gray-50 rounded-lg p-3 mt-2">
+                      <h4 className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Dica Principal</h4>
+                      <p className="text-sm text-gray-700">{selectedWAEval.avaliacao.dica_principal}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1018,7 +1079,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
             </div>
             {comprehensiveData?.challenges?.items && comprehensiveData.challenges.items.length > 0 ? (
               <div className="space-y-2 max-h-32 overflow-y-auto">
-                {comprehensiveData.challenges.items.filter((c: any) => c.completed).slice(0, 3).map((challenge: any) => (
+                {comprehensiveData.challenges.items.filter((c: any) => c.completed || c.score > 0).slice(0, 3).map((challenge: any) => (
                   <div
                     key={challenge.id}
                     className="group flex items-center justify-between p-2.5 bg-white rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-200 transition-all border border-gray-100 hover:shadow-sm"
@@ -1073,45 +1134,6 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
             )}
           </div>
 
-          {/* Mensagens Analisadas (Follow-ups) */}
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
-                <MessageSquare className="w-3 h-3" />
-                Mensagens Analisadas
-              </span>
-              <span className="text-lg font-bold text-gray-900">{seller.followup_data?.total_analyses || 0}</span>
-            </div>
-            {seller.followup_data && seller.followup_data.total_analyses > 0 ? (
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {seller.followup_data.recent_analyses.slice(0, 3).map(analysis => (
-                  <div
-                    key={analysis.id}
-                    className="group flex items-center justify-between p-2.5 bg-white rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-200 transition-all border border-gray-100 hover:shadow-sm"
-                    onClick={() => setSelectedFollowUp(analysis)}
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
-                        analysis.classificacao === 'excelente' ? 'bg-green-100 text-green-700' :
-                        analysis.classificacao === 'bom' ? 'bg-green-50 text-green-600' :
-                        analysis.classificacao === 'medio' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-50 text-red-600'
-                      }`}>
-                        {translateClassification(analysis.classificacao)}
-                      </span>
-                      <span className="text-xs text-gray-500 truncate">{analysis.tipo_venda}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-sm font-bold ${getScoreColor(analysis.nota_final)}`}>{analysis.nota_final.toFixed(1)}</span>
-                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-green-500 transition-colors" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 text-center py-3">Nenhuma mensagem analisada</p>
-            )}
-          </div>
         </div>
       </div>
 

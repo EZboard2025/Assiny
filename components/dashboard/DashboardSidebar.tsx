@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video } from 'lucide-react'
+import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp } from 'lucide-react'
 
 interface DashboardSidebarProps {
   userRole: string | null
@@ -31,7 +31,8 @@ export default function DashboardSidebar({
     { icon: User, href: '/profile', label: 'Meu Perfil', show: true },
     { icon: Clock, href: '/history', label: 'Histórico', show: true },
     { icon: Target, href: '/pdi-page', label: 'PDI', show: hasPDI },
-    { icon: MessageSquare, href: '/followup', label: 'WhatsApp IA+', show: true, disabled: true },
+    { icon: TrendingUp, href: '/manager', label: 'Gestão', show: isAdmin || isGestor },
+    { icon: MessageSquare, href: '/followup', label: 'WhatsApp IA+', show: true },
     { icon: Video, href: '/meet-analysis', label: 'Análise Meet', show: true },
     { icon: Link2, href: '/roleplay-links', label: 'Links Públicos', show: isAdmin || isGestor },
   ]
