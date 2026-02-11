@@ -748,6 +748,22 @@ async function ensureValidConnectionId(state: ClientState): Promise<string | nul
   return state.connectionId
 }
 
+// Format media type for conversation preview (WhatsApp Web style)
+function formatMediaPreview(messageType: string): string {
+  const labels: Record<string, string> = {
+    image: '📷 Foto',
+    video: '🎥 Vídeo',
+    audio: '🎵 Áudio',
+    ptt: '🎤 Áudio',
+    document: '📄 Documento',
+    sticker: '🏷️ Figurinha',
+    location: '📍 Localização',
+    contact: '👤 Contato',
+    contacts: '👤 Contato',
+  }
+  return labels[messageType] || (messageType === 'text' || messageType === 'message' ? '' : `[${messageType}]`)
+}
+
 // Helper to extract message content
 function extractMessageContent(msg: Message): { messageType: string; content: string; mediaMimeType: string | null } | null {
   // Universal catch-all: whatsapp-web.js marks all system/notification messages
@@ -886,7 +902,7 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       } catch {}
     } else {
       const contact = await chat.getContact()
-      contactName = contact?.pushname || contact?.name || chat.name || null
+      contactName = chat.name || contact?.name || contact?.pushname || null
 
       try {
         profilePicUrl = await state.client.getProfilePicUrl(chat.id._serialized) || null
@@ -937,7 +953,7 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       if (isGroup && !msg.fromMe) {
         try {
           const senderContact = await msg.getContact()
-          const resolvedName = senderContact?.pushname || senderContact?.name || null
+          const resolvedName = senderContact?.name || senderContact?.pushname || null
           // Don't use raw author IDs (like "2377013243905270lid") as display names
           const authorName = msg.author && !/^\d+(@|$)/.test(msg.author) ? msg.author : null
           msgContactName = resolvedName || authorName || contactName
@@ -973,7 +989,7 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
 
       if (!lastMessageAt || msgTimestamp > lastMessageAt) {
         lastMessageAt = msgTimestamp
-        lastMessagePreview = content?.substring(0, 100) || `[${messageType}]`
+        lastMessagePreview = content?.substring(0, 100) || formatMediaPreview(messageType)
       }
     }
 
@@ -1011,16 +1027,24 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false)
       } catch {}
     }
 
-    // Upsert conversation
+    // Upsert conversation — find latest non-notification message for preview
     const latestMsg = messages.reduce((latest: any, msg: any) => {
       if (!latest || msg.timestamp > latest.timestamp) return msg
       return latest
     }, null)
+    // Find latest message that has actual content (skip notifications)
+    const latestContentMsg = messages
+      .filter((msg: any) => extractMessageContent(msg) !== null)
+      .reduce((latest: any, msg: any) => {
+        if (!latest || msg.timestamp > latest.timestamp) return msg
+        return latest
+      }, null)
 
     if (latestMsg) {
       const latestTimestamp = new Date(latestMsg.timestamp * 1000)
-      const latestContent = extractMessageContent(latestMsg)
-      const preview = latestContent?.content?.substring(0, 100) || `[${latestContent?.messageType || 'message'}]`
+      const previewSource = latestContentMsg || latestMsg
+      const latestContent = extractMessageContent(previewSource)
+      const preview = latestContent?.content?.substring(0, 100) || formatMediaPreview(latestContent?.messageType || 'text')
 
       await supabaseAdmin
         .from('whatsapp_conversations')
@@ -1154,7 +1178,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       } else {
         try {
           const senderContact = await msg.getContact()
-          const resolvedName = senderContact?.pushname || senderContact?.name || null
+          const resolvedName = senderContact?.name || senderContact?.pushname || null
           // Don't use raw author IDs (like "2377013243905270lid") as display names
           const author = (msg as any).author
           const authorName = author && !/^\d+(@|$)/.test(author) ? author : null
@@ -1167,7 +1191,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       }
     } else {
       const contact = await chat.getContact()
-      contactName = contact?.pushname || contact?.name || chat.name || null
+      contactName = chat.name || contact?.name || contact?.pushname || null
       convContactName = contactName
 
       if (!fromMe) {
@@ -1252,7 +1276,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chat.id._serialized, is_lid: isLidContact, is_group: isGroup }
       })
 
-    const messagePreview = content?.substring(0, 100) || `[${messageType}]`
+    const messagePreview = content?.substring(0, 100) || formatMediaPreview(messageType)
     const convData: any = {
       connection_id: validConnId,
       user_id: state.userId,

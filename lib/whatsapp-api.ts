@@ -26,7 +26,7 @@ export function formatPhoneDisplay(phone: string): string {
     return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`
   }
   if (cleaned.length === 12 && cleaned.startsWith('55')) {
-    return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 8)}-${cleaned.slice(8)}`
+    return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 8)}-${cleaned.slice(8, 12)}`
   }
   return `+${cleaned}`
 }

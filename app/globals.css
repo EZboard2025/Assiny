@@ -408,6 +408,19 @@
     50% { opacity: 1; transform: scale(1.15); }
   }
 
+  /* Copilot hero icon — foil shimmer on icon itself */
+  .copilot-hero-icon svg {
+    animation: heroFoil 3s ease-in-out infinite;
+  }
+
+  @keyframes heroFoil {
+    0%   { color: #00a884; filter: brightness(1); }
+    25%  { color: #00ffcc; filter: brightness(1.4); }
+    50%  { color: #00d4aa; filter: brightness(1.1); }
+    75%  { color: #80ffd4; filter: brightness(1.5); }
+    100% { color: #00a884; filter: brightness(1); }
+  }
+
   /* Fade in for AI messages */
   .copilot-msg-fade-in {
     animation: copilotMsgFade 0.3s ease-out forwards;
@@ -418,27 +431,33 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* Gemini-style chunk reveal - gradient wipe from left to right */
+  /* Word-by-word reveal - fade from transparent + blur to solid */
   .copilot-chunk-reveal {
     display: inline;
-    -webkit-mask-image: linear-gradient(to right, #000 30%, transparent 70%);
-    mask-image: linear-gradient(to right, #000 30%, transparent 70%);
-    -webkit-mask-size: 300% 100%;
-    mask-size: 300% 100%;
-    -webkit-mask-position: 100% 0;
-    mask-position: 100% 0;
-    animation: chunkWipe 1.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+    opacity: 0;
+    filter: blur(4px);
+    animation: wordFade 0.35s ease-out forwards;
   }
 
-  @keyframes chunkWipe {
-    to {
-      -webkit-mask-position: 0% 0;
-      mask-position: 0% 0;
-    }
+  @keyframes wordFade {
+    from { opacity: 0; filter: blur(4px); }
+    to { opacity: 1; filter: blur(0px); }
   }
 
   /* Already-revealed chunks stay fully visible */
   .copilot-chunk-done {
     opacity: 1;
   }
+
+  /* Pulsing dots while AI is thinking */
+  @keyframes copilotDot {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1.2); }
+  }
 }
+
+/* WhatsApp chat background */
+.whatsapp-chat-bg {
+  background-color: #0b141a;
+}
+

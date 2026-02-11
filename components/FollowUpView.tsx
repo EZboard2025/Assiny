@@ -55,12 +55,15 @@ interface WhatsAppConversation {
   profile_pic_url: string | null
   last_message_at: string | null
   last_message_preview: string | null
+  last_message_sender: string | null
+  last_message_from_me: boolean
   unread_count: number
   message_count: number
 }
 
 interface WhatsAppMessage {
   id: string
+  waMessageId?: string
   body: string
   fromMe: boolean
   timestamp: string
@@ -135,6 +138,82 @@ export default function FollowUpView() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const attachMenuRef = useRef<HTMLDivElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
+
+  // New conversation / contact state
+  const [showNewConversation, setShowNewConversation] = useState(false)
+  const [showNewContactForm, setShowNewContactForm] = useState(false)
+  const [newContactName, setNewContactName] = useState('')
+  const [newContactSurname, setNewContactSurname] = useState('')
+  const [newContactPhone, setNewContactPhone] = useState('')
+  const [newConversationSearch, setNewConversationSearch] = useState('')
+
+  // Message dropdown menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: WhatsAppMessage } | null>(null)
+  const [isDeletingMessage, setIsDeletingMessage] = useState(false)
+  const [editingMessage, setEditingMessage] = useState<WhatsAppMessage | null>(null)
+  const [editInput, setEditInput] = useState('')
+  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null)
+  const [forwardingMessage, setForwardingMessage] = useState<WhatsAppMessage | null>(null)
+  const [forwardSearch, setForwardSearch] = useState('')
+
+  // Audio playback state
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null)
+  const [audioProgress, setAudioProgress] = useState<Record<string, number>>({})
+  const [audioDurations, setAudioDurations] = useState<Record<string, number>>({})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioProgressTimer = useRef<NodeJS.Timeout | null>(null)
+
+  const playAudio = (msgId: string, mediaId: string) => {
+    // If same audio is playing, pause it
+    if (playingAudioId === msgId && audioRef.current) {
+      audioRef.current.pause()
+      setPlayingAudioId(null)
+      if (audioProgressTimer.current) clearInterval(audioProgressTimer.current)
+      return
+    }
+
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause()
+      if (audioProgressTimer.current) clearInterval(audioProgressTimer.current)
+    }
+
+    const audio = new Audio(getMediaSrc(mediaId))
+    audioRef.current = audio
+    setPlayingAudioId(msgId)
+
+    audio.onloadedmetadata = () => {
+      setAudioDurations(prev => ({ ...prev, [msgId]: audio.duration }))
+    }
+
+    audio.ontimeupdate = () => {
+      if (audio.duration) {
+        setAudioProgress(prev => ({ ...prev, [msgId]: audio.currentTime / audio.duration }))
+      }
+    }
+
+    audio.onended = () => {
+      setPlayingAudioId(null)
+      setAudioProgress(prev => ({ ...prev, [msgId]: 0 }))
+      if (audioProgressTimer.current) clearInterval(audioProgressTimer.current)
+    }
+
+    audio.onerror = () => {
+      console.error('[Audio] Failed to play:', mediaId)
+      setPlayingAudioId(null)
+    }
+
+    audio.play().catch(err => {
+      console.error('[Audio] Play error:', err)
+      setPlayingAudioId(null)
+    })
+  }
+
+  const formatAudioTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = Math.floor(seconds % 60)
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -515,14 +594,21 @@ export default function FollowUpView() {
 
           if (data.messages) {
             setMessages(prev => {
+              const tempMessages = prev.filter(m => m.id.startsWith('temp_'))
               const realPrev = prev.filter(m => !m.id.startsWith('temp_'))
+
+              // Don't wipe messages if DB has fewer (race: event handler hasn't saved yet)
+              if (data.messages.length < realPrev.length) {
+                return prev
+              }
+
               if (data.messages.length !== realPrev.length) {
-                return data.messages
+                return [...data.messages, ...tempMessages]
               }
               const lastNew = data.messages[data.messages.length - 1]
               const lastOld = realPrev[realPrev.length - 1]
               if (lastNew && lastOld && lastNew.id !== lastOld.id) {
-                return data.messages
+                return [...data.messages, ...tempMessages]
               }
               return prev
             })
@@ -530,7 +616,7 @@ export default function FollowUpView() {
         } catch (e) {
           // Silent fail for polling
         }
-      }, 30000) // Anti-ban: Reduced polling frequency (was 5s, now 30s)
+      }, 5000) // Poll own DB every 5s (no WhatsApp API calls, no ban risk)
     }
 
     return () => {
@@ -551,7 +637,37 @@ export default function FollowUpView() {
           const data = await response.json()
 
           if (data.conversations) {
-            setConversations(data.conversations)
+            // Preserve synthetic conversations and contact names across polling updates
+            setConversations(prev => {
+              // Build a map of names from previous state (synthetic + user-assigned)
+              const prevNameMap = new Map<string, string>()
+              prev.forEach(c => {
+                if (c.contact_name) {
+                  const suffix = c.contact_phone.replace(/[^0-9]/g, '').slice(-8)
+                  prevNameMap.set(suffix, c.contact_name)
+                }
+              })
+
+              // Preserve synthetic conversations that don't have a DB counterpart yet
+              const syntheticConvs = prev.filter(c =>
+                typeof c.id === 'string' && c.id.startsWith('new_') &&
+                !data.conversations.some((dc: WhatsAppConversation) =>
+                  dc.contact_phone.replace(/[^0-9]/g, '').slice(-8) === c.contact_phone.replace(/[^0-9]/g, '').slice(-8)
+                )
+              )
+
+              // Enrich DB conversations: if DB has no name but previous state did, keep the name
+              const enriched = data.conversations.map((dc: WhatsAppConversation) => {
+                if (!dc.contact_name) {
+                  const suffix = dc.contact_phone.replace(/[^0-9]/g, '').slice(-8)
+                  const prevName = prevNameMap.get(suffix)
+                  if (prevName) return { ...dc, contact_name: prevName }
+                }
+                return dc
+              })
+
+              return [...syntheticConvs, ...enriched]
+            })
             const currentConv = selectedConvRef.current
             if (currentConv) {
               const updated = data.conversations.find((c: WhatsAppConversation) => c.contact_phone === currentConv.contact_phone)
@@ -560,6 +676,8 @@ export default function FollowUpView() {
                   ...prev,
                   unread_count: updated.unread_count,
                   last_message_preview: updated.last_message_preview,
+                  last_message_sender: updated.last_message_sender,
+                  last_message_from_me: updated.last_message_from_me,
                   last_message_at: updated.last_message_at,
                   message_count: updated.message_count
                 } : prev)
@@ -763,7 +881,36 @@ export default function FollowUpView() {
       const data = await response.json()
 
       if (data.conversations) {
-        setConversations(data.conversations)
+        setConversations(prev => {
+          // Build name map from previous state to preserve user-assigned names
+          const prevNameMap = new Map<string, string>()
+          prev.forEach(c => {
+            if (c.contact_name) {
+              const suffix = c.contact_phone.replace(/[^0-9]/g, '').slice(-8)
+              prevNameMap.set(suffix, c.contact_name)
+            }
+          })
+
+          // Keep synthetic conversations not yet in DB
+          const syntheticConvs = prev.filter(c =>
+            typeof c.id === 'string' && c.id.startsWith('new_') &&
+            !data.conversations.some((dc: WhatsAppConversation) =>
+              dc.contact_phone.replace(/[^0-9]/g, '').slice(-8) === c.contact_phone.replace(/[^0-9]/g, '').slice(-8)
+            )
+          )
+
+          // Enrich DB conversations with preserved names
+          const enriched = data.conversations.map((dc: WhatsAppConversation) => {
+            if (!dc.contact_name) {
+              const suffix = dc.contact_phone.replace(/[^0-9]/g, '').slice(-8)
+              const prevName = prevNameMap.get(suffix)
+              if (prevName) return { ...dc, contact_name: prevName }
+            }
+            return dc
+          })
+
+          return [...syntheticConvs, ...enriched]
+        })
       }
     } catch (error) {
       console.error('Error loading conversations:', error)
@@ -810,7 +957,9 @@ export default function FollowUpView() {
 
       // Try to sync more history from WhatsApp in background
       // Only if we have few messages (less than 10)
-      if (connectionStatus === 'connected' && (!data.messages || data.messages.length < 10)) {
+      // Skip sync for synthetic (new) conversations — no chat exists in WhatsApp yet
+      const isSyntheticConv = selectedConvRef.current?.id?.startsWith('new_')
+      if (connectionStatus === 'connected' && !isSyntheticConv && (!data.messages || data.messages.length < 10)) {
         syncHistoryFromWhatsApp(contactPhone, data.messages?.length || 0)
       }
     } catch (error) {
@@ -903,22 +1052,181 @@ export default function FollowUpView() {
     } catch (err) {
       console.error('Error sending message:', err)
       setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id))
-      setError(err instanceof Error ? err.message : 'Erro ao enviar mensagem')
+      const errMsg = err instanceof Error ? err.message : 'Erro ao enviar mensagem'
+      // Improve whatsapp-web.js cryptic errors
+      if (errMsg.includes('No LID') || errMsg.includes('no LID')) {
+        setError('Este número não está registrado no WhatsApp. Verifique o número e tente novamente.')
+      } else {
+        setError(errMsg)
+      }
     } finally {
       setIsSending(false)
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && editingMessage) {
+      e.preventDefault()
+      cancelEdit()
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (selectedFile) {
+      if (editingMessage) {
+        handleEditMessage()
+      } else if (selectedFile) {
         handleSendMedia()
       } else {
         handleSendMessage()
       }
     }
   }
+
+  // ============================================
+  // Message context menu (right-click delete)
+  // ============================================
+
+  const handleMessageContextMenu = (e: React.MouseEvent, msg: WhatsAppMessage) => {
+    e.preventDefault()
+    if (msg.id.startsWith('temp_')) return // Can't delete temp messages
+    setContextMenu({ x: e.clientX, y: e.clientY, message: msg })
+  }
+
+  const handleDeleteMessage = async (forEveryone: boolean) => {
+    if (!contextMenu || !authToken) return
+
+    const msg = contextMenu.message
+    closeContextMenu()
+    setIsDeletingMessage(true)
+
+    try {
+      const response = await fetch('/api/whatsapp/delete-message', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          waMessageId: msg.waMessageId || msg.id,
+          deleteForEveryone: forEveryone
+        })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao apagar mensagem')
+      }
+
+      if (forEveryone) {
+        // Show "deleted" placeholder like WhatsApp
+        setMessages(prev => prev.map(m =>
+          m.id === msg.id
+            ? { ...m, type: 'revoked', body: '', hasMedia: false, mediaId: null }
+            : m
+        ))
+      } else {
+        // Delete for me: just remove from view
+        setMessages(prev => prev.filter(m => m.id !== msg.id))
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao apagar mensagem')
+    } finally {
+      setIsDeletingMessage(false)
+    }
+  }
+
+  const startEditMessage = () => {
+    if (!contextMenu) return
+    const msg = contextMenu.message
+    setEditingMessage(msg)
+    setEditInput(msg.body || '')
+    closeContextMenu()
+  }
+
+  const cancelEdit = () => {
+    setEditingMessage(null)
+    setEditInput('')
+  }
+
+  const handleEditMessage = async () => {
+    if (!editingMessage || !authToken || !editInput.trim()) return
+
+    const newContent = editInput.trim()
+    if (newContent === editingMessage.body) {
+      cancelEdit()
+      return
+    }
+
+    try {
+      const response = await fetch('/api/whatsapp/edit-message', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          waMessageId: editingMessage.waMessageId || editingMessage.id,
+          newContent
+        })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao editar mensagem')
+      }
+
+      // Update message in local state
+      setMessages(prev => prev.map(m =>
+        m.id === editingMessage.id ? { ...m, body: newContent } : m
+      ))
+      cancelEdit()
+    } catch (err) {
+      console.error('Error editing message:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao editar mensagem')
+    }
+  }
+
+  const closeContextMenu = () => {
+    setContextMenu(null)
+    setHoveredMsgId(null)
+  }
+
+  const startForwardMessage = () => {
+    if (!contextMenu) return
+    setForwardingMessage(contextMenu.message)
+    setForwardSearch('')
+    closeContextMenu()
+  }
+
+  const handleForwardMessage = async (targetConversation: WhatsAppConversation) => {
+    if (!forwardingMessage || !authToken) return
+    const waMessageId = forwardingMessage.waMessageId
+    if (!waMessageId) return
+
+    const targetChatId = targetConversation.contact_phone.includes('@')
+      ? targetConversation.contact_phone
+      : targetConversation.contact_phone + '@c.us'
+
+    setForwardingMessage(null)
+
+    try {
+      const response = await fetch('/api/whatsapp/forward-message', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ waMessageId, targetChatId })
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao reencaminhar mensagem')
+      }
+    } catch (err) {
+      console.error('Error forwarding message:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao reencaminhar mensagem')
+    }
+  }
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return
+    const handleClick = () => closeContextMenu()
+    window.addEventListener('click', handleClick)
+    return () => window.removeEventListener('click', handleClick)
+  }, [contextMenu])
 
   // ============================================
   // Media send handlers
@@ -1299,6 +1607,12 @@ export default function FollowUpView() {
     closeMessageSearch()
     setShowContactInfo(false)
     setContactDetailInfo(null)
+    cancelEdit()
+    // Stop any playing audio
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    setPlayingAudioId(null)
+    setAudioProgress({})
+    setAudioDurations({})
 
     // Mark as read
     if (conv.unread_count > 0 && authToken) {
@@ -1324,6 +1638,57 @@ export default function FollowUpView() {
     }
 
     loadMessages(conv.contact_phone)
+  }
+
+  const handleSaveNewContact = () => {
+    const name = newContactName.trim()
+    if (!name) return
+
+    const cleanPhone = newContactPhone.replace(/[^0-9]/g, '')
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      setError('Telefone inválido. Digite DDD + número (ex: 31947133578)')
+      return
+    }
+
+    const fullPhone = `55${cleanPhone}`
+    const fullName = newContactSurname.trim()
+      ? `${name} ${newContactSurname.trim()}`
+      : name
+
+    // Check if conversation already exists (suffix match on last 8 digits)
+    const existingConv = conversations.find(c => {
+      const cDigits = c.contact_phone.replace(/[^0-9]/g, '')
+      return cDigits.slice(-8) === fullPhone.slice(-8)
+    })
+
+    if (existingConv) {
+      selectConversation(existingConv)
+    } else {
+      const newConv: WhatsAppConversation = {
+        id: `new_${Date.now()}`,
+        contact_phone: fullPhone,
+        contact_name: fullName,
+        profile_pic_url: null,
+        last_message_at: null,
+        last_message_preview: null,
+        last_message_sender: null,
+        last_message_from_me: false,
+        unread_count: 0,
+        message_count: 0
+      }
+      setConversations(prev => [newConv, ...prev])
+      setSelectedConversation(newConv)
+      setMessages([])
+    }
+
+    // Reset form and close panels
+    setNewContactName('')
+    setNewContactSurname('')
+    setNewContactPhone('')
+    setNewConversationSearch('')
+    setShowNewContactForm(false)
+    setShowNewConversation(false)
+    setError(null)
   }
 
   const handleAnalyze = async () => {
@@ -1406,8 +1771,13 @@ export default function FollowUpView() {
       const lidId = phone.replace('lid_', '')
       return `ID: ...${lidId.slice(-6)}`
     }
-    if (phone.length >= 12) {
+    if (phone.length === 13) {
+      // 13 digits: +55 (31) 94713-3578
       return `+${phone.slice(0, 2)} (${phone.slice(2, 4)}) ${phone.slice(4, 9)}-${phone.slice(9)}`
+    }
+    if (phone.length >= 12) {
+      // 12 digits: +55 (31) 9471-3357 (4 digits after hyphen)
+      return `+${phone.slice(0, 2)} (${phone.slice(2, 4)}) ${phone.slice(4, phone.length - 4)}-${phone.slice(phone.length - 4)}`
     }
     return `+${phone}`
   }
@@ -1577,165 +1947,349 @@ export default function FollowUpView() {
   // Render conversation sidebar
   const renderChatSidebar = () => (
     <div className="w-[400px] bg-[#111b21] border-r border-[#222d34] flex flex-col h-full">
-      {/* Header */}
-      <div className="h-[60px] bg-[#202c33] px-5 flex items-center justify-between">
-        <span className="text-[#e9edef] text-[22px] font-bold">WhatsApp</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={async () => {
-              setIsRefreshing(true)
-              if (conversations.length === 0) {
-                triggerManualSync()
-              }
-              await loadConversations()
-              setIsRefreshing(false)
-            }}
-            className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-            title={conversations.length === 0 ? 'Sincronizar conversas' : 'Atualizar'}
-          >
-            <RefreshCw className={`w-[20px] h-[20px] text-[#aebac1] ${isRefreshing || isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            onClick={disconnectWhatsApp}
-            className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-            title="Desconectar"
-          >
-            <LogOut className="w-[20px] h-[20px] text-[#aebac1]" />
-          </button>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="px-3 py-1.5 bg-[#111b21]">
-        <div className="flex items-center bg-[#202c33] rounded-lg px-3 py-[6px]">
-          <Search className="w-[18px] h-[18px] text-[#8696a0] mr-4" />
-          <input
-            type="text"
-            placeholder="Pesquisar ou começar uma nova conversa"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 bg-transparent text-[#e9edef] text-[14px] placeholder-[#8696a0] outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-[#111b21]">
-        {([
-          { key: 'all' as const, label: 'Todas' },
-          { key: 'unread' as const, label: 'Não lidas' },
-          { key: 'groups' as const, label: 'Grupos' },
-        ]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setChatFilter(tab.key)}
-            className={`px-3.5 py-[5px] rounded-full text-[13px] font-medium transition-colors ${
-              chatFilter === tab.key
-                ? 'bg-[#00a884] text-[#111b21]'
-                : 'bg-[#202c33] text-[#e9edef] hover:bg-[#2a3942]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Conversation List */}
-      <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
-        {isLoadingConversations ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-[#00a884]" />
-          </div>
-        ) : filteredConversations.length === 0 ? (
-          <div className="text-center py-8 px-4">
-            <MessageSquare className="w-12 h-12 text-[#364147] mx-auto mb-3" />
-            <p className="text-[#8696a0] text-sm">
-              {conversations.length === 0
-                ? (syncStatus === 'syncing' || isSyncing
-                    ? 'Sincronizando conversas...'
-                    : syncStatus === 'error'
-                    ? 'Erro ao sincronizar conversas'
-                    : 'Aguardando sincronizacao...')
-                : 'Nenhuma conversa encontrada'}
-            </p>
-            {conversations.length === 0 && (
-              <>
-                {(syncStatus === 'syncing' || isSyncing) ? (
-                  <div className="flex items-center justify-center gap-2 mt-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#00a884]" />
-                    <p className="text-[#8696a0] text-xs">Isso pode levar alguns segundos...</p>
+      {showNewConversation ? (
+        showNewContactForm ? (
+          /* ─── Novo Contato Form ─── */
+          <>
+            <div className="h-[60px] bg-[#202c33] px-5 flex items-center gap-4">
+              <button
+                onClick={() => setShowNewContactForm(false)}
+                className="p-1 hover:bg-[#2a3942] rounded-full transition-colors"
+              >
+                <ArrowLeft className="w-[20px] h-[20px] text-[#aebac1]" />
+              </button>
+              <span className="text-[#e9edef] text-[17px] font-medium">Novo contato</span>
+            </div>
+            <div className="flex-1 overflow-y-auto whatsapp-scrollbar p-5 space-y-5">
+              <div>
+                <label className="text-[#8696a0] text-xs mb-1.5 block">Nome *</label>
+                <input
+                  type="text"
+                  value={newContactName}
+                  onChange={(e) => setNewContactName(e.target.value)}
+                  placeholder="Nome do contato"
+                  className="w-full bg-transparent border-b-2 border-[#2a3942] focus:border-[#00a884] text-[#e9edef] text-[15px] py-2 outline-none transition-colors"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-[#8696a0] text-xs mb-1.5 block">Sobrenome</label>
+                <input
+                  type="text"
+                  value={newContactSurname}
+                  onChange={(e) => setNewContactSurname(e.target.value)}
+                  placeholder="Sobrenome (opcional)"
+                  className="w-full bg-transparent border-b-2 border-[#2a3942] focus:border-[#00a884] text-[#e9edef] text-[15px] py-2 outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-[#8696a0] text-xs mb-1.5 block">Telefone *</label>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 border-b-2 border-[#2a3942] py-2 px-1 min-w-[80px]">
+                    <span className="text-[15px]">BR</span>
+                    <span className="text-[#e9edef] text-[15px]">+55</span>
                   </div>
-                ) : (
+                  <input
+                    type="tel"
+                    value={newContactPhone}
+                    onChange={(e) => setNewContactPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="DDD + número"
+                    maxLength={11}
+                    className="flex-1 bg-transparent border-b-2 border-[#2a3942] focus:border-[#00a884] text-[#e9edef] text-[15px] py-2 outline-none transition-colors"
+                  />
+                </div>
+              </div>
+              {error && (
+                <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3">
+                  <p className="text-red-300 text-sm">{error}</p>
+                </div>
+              )}
+              <button
+                onClick={handleSaveNewContact}
+                disabled={!newContactName.trim() || !newContactPhone.trim()}
+                className="w-full bg-[#00a884] hover:bg-[#00967d] disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium text-[15px] transition-colors mt-4"
+              >
+                Salvar
+              </button>
+            </div>
+          </>
+        ) : (
+          /* ─── Nova Conversa Panel ─── */
+          <>
+            <div className="h-[60px] bg-[#202c33] px-5 flex items-center gap-4">
+              <button
+                onClick={() => { setShowNewConversation(false); setNewConversationSearch('') }}
+                className="p-1 hover:bg-[#2a3942] rounded-full transition-colors"
+              >
+                <ArrowLeft className="w-[20px] h-[20px] text-[#aebac1]" />
+              </button>
+              <span className="text-[#e9edef] text-[17px] font-medium">Nova conversa</span>
+            </div>
+            <div className="px-3 py-1.5 bg-[#111b21]">
+              <div className="flex items-center bg-[#202c33] rounded-lg px-3 py-[6px]">
+                <Search className="w-[18px] h-[18px] text-[#8696a0] mr-4" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar nome ou número"
+                  value={newConversationSearch}
+                  onChange={(e) => setNewConversationSearch(e.target.value)}
+                  className="flex-1 bg-transparent text-[#e9edef] text-[14px] placeholder-[#8696a0] outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => setShowNewContactForm(true)}
+              className="w-full flex items-center gap-4 px-5 py-3 hover:bg-[#202c33] transition-colors"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#00a884] flex items-center justify-center">
+                <Contact className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-[#e9edef] text-[17px]">Novo contato</span>
+            </button>
+            <div className="border-b border-[#222d34]" />
+            <div className="px-5 py-2">
+              <span className="text-[#00a884] text-[13px] font-medium uppercase tracking-wide">Contatos existentes</span>
+            </div>
+            <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+              {conversations
+                .filter(c => !c.contact_phone.includes('@g.us'))
+                .filter(c => {
+                  if (!newConversationSearch.trim()) return true
+                  const q = newConversationSearch.toLowerCase()
+                  return (c.contact_name || '').toLowerCase().includes(q) ||
+                    c.contact_phone.includes(q)
+                })
+                .map(conv => (
                   <button
-                    onClick={triggerManualSync}
-                    className="mt-3 px-4 py-2 bg-[#00a884] text-white text-sm rounded-lg hover:bg-[#00967d] transition-colors flex items-center gap-2 mx-auto"
+                    key={conv.id}
+                    onClick={() => {
+                      selectConversation(conv)
+                      setShowNewConversation(false)
+                      setNewConversationSearch('')
+                    }}
+                    className="w-full flex items-center px-3 py-3 hover:bg-[#202c33] transition-colors"
                   >
-                    <RefreshCw className="w-4 h-4" />
-                    Sincronizar Conversas
+                    <div className="relative flex-shrink-0 mr-3">
+                      {conv.profile_pic_url ? (
+                        <img
+                          src={conv.profile_pic_url}
+                          alt={conv.contact_name || 'Contact'}
+                          className="w-12 h-12 rounded-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                            target.nextElementSibling?.classList.remove('hidden')
+                          }}
+                        />
+                      ) : null}
+                      <div className={`w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center ${conv.profile_pic_url ? 'hidden' : ''}`}>
+                        <span className="text-white text-lg font-medium">
+                          {getInitials(conv.contact_name)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0 border-b border-[#222d34] py-1">
+                      <span className="text-[#e9edef] text-base truncate block">
+                        {conv.contact_name || formatPhone(conv.contact_phone)}
+                      </span>
+                      <span className="text-[#8696a0] text-sm truncate block">
+                        {formatPhone(conv.contact_phone)}
+                      </span>
+                    </div>
                   </button>
+                ))
+              }
+            </div>
+          </>
+        )
+      ) : (
+        /* ─── Normal Sidebar ─── */
+        <>
+          {/* Header */}
+          <div className="h-[60px] bg-[#202c33] px-5 flex items-center justify-between">
+            <span className="text-[#e9edef] text-[22px] font-bold">WhatsApp</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowNewConversation(true)}
+                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+                title="Nova conversa"
+              >
+                <MessageCirclePlus className="w-[20px] h-[20px] text-[#aebac1]" />
+              </button>
+              <button
+                onClick={async () => {
+                  setIsRefreshing(true)
+                  if (conversations.length === 0) {
+                    triggerManualSync()
+                  }
+                  await loadConversations()
+                  setIsRefreshing(false)
+                }}
+                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+                title={conversations.length === 0 ? 'Sincronizar conversas' : 'Atualizar'}
+              >
+                <RefreshCw className={`w-[20px] h-[20px] text-[#aebac1] ${isRefreshing || isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={disconnectWhatsApp}
+                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
+                title="Desconectar"
+              >
+                <LogOut className="w-[20px] h-[20px] text-[#aebac1]" />
+              </button>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="px-3 py-1.5 bg-[#111b21]">
+            <div className="flex items-center bg-[#202c33] rounded-lg px-3 py-[6px]">
+              <Search className="w-[18px] h-[18px] text-[#8696a0] mr-4" />
+              <input
+                type="text"
+                placeholder="Pesquisar ou começar uma nova conversa"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 bg-transparent text-[#e9edef] text-[14px] placeholder-[#8696a0] outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Filter Tabs */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#111b21]">
+            {([
+              { key: 'all' as const, label: 'Todas' },
+              { key: 'unread' as const, label: 'Não lidas' },
+              { key: 'groups' as const, label: 'Grupos' },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setChatFilter(tab.key)}
+                className={`px-3.5 py-[5px] rounded-full text-[13px] font-medium transition-colors ${
+                  chatFilter === tab.key
+                    ? 'bg-[#00a884] text-[#111b21]'
+                    : 'bg-[#202c33] text-[#e9edef] hover:bg-[#2a3942]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Conversation List */}
+          <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+            {isLoadingConversations ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-[#00a884]" />
+              </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="text-center py-8 px-4">
+                <MessageSquare className="w-12 h-12 text-[#364147] mx-auto mb-3" />
+                <p className="text-[#8696a0] text-sm">
+                  {conversations.length === 0
+                    ? (syncStatus === 'syncing' || isSyncing
+                        ? 'Sincronizando conversas...'
+                        : syncStatus === 'error'
+                        ? 'Erro ao sincronizar conversas'
+                        : 'Aguardando sincronizacao...')
+                    : 'Nenhuma conversa encontrada'}
+                </p>
+                {conversations.length === 0 && (
+                  <>
+                    {(syncStatus === 'syncing' || isSyncing) ? (
+                      <div className="flex items-center justify-center gap-2 mt-3">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#00a884]" />
+                        <p className="text-[#8696a0] text-xs">Isso pode levar alguns segundos...</p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={triggerManualSync}
+                        className="mt-3 px-4 py-2 bg-[#00a884] text-white text-sm rounded-lg hover:bg-[#00967d] transition-colors flex items-center gap-2 mx-auto"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Sincronizar Conversas
+                      </button>
+                    )}
+                  </>
                 )}
-              </>
+              </div>
+            ) : (
+              filteredConversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => selectConversation(conv)}
+                  className={`w-full flex items-center px-3 py-3 hover:bg-[#202c33] transition-colors ${
+                    selectedConversation?.contact_phone === conv.contact_phone ? 'bg-[#2a3942]' : ''
+                  }`}
+                >
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0 mr-3">
+                    {conv.profile_pic_url ? (
+                      <img
+                        src={conv.profile_pic_url}
+                        alt={conv.contact_name || 'Contact'}
+                        className="w-12 h-12 rounded-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initials on error
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          target.nextElementSibling?.classList.remove('hidden')
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center ${conv.profile_pic_url ? 'hidden' : ''}`}>
+                      <span className="text-white text-lg font-medium">
+                        {getInitials(conv.contact_name)}
+                      </span>
+                    </div>
+                    {conv.unread_count > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-[#00a884] text-white text-[10px] font-bold min-w-[20px] h-[20px] flex items-center justify-center rounded-full px-1">
+                        {conv.unread_count}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 border-b border-[#222d34] py-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {conv.contact_phone.includes('@g.us') && (
+                          <Users className="w-4 h-4 text-[#8696a0] flex-shrink-0" />
+                        )}
+                        <span className="text-[#e9edef] text-base truncate">
+                          {conv.contact_name || formatPhone(conv.contact_phone)}
+                        </span>
+                      </div>
+                      <span className={`text-xs flex-shrink-0 ${conv.unread_count > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
+                        {formatTime(conv.last_message_at)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[#8696a0] text-sm truncate pr-2 leading-5">
+                        {conv.last_message_sender && (
+                          <span>{conv.last_message_sender}: </span>
+                        )}
+                        {(() => {
+                          const p = conv.last_message_preview || 'Sem mensagens'
+                          const mediaLabels: Record<string, string> = {
+                            '[image]': '📷 Foto', '[video]': '🎥 Vídeo', '[audio]': '🎵 Áudio',
+                            '[ptt]': '🎤 Áudio', '[document]': '📄 Documento', '[sticker]': '🏷️ Figurinha',
+                            '[location]': '📍 Localização', '[contact]': '👤 Contato', '[contacts]': '👤 Contato',
+                            '[Áudio]': '🎵 Áudio', '[Documento]': '📄 Documento', '[Sticker]': '🏷️ Figurinha',
+                            '[Localização]': '📍 Localização', '[Contato]': '👤 Contato',
+                            '[message]': '', '[text]': '',
+                          }
+                          return mediaLabels[p] ?? p
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))
             )}
           </div>
-        ) : (
-          filteredConversations.map((conv) => (
-            <button
-              key={conv.id}
-              onClick={() => selectConversation(conv)}
-              className={`w-full flex items-center px-3 py-3 hover:bg-[#202c33] transition-colors ${
-                selectedConversation?.contact_phone === conv.contact_phone ? 'bg-[#2a3942]' : ''
-              }`}
-            >
-              {/* Avatar */}
-              <div className="relative flex-shrink-0 mr-3">
-                {conv.profile_pic_url ? (
-                  <img
-                    src={conv.profile_pic_url}
-                    alt={conv.contact_name || 'Contact'}
-                    className="w-12 h-12 rounded-full object-cover"
-                    onError={(e) => {
-                      // Fallback to initials on error
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                      target.nextElementSibling?.classList.remove('hidden')
-                    }}
-                  />
-                ) : null}
-                <div className={`w-12 h-12 rounded-full bg-[#6b7c85] flex items-center justify-center ${conv.profile_pic_url ? 'hidden' : ''}`}>
-                  <span className="text-white text-lg font-medium">
-                    {getInitials(conv.contact_name)}
-                  </span>
-                </div>
-                {conv.unread_count > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#00a884] text-white text-[10px] font-bold min-w-[20px] h-[20px] flex items-center justify-center rounded-full px-1">
-                    {conv.unread_count}
-                  </span>
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0 border-b border-[#222d34] py-1">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {conv.contact_phone.includes('@g.us') && (
-                      <Users className="w-4 h-4 text-[#8696a0] flex-shrink-0" />
-                    )}
-                    <span className="text-[#e9edef] text-base truncate">
-                      {conv.contact_name || formatPhone(conv.contact_phone)}
-                    </span>
-                  </div>
-                  <span className={`text-xs flex-shrink-0 ${conv.unread_count > 0 ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
-                    {formatTime(conv.last_message_at)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[#8696a0] text-sm truncate pr-2">{conv.last_message_preview || 'Sem mensagens'}</p>
-                </div>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 
@@ -1857,9 +2411,7 @@ export default function FollowUpView() {
           )}
 
           {/* Messages Area */}
-          <div className="flex-1 min-h-0 overflow-y-auto whatsapp-scrollbar px-16 py-4" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-          }}>
+          <div className="flex-1 min-h-0 overflow-y-auto whatsapp-scrollbar px-16 py-4 bg-[#0b141a] whatsapp-chat-bg">
             {error && (
               <div className="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-lg flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
@@ -1879,7 +2431,7 @@ export default function FollowUpView() {
               <div className="space-y-1">
                 {messages
                   .filter(msg => {
-                    const hiddenTypes = ['reaction', 'e2e_notification', 'notification', 'notification_template', 'gp2', 'call_log', 'protocol', 'ciphertext', 'revoked']
+                    const hiddenTypes = ['reaction', 'e2e_notification', 'notification', 'notification_template', 'gp2', 'call_log', 'protocol', 'ciphertext']
                     return !hiddenTypes.includes(msg.type)
                   })
                   .map((msg, idx, filtered) => {
@@ -1903,15 +2455,45 @@ export default function FollowUpView() {
                         </div>
                       )}
                       <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[65%] rounded-lg px-3 py-2 shadow transition-colors duration-200 ${
+                        <div
+                          onContextMenu={(e) => handleMessageContextMenu(e, msg)}
+                          onMouseEnter={() => setHoveredMsgId(msg.id)}
+                          onMouseLeave={() => { if (contextMenu?.message.id !== msg.id) setHoveredMsgId(null) }}
+                          className={`max-w-[65%] rounded-lg px-3 py-2 shadow transition-colors duration-200 relative group ${
                           msg.fromMe
                             ? 'bg-[#005c4b] rounded-tr-none'
                             : 'bg-[#202c33] rounded-tl-none'
                         } ${msg.id.startsWith('temp_') ? 'opacity-60' : ''} ${isActiveMatch ? 'ring-2 ring-[#00a884] ring-offset-1 ring-offset-[#0b141a]' : ''}`}>
+                          {/* Dropdown arrow on hover */}
+                          {!msg.id.startsWith('temp_') && msg.type !== 'revoked' && (hoveredMsgId === msg.id || contextMenu?.message.id === msg.id) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setContextMenu({
+                                  x: msg.fromMe ? rect.left - 180 : rect.right + 4,
+                                  y: rect.bottom + 4,
+                                  message: msg
+                                })
+                              }}
+                              className={`absolute top-1 ${msg.fromMe ? 'right-1' : 'right-1'} w-6 h-6 rounded-full flex items-center justify-center z-[2] ${
+                                msg.fromMe ? 'bg-[#005c4b] hover:bg-[#04725e]' : 'bg-[#202c33] hover:bg-[#2a3942]'
+                              } transition-colors`}
+                            >
+                              <ChevronDown className="w-4 h-4 text-[#8696a0]" />
+                            </button>
+                          )}
                           {/* Group sender name (hide raw LID/number IDs) */}
                           {selectedConversation?.contact_phone.includes('@g.us') && !msg.fromMe && msg.contactName && !/^\d+(@|$)/.test(msg.contactName) && (
                             <p className="text-xs font-medium text-[#00a884] mb-1">{msg.contactName}</p>
                           )}
+                          {/* Revoked (deleted) message */}
+                          {msg.type === 'revoked' ? (
+                            <p className="text-[#8696a0] text-[13px] italic flex items-center gap-1.5 py-0.5">
+                              <Ban className="w-[14px] h-[14px]" />
+                              {msg.fromMe ? 'Você apagou esta mensagem' : 'Esta mensagem foi apagada'}
+                            </p>
+                          ) : (<>
                           {/* Image */}
                           {msg.hasMedia && msg.mediaId && (msg.type === 'image' || msg.mimetype?.startsWith('image/')) && msg.type !== 'sticker' && (
                             <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
@@ -1946,26 +2528,41 @@ export default function FollowUpView() {
                             </div>
                           )}
                           {/* Audio */}
-                          {(msg.type === 'audio' || msg.type === 'ptt') && msg.mediaId && (
+                          {(msg.type === 'audio' || msg.type === 'ptt') && msg.mediaId && (() => {
+                            const isPlaying = playingAudioId === msg.id
+                            const progress = audioProgress[msg.id] || 0
+                            const duration = audioDurations[msg.id] || 0
+                            const currentTime = duration * progress
+                            const playedBars = Math.floor(progress * 36)
+
+                            return (
                             <div className="min-w-[280px]">
                               <div className="flex items-center gap-2.5">
-                                {/* Play button */}
-                                <div className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#8696a0" stroke="none"><polygon points="8 5 19 12 8 19 8 5"/></svg>
-                                </div>
-                                {/* Waveform */}
+                                {/* Play/Pause button */}
+                                <button
+                                  onClick={() => playAudio(msg.id, msg.mediaId!)}
+                                  className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-white/5 transition-colors"
+                                >
+                                  {isPlaying ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="#8696a0" stroke="none"><rect x="7" y="5" width="3" height="14" rx="1"/><rect x="14" y="5" width="3" height="14" rx="1"/></svg>
+                                  ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#8696a0" stroke="none"><polygon points="8 5 19 12 8 19 8 5"/></svg>
+                                  )}
+                                </button>
+                                {/* Waveform with progress */}
                                 <div className="flex-1 flex items-center gap-[2px] h-[28px]">
                                   {Array.from({ length: 36 }, (_, i) => {
                                     const seed = (msg.id.charCodeAt(i % msg.id.length) * (i + 1)) % 100
                                     const h = Math.max(4, Math.min(26, seed * 0.26))
+                                    const played = i < playedBars
                                     return (
                                       <div
                                         key={i}
-                                        className="rounded-full flex-shrink-0"
+                                        className="rounded-full flex-shrink-0 transition-colors duration-100"
                                         style={{
                                           width: '2.5px',
                                           height: `${h}px`,
-                                          backgroundColor: i < 12 ? (msg.fromMe ? '#b3d4cc' : '#8696a0') : '#374045'
+                                          backgroundColor: played ? (msg.fromMe ? '#b3d4cc' : '#8696a0') : '#374045'
                                         }}
                                       />
                                     )
@@ -1973,10 +2570,13 @@ export default function FollowUpView() {
                                 </div>
                               </div>
                               <div className="flex items-center justify-between mt-0.5 px-1">
-                                <span className="text-[11px] text-[#8696a0]">0:00</span>
+                                <span className="text-[11px] text-[#8696a0]">
+                                  {isPlaying || currentTime > 0 ? formatAudioTime(currentTime) : duration > 0 ? formatAudioTime(duration) : '0:00'}
+                                </span>
                               </div>
                             </div>
-                          )}
+                            )
+                          })()}
                           {/* Video */}
                           {msg.type === 'video' && msg.mediaId && (
                             <div className="mb-1 rounded-md overflow-hidden" style={{ margin: '-4px -6px 4px -6px' }}>
@@ -2125,6 +2725,7 @@ export default function FollowUpView() {
                               })() : msg.body}
                             </p>
                           )}
+                          </>)}
                           <div className="flex items-center justify-end gap-1 mt-1">
                             <span className="text-[10px] text-[#8696a0]">
                               {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
@@ -2154,6 +2755,19 @@ export default function FollowUpView() {
 
           {/* Message Input Bar */}
           <div className="px-[10px] py-[5px] bg-[#202c33] flex-shrink-0">
+            {/* Edit Message Banner */}
+            {editingMessage && (
+              <div className="mb-1 px-3 py-2 bg-[#1d282f] rounded-lg flex items-center gap-3 border-l-4 border-[#00a884]">
+                <Pencil className="w-4 h-4 text-[#00a884] flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#00a884] text-[12px] font-medium">Editando mensagem</p>
+                  <p className="text-[#8696a0] text-[13px] truncate">{editingMessage.body}</p>
+                </div>
+                <button onClick={cancelEdit} className="p-1 hover:bg-[#111b21] rounded-full transition-colors flex-shrink-0">
+                  <X className="w-4 h-4 text-[#8696a0]" />
+                </button>
+              </div>
+            )}
             {/* File Preview Strip */}
             {selectedFile && (
               <div className="mb-2 p-2 bg-[#2a3942] rounded-lg flex items-center gap-3">
@@ -2300,10 +2914,10 @@ export default function FollowUpView() {
                   {/* Text Input */}
                   <div className="flex-1 py-[9px] pr-3">
                     <textarea
-                      value={selectedFile ? mediaCaption : messageInput}
-                      onChange={(e) => selectedFile ? setMediaCaption(e.target.value) : setMessageInput(e.target.value)}
+                      value={editingMessage ? editInput : (selectedFile ? mediaCaption : messageInput)}
+                      onChange={(e) => editingMessage ? setEditInput(e.target.value) : (selectedFile ? setMediaCaption(e.target.value) : setMessageInput(e.target.value))}
                       onKeyDown={handleKeyDown}
-                      placeholder={selectedFile ? "Adicionar legenda..." : "Digite uma mensagem"}
+                      placeholder={editingMessage ? "Editar mensagem..." : (selectedFile ? "Adicionar legenda..." : "Digite uma mensagem")}
                       rows={1}
                       className="w-full bg-transparent text-[#e9edef] text-[15px] placeholder-[#8696a0] outline-none resize-none max-h-[120px] overflow-y-auto leading-[20px]"
                       style={{ minHeight: '20px' }}
@@ -2317,10 +2931,10 @@ export default function FollowUpView() {
                 </div>
 
                 {/* Mic / Send Button (outside the input bar) */}
-                {(messageInput.trim() || selectedFile) ? (
+                {(editingMessage || messageInput.trim() || selectedFile) ? (
                   <button
-                    onClick={selectedFile ? handleSendMedia : handleSendMessage}
-                    disabled={isSending || (!messageInput.trim() && !selectedFile)}
+                    onClick={editingMessage ? handleEditMessage : (selectedFile ? handleSendMedia : () => handleSendMessage())}
+                    disabled={editingMessage ? !editInput.trim() : (isSending || (!messageInput.trim() && !selectedFile))}
                     className="w-[42px] h-[42px] flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                   >
                     {isSending ? <Loader2 className="w-5 h-5 text-[#8696a0] animate-spin" /> : <Send className="w-[20px] h-[20px] text-[#8696a0]" />}
@@ -2846,6 +3460,68 @@ export default function FollowUpView() {
         renderDisconnected()
       )}
 
+      {/* Forward message modal */}
+      {forwardingMessage && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center" onClick={() => setForwardingMessage(null)}>
+          <div
+            className="bg-[#111b21] rounded-xl w-[420px] max-h-[500px] flex flex-col shadow-2xl border border-[#2a3942] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#2a3942]">
+              <button onClick={() => setForwardingMessage(null)} className="text-[#aebac1] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-[#e9edef] text-[16px] font-medium">Reencaminhar mensagem</h3>
+            </div>
+            <div className="px-4 py-3 border-b border-[#2a3942]">
+              <div className="flex items-center gap-2 bg-[#202c33] rounded-lg px-3 py-2">
+                <Search className="w-4 h-4 text-[#8696a0]" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar conversa..."
+                  value={forwardSearch}
+                  onChange={(e) => setForwardSearch(e.target.value)}
+                  className="bg-transparent text-[#e9edef] text-[14px] outline-none flex-1 placeholder-[#8696a0]"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+              {conversations
+                .filter(c => {
+                  if (!forwardSearch.trim()) return true
+                  const s = forwardSearch.toLowerCase()
+                  return (c.contact_name?.toLowerCase().includes(s)) || c.contact_phone.includes(s)
+                })
+                .map(conv => (
+                  <button
+                    key={conv.id}
+                    onClick={() => handleForwardMessage(conv)}
+                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#202c33] transition-colors text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-[#2a3942] flex-shrink-0 overflow-hidden flex items-center justify-center">
+                      {conv.profile_pic_url ? (
+                        <img src={conv.profile_pic_url} alt="" className="w-full h-full object-cover rounded-full" />
+                      ) : (
+                        <Users className="w-5 h-5 text-[#8696a0]" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[#e9edef] text-[15px] truncate">
+                        {conv.contact_name || conv.contact_phone}
+                      </p>
+                      <p className="text-[#8696a0] text-[12px] truncate">
+                        {conv.contact_phone.includes('@g.us') ? 'Grupo' : conv.contact_phone}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Image Lightbox */}
       {lightboxImage && (
         <div
@@ -2864,6 +3540,56 @@ export default function FollowUpView() {
             className="max-w-[90vw] max-h-[90vh] object-contain"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      {/* Message dropdown menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-[90] bg-[#233138] rounded-lg shadow-xl min-w-[200px] border border-[#2a3942] overflow-hidden"
+          style={{
+            left: Math.min(contextMenu.x, typeof window !== 'undefined' ? window.innerWidth - 220 : 800),
+            top: Math.min(contextMenu.y, typeof window !== 'undefined' ? window.innerHeight - 220 : 600)
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Actions */}
+          <div className="py-1">
+            {contextMenu.message.fromMe && contextMenu.message.type === 'text' && contextMenu.message.body && (
+              <button
+                onClick={startEditMessage}
+                className="w-full text-left px-4 py-2.5 text-[14px] text-[#e9edef] hover:bg-[#2a3942] transition-colors flex items-center gap-3"
+              >
+                <Pencil className="w-4 h-4 text-[#8696a0]" />
+                Editar
+              </button>
+            )}
+            <button
+              onClick={startForwardMessage}
+              className="w-full text-left px-4 py-2.5 text-[14px] text-[#e9edef] hover:bg-[#2a3942] transition-colors flex items-center gap-3"
+            >
+              <Share2 className="w-4 h-4 text-[#8696a0]" />
+              Reencaminhar
+            </button>
+            <button
+              onClick={() => handleDeleteMessage(false)}
+              disabled={isDeletingMessage}
+              className="w-full text-left px-4 py-2.5 text-[14px] text-[#e9edef] hover:bg-[#2a3942] transition-colors flex items-center gap-3"
+            >
+              <Trash2 className="w-4 h-4 text-[#8696a0]" />
+              Apagar para mim
+            </button>
+            {contextMenu.message.fromMe && (
+              <button
+                onClick={() => handleDeleteMessage(true)}
+                disabled={isDeletingMessage}
+                className="w-full text-left px-4 py-2.5 text-[14px] text-[#e9edef] hover:bg-[#2a3942] transition-colors flex items-center gap-3"
+              >
+                <Trash2 className="w-4 h-4 text-red-400" />
+                Apagar para todos
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

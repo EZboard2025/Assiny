@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Send, Copy, ThumbsUp, ThumbsDown, Sparkles, Loader2, RefreshCw, ArrowLeft, MoreVertical } from 'lucide-react'
+import { X, Send, Copy, ThumbsUp, ThumbsDown, Sparkles, Loader2, RefreshCw, ArrowLeft, MoreVertical, Mic } from 'lucide-react'
 
 interface WhatsAppConversation {
   id: string
@@ -98,24 +98,77 @@ export default function SalesCopilot({
   const [revealingMsgId, setRevealingMsgId] = useState<string | null>(null)
   const [revealedChunks, setRevealedChunks] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const lastUserMsgRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const prevConvRef = useRef<string | null>(null)
 
-  // Split text into line-based chunks for Gemini-style reveal
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [micError, setMicError] = useState<string | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Split text into word-based chunks for Gemini-style reveal
   const splitIntoChunks = (text: string): string[] => {
-    // Split by double newlines (paragraphs) or single newlines (lines)
-    return text.split(/\n/).map((line, i, arr) => {
-      // Preserve empty lines as newlines
-      if (line.trim() === '') return '\n'
-      return line + (i < arr.length - 1 ? '\n' : '')
-    })
+    const chunks: string[] = []
+    const lines = text.split('\n')
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const appendNewline = i < lines.length - 1
+
+      if (line.trim() === '') {
+        chunks.push('\n')
+        continue
+      }
+
+      // Split into individual words, each with its trailing space
+      const words = line.split(/(\s+)/).filter(w => w.length > 0)
+
+      for (let j = 0; j < words.length; j++) {
+        // Skip standalone whitespace — merge it into previous chunk
+        if (/^\s+$/.test(words[j])) continue
+        const trailing = j + 1 < words.length && /^\s+$/.test(words[j + 1]) ? words[j + 1] : ''
+        chunks.push(words[j] + trailing)
+      }
+
+      // Add newline as separate chunk after line's words
+      if (appendNewline) chunks.push('\n')
+    }
+
+    return chunks
   }
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      streamRef.current?.getTracks().forEach(t => t.stop())
+    }
+  }, [])
 
   // Reset copilot when conversation changes
   useEffect(() => {
     const currentPhone = selectedConversation?.contact_phone || null
     if (currentPhone !== prevConvRef.current) {
       prevConvRef.current = currentPhone
+      // Cancel any in-progress recording
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop()
+      }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+        recordingTimerRef.current = null
+      }
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+      mediaRecorderRef.current = null
+      setIsRecording(false)
+      setRecordingDuration(0)
       setCopilotMessages([])
       setFeedbackStates({})
       setSentMsgIds(new Set())
@@ -142,22 +195,26 @@ export default function SalesCopilot({
       if (current < chunks.length) {
         // Skip empty newline chunks instantly, pause on real lines
         const nextChunk = chunks[current]
-        const delay = nextChunk === '\n' ? 80 : 500 + Math.random() * 200
+        const delay = nextChunk === '\n' ? 150 : 30 + Math.random() * 25
         setTimeout(revealNext, delay)
       } else {
         setRevealingMsgId(null)
       }
     }
 
-    const startTimeout = setTimeout(revealNext, 100)
+    const startTimeout = setTimeout(revealNext, 60)
     return () => clearTimeout(startTimeout)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [copilotMessages])
 
-  // Auto-scroll during reveal
+  // Auto-scroll: scroll last user message to top of viewport (Gemini behavior)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [copilotMessages, revealedChunks])
+    if (lastUserMsgRef.current) {
+      lastUserMsgRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [copilotMessages, isLoading])
 
   // Periodic check for no-response messages (every 30 min)
   useEffect(() => {
@@ -367,20 +424,152 @@ export default function SalesCopilot({
     }
   }
 
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      // Check if mediaDevices API is available (requires secure context)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setMicError('Microfone requer HTTPS ou localhost')
+        setTimeout(() => setMicError(null), 4000)
+        return
+      }
+
+      // Enumerate devices to diagnose issues
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const audioInputs = devices.filter(d => d.kind === 'audioinput')
+      console.log('[Copilot Mic] Audio inputs found:', audioInputs.length, audioInputs.map(d => ({ label: d.label, id: d.deviceId })))
+
+      if (audioInputs.length === 0) {
+        setMicError('Nenhum microfone detectado pelo navegador')
+        setTimeout(() => setMicError(null), 4000)
+        return
+      }
+
+      // If devices exist but have no label, permission hasn't been granted yet - that's OK, getUserMedia will prompt
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm',
+        audioBitsPerSecond: 32000
+      })
+      mediaRecorderRef.current = recorder
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.start(100)
+      setIsRecording(true)
+      setRecordingDuration(0)
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1)
+      }, 1000)
+    } catch (err: any) {
+      console.error('Mic error:', err)
+      const msg = err?.name === 'NotFoundError'
+        ? 'Microfone não encontrado'
+        : err?.name === 'NotAllowedError'
+          ? 'Permissão de microfone negada'
+          : 'Erro ao acessar microfone'
+      setMicError(msg)
+      setTimeout(() => setMicError(null), 3000)
+    }
+  }
+
+  const cancelRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop()
+    }
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+    mediaRecorderRef.current = null
+    setIsRecording(false)
+    setRecordingDuration(0)
+  }
+
+  const stopAndTranscribe = async () => {
+    if (!mediaRecorderRef.current) return
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+
+    setIsRecording(false)
+
+    const recorder = mediaRecorderRef.current
+    const audioBlob = await new Promise<Blob>((resolve) => {
+      recorder.onstop = () => {
+        resolve(new Blob(audioChunksRef.current, { type: recorder.mimeType }))
+      }
+      recorder.stop()
+    })
+
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+    mediaRecorderRef.current = null
+
+    if (audioBlob.size === 0) return
+
+    setIsTranscribing(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'copilot-voice.webm')
+
+      if (companyData?.company_id) {
+        formData.append('companyId', companyData.company_id)
+      }
+
+      const response = await fetch('/api/roleplay/transcribe', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (data.text && data.isValid) {
+        handleSend(data.text)
+      } else if (data.text) {
+        setInput(data.text)
+      }
+    } catch (err) {
+      console.error('Transcription error:', err)
+    } finally {
+      setIsTranscribing(false)
+      setRecordingDuration(0)
+    }
+  }
+
   if (!isVisible || !isOpen) return null
 
   const hasMessages = copilotMessages.length > 0
 
   return (
-      <div className="h-full w-[400px] min-w-[400px] bg-[#111b21] border-l border-[#222d34] flex flex-col shrink-0">
+      <div className="h-full w-[400px] min-w-[400px] bg-[#111b21] flex flex-col shrink-0 relative">
+        {/* Header border — neutral */}
+        <div className="absolute left-0 top-0 h-[60px] w-px bg-[#222d34]" />
+        {/* Neon glow line — only below header */}
+        <div className="absolute left-0 top-[60px] bottom-0 w-px bg-[#00a884]/30 z-10 pointer-events-none" style={{ boxShadow: '-4px 0 20px 2px rgba(0, 200, 150, 0.25), -2px 0 8px rgba(0, 255, 180, 0.15)' }} />
         {/* Header - minimal */}
-        <div className="h-[50px] bg-[#202c33] px-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#00a884]" />
-            <span className="text-[#e9edef] text-sm font-medium">Copiloto de Vendas</span>
-            <span className="text-[9px] bg-[#00a884]/20 text-[#00a884] px-1.5 py-0.5 rounded-full">IA</span>
+        <div className="h-[60px] bg-[#202c33] px-4 flex items-center shrink-0 relative">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#00a884]" />
+              <span className="text-[#e9edef] text-sm font-medium">Copiloto de Vendas</span>
+              <span className="text-[9px] bg-[#00a884]/20 text-[#00a884] px-1.5 py-0.5 rounded-full">IA</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1 relative z-10">
             {hasMessages && (
               <button
                 onClick={() => {
@@ -406,7 +595,9 @@ export default function SalesCopilot({
           <div className="flex-1 flex flex-col">
             {/* Centered hero section */}
             <div className="flex-1 flex flex-col items-center justify-center px-6">
-              <Sparkles className="w-10 h-10 text-[#00a884] mb-4" />
+              <div className="copilot-hero-icon mb-4">
+                <Sparkles className="w-12 h-12 text-[#00a884]" />
+              </div>
               <h2 className="text-[#e9edef] text-xl font-semibold mb-1">Como posso ajudar?</h2>
               <p className="text-[#8696a0] text-xs text-center mb-6">
                 Analiso conversas, sugiro respostas e ajudo a fechar vendas.
@@ -414,25 +605,67 @@ export default function SalesCopilot({
 
               {/* Input field */}
               <div className="w-full bg-[#202c33] rounded-xl border border-[#2a3942] px-3 py-2 mb-6">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Pergunte ao copiloto..."
-                  className="w-full bg-transparent text-[#e9edef] text-sm resize-none outline-none placeholder-[#8696a0] max-h-[80px] min-h-[36px]"
-                  rows={1}
-                  disabled={isLoading}
-                />
-                <div className="flex items-center justify-end mt-1">
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={!input.trim() || isLoading}
-                    className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isLoading ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" /> : <Send className="w-3.5 h-3.5 text-white" />}
-                  </button>
+                {isRecording ? (
+                  <div className="flex items-center gap-2 min-h-[36px]">
+                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-red-400 text-xs font-mono">
+                      {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+                    </span>
+                    <span className="text-[#8696a0] text-xs">Gravando...</span>
+                  </div>
+                ) : (
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={isTranscribing ? 'Transcrevendo...' : 'Pergunte ao copiloto...'}
+                    className="w-full bg-transparent text-[#e9edef] text-sm resize-none outline-none placeholder-[#8696a0] max-h-[80px] min-h-[36px]"
+                    rows={1}
+                    disabled={isLoading || isTranscribing}
+                  />
+                )}
+                <div className="flex items-center justify-end gap-2 mt-1">
+                  {isRecording ? (
+                    <>
+                      <button
+                        onClick={cancelRecording}
+                        className="p-1.5 rounded-full text-red-400 hover:bg-[#2a3942] transition-colors"
+                        title="Cancelar"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={stopAndTranscribe}
+                        className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] transition-colors"
+                        title="Enviar"
+                      >
+                        <Send className="w-3.5 h-3.5 text-white" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={startRecording}
+                        disabled={isLoading || isTranscribing}
+                        className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Gravar mensagem de voz"
+                      >
+                        <Mic className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleSend()}
+                        disabled={!input.trim() || isLoading}
+                        className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isLoading || isTranscribing ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" /> : <Send className="w-3.5 h-3.5 text-white" />}
+                      </button>
+                    </>
+                  )}
                 </div>
+                {micError && (
+                  <p className="text-red-400 text-[11px] mt-1">{micError}</p>
+                )}
               </div>
 
               {/* Quick suggestions as cards */}
@@ -458,7 +691,6 @@ export default function SalesCopilot({
                   <span className="text-[#e9edef]">
                     {selectedConversation.contact_name || selectedConversation.contact_phone}
                   </span>
-                  {' '}({messages.length} msgs)
                 </p>
               </div>
             )}
@@ -469,12 +701,15 @@ export default function SalesCopilot({
         {hasMessages && (
           <>
             {/* Messages area */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-              {copilotMessages.map(msg => (
+            <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+              <div className="px-5 py-4 space-y-6 flex flex-col" style={{ minHeight: '100%' }}>
+              {(() => {
+                const lastUserIdx = copilotMessages.reduce((last, m, i) => m.role === 'user' ? i : last, -1)
+                return copilotMessages.map((msg, msgIdx) => (
                 <div key={msg.id} className="copilot-msg-fade-in">
                   {/* User message - subtle bubble on the right */}
                   {msg.role === 'user' && (
-                    <div className="flex justify-end">
+                    <div ref={msgIdx === lastUserIdx ? lastUserMsgRef : undefined} className="flex justify-end">
                       <div className="max-w-[85%] bg-[#2a3942] text-[#e9edef] rounded-2xl rounded-br-md px-4 py-2.5">
                         <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                       </div>
@@ -498,10 +733,16 @@ export default function SalesCopilot({
                       {/* Message content - chunks fade in one by one */}
                       <div className="flex-1 min-w-0">
                         <div className="text-[#e9edef] text-sm leading-relaxed whitespace-pre-wrap break-words">
-                          {chunks.slice(0, visibleCount).map((chunk, i) => (
+                          {chunks.map((chunk, i) => (
                             <span
                               key={i}
-                              className={isRevealing && i === visibleCount - 1 ? 'copilot-chunk-reveal' : ''}
+                              className={
+                                i >= visibleCount
+                                  ? 'invisible'
+                                  : isRevealing
+                                    ? 'copilot-chunk-reveal'
+                                    : ''
+                              }
                             >{chunk === '\n' ? '\n' : chunk}</span>
                           ))}
                         </div>
@@ -579,21 +820,24 @@ export default function SalesCopilot({
                     )
                   })()}
                 </div>
-              ))}
+              ))})()}
 
-              {/* Loading indicator - Gemini style with spinning ring */}
-              {isLoading && (
+              {/* Loading - sparkle icon with spinning ring */}
+              {(isLoading || isTranscribing) && (
                 <div className="flex gap-3 items-start copilot-msg-fade-in">
                   <div className="copilot-thinking-ring w-7 h-7 rounded-full bg-gradient-to-br from-[#00a884] to-[#00d4aa] flex items-center justify-center flex-shrink-0">
                     <Sparkles className="w-3.5 h-3.5 text-white copilot-sparkle-thinking" />
                   </div>
-                  <div className="flex items-center pt-1">
-                    <span className="text-[#8696a0] text-sm">Pensando...</span>
-                  </div>
+                  {isTranscribing && (
+                    <span className="text-[#8696a0] text-xs self-center">Transcrevendo...</span>
+                  )}
                 </div>
               )}
 
+              {/* Spacer - fills remaining viewport so user message can scroll to top */}
+              <div className="flex-grow" />
               <div ref={messagesEndRef} />
+              </div>
             </div>
 
             {/* Quick suggestions - compact pills */}
@@ -614,24 +858,63 @@ export default function SalesCopilot({
             {/* Input bar - clean minimal style */}
             <div className="px-4 py-3 shrink-0">
               <div className="flex items-end gap-2 bg-[#202c33] rounded-2xl border border-[#2a3942] px-3 py-2">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Pergunte ao copiloto..."
-                  className="flex-1 bg-transparent text-[#e9edef] text-sm resize-none outline-none placeholder-[#8696a0] max-h-[100px] min-h-[36px]"
-                  rows={1}
-                  disabled={isLoading}
-                />
-                <button
-                  onClick={() => handleSend()}
-                  disabled={!input.trim() || isLoading}
-                  className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
-                >
-                  <Send className="w-4 h-4 text-white" />
-                </button>
+                {isRecording ? (
+                  <>
+                    <div className="flex items-center gap-2 flex-1 min-h-[36px]">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-red-400 text-xs font-mono">
+                        {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+                      </span>
+                      <span className="text-[#8696a0] text-xs">Gravando...</span>
+                    </div>
+                    <button
+                      onClick={cancelRecording}
+                      className="p-1.5 rounded-full text-red-400 hover:bg-[#2a3942] transition-colors shrink-0"
+                      title="Cancelar"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={stopAndTranscribe}
+                      className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] transition-colors shrink-0"
+                      title="Enviar"
+                    >
+                      <Send className="w-4 h-4 text-white" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={isTranscribing ? 'Transcrevendo...' : 'Pergunte ao copiloto...'}
+                      className="flex-1 bg-transparent text-[#e9edef] text-sm resize-none outline-none placeholder-[#8696a0] max-h-[100px] min-h-[36px]"
+                      rows={1}
+                      disabled={isLoading || isTranscribing}
+                    />
+                    <button
+                      onClick={startRecording}
+                      disabled={isLoading || isTranscribing}
+                      className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+                      title="Gravar mensagem de voz"
+                    >
+                      <Mic className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleSend()}
+                      disabled={!input.trim() || isLoading}
+                      className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+                    >
+                      {isLoading || isTranscribing ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Send className="w-4 h-4 text-white" />}
+                    </button>
+                  </>
+                )}
               </div>
+              {micError && (
+                <p className="text-red-400 text-[11px] mt-1 px-1">{micError}</p>
+              )}
             </div>
           </>
         )}

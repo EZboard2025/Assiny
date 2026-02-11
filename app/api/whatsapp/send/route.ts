@@ -54,8 +54,8 @@ async function handleTextMessage(request: NextRequest, body: any) {
 
     console.log(`[WA Send] Resolving chatId for: ${to}`)
     const chatId = await Promise.race([
-      resolveChatId(to, user!.id),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('resolveChatId timeout (5s)')), 5000))
+      resolveChatId(to, user!.id, client),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('resolveChatId timeout (10s)')), 10000))
     ])
     console.log(`[WA Send] Resolved chatId: ${chatId}`)
 
@@ -133,7 +133,7 @@ async function handleMediaMessage(request: NextRequest) {
       return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
     }
 
-    const chatId = await resolveChatId(to, user!.id)
+    const chatId = await resolveChatId(to, user!.id, client)
 
     // Convert File to base64 for MessageMedia
     const arrayBuffer = await file.arrayBuffer()
@@ -235,7 +235,7 @@ async function handleContactMessage(request: NextRequest, body: any) {
       return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
     }
 
-    const chatId = await resolveChatId(to, user!.id)
+    const chatId = await resolveChatId(to, user!.id, client)
 
     // Build vCard
     const cleanPhone = contactPhone.replace(/[^0-9+]/g, '')
@@ -290,7 +290,7 @@ async function authenticateRequest(request: NextRequest): Promise<{ user: any; e
   return { user, error: null }
 }
 
-async function resolveChatId(to: string, userId: string): Promise<string> {
+async function resolveChatId(to: string, userId: string, client?: any): Promise<string> {
   if (to.startsWith('lid_')) {
     const lidNumber = to.replace('lid_', '')
     console.log(`[WA Send] LID contact detected, using: ${lidNumber}@lid`)
@@ -316,7 +316,45 @@ async function resolveChatId(to: string, userId: string): Promise<string> {
     return recentMessage.raw_payload.original_chat_id
   }
 
-  const chatId = `${to.replace(/[^0-9]/g, '')}@c.us`
+  const digits = to.replace(/[^0-9]/g, '')
+
+  // For new contacts, use getNumberId to verify and get correct WhatsApp ID
+  if (client) {
+    try {
+      // Try the full number first (e.g., 5531971985443)
+      const numberId = await client.getNumberId(`${digits}@c.us`)
+      if (numberId) {
+        console.log(`[WA Send] getNumberId resolved: ${numberId._serialized}`)
+        return numberId._serialized
+      }
+
+      // Brazilian numbers: try without the 9th digit (e.g., 5531971985443 → 553171985443)
+      if (digits.startsWith('55') && digits.length === 13) {
+        const without9 = digits.slice(0, 4) + digits.slice(5) // Remove 5th char (the 9 after DDD)
+        const numberId2 = await client.getNumberId(`${without9}@c.us`)
+        if (numberId2) {
+          console.log(`[WA Send] getNumberId resolved (without 9): ${numberId2._serialized}`)
+          return numberId2._serialized
+        }
+      }
+
+      // Brazilian numbers: try WITH the 9th digit if number has 12 digits
+      if (digits.startsWith('55') && digits.length === 12) {
+        const with9 = digits.slice(0, 4) + '9' + digits.slice(4)
+        const numberId3 = await client.getNumberId(`${with9}@c.us`)
+        if (numberId3) {
+          console.log(`[WA Send] getNumberId resolved (with 9): ${numberId3._serialized}`)
+          return numberId3._serialized
+        }
+      }
+
+      console.log(`[WA Send] getNumberId returned null for ${digits} - number not on WhatsApp`)
+    } catch (e) {
+      console.error(`[WA Send] getNumberId error:`, e)
+    }
+  }
+
+  const chatId = `${digits}@c.us`
   console.log(`[WA Send] Using @c.us format: ${chatId}`)
   return chatId
 }
