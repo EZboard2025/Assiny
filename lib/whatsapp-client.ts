@@ -884,11 +884,8 @@ async function processSingleChat(chat: any, state: ClientState, isGroup = false,
   try {
     const chatIdSerialized = chat.id._serialized || ''
 
-    // Skip LID chats in processSingleChat as defense-in-depth
-    // (they should already be filtered in syncChatHistory, but just in case)
-    if (chatIdSerialized.endsWith('@lid')) {
-      return
-    }
+    // LID chats are now processed normally — resolveContactPhone() handles
+    // mapping LID contacts to their real phone numbers
 
     let contactPhone: string
     let contactName: string | null
