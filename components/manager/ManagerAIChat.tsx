@@ -41,12 +41,14 @@ function ProgressBar({ label, value, max }: { label: string; value: number; max:
     <div className="my-2 w-full">
       <div className="flex items-center justify-between text-xs mb-1">
         <span className="text-[#8696a0]">{label}</span>
-        <span className="font-bold" style={{ color: getScoreColor(value) }}>{value.toFixed(1)}/{max}</span>
+        <span className="font-bold" style={{ color: max === 100 ? getScoreColor(value / 10) : getScoreColor(value) }}>
+          {max === 100 ? `${value.toFixed(0)}%` : `${value.toFixed(1)}/${max}`}
+        </span>
       </div>
       <div className="h-2 bg-white/5 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, backgroundColor: getScoreColor(value) }}
+          style={{ width: `${pct}%`, backgroundColor: max === 100 ? getScoreColor(value / 10) : getScoreColor(value) }}
         />
       </div>
     </div>
