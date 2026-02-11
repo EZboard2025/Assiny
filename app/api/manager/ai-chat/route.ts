@@ -32,7 +32,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
     }
 
-    if (requestingEmployee.role !== 'admin' && requestingEmployee.role !== 'gestor') {
+    const role = (requestingEmployee.role || '').toLowerCase()
+    if (role !== 'admin' && role !== 'gestor') {
       return NextResponse.json({ error: 'Acesso restrito a gestores' }, { status: 403 })
     }
 
