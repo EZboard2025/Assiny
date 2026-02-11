@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Clock, Target, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText } from 'lucide-react'
+import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText } from 'lucide-react'
 
 interface MeetEvaluation {
   id: string
@@ -103,19 +103,7 @@ export default function MeetHistoryContent() {
     })
   }
 
-  const getFunnelStageLabel = (stage: string | null) => {
-    const labels: Record<string, string> = {
-      'prospeccao': 'Prospecção',
-      'discovery': 'Discovery',
-      'demo': 'Demo',
-      'negociacao': 'Negociação',
-      'fechamento': 'Fechamento',
-      'follow_up': 'Follow-up'
-    }
-    return labels[stage || ''] || stage || 'N/A'
-  }
-
-  const getScoreColor = (score: number | null) => {
+const getScoreColor = (score: number | null) => {
     if (score === null) return 'text-gray-400'
     if (score >= 80) return 'text-green-600'
     if (score >= 60) return 'text-yellow-600'
@@ -207,10 +195,8 @@ export default function MeetHistoryContent() {
                     <div className="text-sm font-medium text-gray-900 mb-0.5 truncate">
                       {evaluation.seller_name || 'Sem nome'}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>{getFunnelStageLabel(evaluation.funnel_stage)}</span>
-                      <span className="text-gray-300">•</span>
-                      <span>{formatDate(evaluation.created_at)}</span>
+                    <div className="text-xs text-gray-500">
+                      {formatDate(evaluation.created_at)}
                     </div>
                   </div>
                 </div>
@@ -243,10 +229,6 @@ export default function MeetHistoryContent() {
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       {formatDate(selectedEvaluation.created_at)} às {formatTime(selectedEvaluation.created_at)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Target className="w-4 h-4" />
-                      {getFunnelStageLabel(selectedEvaluation.funnel_stage)}
                     </span>
                   </div>
                 </div>
