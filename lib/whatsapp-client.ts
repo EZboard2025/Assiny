@@ -370,9 +370,10 @@ export async function initializeClient(userId: string, companyId: string | null)
 
     await upsertConnection(state)
 
-    // Brief wait for Chrome to settle before syncing
-    console.log(`[WA] Waiting 3s before sync for user ${userId}...`)
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    // Wait for WhatsApp to sync offline chats from server before reading chat list
+    // 8s gives enough time for chat metadata to load (especially for offline conversations)
+    console.log(`[WA] Waiting 8s before sync for user ${userId}...`)
+    await new Promise(resolve => setTimeout(resolve, 8000))
 
     if (state.destroyed) return  // Check again after delay
 
@@ -1078,24 +1079,18 @@ async function syncChatHistory(state: ClientState): Promise<void> {
     if (state.destroyed) { console.log(`[WA] Sync aborted (destroyed) for user ${state.userId}`); return }
     const client = state.client
 
-    // LIGHTWEIGHT APPROACH: Get chat IDs directly from WhatsApp Web store
-    // instead of using client.getChats() which serializes every chat + group metadata (very slow)
-    console.log(`[WA] Getting chat list (lightweight) for user ${state.userId}`)
+    // Use client.getChats() which returns proper Chat objects for ALL contact types
+    // including LID contacts (which represent 90%+ of chats on modern WhatsApp).
+    // Previous approach (Store.Chat + getChatById) crashed on LID contacts, skipping most chats.
+    console.log(`[WA] Getting chat list for user ${state.userId}`)
 
-    let chatIds: { id: string; name: string; isGroup: boolean }[] = []
+    let allChats: any[]
 
     try {
-      chatIds = await Promise.race([
-        client.pupPage!.evaluate(() => {
-          const chats = (window as any).Store.Chat.getModelsArray()
-          return chats.map((chat: any) => ({
-            id: chat.id._serialized,
-            name: chat.formattedTitle || chat.name || chat.id.user || '',
-            isGroup: chat.isGroup || chat.id._serialized.endsWith('@g.us')
-          }))
-        }),
+      allChats = await Promise.race([
+        client.getChats(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Chat list fetch timed out after 30s')), 30000)
+          setTimeout(() => reject(new Error('getChats timed out after 45s')), 45000)
         )
       ])
     } catch (err: any) {
@@ -1105,16 +1100,18 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 
     if (state.destroyed) return
 
-    // Filter OUT @lid chats — getChatById() on LID contacts crashes Puppeteer
-    // (causes "Invariant Violation" and "Execution context destroyed" errors)
-    // LID contacts still work for real-time messages, just skip them during sync
-    const safeChatIds = chatIds.filter(c => !c.id.endsWith('@lid'))
-    const skippedLid = chatIds.length - safeChatIds.length
+    // Filter out status broadcasts, limit to 40 most recent
+    // getChats() returns chats ordered by most recent activity
+    const filteredChats = allChats
+      .filter((c: any) => {
+        const id = c.id?._serialized || ''
+        return !id.includes('status@broadcast')
+      })
+      .slice(0, 40)
 
-    // Include both individual chats and groups, limit to 40
-    const filteredChats = safeChatIds.slice(0, 40)
-    const groupCount = filteredChats.filter(c => c.isGroup).length
-    console.log(`[WA] Found ${chatIds.length} total chats (${skippedLid} LID skipped, ${groupCount} groups). Syncing ${filteredChats.length}...`)
+    const groupCount = filteredChats.filter((c: any) => c.isGroup).length
+    const lidCount = filteredChats.filter((c: any) => (c.id?._serialized || '').endsWith('@lid')).length
+    console.log(`[WA] Found ${allChats.length} total chats. Syncing ${filteredChats.length} (${groupCount} groups, ${lidCount} LID)...`)
 
     if (filteredChats.length === 0) {
       console.log(`[WA] No chats found for user ${state.userId}`)
@@ -1128,8 +1125,7 @@ async function syncChatHistory(state: ClientState): Promise<void> {
       return
     }
 
-    // Process chats in parallel batches of 5 (much faster than sequential)
-    // Puppeteer can handle ~5 concurrent getChatById calls safely
+    // Process chats in parallel batches of 5
     const BATCH_SIZE = 5
     let contextDead = false
     let processedCount = 0
@@ -1141,16 +1137,10 @@ async function syncChatHistory(state: ClientState): Promise<void> {
       const batch = filteredChats.slice(batchStart, batchStart + BATCH_SIZE)
 
       const results = await Promise.allSettled(
-        batch.map(async (chatInfo) => {
-          const chat = await Promise.race([
-            client.getChatById(chatInfo.id),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error(`getChatById timed out for ${chatInfo.id}`)), 15000)
-            )
-          ])
-          // Skip profile pics during sync (they're slow Puppeteer calls)
-          // Profile pics are loaded lazily when conversation list is displayed
-          await processSingleChat(chat, state, chatInfo.isGroup, cachedConnId, true)
+        batch.map(async (chat: any) => {
+          // Chat objects from getChats() are ready to use — no getChatById needed
+          const isGroup = chat.isGroup || (chat.id?._serialized || '').endsWith('@g.us')
+          await processSingleChat(chat, state, isGroup, cachedConnId, true)
         })
       )
 
@@ -1158,7 +1148,8 @@ async function syncChatHistory(state: ClientState): Promise<void> {
         const result = results[j]
         if (result.status === 'rejected') {
           const errMsg = result.reason?.message || String(result.reason)
-          console.error(`[WA] Error processing chat ${batch[j].id}:`, errMsg)
+          const chatId = batch[j]?.id?._serialized || 'unknown'
+          console.error(`[WA] Error processing chat ${chatId}:`, errMsg)
 
           // If Puppeteer context is dead, stop processing remaining batches
           if (errMsg.includes('Execution context was destroyed') || errMsg.includes('context destroyed') || errMsg.includes('Target closed')) {
