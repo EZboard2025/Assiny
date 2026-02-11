@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Send, Copy, Brain, Loader2, RefreshCw } from 'lucide-react'
+import { X, Send, Copy, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 
 interface ChatMessage {
   id: string
@@ -189,68 +189,72 @@ export default function ManagerAIChat() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center z-[60] transition-all hover:scale-110"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center z-[60] transition-all hover:scale-110"
           title="Assistente da Equipe"
         >
-          <Brain className="w-7 h-7 text-white" />
+          <Sparkles className="w-7 h-7 text-white" />
         </button>
       )}
 
       {/* Side panel */}
       {isOpen && (
         <div
-          className="fixed top-0 right-0 h-screen w-full sm:w-[400px] bg-white border-l border-gray-200 z-[65] flex flex-col shadow-2xl"
-          style={{ animation: 'managerChatSlideIn 0.2s ease-out' }}
+          className="fixed top-0 right-0 h-screen w-full sm:w-[400px] bg-[#111b21] border-l border-[#222d34] z-[65] flex flex-col shadow-2xl"
+          style={{ animation: 'slideInRight 0.2s ease-out' }}
         >
           {/* Header */}
-          <div className="h-[60px] bg-gradient-to-r from-green-600 to-emerald-600 px-4 flex items-center justify-between shrink-0">
+          <div className="h-[60px] bg-[#202c33] px-4 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
-              <Brain className="w-5 h-5 text-white" />
-              <span className="text-white font-medium">Assistente da Equipe</span>
-              <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">IA</span>
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              <span className="text-[#e9edef] font-medium">Assistente da Equipe</span>
+              <span className="text-[10px] bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded-full">IA</span>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white transition-colors">
+            <button onClick={() => setIsOpen(false)} className="text-[#8696a0] hover:text-[#e9edef] transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Messages area */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50">
-            {/* Initial greeting */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            {/* Welcome message */}
             {messages.length === 0 && (
-              <div className="flex justify-start">
-                <div className="max-w-[90%] rounded-lg px-3 py-2 bg-white text-gray-800 border border-gray-200 shadow-sm">
-                  <p className="text-sm">Olá{userName ? ` ${userName}` : ''}, como posso te ajudar?</p>
-                </div>
+              <div className="text-center py-8">
+                <Sparkles className="w-10 h-10 text-purple-400/50 mx-auto mb-3" />
+                <p className="text-[#8696a0] text-sm mb-1">Olá{userName ? ` ${userName}` : ''}! Sou o assistente da equipe.</p>
+                <p className="text-[#8696a0] text-xs">Posso ajudar com análises de vendedores, comparações, coaching e tendências.</p>
               </div>
             )}
 
             {/* Messages */}
             {messages.map(msg => (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                style={{ animation: 'msgFadeIn 0.3s ease-out' }}
+              >
                 <div className={`max-w-[90%] rounded-lg px-3 py-2 ${
                   msg.role === 'user'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-white text-gray-800 border border-gray-200 shadow-sm'
+                    ? 'bg-[#005c4b] text-[#e9edef]'
+                    : 'bg-[#202c33] text-[#e9edef]'
                 }`}>
                   <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
 
                   {/* Action buttons for AI messages */}
                   {msg.role === 'assistant' && !msg.content.startsWith('Erro:') && (
-                    <div className="flex items-center gap-1 mt-2 pt-1 border-t border-gray-100">
+                    <div className="flex items-center gap-1 mt-2 pt-1 border-t border-white/10">
                       <button
                         onClick={() => handleCopy(msg.content, msg.id)}
-                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                        className="p-1 rounded hover:bg-white/10 transition-colors"
                         title="Copiar"
                       >
-                        <Copy className={`w-3.5 h-3.5 ${copiedId === msg.id ? 'text-green-500' : 'text-gray-400'}`} />
+                        <Copy className={`w-3.5 h-3.5 ${copiedId === msg.id ? 'text-green-400' : 'text-[#8696a0]'}`} />
                       </button>
                       {copiedId === msg.id && (
-                        <span className="text-[10px] text-green-500">Copiado!</span>
+                        <span className="text-[10px] text-green-400">Copiado!</span>
                       )}
                       <button
                         onClick={() => handleRegenerate(msg.id)}
-                        className="p-1 rounded hover:bg-gray-100 transition-colors text-gray-400"
+                        className="p-1 rounded hover:bg-white/10 transition-colors text-[#8696a0]"
                         title="Gerar outra resposta"
                         disabled={isLoading}
                       >
@@ -264,10 +268,10 @@ export default function ManagerAIChat() {
 
             {/* Loading indicator */}
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white rounded-lg px-3 py-2 flex items-center gap-2 border border-gray-200 shadow-sm">
-                  <Loader2 className="w-4 h-4 text-green-500 animate-spin" />
-                  <span className="text-gray-500 text-sm">Analisando dados da equipe...</span>
+              <div className="flex justify-start" style={{ animation: 'msgFadeIn 0.3s ease-out' }}>
+                <div className="bg-[#202c33] rounded-lg px-3 py-2 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                  <span className="text-[#8696a0] text-sm">Analisando dados da equipe...</span>
                 </div>
               </div>
             )}
@@ -275,8 +279,23 @@ export default function ManagerAIChat() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Quick suggestions */}
+          {messages.length === 0 && !isLoading && (
+            <div className="px-4 py-2 flex flex-wrap gap-2 shrink-0 border-t border-[#222d34]">
+              {['Quem precisa de atenção?', 'Compare os vendedores', 'Média da equipe', 'Quem mais evoluiu?'].map(suggestion => (
+                <button
+                  key={suggestion}
+                  onClick={() => handleSend(suggestion)}
+                  className="text-xs bg-[#202c33] text-purple-300 px-3 py-1.5 rounded-full hover:bg-[#2a3942] transition-colors border border-purple-500/20"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Input bar */}
-          <div className="px-4 py-3 bg-white border-t border-gray-200 shrink-0">
+          <div className="px-4 py-3 bg-[#202c33] border-t border-[#222d34] shrink-0">
             <div className="flex items-end gap-2">
               <textarea
                 ref={textareaRef}
@@ -284,14 +303,14 @@ export default function ManagerAIChat() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Pergunte sobre a equipe..."
-                className="flex-1 bg-gray-100 text-gray-800 text-sm rounded-lg px-3 py-2 resize-none outline-none placeholder-gray-400 max-h-[100px] min-h-[40px] focus:ring-2 focus:ring-green-500/30"
+                className="flex-1 bg-[#2a3942] text-[#e9edef] text-sm rounded-lg px-3 py-2 resize-none outline-none placeholder-[#8696a0] max-h-[100px] min-h-[40px]"
                 rows={1}
                 disabled={isLoading}
               />
               <button
                 onClick={() => handleSend()}
                 disabled={!input.trim() || isLoading}
-                className="p-2 rounded-full bg-green-600 hover:bg-green-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+                className="p-2 rounded-full bg-purple-600 hover:bg-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
               >
                 <Send className="w-4 h-4 text-white" />
               </button>
@@ -300,11 +319,15 @@ export default function ManagerAIChat() {
         </div>
       )}
 
-      {/* CSS animation */}
+      {/* CSS animations */}
       <style jsx>{`
-        @keyframes managerChatSlideIn {
+        @keyframes slideInRight {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
+        }
+        @keyframes msgFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </>

@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       // ALL meet evaluations — no limit
       supabaseAdmin
         .from('meet_evaluations')
-        .select('user_id, created_at, evaluation, overall_score, summary')
+        .select('user_id, seller_name, created_at, evaluation, overall_score, performance_level, spin_s_score, spin_p_score, spin_i_score, spin_n_score')
         .order('created_at', { ascending: false }),
 
       // ALL daily challenges — no limit
@@ -209,11 +209,13 @@ export async function POST(request: Request) {
       const meetDetails: string[] = []
       userMeets.forEach((m: any, i: number) => {
         const evaluation = parseEval(m.evaluation)
-        const score = evaluation?.overall_score || m.overall_score || 0
+        let score = evaluation?.overall_score || m.overall_score || 0
+        if (score > 10) score = score / 10
         meetTotal += score
         const date = new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
         const playbookAdh = evaluation?.playbook_adherence
-        meetDetails.push(`  Reuniao ${i + 1} (${date}): ${score.toFixed ? score.toFixed(1) : score}/10${playbookAdh ? ' | Playbook: ' + (playbookAdh.overall_adherence_score || playbookAdh.overall_score || 'N/A') + '%' : ''}${evaluation?.resumo_executivo ? ' | ' + evaluation.resumo_executivo.substring(0, 80) : m.summary ? ' | ' + m.summary.substring(0, 80) : ''}`)
+        const spinStr = m.spin_s_score !== null ? ` | SPIN: S=${m.spin_s_score?.toFixed(1)} P=${m.spin_p_score?.toFixed(1)} I=${m.spin_i_score?.toFixed(1)} N=${m.spin_n_score?.toFixed(1)}` : ''
+        meetDetails.push(`  Reuniao ${i + 1} (${date}): ${typeof score === 'number' ? score.toFixed(1) : score}/10 | ${m.performance_level || 'N/A'}${spinStr}${playbookAdh ? ' | Playbook: ' + (playbookAdh.overall_adherence_score || playbookAdh.overall_score || 'N/A') + '%' : ''}${evaluation?.executive_summary ? ' | ' + evaluation.executive_summary.substring(0, 80) : ''}`)
       })
       const meetAvg = userMeets.length > 0 ? meetTotal / userMeets.length : 0
 

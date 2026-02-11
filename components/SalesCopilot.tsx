@@ -350,7 +350,11 @@ export default function SalesCopilot({
 
             {/* Messages */}
             {copilotMessages.map(msg => (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                style={{ animation: 'msgFadeIn 0.3s ease-out' }}
+              >
                 <div className={`max-w-[90%] rounded-lg px-3 py-2 ${
                   msg.role === 'user'
                     ? 'bg-[#005c4b] text-[#e9edef]'
@@ -413,7 +417,7 @@ export default function SalesCopilot({
 
             {/* Loading indicator */}
             {isLoading && (
-              <div className="flex justify-start">
+              <div className="flex justify-start" style={{ animation: 'msgFadeIn 0.3s ease-out' }}>
                 <div className="bg-[#202c33] rounded-lg px-3 py-2 flex items-center gap-2">
                   <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
                   <span className="text-[#8696a0] text-sm">Pensando...</span>
@@ -464,11 +468,15 @@ export default function SalesCopilot({
         </div>
       )}
 
-      {/* CSS animation */}
+      {/* CSS animations */}
       <style jsx>{`
         @keyframes slideInRight {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
+        }
+        @keyframes msgFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </>
