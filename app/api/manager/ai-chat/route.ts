@@ -32,7 +32,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
     }
 
-    if (requestingEmployee.role !== 'admin' && requestingEmployee.role !== 'gestor') {
+    const role = (requestingEmployee.role || '').toLowerCase()
+    if (role !== 'admin' && role !== 'gestor') {
       return NextResponse.json({ error: 'Acesso restrito a gestores' }, { status: 403 })
     }
 
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       // ALL meet evaluations — no limit
       supabaseAdmin
         .from('meet_evaluations')
-        .select('user_id, created_at, evaluation, overall_score, summary')
+        .select('user_id, seller_name, created_at, evaluation, overall_score, performance_level, spin_s_score, spin_p_score, spin_i_score, spin_n_score')
         .order('created_at', { ascending: false }),
 
       // ALL daily challenges — no limit
@@ -208,11 +209,13 @@ export async function POST(request: Request) {
       const meetDetails: string[] = []
       userMeets.forEach((m: any, i: number) => {
         const evaluation = parseEval(m.evaluation)
-        const score = evaluation?.overall_score || m.overall_score || 0
+        let score = evaluation?.overall_score || m.overall_score || 0
+        if (score > 10) score = score / 10
         meetTotal += score
         const date = new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
         const playbookAdh = evaluation?.playbook_adherence
-        meetDetails.push(`  Reuniao ${i + 1} (${date}): ${score.toFixed ? score.toFixed(1) : score}/10${playbookAdh ? ' | Playbook: ' + (playbookAdh.overall_adherence_score || playbookAdh.overall_score || 'N/A') + '%' : ''}${evaluation?.resumo_executivo ? ' | ' + evaluation.resumo_executivo.substring(0, 80) : m.summary ? ' | ' + m.summary.substring(0, 80) : ''}`)
+        const spinStr = m.spin_s_score !== null ? ` | SPIN: S=${m.spin_s_score?.toFixed(1)} P=${m.spin_p_score?.toFixed(1)} I=${m.spin_i_score?.toFixed(1)} N=${m.spin_n_score?.toFixed(1)}` : ''
+        meetDetails.push(`  Reuniao ${i + 1} (${date}): ${typeof score === 'number' ? score.toFixed(1) : score}/10 | ${m.performance_level || 'N/A'}${spinStr}${playbookAdh ? ' | Playbook: ' + (playbookAdh.overall_adherence_score || playbookAdh.overall_score || 'N/A') + '%' : ''}${evaluation?.executive_summary ? ' | ' + evaluation.executive_summary.substring(0, 80) : ''}`)
       })
       const meetAvg = userMeets.length > 0 ? meetTotal / userMeets.length : 0
 
@@ -425,7 +428,6 @@ REGRAS:
 - Responda SEMPRE em portugues brasileiro
 - Seja direto, conciso e pratico — o gestor tem pouco tempo
 - NAO use markdown (nada de **, *, ###, ---, \`\`\`)
-- Use texto corrido natural com numeracao simples quando necessario
 - Quando comparar vendedores, use dados concretos (notas, tendencias, datas)
 - Quando sugerir coaching, seja especifico e acionavel
 - Se perguntarem sobre um vendedor especifico, foque nele com TODA a profundidade dos dados
@@ -442,6 +444,59 @@ REGRAS:
   2. Nota geral baixa (<5)
   3. Gaps criticos recorrentes
   4. Baixa taxa de completude de desafios
+
+COMPONENTES VISUAIS — USE QUANDO TIVER DADOS REAIS:
+Voce tem acesso a tags especiais que o frontend renderiza como graficos. Use quando tiver dados numericos REAIS dos vendedores. Misture texto normal com as tags. As tags devem estar em uma LINHA SEPARADA (nao inline com texto).
+
+REGRAS CRITICAS PARA TAGS:
+- NUNCA use uma tag com valores 0.0 ou zerados — se nao tem dado, NAO use a tag
+- NUNCA invente valores para preencher tags — so use dados que estao no contexto
+- Use {{SPIN:...}} APENAS quando os 4 scores SPIN existirem nos dados do vendedor
+- Se um vendedor so tem dados de roleplay mas nao de reunioes, NAO crie SPIN com zeros para reunioes
+- Prefira {{BARRA:...}} para metricas individuais e {{NOTA:...}} para scores pontuais
+
+Tags disponiveis:
+
+1. NOTA — badge colorido com score:
+{{NOTA:7.5}}
+Use para qualquer nota individual que exista nos dados.
+
+2. BARRA — barra de progresso horizontal:
+{{BARRA:Label|valor|maximo}}
+Exemplo: {{BARRA:Media Geral|7.5|10}}
+Use para mostrar uma metrica com contexto visual.
+
+3. SPIN — 4 barras SPIN lado a lado:
+{{SPIN:S=5.8|P=6.2|I=3.5|N=6.0}}
+Use SOMENTE quando os 4 valores SPIN existirem nos dados. NUNCA com zeros.
+
+4. RANKING — ranking visual com barras:
+{{RANKING:Nome1|7.5,Nome2|6.3,Nome3|5.1}}
+Use para rankings e comparacoes entre vendedores.
+
+5. TENDENCIA — indicador de tendencia:
+{{TENDENCIA:melhorando}} ou {{TENDENCIA:piorando}} ou {{TENDENCIA:estavel}}
+Use quando falar sobre evolucao de um vendedor.
+
+6. COMPARAR — barras de comparacao lado a lado:
+{{COMPARAR:Nome1|7.5,Nome2|6.3}}
+Use para comparar 2+ vendedores em uma metrica especifica.
+
+EXEMPLO DE RESPOSTA:
+"Joao Gattoni esta com media geral de
+{{NOTA:7.8}}
+com tendencia de
+{{TENDENCIA:melhorando}}
+
+Seus scores SPIN nos roleplays:
+{{SPIN:S=8.1|P=7.5|I=6.2|N=7.0}}
+
+Comparado com a equipe:
+{{RANKING:Joao|7.8,Maria|6.3,Pedro|5.1}}
+
+O principal gap e em Implicacao. Recomendo focar em explorar consequencias dos problemas."
+
+IMPORTANTE: Use tags visuais quando tiver dados reais. O gestor prefere dados visuais a texto puro. Mas NUNCA force uma tag com dados zerados ou inventados — isso confunde mais do que ajuda.
 
 VOCE TEM ACESSO A:
 - Informacoes da empresa (produtos, diferenciais, concorrentes, etc.)
