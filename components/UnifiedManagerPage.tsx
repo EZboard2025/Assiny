@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import SellerGrid from './manager/SellerGrid'
 import SellerDetailView from './manager/SellerDetailView'
+import ManagerAIChat from './manager/ManagerAIChat'
 import type { SellerPerformance } from './manager/SellerGrid'
 
 type ViewState =
@@ -58,6 +59,9 @@ export default function UnifiedManagerPage() {
           />
         )}
       </div>
+
+      {/* Manager AI Chat - Floating panel */}
+      <ManagerAIChat />
     </div>
   )
 }
