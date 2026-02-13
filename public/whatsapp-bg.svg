@@ -1,0 +1,500 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#0b141a"/>
+  <g stroke="#1a2730" fill="none" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.55">
+
+    <!-- Row 1 -->
+    <!-- Bar chart rising -->
+    <g transform="translate(30,25)">
+      <rect x="0" y="12" width="4" height="8" rx="0.5" fill="#1a2730"/>
+      <rect x="6" y="8" width="4" height="12" rx="0.5" fill="#1a2730"/>
+      <rect x="12" y="3" width="4" height="17" rx="0.5" fill="#1a2730"/>
+      <line x1="0" y1="20" x2="16" y2="20"/>
+    </g>
+
+    <!-- Dollar sign -->
+    <g transform="translate(110,28)">
+      <path d="M4 2v2M4 12v2M1.5 5.5C1.5 4 2.8 3 4 3s3 .5 3 2.2c0 2-3 2-3 3.8 0 1.7 1.3 2.2 3 2.2s2.5-1 2.5-2.5" />
+    </g>
+
+    <!-- Chat bubble -->
+    <g transform="translate(195,22)">
+      <path d="M2 2h14a2 2 0 012 2v8a2 2 0 01-2 2H8l-4 3v-3H2a2 2 0 01-2-2V4a2 2 0 012-2z"/>
+      <line x1="5" y1="6" x2="13" y2="6"/>
+      <line x1="5" y1="9" x2="10" y2="9"/>
+    </g>
+
+    <!-- Target/bullseye -->
+    <g transform="translate(290,28)">
+      <circle cx="8" cy="8" r="7"/>
+      <circle cx="8" cy="8" r="4"/>
+      <circle cx="8" cy="8" r="1.2" fill="#1a2730"/>
+    </g>
+
+    <!-- Rocket -->
+    <g transform="translate(375,22)">
+      <path d="M9 16l-2-2M9 16l2-2M4 11l-2 2 3 1M14 11l2 2-3 1"/>
+      <path d="M9 2c0 0-5 4-5 10l5 4 5-4c0-6-5-10-5-10z"/>
+      <circle cx="9" cy="9" r="1.5" fill="#1a2730"/>
+    </g>
+
+    <!-- Lightning bolt -->
+    <g transform="translate(465,25)">
+      <path d="M8 1L3 10h5l-1 8 6-10H8l2-7z" fill="#1a2730" stroke="#1a2730"/>
+    </g>
+
+    <!-- Trophy -->
+    <g transform="translate(545,23)">
+      <path d="M5 2h8v6a4 4 0 01-8 0V2z"/>
+      <path d="M5 4H2a1 1 0 00-1 1v1a3 3 0 003 3h1"/>
+      <path d="M13 4h3a1 1 0 011 1v1a3 3 0 01-3 3h-1"/>
+      <line x1="9" y1="13" x2="9" y2="16"/>
+      <line x1="6" y1="16" x2="12" y2="16"/>
+    </g>
+
+    <!-- Handshake -->
+    <g transform="translate(640,28)">
+      <path d="M1 6l4-3 3 1 2-1 3-1 4 3"/>
+      <path d="M1 6l3 4 2 1 2-1 2 2 2-1"/>
+      <path d="M17 6l-3 4-2-1"/>
+    </g>
+
+    <!-- Star -->
+    <g transform="translate(730,26)">
+      <path d="M8 1l2.2 4.5 5 .7-3.6 3.5.9 5L8 12.5 3.5 14.7l.9-5L.8 6.2l5-.7z" fill="#1a2730" stroke="#1a2730"/>
+    </g>
+
+    <!-- Row 2 -->
+    <!-- Lightbulb -->
+    <g transform="translate(55,105)">
+      <path d="M6 14h4M6.5 16h3"/>
+      <path d="M5 10c-1.5-1.5-2-3.5-1.5-5.5A6 6 0 018 1a6 6 0 014.5 3.5c.5 2-0 4-1.5 5.5-.7.7-1 1.5-1 2.5v.5H6v-.5c0-1-.3-1.8-1-2.5z"/>
+    </g>
+
+    <!-- Line chart up -->
+    <g transform="translate(155,108)">
+      <polyline points="0,14 4,10 8,12 12,5 16,2"/>
+      <polyline points="12,2 16,2 16,5"/>
+      <line x1="0" y1="16" x2="16" y2="16"/>
+    </g>
+
+    <!-- Megaphone -->
+    <g transform="translate(250,108)">
+      <path d="M2 7v4h3l5 4V3L5 7H2z"/>
+      <path d="M14 6.5a3 3 0 010 5"/>
+      <path d="M16 4a6 6 0 010 10"/>
+    </g>
+
+    <!-- Clock -->
+    <g transform="translate(345,110)">
+      <circle cx="8" cy="8" r="7"/>
+      <polyline points="8,4 8,8 11,10"/>
+    </g>
+
+    <!-- Email -->
+    <g transform="translate(440,112)">
+      <rect x="1" y="3" width="16" height="12" rx="1.5"/>
+      <polyline points="1,3 9,9 17,3"/>
+    </g>
+
+    <!-- Person -->
+    <g transform="translate(530,108)">
+      <circle cx="8" cy="4" r="3.5"/>
+      <path d="M1 16c0-3.9 3.1-7 7-7s7 3.1 7 7"/>
+    </g>
+
+    <!-- Pie chart -->
+    <g transform="translate(625,110)">
+      <circle cx="8" cy="8" r="7"/>
+      <path d="M8 8V1"/>
+      <path d="M8 8l5 5"/>
+      <path d="M8 8l-6 3"/>
+    </g>
+
+    <!-- Flag -->
+    <g transform="translate(720,106)">
+      <line x1="3" y1="2" x2="3" y2="18"/>
+      <path d="M3 2h10l-3 3.5L13 9H3"/>
+    </g>
+
+    <!-- Row 3 -->
+    <!-- Gear -->
+    <g transform="translate(25,195)">
+      <circle cx="9" cy="9" r="3"/>
+      <path d="M9 1.5V0M9 18v-1.5M16.5 9H18M0 9h1.5M14.7 3.3l1-1M2.3 14.7l1-1M14.7 14.7l1 1M2.3 3.3l1 1"/>
+    </g>
+
+    <!-- Thumb up -->
+    <g transform="translate(120,195)">
+      <path d="M2 9h3v7H2zM5 9l2-6c.5-1.5 2-1 2 .5V7h5.5a1.5 1.5 0 011.5 1.7l-1 6A1.5 1.5 0 0113.5 16H5V9z"/>
+    </g>
+
+    <!-- Diamond/gem -->
+    <g transform="translate(210,198)">
+      <path d="M3 1h10l4 5-9 10L-1 6z"/>
+      <line x1="-1" y1="6" x2="17" y2="6"/>
+      <line x1="8" y1="1" x2="8" y2="16"/>
+    </g>
+
+    <!-- Headset -->
+    <g transform="translate(305,195)">
+      <path d="M2 10V8a7 7 0 0114 0v2"/>
+      <rect x="0" y="10" width="4" height="5" rx="1"/>
+      <rect x="14" y="10" width="4" height="5" rx="1"/>
+      <path d="M16 15v1a2 2 0 01-2 2h-3"/>
+    </g>
+
+    <!-- Calendar -->
+    <g transform="translate(400,195)">
+      <rect x="1" y="3" width="16" height="14" rx="1.5"/>
+      <line x1="1" y1="8" x2="17" y2="8"/>
+      <line x1="5" y1="1" x2="5" y2="5"/>
+      <line x1="13" y1="1" x2="13" y2="5"/>
+      <rect x="4" y="10.5" width="2.5" height="2.5" rx="0.3" fill="#1a2730"/>
+      <rect x="8" y="10.5" width="2.5" height="2.5" rx="0.3" fill="#1a2730"/>
+    </g>
+
+    <!-- Briefcase -->
+    <g transform="translate(500,198)">
+      <rect x="1" y="5" width="16" height="11" rx="1.5"/>
+      <path d="M6 5V3a1 1 0 011-1h4a1 1 0 011 1v2"/>
+      <line x1="1" y1="10" x2="17" y2="10"/>
+    </g>
+
+    <!-- Phone -->
+    <g transform="translate(590,196)">
+      <rect x="3" y="1" width="12" height="18" rx="2"/>
+      <line x1="7" y1="16" x2="11" y2="16"/>
+      <line x1="3" y1="4" x2="15" y2="4"/>
+      <line x1="3" y1="14" x2="15" y2="14"/>
+    </g>
+
+    <!-- Coins -->
+    <g transform="translate(685,200)">
+      <circle cx="6" cy="9" r="5.5"/>
+      <ellipse cx="12" cy="7" rx="5.5" ry="5.5"/>
+      <path d="M11 4.5v1M11 9.5v1M9 6c0-.8.9-1.5 2-1.5s2 .4 2 1.3c0 1.2-2 1.2-2 2.2 0 .8.9 1.3 2 1.3s2-.7 2-1.5"/>
+    </g>
+
+    <!-- Row 4 -->
+    <!-- Growth arrow -->
+    <g transform="translate(65,285)">
+      <polyline points="1,16 6,8 10,11 16,2"/>
+      <polyline points="11,2 16,2 16,6"/>
+    </g>
+
+    <!-- Shield/security -->
+    <g transform="translate(160,282)">
+      <path d="M9 1L2 4v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V4L9 1z"/>
+      <polyline points="6,9 8.5,11.5 13,6"/>
+    </g>
+
+    <!-- Globe -->
+    <g transform="translate(255,285)">
+      <circle cx="8" cy="8" r="7"/>
+      <ellipse cx="8" cy="8" rx="3" ry="7"/>
+      <line x1="1" y1="8" x2="15" y2="8"/>
+      <path d="M2.5 4h11M2.5 12h11"/>
+    </g>
+
+    <!-- Heart -->
+    <g transform="translate(350,285)">
+      <path d="M8 15S1 10.5 1 5.5C1 3 3 1 5.5 1 7 1 8 2 8 2s1-1 2.5-1C13 1 15 3 15 5.5 15 10.5 8 15 8 15z" fill="#1a2730" stroke="#1a2730"/>
+    </g>
+
+    <!-- Checklist -->
+    <g transform="translate(445,282)">
+      <rect x="0" y="0" width="16" height="18" rx="1.5"/>
+      <polyline points="3,5 5,7 8,3"/>
+      <line x1="10" y1="5" x2="14" y2="5"/>
+      <polyline points="3,11 5,13 8,9"/>
+      <line x1="10" y1="11" x2="14" y2="11"/>
+    </g>
+
+    <!-- Key -->
+    <g transform="translate(540,288)">
+      <circle cx="5" cy="5" r="4"/>
+      <line x1="9" y1="5" x2="18" y2="5"/>
+      <line x1="15" y1="5" x2="15" y2="8"/>
+      <line x1="18" y1="5" x2="18" y2="8"/>
+    </g>
+
+    <!-- Compass -->
+    <g transform="translate(640,285)">
+      <circle cx="8" cy="8" r="7"/>
+      <polygon points="8,3 6,8 8,13 10,8" fill="#1a2730"/>
+      <circle cx="8" cy="8" r="1"/>
+    </g>
+
+    <!-- Book -->
+    <g transform="translate(740,285)">
+      <path d="M1 2c2-1 5-1 7 0 2-1 5-1 7 0v14c-2-1-5-1-7 0-2-1-5-1-7 0V2z"/>
+      <line x1="8" y1="2" x2="8" y2="16"/>
+    </g>
+
+    <!-- Row 5 -->
+    <!-- Pencil -->
+    <g transform="translate(40,375)">
+      <path d="M12 2l4 4L6 16H2v-4L12 2z"/>
+      <line x1="10" y1="4" x2="14" y2="8"/>
+    </g>
+
+    <!-- Wifi signal -->
+    <g transform="translate(130,378)">
+      <circle cx="8" cy="15" r="1.2" fill="#1a2730"/>
+      <path d="M4.5 12.5a5 5 0 017 0"/>
+      <path d="M1.5 9.5a9 9 0 0113 0"/>
+    </g>
+
+    <!-- Paper plane -->
+    <g transform="translate(220,375)">
+      <path d="M1 8l16-7-4 16-5-5z" fill="#1a2730" stroke="#1a2730"/>
+      <line x1="17" y1="1" x2="8" y2="12"/>
+    </g>
+
+    <!-- Lock -->
+    <g transform="translate(320,373)">
+      <rect x="2" y="8" width="12" height="9" rx="1.5"/>
+      <path d="M5 8V5a3 3 0 016 0v3"/>
+      <circle cx="8" cy="12.5" r="1.2" fill="#1a2730"/>
+    </g>
+
+    <!-- Users/team -->
+    <g transform="translate(415,375)">
+      <circle cx="6" cy="4.5" r="3"/>
+      <path d="M0 15c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+      <circle cx="14" cy="5.5" r="2.5"/>
+      <path d="M13 15c0-2.5 1.5-4.5 3.5-5.2"/>
+    </g>
+
+    <!-- Signal/antenna -->
+    <g transform="translate(510,378)">
+      <line x1="8" y1="8" x2="8" y2="16"/>
+      <circle cx="8" cy="8" r="1" fill="#1a2730"/>
+      <path d="M4.5 5a5 5 0 017 0"/>
+      <path d="M2 2.5a8.5 8.5 0 0112 0"/>
+    </g>
+
+    <!-- Shopping bag -->
+    <g transform="translate(605,375)">
+      <rect x="1" y="6" width="14" height="12" rx="1"/>
+      <path d="M5 6V3.5a3 3 0 016 0V6"/>
+    </g>
+
+    <!-- Music note -->
+    <g transform="translate(700,375)">
+      <circle cx="4" cy="14" r="2.5"/>
+      <circle cx="14" cy="12" r="2.5"/>
+      <line x1="6.5" y1="14" x2="6.5" y2="2"/>
+      <line x1="16.5" y1="12" x2="16.5" y2="1"/>
+      <line x1="6.5" y1="2" x2="16.5" y2="1"/>
+    </g>
+
+    <!-- Row 6 -->
+    <!-- Pin/location -->
+    <g transform="translate(30,465)">
+      <path d="M8 18S2 11 2 7a6 6 0 0112 0c0 4-6 11-6 11z"/>
+      <circle cx="8" cy="7" r="2.5"/>
+    </g>
+
+    <!-- Magnifying glass -->
+    <g transform="translate(125,468)">
+      <circle cx="7" cy="7" r="6"/>
+      <line x1="11.5" y1="11.5" x2="16" y2="16"/>
+    </g>
+
+    <!-- Cloud -->
+    <g transform="translate(215,470)">
+      <path d="M5 14h9a4 4 0 000-8 5.5 5.5 0 00-10 2 3.5 3.5 0 001 6z"/>
+    </g>
+
+    <!-- Coffee cup -->
+    <g transform="translate(310,468)">
+      <path d="M2 4h11v8a3 3 0 01-3 3H5a3 3 0 01-3-3V4z"/>
+      <path d="M13 6h2a2 2 0 010 4h-2"/>
+      <line x1="2" y1="17" x2="14" y2="17"/>
+      <path d="M5 1v2M7.5 1v2M10 1v2"/>
+    </g>
+
+    <!-- Percentage -->
+    <g transform="translate(405,470)">
+      <circle cx="4" cy="4" r="2.5"/>
+      <circle cx="13" cy="13" r="2.5"/>
+      <line x1="15" y1="2" x2="2" y2="15"/>
+    </g>
+
+    <!-- Bell -->
+    <g transform="translate(500,465)">
+      <path d="M8 1a1.5 1.5 0 00-1.5 1.5c-3 .5-5 3-5 6V12l-1.5 2h16L14.5 12V8.5c0-3-2-5.5-5-6A1.5 1.5 0 008 1z"/>
+      <path d="M6 14a2 2 0 004 0"/>
+    </g>
+
+    <!-- Bolt/flash -->
+    <g transform="translate(595,468)">
+      <path d="M8 1L2 10h5l-1.5 7L14 8H9l2.5-7z" fill="#1a2730" stroke="#1a2730"/>
+    </g>
+
+    <!-- Crown -->
+    <g transform="translate(690,470)">
+      <path d="M1 14L3 5l4 4 3-7 3 7 4-4 2 9z" fill="#1a2730" stroke="#1a2730"/>
+      <line x1="1" y1="16" x2="17" y2="16"/>
+    </g>
+
+    <!-- Row 7 -->
+    <!-- Award/medal -->
+    <g transform="translate(60,555)">
+      <circle cx="8" cy="6" r="5"/>
+      <polyline points="5,10 3,17 8,14 13,17 11,10"/>
+    </g>
+
+    <!-- Layers/stack -->
+    <g transform="translate(160,558)">
+      <polygon points="8,1 16,5 8,9 0,5"/>
+      <polyline points="0,8 8,12 16,8"/>
+      <polyline points="0,11 8,15 16,11"/>
+    </g>
+
+    <!-- Play button -->
+    <g transform="translate(250,558)">
+      <circle cx="8" cy="8" r="7"/>
+      <polygon points="6,4.5 13,8 6,11.5" fill="#1a2730"/>
+    </g>
+
+    <!-- Battery -->
+    <g transform="translate(348,560)">
+      <rect x="0" y="3" width="14" height="10" rx="1.5"/>
+      <line x1="14" y1="6" x2="16" y2="6"/>
+      <line x1="14" y1="10" x2="16" y2="10"/>
+      <rect x="2" y="5" width="5" height="6" rx="0.5" fill="#1a2730"/>
+    </g>
+
+    <!-- Infinity -->
+    <g transform="translate(440,562)">
+      <path d="M8 8c-2-3-6-3-6 0s4 3 6 0c2-3 6-3 6 0s-4 3-6 0"/>
+    </g>
+
+    <!-- Upload/share -->
+    <g transform="translate(535,555)">
+      <path d="M1 12v4a1 1 0 001 1h12a1 1 0 001-1v-4"/>
+      <polyline points="4,6 8,2 12,6"/>
+      <line x1="8" y1="2" x2="8" y2="13"/>
+    </g>
+
+    <!-- Eye -->
+    <g transform="translate(630,560)">
+      <path d="M1 8s3-5.5 7-5.5S15 8 15 8s-3 5.5-7 5.5S1 8 1 8z"/>
+      <circle cx="8" cy="8" r="2.5"/>
+    </g>
+
+    <!-- Hashtag -->
+    <g transform="translate(725,558)">
+      <line x1="4" y1="1" x2="2" y2="15"/>
+      <line x1="11" y1="1" x2="9" y2="15"/>
+      <line x1="0" y1="5" x2="14" y2="5"/>
+      <line x1="0" y1="11" x2="14" y2="11"/>
+    </g>
+
+    <!-- Row 8 -->
+    <!-- Funnel -->
+    <g transform="translate(35,648)">
+      <path d="M0 1h16l-5 7v6l-2 2v-8z"/>
+    </g>
+
+    <!-- Scissors/cut -->
+    <g transform="translate(130,652)">
+      <circle cx="4" cy="4" r="2.5"/>
+      <circle cx="4" cy="14" r="2.5"/>
+      <line x1="6" y1="5.5" x2="16" y2="14"/>
+      <line x1="6" y1="12.5" x2="16" y2="4"/>
+    </g>
+
+    <!-- Lamp/desk -->
+    <g transform="translate(225,648)">
+      <path d="M4 16h8M8 16v-3M3 13h10l-2-8H5z"/>
+      <path d="M6 5l2-4 2 4"/>
+    </g>
+
+    <!-- Magnet -->
+    <g transform="translate(320,650)">
+      <path d="M4 2v8a4 4 0 008 0V2"/>
+      <line x1="1" y1="2" x2="7" y2="2"/>
+      <line x1="9" y1="2" x2="15" y2="2"/>
+      <line x1="1" y1="5" x2="7" y2="5"/>
+      <line x1="9" y1="5" x2="15" y2="5"/>
+    </g>
+
+    <!-- Puzzle piece -->
+    <g transform="translate(418,650)">
+      <path d="M2 6h3a2 2 0 010-4h0a2 2 0 010 4h5v3a2 2 0 01-4 0h0a2 2 0 014 0v5H2z"/>
+    </g>
+
+    <!-- Link/chain -->
+    <g transform="translate(510,652)">
+      <path d="M7 11L5 13a3 3 0 01-4-4l2-2a3 3 0 014 0"/>
+      <path d="M11 7l2-2a3 3 0 014 4l-2 2a3 3 0 01-4 0"/>
+      <line x1="7" y1="11" x2="11" y2="7"/>
+    </g>
+
+    <!-- Camera -->
+    <g transform="translate(605,648)">
+      <rect x="1" y="5" width="16" height="11" rx="1.5"/>
+      <circle cx="9" cy="10.5" r="3.5"/>
+      <path d="M5 5l1.5-3h5L13 5"/>
+    </g>
+
+    <!-- Smile emoji -->
+    <g transform="translate(700,652)">
+      <circle cx="8" cy="8" r="7"/>
+      <circle cx="5.5" cy="6.5" r="0.8" fill="#1a2730"/>
+      <circle cx="10.5" cy="6.5" r="0.8" fill="#1a2730"/>
+      <path d="M4.5 10.5a4 4 0 007 0"/>
+    </g>
+
+    <!-- Row 9 (partial, scattered) -->
+    <!-- Sparkle -->
+    <g transform="translate(75,740)">
+      <path d="M8 0l1.5 5.5L15 8l-5.5 1.5L8 15l-1.5-5.5L1 8l5.5-1.5z" fill="#1a2730" stroke="#1a2730"/>
+    </g>
+
+    <!-- Document -->
+    <g transform="translate(180,738)">
+      <path d="M3 1h8l4 4v12a1 1 0 01-1 1H3a1 1 0 01-1-1V2a1 1 0 011-1z"/>
+      <polyline points="11,1 11,5 15,5"/>
+      <line x1="5" y1="9" x2="12" y2="9"/>
+      <line x1="5" y1="12" x2="10" y2="12"/>
+    </g>
+
+    <!-- Fire/hot -->
+    <g transform="translate(290,740)">
+      <path d="M8 16c-4 0-6-3-6-6 0-4 4-7 4-10 1 2 2 3 3 3 0-2 1-3 3-3-1 2 1 4 2 5 1.5 1.5 2 3.5 0 6s-3 5-6 5z" fill="#1a2730" stroke="#1a2730"/>
+    </g>
+
+    <!-- Connection/nodes -->
+    <g transform="translate(395,742)">
+      <circle cx="3" cy="3" r="2"/>
+      <circle cx="14" cy="3" r="2"/>
+      <circle cx="8.5" cy="13" r="2"/>
+      <line x1="5" y1="3.5" x2="12" y2="3.5"/>
+      <line x1="4" y1="5" x2="7" y2="11"/>
+      <line x1="13" y1="5" x2="10" y2="11"/>
+    </g>
+
+    <!-- Gift -->
+    <g transform="translate(500,738)">
+      <rect x="1" y="6" width="16" height="4"/>
+      <rect x="2.5" y="10" width="13" height="7" rx="1"/>
+      <line x1="9" y1="6" x2="9" y2="17"/>
+      <path d="M9 6C9 4 7 2 5 2s-2 2 0 3l4 1"/>
+      <path d="M9 6c0-2 2-4 4-4s2 2 0 3l-4 1"/>
+    </g>
+
+    <!-- Hourglass -->
+    <g transform="translate(605,740)">
+      <path d="M4 1h8M4 17h8M5 1v3l3 4-3 4v5M11 1v3l-3 4 3 4v5"/>
+    </g>
+
+    <!-- Cursor click -->
+    <g transform="translate(715,740)">
+      <path d="M3 1v12l3.5-3.5L10 16l2-1-3.5-6.5H14z" fill="#1a2730" stroke="#1a2730"/>
+    </g>
+  </g>
+</svg>

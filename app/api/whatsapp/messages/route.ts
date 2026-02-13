@@ -141,7 +141,8 @@ export async function GET(request: NextRequest) {
           mimetype: msg.media_mime_type,
           contactName: msg.contact_name,
           status: msg.status,
-          transcription: msg.transcription || null
+          transcription: msg.transcription || null,
+          isAutopilot: msg.is_autopilot || false
         }
       })
     })

@@ -1321,8 +1321,213 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         )
       }
     }
+
+    // === AUTOPILOT HOOK (non-blocking, inbound text only, skip groups) ===
+    if (!fromMe && messageType === 'text' && content && !isGroup) {
+      console.log(`[WA Autopilot] Hook triggered for ${contactPhone} (${contactName}): "${content.slice(0, 50)}"`)
+      triggerAutopilotResponse(state, contactPhone, contactName, content).catch((err: any) =>
+        console.error('[WA Autopilot] error:', err.message || err)
+      )
+    } else if (!fromMe && !isGroup) {
+      console.log(`[WA Autopilot] Hook skipped: messageType=${messageType}, hasContent=${!!content}`)
+    }
   } catch (error) {
     console.error(`[WA] Error handling message:`, error)
+  }
+}
+
+// === AUTOPILOT ===
+
+// Cache autopilot config in globalThis to survive HMR
+const globalForAutopilot = globalThis as unknown as {
+  autopilotConfigCache?: Map<string, { config: any; fetchedAt: number }>
+}
+if (!globalForAutopilot.autopilotConfigCache) {
+  globalForAutopilot.autopilotConfigCache = new Map()
+}
+const autopilotCache = globalForAutopilot.autopilotConfigCache
+
+async function getAutopilotConfig(userId: string): Promise<any | null> {
+  const cached = autopilotCache.get(userId)
+  if (cached && Date.now() - cached.fetchedAt < 30000) {
+    console.log(`[WA Autopilot] Config from cache for ${userId}: enabled=${cached.config?.enabled}`)
+    return cached.config
+  }
+
+  const { data: configs, error } = await supabaseAdmin
+    .from('autopilot_config')
+    .select('*')
+    .eq('user_id', userId)
+    .limit(1)
+
+  if (error) {
+    console.error(`[WA Autopilot] Config query error:`, error.message)
+    return null
+  }
+
+  const config = configs?.[0] || null
+  console.log(`[WA Autopilot] Config loaded for ${userId}: enabled=${config?.enabled}, has_instructions=${!!config?.custom_instructions}`)
+  autopilotCache.set(userId, { config, fetchedAt: Date.now() })
+  return config
+}
+
+async function triggerAutopilotResponse(
+  state: ClientState,
+  contactPhone: string,
+  contactName: string | null,
+  incomingMessage: string
+): Promise<void> {
+  // 1. Quick check: is autopilot enabled?
+  const config = await getAutopilotConfig(state.userId)
+  if (!config?.enabled) {
+    console.log(`[WA Autopilot] Skipped: config not enabled (config=${JSON.stringify(config ? { enabled: config.enabled } : null)})`)
+    return
+  }
+  console.log(`[WA Autopilot] Config enabled, companyId=${state.companyId}`)
+
+  if (!state.companyId) {
+    console.error(`[WA Autopilot] No companyId in state for user ${state.userId}`)
+    return
+  }
+
+  // 2. Is this contact monitored?
+  // contactPhone from handleIncomingMessage can be in different formats:
+  // - "5531999713132" (digits only, for regular contacts)
+  // - "lid_12345" (for LID contacts)
+  // Autopilot contacts saved from panel can be:
+  // - "5531999713132@c.us" (serialized ID from Store.Contact)
+  // - "5531999713132" (from conversations)
+  // We need to check both formats
+  const phoneSuffix = contactPhone.replace(/\D/g, '').slice(-9)
+  const { data: contacts, error: contactsErr } = await supabaseAdmin
+    .from('autopilot_contacts')
+    .select('contact_phone, enabled, needs_human')
+    .eq('user_id', state.userId)
+
+  if (contactsErr) {
+    console.error(`[WA Autopilot] Contacts query error:`, contactsErr.message)
+    return
+  }
+  console.log(`[WA Autopilot] Found ${contacts?.length || 0} monitored contacts for user. Incoming phone: ${contactPhone}, suffix: ${phoneSuffix}`)
+  contacts?.forEach(c => {
+    const cSuffix = c.contact_phone.replace(/@.*$/, '').replace(/\D/g, '').slice(-9)
+    console.log(`[WA Autopilot]   - stored: ${c.contact_phone} (suffix: ${cSuffix}), enabled=${c.enabled}, needs_human=${c.needs_human}`)
+  })
+
+  const contact = contacts?.find(c => {
+    const cSuffix = c.contact_phone.replace(/@.*$/, '').replace(/\D/g, '').slice(-9)
+    return cSuffix === phoneSuffix
+  })
+
+  if (!contact?.enabled || contact.needs_human) {
+    if (!contact) console.log(`[WA Autopilot] Contact ${contactPhone} NOT matched to any monitored contact`)
+    else if (contact.needs_human) console.log(`[WA Autopilot] Contact ${contactPhone} already flagged as needs_human`)
+    else console.log(`[WA Autopilot] Contact ${contactPhone} is disabled`)
+    return
+  }
+  console.log(`[WA Autopilot] Contact ${contactPhone} matched to monitored: ${contact.contact_phone}`)
+
+  // 3. Apply random delay for natural feel
+  const settings = config.settings || {}
+  const delayMin = (settings.response_delay_min || 15) * 1000
+  const delayMax = (settings.response_delay_max || 60) * 1000
+  const delay = delayMin + Math.random() * (delayMax - delayMin)
+  console.log(`[WA Autopilot] Waiting ${Math.round(delay / 1000)}s before responding to ${contactPhone}`)
+  await new Promise(resolve => setTimeout(resolve, delay))
+
+  // 4. Call the autopilot respond API (always use localhost for internal server-to-server call)
+  const port = process.env.PORT || 3000
+  const baseUrl = `http://localhost:${port}`
+  try {
+    const response = await fetch(`${baseUrl}/api/autopilot/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: state.userId,
+        contactPhone,
+        contactName,
+        incomingMessage: incomingMessage.slice(0, 2000),
+        companyId: state.companyId
+      })
+    })
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      console.error(`[WA Autopilot] API responded ${response.status}: ${errText.slice(0, 300)}`)
+      return
+    }
+    const result = await response.json()
+    console.log(`[WA Autopilot] ${contactPhone}: action=${result.action}, reason=${result.reason || 'n/a'}`)
+  } catch (err: any) {
+    console.error(`[WA Autopilot] API call failed:`, err.message || err)
+  }
+}
+
+// Send a message from the autopilot (called by /api/autopilot/respond)
+export async function sendAutopilotMessage(
+  userId: string,
+  contactPhone: string,
+  message: string
+): Promise<{ success: boolean; messageId?: string }> {
+  const client = getConnectedClient(userId)
+  if (!client) {
+    console.error(`[WA Autopilot] No connected client for user ${userId}`)
+    return { success: false }
+  }
+
+  try {
+    // Resolve chat ID
+    let chatId: string
+
+    if (contactPhone.startsWith('lid_')) {
+      chatId = `${contactPhone.replace('lid_', '')}@lid`
+    } else if (contactPhone.includes('@')) {
+      chatId = contactPhone
+    } else {
+      // Try to find original chat ID from recent message
+      const { data: recentMessage } = await supabaseAdmin
+        .from('whatsapp_messages')
+        .select('raw_payload')
+        .eq('user_id', userId)
+        .eq('contact_phone', contactPhone)
+        .order('message_timestamp', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (recentMessage?.raw_payload?.original_chat_id) {
+        chatId = recentMessage.raw_payload.original_chat_id
+      } else {
+        const digits = contactPhone.replace(/[^0-9]/g, '')
+        // Try getNumberId for proper resolution
+        try {
+          const numberId = await client.getNumberId(`${digits}@c.us`)
+          chatId = numberId ? numberId._serialized : `${digits}@c.us`
+        } catch {
+          chatId = `${digits}@c.us`
+        }
+      }
+    }
+
+    // Anti-ban: typing simulation
+    try {
+      const chat = await client.getChatById(chatId)
+      await chat.sendStateTyping()
+    } catch {}
+
+    const typingDelay = 2000 + Math.random() * 2000
+    await new Promise(resolve => setTimeout(resolve, typingDelay))
+
+    // Send with timeout
+    const sentMsg = await Promise.race([
+      client.sendMessage(chatId, message),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sendMessage timeout (15s)')), 15000))
+    ])
+
+    console.log(`[WA Autopilot] Message sent to ${contactPhone}, ID: ${sentMsg.id._serialized}`)
+    return { success: true, messageId: sentMsg.id._serialized }
+  } catch (err: any) {
+    console.error(`[WA Autopilot] Send failed:`, err.message || err)
+    return { success: false }
   }
 }
 
