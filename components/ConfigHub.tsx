@@ -2215,8 +2215,8 @@ function ConfigurationInterface({
   }
 
   const handleSavePersona = async () => {
-    // Determinar o tipo de persona baseado no businessType e selectedPersonaType
-    const personaType = businessType === 'Ambos' ? selectedPersonaType : businessType
+    // Usar o tipo selecionado no formulário
+    const personaType = selectedPersonaType
 
     if (personaType === 'B2B') {
       const persona = newPersona as PersonaB2B
@@ -4102,7 +4102,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-gray-900">
-                        {editingPersonaId ? 'Editar' : 'Nova'} Persona {businessType === 'Ambos' ? selectedPersonaType : businessType}
+                        {editingPersonaId ? 'Editar' : 'Nova'} Persona {selectedPersonaType}
                       </h4>
                       <button
                         onClick={() => {
@@ -4117,8 +4117,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </button>
                   </div>
 
-                  {/* Selector de tipo quando businessType é "Ambos" */}
-                  {businessType === 'Ambos' && !editingPersonaId && (
+                  {/* Selector de tipo B2B/B2C */}
+                  {!editingPersonaId && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Tipo de Persona
@@ -4154,8 +4154,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </div>
                   )}
 
-                  {/* Ao editar, sempre usa selectedPersonaType. Ao criar nova, considera o businessType da empresa */}
-                  {(editingPersonaId ? selectedPersonaType === 'B2B' : (businessType === 'B2B' || (businessType === 'Ambos' && selectedPersonaType === 'B2B'))) ? (
+                  {/* Formulário muda baseado no selectedPersonaType */}
+                  {selectedPersonaType === 'B2B' ? (
                     <>
                       {/* Formulário B2B */}
                       <div>
