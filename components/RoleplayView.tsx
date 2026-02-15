@@ -31,14 +31,45 @@ interface ChallengeConfig {
   coaching_tips: string[]
 }
 
+interface MeetSimulationConfig {
+  persona: {
+    business_type: 'B2B' | 'B2C'
+    cargo?: string
+    tipo_empresa_faturamento?: string
+    contexto?: string
+    busca?: string
+    dores?: string
+    profissao?: string
+    perfil_socioeconomico?: string
+  }
+  objections: Array<{
+    name: string
+    rebuttals: string[]
+    source: 'meeting' | 'coaching'
+  }>
+  age: number
+  temperament: string
+  objective: {
+    name: string
+    description: string
+  }
+  coaching_focus: Array<{
+    area: string
+    what_to_improve: string
+    tips: string[]
+  }>
+  meeting_context: string
+}
+
 interface RoleplayViewProps {
   onNavigateToHistory?: () => void
   challengeConfig?: ChallengeConfig
   challengeId?: string
   onChallengeComplete?: () => void
+  meetSimulationConfig?: MeetSimulationConfig
 }
 
-export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete }: RoleplayViewProps = {}) {
+export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete, meetSimulationConfig }: RoleplayViewProps = {}) {
   // Hook para verificar limites do plano
   const {
     checkRoleplayLimit,
@@ -156,8 +187,10 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   // Estado para modal de aviso ao encerrar
   const [showEndSessionWarning, setShowEndSessionWarning] = useState(false)
 
-  // Quando há um desafio ativo, as configurações ficam travadas
+  // Quando há um desafio ativo ou simulação de meet, as configurações ficam travadas
   const isChallengeLocked = !!challengeConfig
+  const isMeetSimulation = !!meetSimulationConfig
+  const isConfigLocked = isChallengeLocked || isMeetSimulation
 
   // Dados do banco
   const [businessType, setBusinessType] = useState<'B2B' | 'B2C' | 'Ambos'>('B2C')
@@ -342,6 +375,15 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
             setAge(Math.floor((minAge + maxAge) / 2))
           }
         }
+      }
+
+      // Apply meet simulation configuration if present
+      if (meetSimulationConfig) {
+        console.log('🎯 Aplicando configuracao da simulacao Meet:', meetSimulationConfig)
+        setAge(meetSimulationConfig.age)
+        setTemperament(meetSimulationConfig.temperament)
+        // Persona/objections/objective are passed inline in handleStartSimulation
+        // No need to set selectedPersona/selectedObjections/selectedObjective by DB ID
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -644,46 +686,49 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   }
 
   const handleStartSimulation = async () => {
-    // Validar persona selecionada
-    if (!selectedPersona) {
-      const messageElement = document.createElement('div')
-      messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
-      messageElement.textContent = 'Selecione uma persona para o roleplay'
-      document.body.appendChild(messageElement)
+    // Skip validation when using meet simulation (data is inline, not from DB)
+    if (!isMeetSimulation) {
+      // Validar persona selecionada
+      if (!selectedPersona) {
+        const messageElement = document.createElement('div')
+        messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
+        messageElement.textContent = 'Selecione uma persona para o roleplay'
+        document.body.appendChild(messageElement)
 
-      setTimeout(() => {
-        messageElement.remove()
-      }, 3000)
+        setTimeout(() => {
+          messageElement.remove()
+        }, 3000)
 
-      return
-    }
+        return
+      }
 
-    // Validar objeções selecionadas
-    if (selectedObjections.length === 0) {
-      const messageElement = document.createElement('div')
-      messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
-      messageElement.textContent = 'Selecione pelo menos uma objeção'
-      document.body.appendChild(messageElement)
+      // Validar objeções selecionadas
+      if (selectedObjections.length === 0) {
+        const messageElement = document.createElement('div')
+        messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
+        messageElement.textContent = 'Selecione pelo menos uma objeção'
+        document.body.appendChild(messageElement)
 
-      setTimeout(() => {
-        messageElement.remove()
-      }, 3000)
+        setTimeout(() => {
+          messageElement.remove()
+        }, 3000)
 
-      return
-    }
+        return
+      }
 
-    // Validar objetivo selecionado
-    if (!selectedObjective) {
-      const messageElement = document.createElement('div')
-      messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
-      messageElement.textContent = 'Selecione um objetivo para o roleplay'
-      document.body.appendChild(messageElement)
+      // Validar objetivo selecionado
+      if (!selectedObjective) {
+        const messageElement = document.createElement('div')
+        messageElement.className = 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg'
+        messageElement.textContent = 'Selecione um objetivo para o roleplay'
+        document.body.appendChild(messageElement)
 
-      setTimeout(() => {
-        messageElement.remove()
-      }, 3000)
+        setTimeout(() => {
+          messageElement.remove()
+        }, 3000)
 
-      return
+        return
+      }
     }
 
     // Primeiro verificar os limites do plano antes de iniciar
@@ -733,49 +778,70 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
       // Salvar companyId no estado para usar na transcrição
       setCurrentCompanyId(companyId)
 
-      // Buscar persona selecionada
-      const selectedPersonaData = personas.find(p => p.id === selectedPersona)
-      const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
-      const selectedObjectiveData = objectives.find(o => o.id === selectedObjective)
-
-      // Enviar todos os dados da persona para o agente (usando nomes do banco de dados)
+      // Assemble persona, objections, and objective data
       let personaData: any = {}
-      if (selectedPersonaData) {
-        // O banco usa nomes em português: cargo, tipo_empresa_faturamento, contexto, busca, dores
-        const p = selectedPersonaData as any
-        if (selectedPersonaData.business_type === 'B2B') {
-          personaData = {
-            business_type: 'B2B',
-            cargo: p.cargo || p.job_title,
-            tipo_empresa_faturamento: p.tipo_empresa_faturamento || p.company_type,
-            contexto: p.contexto || p.context,
-            busca: p.busca || p.company_goals,
-            dores: p.dores || p.business_challenges,
-            prior_knowledge: p.prior_knowledge
-          }
-        } else {
-          personaData = {
-            business_type: 'B2C',
-            profissao: p.profissao || p.profession,
-            contexto: p.contexto || p.context,
-            busca: p.busca || p.what_seeks,
-            dores: p.dores || p.main_pains,
-            prior_knowledge: p.prior_knowledge
+      let objectionsWithRebuttals: any[]
+      let selectedObjectiveData: any
+      let selectedPersonaData: any = null
+
+      if (isMeetSimulation && meetSimulationConfig) {
+        // USE INLINE MEET SIMULATION CONFIG (not from database)
+        console.log('🎯 Using meet simulation config:', meetSimulationConfig)
+        personaData = meetSimulationConfig.persona
+        objectionsWithRebuttals = meetSimulationConfig.objections.map((obj, idx) => ({
+          id: `meet_obj_${idx}`,
+          name: obj.name,
+          rebuttals: obj.rebuttals || []
+        }))
+        selectedObjectiveData = {
+          id: 'meet_objective',
+          name: meetSimulationConfig.objective.name,
+          description: meetSimulationConfig.objective.description
+        }
+      } else {
+        // STANDARD FLOW: look up from database
+        selectedPersonaData = personas.find(p => p.id === selectedPersona)
+        const selectedObjectionsData = objections.filter(o => selectedObjections.includes(o.id))
+        selectedObjectiveData = objectives.find(o => o.id === selectedObjective)
+
+        // Enviar todos os dados da persona para o agente (usando nomes do banco de dados)
+        if (selectedPersonaData) {
+          const p = selectedPersonaData as any
+          if (selectedPersonaData.business_type === 'B2B') {
+            personaData = {
+              business_type: 'B2B',
+              cargo: p.cargo || p.job_title,
+              tipo_empresa_faturamento: p.tipo_empresa_faturamento || p.company_type,
+              contexto: p.contexto || p.context,
+              busca: p.busca || p.company_goals,
+              dores: p.dores || p.business_challenges,
+              prior_knowledge: p.prior_knowledge
+            }
+          } else {
+            personaData = {
+              business_type: 'B2C',
+              profissao: p.profissao || p.profession,
+              contexto: p.contexto || p.context,
+              busca: p.busca || p.what_seeks,
+              dores: p.dores || p.main_pains,
+              prior_knowledge: p.prior_knowledge
+            }
           }
         }
+
+        objectionsWithRebuttals = selectedObjectionsData.map(o => ({
+          id: o.id,
+          name: o.name,
+          rebuttals: o.rebuttals || []
+        }))
       }
 
-      // Formatar objeções com suas formas de quebra E incluir o ID
-      const objectionsWithRebuttals = selectedObjectionsData.map(o => ({
-        id: o.id,  // IMPORTANTE: Incluir o ID real do banco
-        name: o.name,
-        rebuttals: o.rebuttals || []
-      }))
-
       // Salvar configuração completa para usar em todas as mensagens
+      const simAge = isMeetSimulation && meetSimulationConfig ? meetSimulationConfig.age : age
+      const simTemperament = isMeetSimulation && meetSimulationConfig ? meetSimulationConfig.temperament : temperament
       const fullConfig = {
-        age,
-        temperament,
+        age: simAge,
+        temperament: simTemperament,
         selectedPersona: selectedPersonaData,
         objections: objectionsWithRebuttals,
         objective: selectedObjectiveData,
@@ -813,7 +879,7 @@ PERFIL DO CLIENTE B2B:
       } else if (personaData.business_type === 'B2C') {
         personaInfo = `
 PERFIL DO CLIENTE B2C:
-- Profissão: ${personaData.profissao || 'Não especificado'}
+- Profissão: ${personaData.profissao || 'Não especificado'}${personaData.perfil_socioeconomico ? `\n- Perfil Socioeconômico: ${personaData.perfil_socioeconomico}` : ''}
 - Contexto: ${personaData.contexto || 'Não especificado'}
 - O que busca/valoriza: ${personaData.busca || 'Não especificado'}
 - Principais dores/problemas: ${personaData.dores || 'Não especificado'}
@@ -821,8 +887,8 @@ PERFIL DO CLIENTE B2C:
       }
 
       const contextMessage = `Você está em uma simulação de venda. Características do cliente:
-- Idade: ${age} anos
-- Temperamento: ${temperament}
+- Idade: ${simAge} anos
+- Temperamento: ${simTemperament}
 ${personaInfo}
 
 Objeções que o cliente pode usar:
@@ -842,8 +908,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         },
         body: JSON.stringify({
           config: {
-            age,
-            temperament,
+            age: isMeetSimulation && meetSimulationConfig ? meetSimulationConfig.age : age,
+            temperament: isMeetSimulation && meetSimulationConfig ? meetSimulationConfig.temperament : temperament,
             persona: personaData,
             objections: objectionsWithRebuttals,
             objective: selectedObjectiveData,
@@ -887,8 +953,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       // Criar sessão no Supabase (usando sessionId do N8N como thread_id)
       const session = await createRoleplaySession(data.sessionId, {
-        age,
-        temperament,
+        age: simAge,
+        temperament: simTemperament,
         segment: segmentDescription,
         objections: objectionsWithRebuttals,
         client_name: data.clientName, // Salvar o nome do cliente
@@ -1890,6 +1956,66 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               </div>
             )}
 
+            {/* Meet Simulation Coaching Panel */}
+            {isMeetSimulation && meetSimulationConfig && (
+              <div className="w-72 bg-white/95 border-r border-gray-200 flex flex-col flex-shrink-0 backdrop-blur-sm">
+                <div className="p-3 flex items-center gap-3 border-b border-gray-100">
+                  <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Target size={18} className="text-purple-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900">Simulacao Meet</h3>
+                    <p className="text-[10px] text-purple-600 truncate">{meetSimulationConfig.objective.name}</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                  {/* Meeting Context */}
+                  {meetSimulationConfig.meeting_context && (
+                    <p className="text-xs text-gray-600 italic leading-relaxed">{meetSimulationConfig.meeting_context}</p>
+                  )}
+
+                  {/* Coaching Focus */}
+                  {meetSimulationConfig.coaching_focus.map((focus, idx) => (
+                    <div key={idx} className="p-3 bg-amber-50 rounded-lg border border-amber-100">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Lightbulb size={14} className="text-amber-600" />
+                        <span className="text-xs font-semibold text-amber-700">{focus.area}</span>
+                      </div>
+                      <p className="text-xs text-gray-700 leading-relaxed">{focus.what_to_improve}</p>
+                      {focus.tips && focus.tips.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {focus.tips.map((tip, i) => (
+                            <li key={i} className="text-[11px] text-amber-600 flex items-start gap-1">
+                              <span className="text-amber-400 mt-0.5">-</span>
+                              {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Objections summary */}
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">Objecoes esperadas:</p>
+                    <div className="space-y-1">
+                      {meetSimulationConfig.objections.map((obj, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5">
+                          <span className={`text-[10px] px-1 py-0.5 rounded font-medium mt-0.5 ${
+                            obj.source === 'meeting' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
+                          }`}>
+                            {obj.source === 'meeting' ? 'M' : 'C'}
+                          </span>
+                          <span className="text-xs text-gray-700">{obj.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Área dos vídeos */}
             <div className="flex-1 flex items-center justify-center gap-4 p-6 transition-all">
               {/* Avatar do Cliente Virtual (gerado por IA) */}
@@ -2200,15 +2326,38 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 </div>
               ) : (
               <>
-              {/* Aviso de configuração travada pelo desafio */}
-              {isChallengeLocked && (
+              {/* Aviso de configuração travada */}
+              {isConfigLocked && (
                 <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-3">
                   <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Lock className="w-4 h-4 text-purple-600" />
+                    {isMeetSimulation ? <Target className="w-4 h-4 text-purple-600" /> : <Lock className="w-4 h-4 text-purple-600" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-purple-900">Configuração do Desafio</p>
-                    <p className="text-xs text-purple-600">Persona, idade, temperamento e objeções foram definidos pelo desafio e não podem ser alterados.</p>
+                    <p className="text-sm font-medium text-purple-900">
+                      {isMeetSimulation ? 'Simulacao de Reuniao' : 'Configuracao do Desafio'}
+                    </p>
+                    <p className="text-xs text-purple-600">
+                      {isMeetSimulation
+                        ? 'Configuracao gerada automaticamente com base na avaliacao do Google Meet.'
+                        : 'Persona, idade, temperamento e objecoes foram definidos pelo desafio e nao podem ser alterados.'}
+                    </p>
+                    {isMeetSimulation && meetSimulationConfig && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-purple-700"><strong>Objetivo:</strong> {meetSimulationConfig.objective.name}</p>
+                        <p className="text-xs text-purple-700"><strong>Objecoes:</strong> {meetSimulationConfig.objections.map(o => o.name).join(', ')}</p>
+                        {meetSimulationConfig.coaching_focus.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5">
+                            <p className="text-xs font-medium text-amber-700">Foco de melhoria:</p>
+                            {meetSimulationConfig.coaching_focus.map((f, i) => (
+                              <p key={i} className="text-xs text-amber-600 flex items-start gap-1">
+                                <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                <span><strong>{f.area}:</strong> {f.what_to_improve}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2224,18 +2373,18 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     <div className="relative group">
                       <button
                         onClick={handleRandomSelection}
-                        disabled={isChallengeLocked || dataLoading || personas.length === 0 || objections.length === 0 || objectives.length === 0}
+                        disabled={isConfigLocked || dataLoading || personas.length === 0 || objections.length === 0 || objectives.length === 0}
                         className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all shadow-sm ${
-                          isChallengeLocked
+                          isConfigLocked
                             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             : 'bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white hover:scale-105'
                         }`}
-                        title={isChallengeLocked ? 'Configuração definida pelo desafio' : 'Selecionar configuração aleatória'}
+                        title={isConfigLocked ? 'Configuração definida pelo desafio' : 'Selecionar configuração aleatória'}
                       >
-                        {isChallengeLocked ? <Lock className="w-4 h-4" /> : <Shuffle className="w-4 h-4" />}
-                        {isChallengeLocked ? 'Travado' : 'Aleatório'}
+                        {isConfigLocked ? <Lock className="w-4 h-4" /> : <Shuffle className="w-4 h-4" />}
+                        {isConfigLocked ? 'Travado' : 'Aleatório'}
                       </button>
-                      {!isChallengeLocked && (
+                      {!isConfigLocked && (
                         <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-white/70 backdrop-blur-md border border-gray-200 text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                           <p className="font-semibold text-green-600 mb-1">Modo Aleatório</p>
                           <p className="text-gray-800 leading-relaxed">
@@ -2303,13 +2452,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Perfil do Cliente</h3>
 
                   {/* Idade do Cliente */}
-                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className={`rounded-xl border p-4 ${isConfigLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <label className="text-sm font-medium text-gray-700">Idade do Cliente</label>
-                        {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                        {isConfigLocked && <Lock className="w-3 h-3 text-purple-500" />}
                       </div>
-                      <span className={`text-lg font-bold ${hiddenMode ? 'text-gray-400' : isChallengeLocked ? 'text-purple-600' : 'text-green-600'}`}>
+                      <span className={`text-lg font-bold ${hiddenMode ? 'text-gray-400' : isConfigLocked ? 'text-purple-600' : 'text-green-600'}`}>
                         {hiddenMode ? '?? anos' : `${age} anos`}
                       </span>
                     </div>
@@ -2318,12 +2467,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       min="18"
                       max="60"
                       value={hiddenMode ? 39 : age}
-                      onChange={(e) => !isChallengeLocked && setAge(Number(e.target.value))}
-                      disabled={isChallengeLocked}
+                      onChange={(e) => !isConfigLocked && setAge(Number(e.target.value))}
+                      disabled={isConfigLocked}
                       className={`w-full h-2 rounded-lg appearance-none ${
                         hiddenMode
                           ? 'bg-gray-300 accent-gray-400 pointer-events-none cursor-not-allowed'
-                          : isChallengeLocked
+                          : isConfigLocked
                             ? 'bg-purple-200 accent-purple-500 cursor-not-allowed'
                             : 'bg-gray-200 accent-green-500 cursor-pointer'
                       }`}
@@ -2376,21 +2525,21 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
 
                   {/* Temperamento */}
-                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className={`rounded-xl border p-4 ${isConfigLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex items-center gap-2 mb-3">
                       <label className="text-sm font-medium text-gray-700">Temperamento</label>
-                      {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                      {isConfigLocked && <Lock className="w-3 h-3 text-purple-500" />}
                     </div>
                     <div className={`flex flex-wrap gap-2 ${hiddenMode ? 'blur-sm select-none pointer-events-none' : ''}`}>
                       {temperaments.map((temp) => (
                         <button
                           key={temp}
-                          onClick={() => !isChallengeLocked && setTemperament(temp)}
-                          disabled={isChallengeLocked}
+                          onClick={() => !isConfigLocked && setTemperament(temp)}
+                          disabled={isConfigLocked}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                             hiddenMode
                               ? 'bg-gray-300 text-gray-500 border border-gray-300'
-                              : isChallengeLocked
+                              : isConfigLocked
                                 ? temperament === temp
                                   ? 'bg-purple-500 text-white border border-purple-500 cursor-not-allowed'
                                   : 'bg-purple-100 text-purple-400 border border-purple-200 cursor-not-allowed'
@@ -2461,11 +2610,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Persona</h3>
-                    {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                    {isConfigLocked && <Lock className="w-3 h-3 text-purple-500" />}
                   </div>
 
                   {/* Persona */}
-                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className={`rounded-xl border p-4 ${isConfigLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
@@ -2489,9 +2638,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                   {groupPersonas.map((persona) => (
                                     <div
                                       key={persona.id}
-                                      onClick={() => !isChallengeLocked && setSelectedPersona(persona.id!)}
+                                      onClick={() => !isConfigLocked && setSelectedPersona(persona.id!)}
                                       className={`rounded-lg p-2 border transition-all ${
-                                        isChallengeLocked
+                                        isConfigLocked
                                           ? selectedPersona === persona.id
                                             ? 'bg-purple-100 border-purple-500 cursor-not-allowed'
                                             : 'bg-purple-50/50 border-purple-100 cursor-not-allowed opacity-50'
@@ -2504,9 +2653,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                     >
                                       <div className="flex items-center gap-2">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                          hiddenMode ? 'bg-gray-200' : isChallengeLocked && selectedPersona === persona.id ? 'bg-purple-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                          hiddenMode ? 'bg-gray-200' : isConfigLocked && selectedPersona === persona.id ? 'bg-purple-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
                                         }`}>
-                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : isChallengeLocked && selectedPersona === persona.id ? 'text-purple-600' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : isConfigLocked && selectedPersona === persona.id ? 'text-purple-600' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-medium text-gray-900 truncate">
@@ -2516,7 +2665,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                             {hiddenMode ? '••••••••' : (persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks))}
                                           </p>
                                         </div>
-                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className={`w-4 h-4 flex-shrink-0 ${isChallengeLocked ? 'text-purple-500' : 'text-green-500'}`} />}
+                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className={`w-4 h-4 flex-shrink-0 ${isConfigLocked ? 'text-purple-500' : 'text-green-500'}`} />}
                                       </div>
                                     </div>
                                   ))}
@@ -2532,9 +2681,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                   {noTagPersonas.map((persona) => (
                                     <div
                                       key={persona.id}
-                                      onClick={() => !isChallengeLocked && setSelectedPersona(persona.id!)}
+                                      onClick={() => !isConfigLocked && setSelectedPersona(persona.id!)}
                                       className={`rounded-lg p-2 border transition-all ${
-                                        isChallengeLocked
+                                        isConfigLocked
                                           ? selectedPersona === persona.id
                                             ? 'bg-purple-100 border-purple-500 cursor-not-allowed'
                                             : 'bg-purple-50/50 border-purple-100 cursor-not-allowed opacity-50'
@@ -2547,9 +2696,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                     >
                                       <div className="flex items-center gap-2">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                          hiddenMode ? 'bg-gray-200' : isChallengeLocked && selectedPersona === persona.id ? 'bg-purple-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
+                                          hiddenMode ? 'bg-gray-200' : isConfigLocked && selectedPersona === persona.id ? 'bg-purple-200' : selectedPersona === persona.id ? 'bg-green-100' : 'bg-gray-100'
                                         }`}>
-                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : isChallengeLocked && selectedPersona === persona.id ? 'text-purple-600' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
+                                          <UserCircle2 className={`w-4 h-4 ${hiddenMode ? 'text-gray-400' : isConfigLocked && selectedPersona === persona.id ? 'text-purple-600' : selectedPersona === persona.id ? 'text-green-600' : 'text-gray-400'}`} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-xs font-medium text-gray-900 truncate">
@@ -2559,7 +2708,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                             {hiddenMode ? '••••••••' : (persona.business_type === 'B2B' ? ((persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type) : ((persona as any).busca || (persona as PersonaB2C).what_seeks))}
                                           </p>
                                         </div>
-                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className={`w-4 h-4 flex-shrink-0 ${isChallengeLocked ? 'text-purple-500' : 'text-green-500'}`} />}
+                                        {!hiddenMode && selectedPersona === persona.id && <CheckCircle className={`w-4 h-4 flex-shrink-0 ${isConfigLocked ? 'text-purple-500' : 'text-green-500'}`} />}
                                       </div>
                                     </div>
                                   ))}
@@ -2577,14 +2726,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Objeções</h3>
-                    {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                    {isConfigLocked && <Lock className="w-3 h-3 text-purple-500" />}
                   </div>
 
                   {/* Objeções */}
-                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className={`rounded-xl border p-4 ${isConfigLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-medium text-gray-700">Selecione as objeções</span>
-                      {!dataLoading && <span className={`text-xs font-medium ${hiddenMode ? 'text-gray-400' : isChallengeLocked ? 'text-purple-600' : 'text-green-600'}`}>{hiddenMode ? '? selecionadas' : `${selectedObjections.length} selecionadas`}</span>}
+                      {!dataLoading && <span className={`text-xs font-medium ${hiddenMode ? 'text-gray-400' : isConfigLocked ? 'text-purple-600' : 'text-green-600'}`}>{hiddenMode ? '? selecionadas' : `${selectedObjections.length} selecionadas`}</span>}
                     </div>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
@@ -2598,7 +2747,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           <div key={objection.id} className="space-y-1">
                             <div
                               className={`flex items-center gap-2 p-2 rounded-lg transition-all ${
-                                isChallengeLocked
+                                isConfigLocked
                                   ? selectedObjections.includes(objection.id)
                                     ? 'bg-purple-100 border border-purple-500 cursor-not-allowed'
                                     : 'bg-purple-50/50 border border-purple-100 cursor-not-allowed opacity-50'
@@ -2610,9 +2759,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                               }`}
                             >
                               <div
-                                onClick={(e) => { e.preventDefault(); !isChallengeLocked && toggleObjection(objection.id) }}
+                                onClick={(e) => { e.preventDefault(); !isConfigLocked && toggleObjection(objection.id) }}
                                 className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                  isChallengeLocked
+                                  isConfigLocked
                                     ? selectedObjections.includes(objection.id)
                                       ? 'bg-purple-500 border-purple-500 cursor-not-allowed'
                                       : 'border-purple-300 cursor-not-allowed'
@@ -2630,8 +2779,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                                 )}
                               </div>
                               <span
-                                onClick={() => !isChallengeLocked && toggleObjection(objection.id)}
-                                className={`text-xs text-gray-700 flex-1 ${isChallengeLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                onClick={() => !isConfigLocked && toggleObjection(objection.id)}
+                                className={`text-xs text-gray-700 flex-1 ${isConfigLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                               >
                                 {hiddenMode ? '••••••••••••' : objection.name}
                               </span>
@@ -2674,12 +2823,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
 
                   {/* Objetivo do Roleplay */}
-                  <div className={`rounded-xl border p-4 ${isChallengeLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className={`rounded-xl border p-4 ${isConfigLocked ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-sm font-medium text-gray-700">
                         Objetivo do Roleplay <span className="text-red-500">*</span>
                       </span>
-                      {isChallengeLocked && <Lock className="w-3 h-3 text-purple-500" />}
+                      {isConfigLocked && <Lock className="w-3 h-3 text-purple-500" />}
                     </div>
                     {dataLoading ? (
                       <div className="flex items-center justify-center py-4">
@@ -2690,10 +2839,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     ) : (
                       <select
                         value={selectedObjective}
-                        onChange={(e) => !isChallengeLocked && setSelectedObjective(e.target.value)}
-                        disabled={isChallengeLocked}
+                        onChange={(e) => !isConfigLocked && setSelectedObjective(e.target.value)}
+                        disabled={isConfigLocked}
                         className={`w-full p-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          isChallengeLocked
+                          isConfigLocked
                             ? 'bg-purple-500 text-white cursor-not-allowed'
                             : hiddenMode
                               ? 'bg-gray-400 text-gray-600 cursor-pointer'

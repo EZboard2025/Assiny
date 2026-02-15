@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Video,
   Loader2,
@@ -18,7 +19,10 @@ import {
   X,
   BookOpen,
   FileText,
-  Save
+  Save,
+  Target,
+  Play,
+  Lightbulb
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -118,6 +122,7 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
 }
 
 export default function MeetAnalysisView() {
+  const router = useRouter()
   const [meetUrl, setMeetUrl] = useState('')
   const [session, setSession] = useState<MeetingSession | null>(null)
   const [error, setError] = useState('')
@@ -130,9 +135,58 @@ export default function MeetAnalysisView() {
   const [savedToHistory, setSavedToHistory] = useState(false)
   const [inputMode, setInputMode] = useState<'link' | 'paste'>('link')
   const [pastedTranscript, setPastedTranscript] = useState('')
+  const [isGeneratingSimulation, setIsGeneratingSimulation] = useState(false)
+  const [simulationConfig, setSimulationConfig] = useState<any>(null)
+  const [savedSimulation, setSavedSimulation] = useState<any>(null)
+  const simulationRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
+
+  // Load saved simulation from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('savedMeetSimulation')
+    if (stored) {
+      try {
+        setSavedSimulation(JSON.parse(stored))
+      } catch (e) {
+        console.error('Error parsing saved simulation:', e)
+        localStorage.removeItem('savedMeetSimulation')
+      }
+    }
+  }, [])
+
+  // Save simulation for later
+  const saveSimulationForLater = () => {
+    if (!simulationConfig || !evaluation) return
+    const data = {
+      simulation_config: simulationConfig,
+      source_evaluation: {
+        overall_score: evaluation.overall_score,
+        performance_level: evaluation.performance_level,
+        meeting_id: session?.botId
+      },
+      saved_at: new Date().toISOString()
+    }
+    localStorage.setItem('savedMeetSimulation', JSON.stringify(data))
+    setSavedSimulation(data)
+    setShowEvaluationModal(false)
+  }
+
+  // Discard saved simulation
+  const discardSavedSimulation = () => {
+    localStorage.removeItem('savedMeetSimulation')
+    setSavedSimulation(null)
+  }
+
+  // Start saved simulation
+  const startSavedSimulation = () => {
+    if (!savedSimulation) return
+    sessionStorage.setItem('meetSimulation', JSON.stringify(savedSimulation))
+    localStorage.removeItem('savedMeetSimulation')
+    setSavedSimulation(null)
+    router.push('/roleplay')
+  }
 
   // Validate Google Meet URL
   const isValidMeetUrl = (url: string): boolean => {
@@ -570,10 +624,15 @@ export default function MeetAnalysisView() {
         setEvaluation(data.evaluation)
         setShowEvaluationModal(true)
 
-        // Save to history
-        if (session?.botId) {
-          await saveEvaluationToHistory(data.evaluation, transcriptToUse, session.botId)
-        }
+        // Save to history + generate simulation in parallel
+        const savePromise = session?.botId
+          ? saveEvaluationToHistory(data.evaluation, transcriptToUse, session.botId)
+          : Promise.resolve()
+
+        // Auto-generate simulation based on evaluation
+        const simPromise = generateSimulation(data.evaluation, transcriptText)
+
+        await Promise.all([savePromise, simPromise])
       } else {
         throw new Error('Resposta inválida da API')
       }
@@ -598,6 +657,7 @@ export default function MeetAnalysisView() {
     setEvaluation(null)
     setIsEvaluating(false)
     setSavedToHistory(false)
+    setSimulationConfig(null)
   }
 
   // Evaluate pasted transcript directly (no bot needed)
@@ -659,7 +719,12 @@ export default function MeetAnalysisView() {
       if (data.success && data.evaluation) {
         setEvaluation(data.evaluation)
         setShowEvaluationModal(true)
-        await saveEvaluationToHistory(data.evaluation, consolidated, fakeId)
+
+        // Save to history + generate simulation in parallel
+        await Promise.all([
+          saveEvaluationToHistory(data.evaluation, consolidated, fakeId),
+          generateSimulation(data.evaluation, text)
+        ])
       } else {
         throw new Error('Resposta inválida da API')
       }
@@ -669,6 +734,56 @@ export default function MeetAnalysisView() {
       setIsEvaluating(false)
       setSession(prev => prev ? { ...prev, status: 'ended' } : null)
     }
+  }
+
+  // Generate simulation from evaluation (accepts params directly to avoid stale state)
+  const generateSimulation = async (evalData: MeetEvaluation, transcriptText: string) => {
+    setIsGeneratingSimulation(true)
+
+    try {
+      const companyId = await getCompanyId()
+
+      const response = await fetch('/api/meet/generate-simulation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluation: evalData,
+          transcript: transcriptText,
+          companyId
+        })
+      })
+
+      const data = await response.json()
+      if (data.success && data.simulationConfig) {
+        setSimulationConfig(data.simulationConfig)
+        // Auto-scroll to simulation section after render
+        setTimeout(() => {
+          simulationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
+      } else {
+        console.error('Erro ao gerar simulacao:', data.error)
+      }
+    } catch (err: any) {
+      console.error('Error generating simulation:', err)
+    } finally {
+      setIsGeneratingSimulation(false)
+    }
+  }
+
+  // Start simulation - navigate to roleplay with pre-configured params
+  const startSimulation = () => {
+    if (!simulationConfig) return
+
+    sessionStorage.setItem('meetSimulation', JSON.stringify({
+      simulation_config: simulationConfig,
+      source_evaluation: {
+        overall_score: evaluation?.overall_score,
+        meeting_id: session?.botId
+      }
+    }))
+
+    setShowEvaluationModal(false)
+    router.push('/roleplay')
   }
 
   // Copy meeting URL
@@ -731,6 +846,104 @@ export default function MeetAnalysisView() {
             Cole o link da reunião e nosso bot entrará para transcrever a conversa
           </p>
         </div>
+
+        {/* Saved Simulation Card - Visible on Main Page */}
+        {savedSimulation && !session && (
+          <div className="bg-white rounded-xl border border-purple-200 shadow-sm mb-6 overflow-hidden">
+            {/* Purple accent bar */}
+            <div className="h-1.5 bg-gradient-to-r from-purple-500 to-purple-600" />
+            <div className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                    <Target className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">Simulacao de Treino Pendente</h3>
+                    <p className="text-xs text-gray-500">
+                      Salva em {new Date(savedSimulation.saved_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      {savedSimulation.source_evaluation?.overall_score && (
+                        <> &middot; Nota da reuniao: <span className={`font-semibold ${
+                          savedSimulation.source_evaluation.overall_score >= 7 ? 'text-green-600' :
+                          savedSimulation.source_evaluation.overall_score >= 5 ? 'text-amber-600' : 'text-red-600'
+                        }`}>{savedSimulation.source_evaluation.overall_score.toFixed(1)}</span></>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={discardSavedSimulation}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+                  title="Descartar simulacao"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Summary Grid */}
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                {/* Persona */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <User className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Persona</span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 line-clamp-1">
+                    {savedSimulation.simulation_config?.persona?.cargo || savedSimulation.simulation_config?.persona?.profissao || 'Cliente'}
+                  </p>
+                  <div className="flex gap-1 mt-1">
+                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
+                      {savedSimulation.simulation_config?.age} anos
+                    </span>
+                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
+                      {savedSimulation.simulation_config?.temperament}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Objective */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Target className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Objetivo</span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                    {savedSimulation.simulation_config?.objective?.name || 'Simulacao'}
+                  </p>
+                </div>
+
+                {/* Objections */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Objecoes</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{savedSimulation.simulation_config?.objections?.length || 0}</p>
+                  <p className="text-[10px] text-gray-500">para treinar</p>
+                </div>
+
+                {/* Coaching */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Coaching</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{savedSimulation.simulation_config?.coaching_focus?.length || 0}</p>
+                  <p className="text-[10px] text-gray-500">areas de foco</p>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={startSavedSimulation}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+              >
+                <Play className="w-5 h-5" />
+                Iniciar Simulacao de Treino
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Input Section */}
         {!session && (
@@ -1392,6 +1605,174 @@ export default function MeetAnalysisView() {
                     </div>
                   </div>
                 )}
+
+                {/* Simulation Loading */}
+                {isGeneratingSimulation && !simulationConfig && (
+                  <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                      <div>
+                        <h3 className="text-base font-bold text-gray-900">Gerando Simulacao de Treino...</h3>
+                        <p className="text-gray-600 text-sm">Criando cenario personalizado baseado nos erros identificados</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Simulation Proposal - Cards Layout */}
+                {simulationConfig && (
+                  <div ref={simulationRef} className="space-y-4">
+                    {/* Header */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <Target className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Simulacao de Treino Sugerida</h3>
+                        <p className="text-sm text-gray-500">Baseada nos erros identificados na reuniao</p>
+                      </div>
+                    </div>
+
+                    {/* Meeting Context */}
+                    {simulationConfig.meeting_context && (
+                      <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                        <p className="text-sm text-gray-700 italic">{simulationConfig.meeting_context}</p>
+                      </div>
+                    )}
+
+                    {/* Cards Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Persona Card */}
+                      <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-purple-300 transition-colors">
+                        <div className="flex items-center gap-2 mb-3">
+                          <User className="w-4 h-4 text-purple-600" />
+                          <h4 className="text-sm font-bold text-gray-900">Persona do Cliente</h4>
+                        </div>
+                        {simulationConfig.persona?.business_type === 'B2B' ? (
+                          <div className="space-y-1.5 text-sm text-gray-700">
+                            {simulationConfig.persona.cargo && <p><span className="text-gray-500">Cargo:</span> {simulationConfig.persona.cargo}</p>}
+                            {simulationConfig.persona.tipo_empresa_faturamento && <p><span className="text-gray-500">Empresa:</span> {simulationConfig.persona.tipo_empresa_faturamento}</p>}
+                            {simulationConfig.persona.contexto && <p><span className="text-gray-500">Contexto:</span> {simulationConfig.persona.contexto}</p>}
+                            {simulationConfig.persona.busca && <p><span className="text-gray-500">Busca:</span> {simulationConfig.persona.busca}</p>}
+                            {simulationConfig.persona.dores && <p><span className="text-gray-500">Dores:</span> {simulationConfig.persona.dores}</p>}
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5 text-sm text-gray-700">
+                            {simulationConfig.persona?.profissao && <p><span className="text-gray-500">Perfil:</span> {simulationConfig.persona.profissao}</p>}
+                            {simulationConfig.persona?.perfil_socioeconomico && <p><span className="text-gray-500">Perfil Socioeconomico:</span> {simulationConfig.persona.perfil_socioeconomico}</p>}
+                            {simulationConfig.persona?.contexto && <p><span className="text-gray-500">Contexto:</span> {simulationConfig.persona.contexto}</p>}
+                            {simulationConfig.persona?.busca && <p><span className="text-gray-500">Busca:</span> {simulationConfig.persona.busca}</p>}
+                            {simulationConfig.persona?.dores && <p><span className="text-gray-500">Dores:</span> {simulationConfig.persona.dores}</p>}
+                          </div>
+                        )}
+                        <div className="mt-3 flex gap-2">
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
+                            {simulationConfig.age} anos
+                          </span>
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
+                            {simulationConfig.temperament}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Objective Card */}
+                      <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-purple-300 transition-colors">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Target className="w-4 h-4 text-purple-600" />
+                          <h4 className="text-sm font-bold text-gray-900">Objetivo</h4>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900 mb-1">{simulationConfig.objective?.name}</p>
+                        {simulationConfig.objective?.description && (
+                          <p className="text-sm text-gray-600">{simulationConfig.objective.description}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Objections Card */}
+                    {simulationConfig.objections && simulationConfig.objections.length > 0 && (
+                      <div className="bg-white rounded-xl p-5 border border-gray-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertTriangle className="w-4 h-4 text-purple-600" />
+                          <h4 className="text-sm font-bold text-gray-900">Objecoes para Treinar</h4>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{simulationConfig.objections.length}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {simulationConfig.objections.map((obj: any, idx: number) => (
+                            <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                              <div className="flex items-start gap-2 mb-1.5">
+                                <p className="text-sm font-medium text-gray-900 flex-1">{obj.name}</p>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                                  obj.source === 'meeting'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {obj.source === 'meeting' ? 'Da reuniao' : 'Coaching'}
+                                </span>
+                              </div>
+                              {obj.rebuttals && obj.rebuttals.length > 0 && (
+                                <div className="space-y-1 mt-2">
+                                  <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-wide">Como quebrar:</p>
+                                  {obj.rebuttals.map((r: string, ri: number) => (
+                                    <p key={ri} className="text-xs text-green-700 flex items-start gap-1.5 bg-green-50 rounded px-2 py-1">
+                                      <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                      {r}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Coaching Focus Card */}
+                    {simulationConfig.coaching_focus && simulationConfig.coaching_focus.length > 0 && (
+                      <div className="bg-white rounded-xl p-5 border border-gray-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Lightbulb className="w-4 h-4 text-amber-500" />
+                          <h4 className="text-sm font-bold text-gray-900">Foco de Coaching</h4>
+                        </div>
+                        <div className="space-y-3">
+                          {simulationConfig.coaching_focus.map((focus: any, idx: number) => (
+                            <div key={idx} className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                              <p className="text-sm font-semibold text-gray-900">{focus.area}</p>
+                              <p className="text-xs text-gray-600 mt-0.5">{focus.what_to_improve}</p>
+                              {focus.tips && focus.tips.length > 0 && (
+                                <ul className="mt-2 space-y-1">
+                                  {focus.tips.map((tip: string, i: number) => (
+                                    <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
+                                      <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                      {tip}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={startSimulation}
+                        className="flex-1 py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+                      >
+                        <Play className="w-5 h-5" />
+                        Fazer Agora
+                      </button>
+                      <button
+                        onClick={saveSimulationForLater}
+                        className="flex-1 py-3.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border-2 border-gray-200 hover:border-purple-300"
+                      >
+                        <Save className="w-5 h-5" />
+                        Deixar para Depois
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
@@ -1408,7 +1789,7 @@ export default function MeetAnalysisView() {
                   className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
                 >
                   <Copy className="w-4 h-4" />
-                  Copiar Transcrição
+                  Copiar Transcricao
                 </button>
                 <button
                   onClick={() => setShowEvaluationModal(false)}
