@@ -89,3 +89,13 @@ CREATE INDEX IF NOT EXISTS idx_autopilot_log_user ON autopilot_log(user_id, crea
 -- 4. Column additions to existing tables
 ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_autopilot BOOLEAN DEFAULT false;
 ALTER TABLE whatsapp_conversations ADD COLUMN IF NOT EXISTS autopilot_needs_human BOOLEAN DEFAULT false;
+
+-- 5. Objective reached columns (run if upgrading)
+ALTER TABLE autopilot_contacts ADD COLUMN IF NOT EXISTS objective_reached BOOLEAN DEFAULT false;
+ALTER TABLE autopilot_contacts ADD COLUMN IF NOT EXISTS objective_reached_reason TEXT;
+ALTER TABLE autopilot_contacts ADD COLUMN IF NOT EXISTS objective_reached_at TIMESTAMPTZ;
+
+-- 6. Update log action constraint to include objective_reached
+ALTER TABLE autopilot_log DROP CONSTRAINT IF EXISTS autopilot_log_action_check;
+ALTER TABLE autopilot_log ADD CONSTRAINT autopilot_log_action_check
+  CHECK (action IN ('responded', 'flagged_human', 'skipped_limit', 'skipped_hours', 'skipped_error', 'skipped_credits', 'objective_reached'));

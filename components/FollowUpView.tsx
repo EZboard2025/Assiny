@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, ArrowLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users, MoreVertical, Camera, Headphones, Contact, Sticker, Star, Bell, Lock, Shield, Heart, Ban, Flag, MapPin, Mail, Globe, Clock, Share2, Building2, Pencil, MessageCirclePlus, EllipsisVertical, Sparkles, Zap } from 'lucide-react'
 import SalesCopilot from './SalesCopilot'
 import AutopilotPanel from './AutopilotPanel'
@@ -99,6 +99,7 @@ export default function FollowUpView() {
   const [copilotOpen, setCopilotOpen] = useState(true)
   const [showAutopilotPanel, setShowAutopilotPanel] = useState(false)
   const [autopilotEnabled, setAutopilotEnabled] = useState(false)
+  const [autopilotPhones, setAutopilotPhones] = useState<Set<string>>(new Set())
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null)
@@ -407,18 +408,37 @@ export default function FollowUpView() {
     }
   }, [authToken])
 
-  // Load autopilot config on mount
-  useEffect(() => {
+  // Load autopilot config + contacts on mount
+  const loadAutopilotData = useCallback(() => {
     if (!authToken) return
-    fetch('/api/autopilot/config', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
+    const headers = { 'Authorization': `Bearer ${authToken}` }
+    fetch('/api/autopilot/config', { headers })
       .then(res => res.json())
       .then(data => {
         if (data.config?.enabled) setAutopilotEnabled(true)
+        else setAutopilotEnabled(false)
+      })
+      .catch(() => {})
+    fetch('/api/autopilot/contacts', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (data.contacts) {
+          const suffixes = new Set<string>()
+          data.contacts.forEach((c: any) => {
+            if (c.enabled) {
+              const suffix = c.contact_phone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)
+              suffixes.add(suffix)
+            }
+          })
+          setAutopilotPhones(suffixes)
+        }
       })
       .catch(() => {})
   }, [authToken])
+
+  useEffect(() => {
+    loadAutopilotData()
+  }, [loadAutopilotData])
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -2206,7 +2226,7 @@ export default function FollowUpView() {
           {showAutopilotPanel && (
             <AutopilotPanel
               isOpen={showAutopilotPanel}
-              onClose={() => setShowAutopilotPanel(false)}
+              onClose={() => { setShowAutopilotPanel(false); loadAutopilotData() }}
               conversations={conversations}
               authToken={authToken}
               onConfigChange={(enabled) => setAutopilotEnabled(enabled)}
@@ -2284,11 +2304,15 @@ export default function FollowUpView() {
                         {conv.unread_count}
                       </span>
                     )}
-                    {(conv as any).autopilot_needs_human && (
+                    {(conv as any).autopilot_needs_human ? (
                       <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center border-2 border-[#111b21]" title="Autopiloto: precisa resposta humana">
                         <AlertCircle className="w-3 h-3 text-white" />
                       </div>
-                    )}
+                    ) : autopilotEnabled && autopilotPhones.has(conv.contact_phone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)) ? (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-[#00a884] rounded-full flex items-center justify-center border-2 border-[#111b21]" title="Autopiloto ativo">
+                        <Zap className="w-2.5 h-2.5 text-white" />
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Content */}

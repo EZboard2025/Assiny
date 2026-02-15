@@ -1467,7 +1467,7 @@ async function triggerAutopilotResponse(
   const phoneSuffix = contactPhone.replace(/\D/g, '').slice(-9)
   const { data: contacts, error: contactsErr } = await supabaseAdmin
     .from('autopilot_contacts')
-    .select('contact_phone, enabled, needs_human')
+    .select('contact_phone, enabled, needs_human, objective_reached')
     .eq('user_id', state.userId)
 
   if (contactsErr) {
@@ -1485,9 +1485,10 @@ async function triggerAutopilotResponse(
     return cSuffix === phoneSuffix
   })
 
-  if (!contact?.enabled || contact.needs_human) {
+  if (!contact?.enabled || contact.needs_human || contact.objective_reached) {
     if (!contact) console.log(`[WA Autopilot] Contact ${contactPhone} NOT matched to any monitored contact`)
     else if (contact.needs_human) console.log(`[WA Autopilot] Contact ${contactPhone} already flagged as needs_human`)
+    else if (contact.objective_reached) console.log(`[WA Autopilot] Contact ${contactPhone} objective already reached — skipping`)
     else console.log(`[WA Autopilot] Contact ${contactPhone} is disabled`)
     return
   }

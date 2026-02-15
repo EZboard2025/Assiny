@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       return cSuffix === phoneSuffix
     })
 
-    if (!contactRecord) {
+    if (!contactRecord || contactRecord.objective_reached) {
       return NextResponse.json({ action: 'skipped_not_monitored' })
     }
     // Use the stored phone for DB updates
@@ -209,48 +209,84 @@ export async function POST(req: NextRequest) {
 
     // 7. Build system prompt
     const tone = settings.tone || 'consultivo'
+    const instructions = config.custom_instructions || ''
+    // Extract objetivo from structured instructions (first line starting with "Objetivo:")
+    const objetivoMatch = instructions.match(/^Objetivo:\s*(.+)$/m)
+    const objetivoVendedor = objetivoMatch?.[1]?.trim() || instructions.split('\n')[0] || 'qualificar o lead e entender suas necessidades'
 
-    let systemPrompt = `Voce e um assistente automatico de vendas que responde leads no WhatsApp quando o vendedor nao esta disponivel. Voce DEVE se comportar como se fosse o proprio vendedor.
+    let systemPrompt = `Voce e um pre-vendedor (SDR) ${tone}, agil e focado em conversao. Voce atua como se fosse o proprio vendedor no WhatsApp.
 
-REGRAS CRITICAS - FORMATO DE RESPOSTA:
+=== INSTRUCOES DO VENDEDOR ===
+${instructions || `Objetivo: ${objetivoVendedor}`}
+
+=== FORMATO DE RESPOSTA (OBRIGATORIO) ===
 Voce DEVE responder em JSON valido. SEM markdown, SEM code blocks, APENAS JSON puro.
-O JSON deve ter EXATAMENTE este formato:
-{"canRespond": true, "response": "sua resposta aqui"}
-OU
-{"canRespond": false, "reason": "motivo pelo qual nao pode responder"}
 
-QUANDO RESPONDER canRespond=FALSE:
+Se PODE responder:
+{"canRespond": true, "response": ["mensagem 1", "mensagem 2"], "objectiveReached": false}
+
+Se NAO pode responder:
+{"canRespond": false, "reason": "motivo"}
+
+REGRAS DE SEPARACAO DE MENSAGENS:
+- Separe a resposta em 2-3 mensagens curtas (como um vendedor real faria no WhatsApp)
+- Cada mensagem deve ter no maximo 2-3 linhas
+- Se a resposta for simples (cumprimento, resposta curta), pode ser 1 mensagem so: ["mensagem unica"]
+- NUNCA mais que 3 mensagens por resposta
+- response DEVE ser um array de strings, NUNCA uma string unica
+
+=== METODO A.V.C. (DISTRIBUA NAS MENSAGENS) ===
+Distribua os tres pilares nas mensagens separadas:
+1. PRIMEIRA mensagem — ACOLHIMENTO: Valide a pergunta do lead (ex: "Otima pergunta!", "Entendo sua duvida...")
+2. SEGUNDA mensagem — VALOR: Entregue a informacao solicitada de forma direta, sem rodeios.
+3. TERCEIRA mensagem — CONVITE: Faca a ponte para o objetivo (${objetivoVendedor}). SEMPRE termine com pergunta.
+Se for so 1 ou 2 mensagens, combine os pilares naturalmente.
+
+=== OBJETIVO ALCANCADO (objectiveReached) ===
+Retorne "objectiveReached": true APENAS quando:
+- O lead ACEITOU EXPLICITAMENTE o objetivo (ex: "vamos agendar", "pode marcar", "quero sim", "manda o link")
+- O lead confirmou que vai fazer a acao desejada
+- O lead demonstrou comprometimento claro (data, horario, confirmacao)
+IMPORTANTE: O objetivo do vendedor e: ${objetivoVendedor}
+So marque como alcancado se o lead demonstrou COMPROMETIMENTO CLARO com esse objetivo especifico.
+Em todos os outros casos, retorne "objectiveReached": false.
+
+=== REGRA DO PING-PONG (FLUXO CONTINUO) ===
+NUNCA encerre uma mensagem com ponto final ou afirmacao isolada. O objetivo de cada mensagem e "vender" a proxima resposta do lead.
+- Toda mensagem DEVE terminar com uma pergunta ou CTA que estimule o lead a responder.
+- Exemplo: Em vez de "Temos integracao com o Google Agenda.", use "Temos integracao com o Google Agenda! Voce costuma concentrar seus compromissos por la?"
+
+=== FOCO NO OBJETIVO ESTRATEGICO ===
+Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o lead ate o objetivo.
+- Use cada resposta como oportunidade para direcionar ao objetivo: ${objetivoVendedor}
+- Use gatilhos de simplicidade: "E bem simples", "O processo e bem rapido", "Leva so uns minutinhos"
+- Se precisar retomar contato, sempre ofereca uma informacao de valor como motivo
+
+=== QUANDO RESPONDER canRespond=FALSE ===
 - O lead pergunta sobre AGENDA, HORARIOS DISPONIVEIS ou DISPONIBILIDADE para reuniao/ligacao
 - O lead pergunta sobre PRECOS ESPECIFICOS, DESCONTOS ou CONDICOES DE PAGAMENTO que NAO estao nos dados da empresa
 - O lead pede para FALAR COM ALGUEM ESPECIFICO (gerente, diretor, outra pessoa)
 - O lead faz uma PERGUNTA TECNICA MUITO ESPECIFICA que nao esta nos dados da empresa
 - O lead expressa uma RECLAMACAO SERIA ou INSATISFACAO que precisa de tratamento humano
 - O lead pede algo que REQUER ACAO HUMANA (enviar contrato, agendar visita, enviar proposta personalizada)
-- Voce NAO TEM CERTEZA da resposta correta
+- Voce NAO TEM CERTEZA da resposta correta. NUNCA invente informacoes.
 - A conversa esta num ponto de NEGOCIACAO AVANCADA que precisa de decisao humana
 - O lead menciona DATAS ESPECIFICAS, PRAZOS ou DEADLINES que precisam de confirmacao humana
 
-QUANDO RESPONDER canRespond=TRUE:
+=== QUANDO RESPONDER canRespond=TRUE ===
 - O lead faz perguntas gerais sobre produtos/servicos (que estao nos dados da empresa)
 - O lead quer saber mais sobre beneficios, funcionalidades, diferenciais
 - O lead envia cumprimentos ou mensagens simples
 - Voce pode agregar valor com informacoes que tem nos dados da empresa
 - O lead faz perguntas frequentes (FAQ) com respostas claras nos dados
 
-ESTILO DA RESPOSTA (quando canRespond=true):
-- Mensagem CURTA: 2-4 linhas max (WhatsApp)
-- Tom: ${tone} e natural
-- Emojis com moderacao (1-2 max)
-- NUNCA diga que voce e uma IA ou bot ou que esta respondendo automaticamente
-- Fale como se fosse o vendedor (primeira pessoa)
-- Sempre termine com uma pergunta ou CTA simples para manter a conversa
-- NUNCA invente informacoes que nao estao nos dados da empresa
-- Use linguagem natural de WhatsApp, nao formal demais`
-
-    // Custom instructions from user
-    if (config.custom_instructions) {
-      systemPrompt += `\n\nINSTRUCOES ESPECIFICAS DO VENDEDOR:\n${config.custom_instructions}`
-    }
+=== FORMATACAO WHATSAPP ===
+- Paragrafos curtos (maximo 3 linhas cada). Evite blocos de texto densos.
+- Use *negrito* apenas em informacoes cruciais (precos, prazos, beneficios principais)
+- Emojis com moderacao (1-2 max por mensagem) para tom humano e profissional
+- Tom: ${tone}. Use "Oi", "Tudo bem?", "Com certeza". Evite "Prezado", "Estimado", "Cordialmente"
+- Fale SEMPRE em primeira pessoa ("Eu", "Nos"). NUNCA se identifique como IA, robo ou assistente automatico.
+- NUNCA invente informacoes que nao estao nos dados da empresa`
 
     // Company data
     if (companyData) {
@@ -303,7 +339,12 @@ ESTILO DA RESPOSTA (quando canRespond=true):
     const rawResponse = completion.choices[0]?.message?.content || '{}'
     console.log(`[Autopilot] AI response for ${contactPhone}:`, rawResponse.slice(0, 200))
 
-    let aiDecision: { canRespond: boolean; response?: string; reason?: string }
+    let aiDecision: {
+      canRespond: boolean
+      response?: string | string[]
+      reason?: string
+      objectiveReached?: boolean
+    }
     try {
       aiDecision = JSON.parse(rawResponse)
     } catch {
@@ -351,49 +392,96 @@ ESTILO DA RESPOSTA (quando canRespond=true):
       })
     }
 
-    // AI can respond - send the message
-    const responseText = aiDecision.response || ''
-    if (!responseText.trim()) {
+    // AI can respond - normalize response to array of messages
+    let messages: string[] = []
+    if (aiDecision.response) {
+      messages = Array.isArray(aiDecision.response)
+        ? aiDecision.response
+        : [aiDecision.response]
+    }
+    messages = messages.filter(m => m.trim())
+
+    if (messages.length === 0) {
       console.log(`[Autopilot] Empty AI response, skipping`)
       return NextResponse.json({ action: 'skipped_error', reason: 'Empty response' })
     }
 
-    // 10. Send via WhatsApp
-    const sendResult = await sendAutopilotMessage(userId, contactPhone, responseText)
+    // 10. Send each message bubble with delay between them
+    const messageIds: string[] = []
+    for (let i = 0; i < messages.length; i++) {
+      const sendResult = await sendAutopilotMessage(userId, contactPhone, messages[i])
 
-    if (!sendResult.success) {
-      console.error(`[Autopilot] Failed to send message to ${contactPhone}`)
+      if (!sendResult.success) {
+        console.error(`[Autopilot] Failed to send bubble ${i + 1}/${messages.length} to ${contactPhone}`)
+        if (messageIds.length === 0) {
+          // First bubble failed — log error and bail
+          await supabaseAdmin.from('autopilot_log').insert({
+            user_id: userId,
+            company_id: companyId,
+            contact_phone: contactPhone,
+            contact_name: contactName,
+            incoming_message: incomingMessage.slice(0, 2000),
+            action: 'skipped_error',
+            ai_response: messages.join(' | '),
+            ai_reasoning: 'Falha ao enviar mensagem via WhatsApp'
+          })
+          return NextResponse.json({ action: 'skipped_error', reason: 'Send failed' })
+        }
+        break // Partial send — continue with what we got
+      }
 
-      await supabaseAdmin.from('autopilot_log').insert({
-        user_id: userId,
-        company_id: companyId,
-        contact_phone: contactPhone,
-        contact_name: contactName,
-        incoming_message: incomingMessage.slice(0, 2000),
-        action: 'skipped_error',
-        ai_response: responseText,
-        ai_reasoning: 'Falha ao enviar mensagem via WhatsApp'
-      })
+      if (sendResult.messageId) messageIds.push(sendResult.messageId)
 
-      return NextResponse.json({ action: 'skipped_error', reason: 'Send failed' })
+      // Delay between bubbles (2-4s) — skip after last message
+      if (i < messages.length - 1) {
+        await new Promise(r => setTimeout(r, 2000 + Math.random() * 2000))
+      }
     }
 
-    // 11. Mark the sent message as autopilot
-    if (sendResult.messageId) {
-      // Small delay to let handleIncomingMessage save the message first
+    // 11. Mark all sent messages as autopilot
+    if (messageIds.length > 0) {
       setTimeout(async () => {
         try {
-          await supabaseAdmin
-            .from('whatsapp_messages')
-            .update({ is_autopilot: true })
-            .eq('wa_message_id', sendResult.messageId)
+          for (const msgId of messageIds) {
+            await supabaseAdmin
+              .from('whatsapp_messages')
+              .update({ is_autopilot: true })
+              .eq('wa_message_id', msgId)
+          }
         } catch (e) {
-          console.error('[Autopilot] Failed to mark message as autopilot:', e)
+          console.error('[Autopilot] Failed to mark messages as autopilot:', e)
         }
       }, 2000)
     }
 
-    // 12. Update contact stats
+    // 12. Check if objective was reached
+    if (aiDecision.objectiveReached) {
+      console.log(`[Autopilot] Objective reached for ${contactPhone}!`)
+      await Promise.all([
+        supabaseAdmin
+          .from('autopilot_contacts')
+          .update({
+            objective_reached: true,
+            objective_reached_reason: 'Lead aceitou o objetivo',
+            objective_reached_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('contact_phone', storedPhone),
+
+        supabaseAdmin.from('autopilot_log').insert({
+          user_id: userId,
+          company_id: companyId,
+          contact_phone: contactPhone,
+          contact_name: contactName,
+          incoming_message: incomingMessage.slice(0, 2000),
+          action: 'objective_reached',
+          ai_response: messages.join(' | '),
+          ai_reasoning: 'Objetivo alcancado — autopilot encerrado para este contato'
+        })
+      ])
+    }
+
+    // 13. Update contact stats
     await supabaseAdmin
       .from('autopilot_contacts')
       .update({
@@ -403,7 +491,7 @@ ESTILO DA RESPOSTA (quando canRespond=true):
       .eq('user_id', userId)
       .eq('contact_phone', storedPhone)
 
-    // 13. Consume 1 credit
+    // 14. Consume 1 credit
     if (companyCredits) {
       await supabaseAdmin
         .from('companies')
@@ -411,7 +499,7 @@ ESTILO DA RESPOSTA (quando canRespond=true):
         .eq('id', companyId)
     }
 
-    // 14. Log success
+    // 15. Log success
     await supabaseAdmin.from('autopilot_log').insert({
       user_id: userId,
       company_id: companyId,
@@ -419,15 +507,15 @@ ESTILO DA RESPOSTA (quando canRespond=true):
       contact_name: contactName,
       incoming_message: incomingMessage.slice(0, 2000),
       action: 'responded',
-      ai_response: responseText,
+      ai_response: messages.join(' | '),
       credits_used: 1
     })
 
-    console.log(`[Autopilot] Successfully responded to ${contactPhone}`)
+    console.log(`[Autopilot] Successfully responded to ${contactPhone} with ${messages.length} bubble(s)`)
 
     return NextResponse.json({
-      action: 'responded',
-      response: responseText
+      action: aiDecision.objectiveReached ? 'objective_reached' : 'responded',
+      response: messages
     })
 
   } catch (error: any) {
