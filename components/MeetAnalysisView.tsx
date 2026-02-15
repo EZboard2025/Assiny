@@ -77,9 +77,9 @@ interface MeetEvaluation {
       required_scripts?: { score: number; status: string; dimension_feedback: string }
       process?: { score: number; status: string; dimension_feedback: string }
     }
-    violations: string[]
-    missed_requirements: string[]
-    exemplary_moments: string[]
+    violations: any[]
+    missed_requirements: any[]
+    exemplary_moments: any[]
     coaching_notes: string
   }
 }
@@ -128,6 +128,8 @@ export default function MeetAnalysisView() {
   const [showEvaluationModal, setShowEvaluationModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [savedToHistory, setSavedToHistory] = useState(false)
+  const [inputMode, setInputMode] = useState<'link' | 'paste'>('link')
+  const [pastedTranscript, setPastedTranscript] = useState('')
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
@@ -591,10 +593,82 @@ export default function MeetAnalysisView() {
     hasTriggeredAutoEvalRef.current = false
     setSession(null)
     setMeetUrl('')
+    setPastedTranscript('')
     setError('')
     setEvaluation(null)
     setIsEvaluating(false)
     setSavedToHistory(false)
+  }
+
+  // Evaluate pasted transcript directly (no bot needed)
+  const evaluatePastedTranscript = async () => {
+    const text = pastedTranscript.trim()
+    if (!text) {
+      setError('Cole a transcrição da reunião antes de avaliar')
+      return
+    }
+
+    // Parse pasted text into segments for display
+    // Supports formats like "Speaker: text" or plain text
+    const lines = text.split('\n').filter(l => l.trim())
+    const segments: TranscriptSegment[] = lines.map(line => {
+      const match = line.match(/^([^:]{1,40}):\s*(.+)/)
+      if (match) {
+        return { speaker: match[1].trim(), text: match[2].trim(), timestamp: '' }
+      }
+      return { speaker: 'Participante', text: line.trim(), timestamp: '' }
+    })
+
+    const consolidated = consolidateTranscript(segments)
+
+    // Create a fake session to reuse the existing evaluation flow
+    const fakeId = `paste_${Date.now()}`
+    setSession({
+      botId: fakeId,
+      meetingUrl: '',
+      status: 'evaluating',
+      startTime: new Date(),
+      transcript: consolidated
+    })
+    setError('')
+    setEvaluation(null)
+    setSavedToHistory(false)
+    hasTriggeredAutoEvalRef.current = true
+    setIsEvaluating(true)
+
+    try {
+      const companyId = await getCompanyId()
+
+      const response = await fetch('/api/meet/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: text,
+          meetingId: fakeId,
+          companyId
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao avaliar reunião')
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.evaluation) {
+        setEvaluation(data.evaluation)
+        setShowEvaluationModal(true)
+        await saveEvaluationToHistory(data.evaluation, consolidated, fakeId)
+      } else {
+        throw new Error('Resposta inválida da API')
+      }
+    } catch (err: any) {
+      setError(`Erro ao avaliar: ${err.message}`)
+    } finally {
+      setIsEvaluating(false)
+      setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+    }
   }
 
   // Copy meeting URL
@@ -661,83 +735,143 @@ export default function MeetAnalysisView() {
         {/* Input Section */}
         {!session && (
           <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Link do Google Meet
-            </label>
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={meetUrl}
-                  onChange={(e) => handleUrlChange(e.target.value)}
-                  placeholder="https://meet.google.com/abc-defg-hij"
-                  className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
-                />
-                {meetUrl && isValidMeetUrl(meetUrl) && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
-                      Válido
-                    </span>
-                    <button
-                      onClick={copyMeetUrl}
-                      className="text-gray-400 hover:text-green-600 transition-colors"
-                    >
-                      {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  </div>
-                )}
-              </div>
+            {/* Mode Toggle */}
+            <div className="flex gap-1 mb-5 bg-gray-100 rounded-lg p-1">
               <button
-                onClick={sendBot}
-                disabled={!meetUrl}
-                className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                onClick={() => { setInputMode('link'); setError('') }}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  inputMode === 'link'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
-                <Send className="w-5 h-5" />
-                Enviar Bot
+                <Video className="w-4 h-4" />
+                Enviar Bot ao Meet
+              </button>
+              <button
+                onClick={() => { setInputMode('paste'); setError('') }}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  inputMode === 'paste'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Colar Transcrição
               </button>
             </div>
+
+            {/* Link Mode */}
+            {inputMode === 'link' && (
+              <>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Link do Google Meet
+                </label>
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={meetUrl}
+                      onChange={(e) => handleUrlChange(e.target.value)}
+                      placeholder="https://meet.google.com/abc-defg-hij"
+                      className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
+                    />
+                    {meetUrl && isValidMeetUrl(meetUrl) && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
+                          Válido
+                        </span>
+                        <button
+                          onClick={copyMeetUrl}
+                          className="text-gray-400 hover:text-green-600 transition-colors"
+                        >
+                          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={sendBot}
+                    disabled={!meetUrl}
+                    className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                  >
+                    <Send className="w-5 h-5" />
+                    Enviar Bot
+                  </button>
+                </div>
+
+                {/* Instructions */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Como funciona:</h3>
+                  <ol className="text-sm text-gray-600 space-y-1.5">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">1.</span>
+                      Cole o link da reunião do Google Meet acima
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">2.</span>
+                      Clique em "Enviar Bot" - um participante chamado "Ramppy" pedirá para entrar
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">3.</span>
+                      <strong className="text-amber-600">Aceite o bot na reunião</strong> quando ele pedir para participar
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">4.</span>
+                      Realize a reunião normalmente - o bot irá gravar e transcrever
+                    </li>
+                  </ol>
+
+                  {/* Warning about ending the call */}
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-amber-500 text-lg">⚠️</span>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-700">Importante:</p>
+                        <p className="text-sm text-amber-600">
+                          Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Paste Mode */}
+            {inputMode === 'paste' && (
+              <>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Transcrição da Reunião
+                </label>
+                <textarea
+                  value={pastedTranscript}
+                  onChange={(e) => { setPastedTranscript(e.target.value); setError('') }}
+                  placeholder={"Cole a transcrição aqui...\n\nFormato sugerido:\nVendedor: Olá, tudo bem?\nCliente: Tudo sim, obrigado.\nVendedor: Gostaria de entender melhor sua situação..."}
+                  className="w-full h-[250px] px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all resize-none text-sm leading-relaxed"
+                />
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-xs text-gray-400">
+                    {pastedTranscript.trim() ? `${pastedTranscript.trim().split('\n').filter(l => l.trim()).length} linhas` : 'Nenhum texto colado'}
+                  </span>
+                  <button
+                    onClick={evaluatePastedTranscript}
+                    disabled={!pastedTranscript.trim()}
+                    className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Avaliar Transcrição
+                  </button>
+                </div>
+              </>
+            )}
+
             {error && (
               <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
                 <AlertTriangle className="w-4 h-4" />
                 {error}
               </div>
             )}
-
-            {/* Instructions */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Como funciona:</h3>
-              <ol className="text-sm text-gray-600 space-y-1.5">
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">1.</span>
-                  Cole o link da reunião do Google Meet acima
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">2.</span>
-                  Clique em "Enviar Bot" - um participante chamado "Ramppy" pedirá para entrar
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">3.</span>
-                  <strong className="text-amber-600">Aceite o bot na reunião</strong> quando ele pedir para participar
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">4.</span>
-                  Realize a reunião normalmente - o bot irá gravar e transcrever
-                </li>
-              </ol>
-
-              {/* Warning about ending the call */}
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-500 text-lg">⚠️</span>
-                  <div>
-                    <p className="text-sm font-semibold text-amber-700">Importante:</p>
-                    <p className="text-sm text-amber-600">
-                      Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1129,10 +1263,10 @@ export default function MeetAnalysisView() {
                       <div className="bg-red-50 rounded-lg p-3 mb-3 border border-red-200">
                         <h4 className="text-sm font-bold text-red-800 mb-2">Violações</h4>
                         <ul className="space-y-1">
-                          {evaluation.playbook_adherence.violations.map((v, i) => (
+                          {evaluation.playbook_adherence.violations.map((v: any, i: number) => (
                             <li key={i} className="text-sm text-red-700 flex items-start gap-1">
                               <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              {v}
+                              {typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}
                             </li>
                           ))}
                         </ul>
@@ -1143,11 +1277,16 @@ export default function MeetAnalysisView() {
                     {evaluation.playbook_adherence.exemplary_moments && evaluation.playbook_adherence.exemplary_moments.length > 0 && (
                       <div className="bg-green-50 rounded-lg p-3 mb-3 border border-green-200">
                         <h4 className="text-sm font-bold text-green-800 mb-2">Momentos Exemplares</h4>
-                        <ul className="space-y-1">
-                          {evaluation.playbook_adherence.exemplary_moments.map((m, i) => (
-                            <li key={i} className="text-sm text-green-700 flex items-start gap-1">
-                              <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              {m}
+                        <ul className="space-y-2">
+                          {evaluation.playbook_adherence.exemplary_moments.map((m: any, i: number) => (
+                            <li key={i} className="text-sm text-green-700">
+                              <div className="flex items-start gap-1">
+                                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                <span className="font-medium">{typeof m === 'string' ? m : m?.criterion || ''}</span>
+                              </div>
+                              {typeof m === 'object' && m?.evidence && (
+                                <p className="text-green-600 text-xs ml-5 mt-0.5">{m.evidence}</p>
+                              )}
                             </li>
                           ))}
                         </ul>
