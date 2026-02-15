@@ -84,7 +84,8 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
     checkRoleplayLimit,
     incrementRoleplay,
     planUsage,
-    trainingPlan
+    trainingPlan,
+    loading: planLoading
   } = usePlanLimits()
 
   // CSS for custom scrollbar
@@ -180,6 +181,7 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
   const [showChallengeTips, setShowChallengeTips] = useState(true) // Mostrar dicas do desafio por padrão
   const [isChallengeTipsMinimized, setIsChallengeTipsMinimized] = useState(false) // Painel de dicas minimizado
+  const [isMeetTipsMinimized, setIsMeetTipsMinimized] = useState(false) // Painel de coaching Meet minimizado
 
   // Configurações do roleplay
   const [age, setAge] = useState(30)
@@ -293,6 +295,16 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
     setMounted(true)
     loadData()
   }, [])
+
+  // Auto-start meet simulation (skip config screen)
+  // Must wait for planLoading to finish, otherwise checkRoleplayLimit() returns {allowed: false}
+  const meetAutoStarted = useRef(false)
+  useEffect(() => {
+    if (isMeetSimulation && mounted && !planLoading && !isSimulating && !meetAutoStarted.current) {
+      meetAutoStarted.current = true
+      handleStartSimulation()
+    }
+  }, [isMeetSimulation, mounted, planLoading])
 
   // Verificar limite de créditos mensais
   useEffect(() => {
@@ -445,12 +457,27 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   // Efeito para gerar avatar APENAS quando a simulação iniciar
   useEffect(() => {
     // Só gera quando a simulação começa
-    if (!isSimulating || !selectedPersona || hiddenMode) {
-      return
+    if (!isSimulating || hiddenMode) return
+
+    // Resolve persona: meet simulation inline OR from dropdown
+    let personaForAvatar: any = null
+    let avatarAge = age
+    let avatarTemperament = temperament
+
+    if (isMeetSimulation && meetSimulationConfig?.persona) {
+      personaForAvatar = {
+        id: 'meet_persona',
+        business_type: meetSimulationConfig.persona.business_type || 'B2B',
+        cargo: meetSimulationConfig.persona.cargo,
+        profissao: meetSimulationConfig.persona.profissao,
+      }
+      avatarAge = meetSimulationConfig.age || age
+      avatarTemperament = meetSimulationConfig.temperament || temperament
+    } else if (selectedPersona) {
+      personaForAvatar = personas.find(p => p.id === selectedPersona)
     }
 
-    const persona = personas.find(p => p.id === selectedPersona)
-    if (!persona) return
+    if (!personaForAvatar) return
 
     // Já tem avatar? Não regenera
     if (avatarUrl) return
@@ -461,14 +488,14 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
 
       try {
         // Tenta gerar com DALL-E 3
-        const aiUrl = await generateAvatarWithAI(persona, age, temperament)
+        const aiUrl = await generateAvatarWithAI(personaForAvatar, avatarAge, avatarTemperament)
 
         if (aiUrl) {
           setAvatarUrl(aiUrl)
         } else {
           // Fallback para Pravatar se DALL-E falhar
           console.warn('DALL-E falhou, usando fallback Pravatar')
-          const fallbackUrl = generateAvatarUrl(persona, age, temperament)
+          const fallbackUrl = generateAvatarUrl(personaForAvatar, avatarAge, avatarTemperament)
           await preloadImage(fallbackUrl)
           setAvatarUrl(fallbackUrl)
         }
@@ -966,8 +993,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         temperament: simTemperament,
         segment: segmentDescription,
         objections: objectionsWithRebuttals,
-        client_name: data.clientName, // Salvar o nome do cliente
-        objective: selectedObjectiveData, // Salvar o objetivo do roleplay
+        client_name: data.clientName,
+        objective: selectedObjectiveData,
+        ...(isMeetSimulation && meetSimulationConfig ? {
+          is_meet_correction: true,
+          meet_simulation_config: meetSimulationConfig,
+        } : {}),
       })
 
       if (session) {
@@ -1092,7 +1123,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
             sessionId,
             messages: messages?.messages || [],
             config: messages?.config || {},
-            challengeId: challengeId || null // Passar diretamente o ID do desafio
+            challengeId: challengeId || null, // Passar diretamente o ID do desafio
+            meetCoachingContext: isMeetSimulation && meetSimulationConfig?.coaching_focus?.length
+              ? meetSimulationConfig.coaching_focus
+              : null
           }),
         });
 
@@ -1860,6 +1894,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   <Lightbulb size={20} />
                 </button>
               )}
+              {/* Botão de Coaching Meet - Expande/Minimiza */}
+              {isMeetSimulation && meetSimulationConfig && (
+                <button
+                  onClick={() => setIsMeetTipsMinimized(!isMeetTipsMinimized)}
+                  className={`p-2 rounded-lg transition-colors ${!isMeetTipsMinimized ? 'bg-purple-600/20 text-purple-400' : 'hover:bg-gray-800 text-white/70'}`}
+                  title={isMeetTipsMinimized ? "Expandir Coaching" : "Minimizar Coaching"}
+                >
+                  <Lightbulb size={20} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1967,93 +2011,98 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
             {/* Meet Simulation Coaching Panel */}
             {isMeetSimulation && meetSimulationConfig && (
-              <div className="w-72 bg-white/95 border-r border-gray-200 flex flex-col flex-shrink-0 backdrop-blur-sm">
-                <div className="p-3 flex items-center gap-3 border-b border-gray-100">
-                  <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Target size={18} className="text-purple-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900">Simulacao Meet</h3>
-                    <p className="text-[10px] text-purple-600 truncate">{meetSimulationConfig.objective.name}</p>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
-                  {/* Meeting Context */}
-                  {meetSimulationConfig.meeting_context && (
-                    <p className="text-xs text-gray-600 italic leading-relaxed">{meetSimulationConfig.meeting_context}</p>
-                  )}
-
-                  {/* Simulation Justification */}
-                  {meetSimulationConfig.simulation_justification && (
-                    <div className="p-2.5 bg-purple-50 rounded-lg border border-purple-100">
-                      <p className="text-[11px] text-gray-700 leading-relaxed line-clamp-4">{meetSimulationConfig.simulation_justification}</p>
+              <div className={`${isMeetTipsMinimized ? 'w-14' : 'w-80'} bg-white/95 border-r border-gray-200 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
+                {/* Header - clickable to toggle */}
+                <button
+                  onClick={() => setIsMeetTipsMinimized(!isMeetTipsMinimized)}
+                  className="w-full px-3 py-2.5 flex items-center gap-2.5 hover:bg-gray-50/50 transition-colors text-left border-b border-gray-100"
+                >
+                  {!isMeetTipsMinimized ? (
+                    <>
+                      <Target size={16} className="text-purple-600 flex-shrink-0" />
+                      <span className="text-xs font-semibold text-gray-900 flex-1">Coaching</span>
+                      <ChevronDown size={14} className="text-gray-400" />
+                    </>
+                  ) : (
+                    <div className="w-full flex flex-col items-center gap-1.5">
+                      <Target size={16} className="text-purple-600" />
+                      <ChevronUp size={12} className="text-gray-400" />
                     </div>
                   )}
+                </button>
 
-                  {/* Coaching Focus */}
-                  {meetSimulationConfig.coaching_focus.map((focus, idx) => {
-                    const sevDot = focus.severity === 'critical' ? 'bg-red-500' : focus.severity === 'high' ? 'bg-amber-500' : 'bg-yellow-500'
-                    const diagnosisText = focus.diagnosis || focus.what_to_improve || ''
-                    const phrases = focus.example_phrases || focus.tips || []
+                {/* Expanded content */}
+                {!isMeetTipsMinimized && (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {/* Coaching Focus Areas */}
+                    {meetSimulationConfig.coaching_focus.map((focus, idx) => {
+                      const cleanText = (text: string) => text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/—/g, '-').replace(/\s{2,}/g, ' ').trim()
+                      const borderColor = focus.severity === 'critical' ? 'border-l-red-400' : focus.severity === 'high' ? 'border-l-amber-400' : 'border-l-yellow-400'
+                      const scoreColor = (focus.spin_score ?? 10) < 4 ? 'text-red-600' : (focus.spin_score ?? 10) < 6 ? 'text-amber-600' : 'text-yellow-600'
+                      const phrases = (focus.example_phrases || focus.tips || []).map((p: string) => cleanText(p))
 
-                    return (
-                      <div key={idx} className="p-3 bg-white rounded-lg border border-gray-200">
-                        {/* Header: severity dot + area + score */}
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${sevDot}`} />
-                          <span className="text-xs font-semibold text-gray-900 flex-1">{focus.area}</span>
-                          {focus.spin_score !== undefined && (
-                            <span className={`text-[10px] font-bold ${focus.spin_score < 4 ? 'text-red-600' : focus.spin_score < 6 ? 'text-amber-600' : 'text-yellow-600'}`}>
-                              {focus.spin_score.toFixed(1)}
-                            </span>
+                      return (
+                        <div key={idx} className={`border-b border-gray-100 border-l-[3px] ${borderColor}`}>
+                          {/* Area + Score */}
+                          <div className="px-3 py-2 flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-900">{focus.area}</span>
+                            {focus.spin_score !== undefined && (
+                              <span className={`text-xs font-bold ${scoreColor}`}>{focus.spin_score.toFixed(1)}</span>
+                            )}
+                          </div>
+
+                          {/* Practice Goal */}
+                          {focus.practice_goal && (
+                            <div className="px-3 pb-1.5">
+                              <p className="text-xs text-gray-700 leading-relaxed">{cleanText(focus.practice_goal)}</p>
+                            </div>
+                          )}
+
+                          {/* One example phrase */}
+                          {phrases.length > 0 && (
+                            <div className="px-3 pb-2.5">
+                              <p className="text-xs text-blue-600 leading-relaxed italic">&ldquo;{phrases[0]}&rdquo;</p>
+                            </div>
                           )}
                         </div>
+                      )
+                    })}
 
-                        {/* Diagnosis */}
-                        {diagnosisText && (
-                          <p className="text-[11px] text-gray-600 leading-relaxed mb-2">{diagnosisText}</p>
-                        )}
-
-                        {/* Practice Goal */}
-                        {focus.practice_goal && (
-                          <div className="p-2 bg-green-50 rounded border border-green-100 mb-2">
-                            <p className="text-[10px] text-green-700 font-medium leading-relaxed">{focus.practice_goal}</p>
-                          </div>
-                        )}
-
-                        {/* Example Phrases */}
-                        {phrases.length > 0 && (
-                          <div className="space-y-0.5">
-                            {phrases.map((phrase: string, i: number) => (
-                              <p key={i} className="text-[11px] text-blue-700 flex items-start gap-1">
-                                <span className="text-blue-400 mt-0.5 flex-shrink-0">&ldquo;</span>
-                                <span className="leading-relaxed">{phrase}</span>
-                              </p>
-                            ))}
-                          </div>
-                        )}
+                    {/* Objections - just names */}
+                    <div className="border-b border-gray-100">
+                      <div className="px-3 py-2">
+                        <span className="text-xs font-bold text-gray-900">Objecoes esperadas</span>
                       </div>
-                    )
-                  })}
-
-                  {/* Objections summary */}
-                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-2">Objecoes esperadas:</p>
-                    <div className="space-y-1">
-                      {meetSimulationConfig.objections.map((obj, idx) => (
-                        <div key={idx} className="flex items-start gap-1.5">
-                          <span className={`text-[10px] px-1 py-0.5 rounded font-medium mt-0.5 ${
-                            obj.source === 'meeting' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
-                          }`}>
-                            {obj.source === 'meeting' ? 'M' : 'C'}
-                          </span>
-                          <span className="text-xs text-gray-700">{obj.name}</span>
-                        </div>
-                      ))}
+                      <div className="px-3 pb-2.5 space-y-1.5">
+                        {meetSimulationConfig.objections.map((obj, idx) => {
+                          const cleanText = (text: string) => text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/—/g, '-').replace(/\s{2,}/g, ' ').trim()
+                          return (
+                            <div key={idx} className="flex items-start gap-1.5">
+                              <span className={`text-[10px] px-1 py-0.5 rounded font-medium mt-px flex-shrink-0 ${
+                                obj.source === 'meeting' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
+                              }`}>
+                                {obj.source === 'meeting' ? 'Meet' : 'Coach'}
+                              </span>
+                              <span className="text-xs text-gray-700 leading-relaxed">{cleanText(obj.name)}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Minimized state */}
+                {isMeetTipsMinimized && (
+                  <div className="flex-1 flex flex-col items-center gap-2.5 pt-3">
+                    {meetSimulationConfig.coaching_focus.map((focus, idx) => {
+                      const dotColor = focus.severity === 'critical' ? 'bg-red-500' : focus.severity === 'high' ? 'bg-amber-500' : 'bg-yellow-500'
+                      return (
+                        <div key={idx} className={`w-2.5 h-2.5 rounded-full ${dotColor}`} title={`${focus.area}: ${focus.spin_score?.toFixed(1) || '?'}/10`} />
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -3018,6 +3067,103 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                       </div>
                     )
                   })()}
+
+                  {/* Seção de Correção Meet - observações da IA */}
+                  {evaluation.meet_correction && (
+                    <div className="mb-6 space-y-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Target className="w-5 h-5 text-purple-600" />
+                        <h3 className="text-sm font-semibold text-gray-800">Correção da Reunião</h3>
+                      </div>
+
+                      {/* Feedback geral */}
+                      {evaluation.meet_correction.overall_feedback && (
+                        <div className={`rounded-xl border p-4 ${
+                          evaluation.meet_correction.overall_corrected
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-amber-50 border-amber-200'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            {evaluation.meet_correction.overall_corrected ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            )}
+                            <span className={`text-sm font-semibold ${
+                              evaluation.meet_correction.overall_corrected ? 'text-green-700' : 'text-amber-700'
+                            }`}>
+                              {evaluation.meet_correction.overall_corrected ? 'Erros Corrigidos!' : 'Continue Praticando'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {safeRender(evaluation.meet_correction.overall_feedback)}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Cards por área */}
+                      {evaluation.meet_correction.areas?.map((area: any, i: number) => (
+                        <div
+                          key={i}
+                          className={`rounded-xl border overflow-hidden ${
+                            area.corrected
+                              ? 'border-green-200'
+                              : area.partially_corrected
+                              ? 'border-amber-200'
+                              : 'border-red-200'
+                          }`}
+                        >
+                          {/* Header */}
+                          <div className={`px-4 py-3 flex items-center justify-between ${
+                            area.corrected
+                              ? 'bg-green-50'
+                              : area.partially_corrected
+                              ? 'bg-amber-50'
+                              : 'bg-red-50'
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-gray-800">{area.area}</span>
+                            </div>
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                              area.corrected
+                                ? 'bg-green-100 text-green-700'
+                                : area.partially_corrected
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {area.corrected ? 'Corrigido' : area.partially_corrected ? 'Parcial' : 'Não corrigido'}
+                            </span>
+                          </div>
+
+                          <div className="p-4 space-y-3 bg-white">
+                            {/* O que o vendedor fez */}
+                            {area.what_seller_did && (
+                              <div>
+                                <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">O que você fez</p>
+                                <p className="text-sm text-gray-700 leading-relaxed">{safeRender(area.what_seller_did)}</p>
+                              </div>
+                            )}
+
+                            {/* O que ainda falta */}
+                            {area.what_still_needs_work && (
+                              <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                                <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-1">O que ainda falta</p>
+                                <p className="text-xs text-gray-700 leading-relaxed">{safeRender(area.what_still_needs_work)}</p>
+                              </div>
+                            )}
+
+                            {/* Momento-chave */}
+                            {area.key_moment && (
+                              <div className="bg-gray-50 rounded-lg p-3 border-l-2 border-l-purple-400 border border-gray-100">
+                                <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1">Momento-Chave</p>
+                                <p className="text-xs text-gray-600 italic leading-relaxed">{safeRender(area.key_moment)}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Seção de Feedback do Desafio - só aparece quando challenge_performance existe */}
                   {evaluation.challenge_performance && (

@@ -13,6 +13,8 @@ export interface RoleplayConfig {
   objections: string[] | { name: string; rebuttals: string[] }[]
   client_name?: string // Nome do cliente virtual gerado
   objective?: { id: string; name: string; description: string | null } // Objetivo do roleplay
+  is_meet_correction?: boolean // Flag para sessoes de correcao Meet
+  meet_simulation_config?: any // Configuracao completa da simulacao de correcao
 }
 
 export interface RoleplaySession {
@@ -204,6 +206,9 @@ export async function getUserRoleplaySessions(
       query = query.not('id', 'in', `(${challengeSessionIds.join(',')})`)
     }
 
+    // Excluir sessões de correção Meet
+    query = query.neq('config->>is_meet_correction', 'true')
+
     const { data, error } = await query
 
     if (error) {
@@ -211,10 +216,40 @@ export async function getUserRoleplaySessions(
       return []
     }
 
-    console.log(`[getUserRoleplaySessions] ${data?.length || 0} sessões encontradas (excluindo ${challengeSessionIds.length} de desafios)`)
+    console.log(`[getUserRoleplaySessions] ${data?.length || 0} sessões encontradas (excluindo desafios e correções)`)
     return data || []
   } catch (error) {
     console.error('Erro ao buscar sessões:', error)
+    return []
+  }
+}
+
+/**
+ * Buscar sessões de correção Meet do usuário
+ */
+export async function getMeetCorrectionSessions(
+  limit: number = 50
+): Promise<RoleplaySession[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    const { data, error } = await supabase
+      .from('roleplay_sessions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('config->>is_meet_correction', 'true')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('Erro ao buscar sessões de correção:', error)
+      return []
+    }
+
+    return data || []
+  } catch (error) {
+    console.error('Erro ao buscar sessões de correção:', error)
     return []
   }
 }

@@ -6,6 +6,7 @@ import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } 
 import FollowUpHistoryView from './FollowUpHistoryView'
 import MeetHistoryContent from './MeetHistoryContent'
 import ChallengeHistoryContent from './ChallengeHistoryContent'
+import CorrectionHistoryContent from './CorrectionHistoryContent'
 
 interface HistoricoViewProps {
   onStartChallenge?: (challenge: any) => void
@@ -17,7 +18,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<'resumo' | 'spin' | 'playbook' | 'transcricao'>('resumo')
-  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'desafios'>('simulacoes')
+  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios'>('simulacoes')
 
   useEffect(() => {
     setMounted(true)
@@ -317,6 +318,17 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
                 Google Meet
               </button>
               <button
+                onClick={() => setHistoryType('correcoes')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  historyType === 'correcoes'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Lightbulb className="w-4 h-4" />
+                Correcoes
+              </button>
+              <button
                 onClick={() => setHistoryType('desafios')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   historyType === 'desafios'
@@ -334,6 +346,8 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
         {/* Render content based on selected history type */}
         {historyType === 'meet' ? (
           <MeetHistoryContent />
+        ) : historyType === 'correcoes' ? (
+          <CorrectionHistoryContent />
         ) : historyType === 'desafios' ? (
           <ChallengeHistoryContent onStartChallenge={onStartChallenge} />
         ) : loading ? (

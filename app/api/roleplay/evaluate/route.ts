@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { evaluateChallengePerformance } from '@/lib/challenges/evaluateChallengePerformance'
 import { evaluateRoleplay } from '@/lib/evaluation/evaluateRoleplay'
+import { evaluateMeetCorrection } from '@/lib/evaluation/evaluateMeetCorrection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +18,7 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { sessionId, challengeId } = body
+    const { sessionId, challengeId, meetCoachingContext } = body
 
     if (!sessionId) {
       console.error('❌ sessionId não fornecido no body:', body)
@@ -227,6 +228,25 @@ OBJEÇÕES TRABALHADAS:`
       } catch (challengeError) {
         console.error('⚠️ Erro ao avaliar desafio (continuando sem challenge_performance):', challengeError)
         // Não falha a avaliação principal se o desafio falhar
+      }
+    }
+
+    // Se é uma simulação de correção Meet, avaliar se os erros foram corrigidos
+    if (meetCoachingContext && Array.isArray(meetCoachingContext) && meetCoachingContext.length > 0) {
+      console.log('🎯 Avaliando correção de erros do Meet...')
+      try {
+        const meetCorrection = await evaluateMeetCorrection(
+          transcription,
+          evaluation,
+          meetCoachingContext
+        )
+        evaluation.meet_correction = meetCorrection
+        console.log('✅ Meet correction adicionado:', {
+          overall_corrected: meetCorrection.overall_corrected,
+          areas: meetCorrection.areas.length
+        })
+      } catch (meetError) {
+        console.error('⚠️ Erro ao avaliar correção Meet (continuando sem meet_correction):', meetError)
       }
     }
 

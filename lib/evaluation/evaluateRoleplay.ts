@@ -144,6 +144,7 @@ export interface RoleplayEvaluation {
     priority: 'critical' | 'high' | 'medium'
   }>
   challenge_performance?: any
+  meet_correction?: any
   playbook_adherence?: PlaybookAdherence
 }
 

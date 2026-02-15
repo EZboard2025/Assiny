@@ -132,7 +132,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
         <div className="p-4 pt-0">
           <button
             type="button"
-            onClick={() => handleStart(latest)}
+            onClick={() => openDetails(latest)}
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Play className="w-4 h-4" />
@@ -241,9 +241,9 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
 
       {/* Detail Modal */}
       {showDetails && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDetails(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-[fadeIn_200ms_ease-out]" onClick={() => setShowDetails(false)}>
           <div
-            className="bg-gray-50 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto"
+            className="bg-gray-50 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto animate-[modalSlideUp_300ms_ease-out]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
