@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { updateHeartbeat } from '@/lib/whatsapp-client'
+import { updateHeartbeat, getClientState } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,6 +25,14 @@ export async function POST(request: NextRequest) {
 
     if (!alive) {
       return NextResponse.json({ status: 'no_client' }, { status: 404 })
+    }
+
+    // Check if client is actually connected (not stuck in QR loop or error state)
+    const state = getClientState(user.id)
+    if (state && state.status !== 'connected' && state.status !== 'connecting') {
+      // Client exists but lost connection (e.g. session expired → qr_ready)
+      // Return 404 so frontend's auto-reconnect logic kicks in
+      return NextResponse.json({ status: 'not_connected', clientStatus: state.status }, { status: 404 })
     }
 
     return NextResponse.json({ status: 'ok' })

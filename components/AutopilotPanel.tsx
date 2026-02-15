@@ -824,11 +824,13 @@ export default function AutopilotPanel({
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                               entry.action === 'responded' ? 'bg-green-900/40 text-green-400' :
+                              entry.action === 'complemented' ? 'bg-blue-900/40 text-blue-400' :
                               entry.action === 'objective_reached' ? 'bg-emerald-900/40 text-emerald-300' :
                               entry.action === 'flagged_human' ? 'bg-amber-900/40 text-amber-400' :
                               'bg-gray-700 text-gray-400'
                             }`}>
                               {entry.action === 'responded' ? 'Respondido' :
+                               entry.action === 'complemented' ? 'Complementou' :
                                entry.action === 'objective_reached' ? '🎯 Objetivo alcançado' :
                                entry.action === 'flagged_human' ? 'Precisa atenção' :
                                entry.action === 'skipped_limit' ? 'Limite atingido' :

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { triggerAutopilotScan } from '@/lib/whatsapp-client'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -95,6 +96,12 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('[Autopilot Config] upsert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // When autopilot is enabled, scan monitored contacts for pending messages
+    // Uses the in-memory client scan (with dedup guards) instead of direct HTTP calls
+    if (enabled) {
+      triggerAutopilotScan(user.id)
     }
 
     return NextResponse.json({ success: true, config })

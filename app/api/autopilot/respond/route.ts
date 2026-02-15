@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
-import { sendAutopilotMessage } from '@/lib/whatsapp-client'
+import { sendAutopilotMessage, pushAutopilotEvent } from '@/lib/whatsapp-client'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
@@ -10,16 +10,37 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
+// Last-resort dedup: prevent the same contact from being processed twice within 90s
+// This catches duplicates even when in-memory guards in whatsapp-client.ts are bypassed
+const globalForRespond = globalThis as unknown as { autopilotRespondDedup?: Map<string, number> }
+if (!globalForRespond.autopilotRespondDedup) {
+  globalForRespond.autopilotRespondDedup = new Map()
+}
+const respondDedup = globalForRespond.autopilotRespondDedup
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { userId, contactPhone, contactName, incomingMessage, companyId } = body
+    const { userId, contactPhone, contactName, incomingMessage, companyId, mode = 'respond' } = body
 
     if (!userId || !contactPhone || !incomingMessage || !companyId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    console.log(`[Autopilot] Processing message from ${contactPhone} for user ${userId}`)
+    // Dedup check: skip if this userId+contact+mode was processed very recently
+    const phoneSuffix9 = contactPhone.replace(/[^0-9]/g, '').slice(-9)
+    const dedupKey = `${userId}:${phoneSuffix9}:${mode}`
+    const lastProcessed = respondDedup.get(dedupKey)
+    if (lastProcessed && Date.now() - lastProcessed < 90_000) {
+      console.log(`[Autopilot] Dedup: ${contactPhone} ${mode} was processed ${Math.round((Date.now() - lastProcessed) / 1000)}s ago — skipping`)
+      return NextResponse.json({ action: 'skipped_dedup' })
+    }
+    // Mark as processing NOW (before the AI call) to block concurrent requests
+    respondDedup.set(dedupKey, Date.now())
+    setTimeout(() => respondDedup.delete(dedupKey), 120_000) // Auto-cleanup after 2 min
+
+    const isComplement = mode === 'complement'
+    console.log(`[Autopilot] Processing ${isComplement ? 'COMPLEMENT' : 'response'} for ${contactPhone} (user ${userId})`)
 
     // 1. Load autopilot config
     const { data: configs, error: configError } = await supabaseAdmin
@@ -61,6 +82,7 @@ export async function POST(req: NextRequest) {
           ai_reasoning: `Fora do horário comercial (${currentTime})`
         })
 
+        pushAutopilotEvent('response_skipped', userId, contactPhone, contactName, `Fora do horário (${currentTime})`)
         return NextResponse.json({ action: 'skipped_hours' })
       }
     }
@@ -95,7 +117,7 @@ export async function POST(req: NextRequest) {
     }
 
     const maxPerDay = settings.max_responses_per_contact_per_day || 5
-    if (dailyCount >= maxPerDay) {
+    if (!isComplement && dailyCount >= maxPerDay) {
       console.log(`[Autopilot] Daily limit reached for ${contactPhone} (${dailyCount}/${maxPerDay})`)
 
       await supabaseAdmin.from('autopilot_log').insert({
@@ -108,6 +130,7 @@ export async function POST(req: NextRequest) {
         ai_reasoning: `Limite diário atingido (${dailyCount}/${maxPerDay})`
       })
 
+      pushAutopilotEvent('response_skipped', userId, contactPhone, contactName, `Limite diário (${dailyCount}/${maxPerDay})`)
       return NextResponse.json({ action: 'skipped_limit' })
     }
 
@@ -153,28 +176,39 @@ export async function POST(req: NextRequest) {
             ai_reasoning: 'Créditos mensais esgotados'
           })
 
+          pushAutopilotEvent('response_skipped', userId, contactPhone, contactName, 'Créditos esgotados')
           return NextResponse.json({ action: 'skipped_credits' })
         }
       }
     }
 
     // 5. Load conversation context (last 30 messages from DB)
-    const { data: recentMessages } = await supabaseAdmin
+    // IMPORTANT: Query DESC to get the NEWEST 30 messages, then reverse to chronological order
+    const phoneSuffixForQuery = contactPhone.replace(/[^0-9]/g, '').slice(-9)
+    const { data: recentMessagesDesc } = await supabaseAdmin
       .from('whatsapp_messages')
       .select('direction, content, contact_name, message_timestamp, transcription')
       .eq('user_id', userId)
-      .like('contact_phone', `%${contactPhone.slice(-9)}`)
-      .order('message_timestamp', { ascending: true })
+      .like('contact_phone', `%${phoneSuffixForQuery}`)
+      .order('message_timestamp', { ascending: false })
       .limit(30)
 
+    // Reverse to chronological order (oldest first) for the AI to read naturally
+    const recentMessages = recentMessagesDesc?.reverse() || []
+
     let conversationContext = ''
-    if (recentMessages && recentMessages.length > 0) {
+    if (recentMessages.length > 0) {
       conversationContext = recentMessages.map(m => {
         const sender = m.direction === 'outbound' ? 'Vendedor' : (contactName || 'Lead')
         const text = m.content || (m.transcription ? `[Áudio transcrito]: ${m.transcription}` : '[mídia]')
         return `${sender}: ${text}`
       }).join('\n')
     }
+
+    // Debug: show last 3 messages the AI will see
+    const lastMsgs = recentMessages.slice(-3)
+    console.log(`[Autopilot] Context for ${contactPhone}: ${recentMessages.length} msgs, last 3:`,
+      lastMsgs.map(m => `${m.direction === 'outbound' ? 'OUT' : 'IN'}: ${(m.content || '').slice(0, 60)}`))
 
     // 6. RAG pipeline (same as copilot)
     const embeddingText = `${incomingMessage}\n${conversationContext.slice(-500)}`
@@ -214,7 +248,7 @@ export async function POST(req: NextRequest) {
     const objetivoMatch = instructions.match(/^Objetivo:\s*(.+)$/m)
     const objetivoVendedor = objetivoMatch?.[1]?.trim() || instructions.split('\n')[0] || 'qualificar o lead e entender suas necessidades'
 
-    let systemPrompt = `Voce e um pre-vendedor (SDR) ${tone}, agil e focado em conversao. Voce atua como se fosse o proprio vendedor no WhatsApp.
+    let systemPrompt = `Voce e um vendedor ${tone} que conversa com leads no WhatsApp. Voce atua como se fosse o proprio vendedor — humano, natural, nunca robotico.
 
 === INSTRUCOES DO VENDEDOR ===
 ${instructions || `Objetivo: ${objetivoVendedor}`}
@@ -235,12 +269,33 @@ REGRAS DE SEPARACAO DE MENSAGENS:
 - NUNCA mais que 3 mensagens por resposta
 - response DEVE ser um array de strings, NUNCA uma string unica
 
-=== METODO A.V.C. (DISTRIBUA NAS MENSAGENS) ===
-Distribua os tres pilares nas mensagens separadas:
-1. PRIMEIRA mensagem — ACOLHIMENTO: Valide a pergunta do lead (ex: "Otima pergunta!", "Entendo sua duvida...")
-2. SEGUNDA mensagem — VALOR: Entregue a informacao solicitada de forma direta, sem rodeios.
-3. TERCEIRA mensagem — CONVITE: Faca a ponte para o objetivo (${objetivoVendedor}). SEMPRE termine com pergunta.
-Se for so 1 ou 2 mensagens, combine os pilares naturalmente.
+=== ESTAGIO DA CONVERSA (FUNDAMENTAL) ===
+Antes de responder, analise o estagio atual da conversa:
+
+ESTAGIO 1 — RAPPORT (primeiras 2-3 trocas de mensagens):
+- Cumprimente, seja cordial e crie conexao HUMANA
+- Faca UMA pergunta leve sobre a situacao do lead (ex: "Como ta o movimento ai?", "Ha quanto tempo voce ta nessa area?")
+- NAO fale sobre produto/servico ainda. NAO faca pitch. NAO mencione beneficios.
+- Objetivo: fazer o lead se sentir ouvido e confortavel
+
+ESTAGIO 2 — QUALIFICACAO (apos rapport, proximas 2-4 trocas):
+- Investigue a situacao atual do lead com perguntas abertas
+- Entenda DOR, NECESSIDADE e CONTEXTO antes de oferecer qualquer coisa
+- Perguntas como: "Qual seu maior desafio hoje com [area]?", "Como voce faz [processo] atualmente?", "O que te motivou a responder?"
+- NAO apresente solucao ainda. Primeiro entenda o cenario.
+
+ESTAGIO 3 — APRESENTACAO (so depois de entender a situacao):
+- Conecte o que o lead disse com sua solucao (usando as palavras DELE)
+- Apresente valor de forma especifica para a dor que ele mencionou
+- Use prova social ou dados quando disponivel
+
+ESTAGIO 4 — CONVITE/CTA (so quando o lead demonstrou interesse):
+- Proponha o proximo passo natural: ${objetivoVendedor}
+- Nao force. Ofereça como sugestao natural da conversa.
+
+REGRA DE OURO: Se voce ainda nao sabe qual a DOR ou SITUACAO do lead, voce esta no estagio 1 ou 2.
+NUNCA pule para o estagio 3 ou 4 sem ter passado pelos anteriores.
+Analise o HISTORICO DA CONVERSA para determinar em qual estagio voce esta.
 
 === OBJETIVO ALCANCADO (objectiveReached) ===
 Retorne "objectiveReached": true APENAS quando:
@@ -251,16 +306,12 @@ IMPORTANTE: O objetivo do vendedor e: ${objetivoVendedor}
 So marque como alcancado se o lead demonstrou COMPROMETIMENTO CLARO com esse objetivo especifico.
 Em todos os outros casos, retorne "objectiveReached": false.
 
-=== REGRA DO PING-PONG (FLUXO CONTINUO) ===
-NUNCA encerre uma mensagem com ponto final ou afirmacao isolada. O objetivo de cada mensagem e "vender" a proxima resposta do lead.
-- Toda mensagem DEVE terminar com uma pergunta ou CTA que estimule o lead a responder.
-- Exemplo: Em vez de "Temos integracao com o Google Agenda.", use "Temos integracao com o Google Agenda! Voce costuma concentrar seus compromissos por la?"
-
-=== FOCO NO OBJETIVO ESTRATEGICO ===
-Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o lead ate o objetivo.
-- Use cada resposta como oportunidade para direcionar ao objetivo: ${objetivoVendedor}
-- Use gatilhos de simplicidade: "E bem simples", "O processo e bem rapido", "Leva so uns minutinhos"
-- Se precisar retomar contato, sempre ofereca uma informacao de valor como motivo
+=== ESTILO DE CONVERSA ===
+- Cada mensagem DEVE terminar com uma pergunta que estimule o lead a responder
+- Perguntas devem ser SOBRE O LEAD (situacao, dor, contexto), nao sobre seu produto
+- So fale do produto quando o lead perguntar ou quando voce ja entendeu a situacao dele
+- NUNCA mande duas informacoes sobre o produto na mesma resposta — dosifique
+- Se o lead fez uma pergunta, responda ELA primeiro, depois faca sua pergunta
 
 === QUANDO RESPONDER canRespond=FALSE ===
 - O lead pergunta sobre AGENDA, HORARIOS DISPONIVEIS ou DISPONIBILIDADE para reuniao/ligacao
@@ -271,14 +322,6 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
 - O lead pede algo que REQUER ACAO HUMANA (enviar contrato, agendar visita, enviar proposta personalizada)
 - Voce NAO TEM CERTEZA da resposta correta. NUNCA invente informacoes.
 - A conversa esta num ponto de NEGOCIACAO AVANCADA que precisa de decisao humana
-- O lead menciona DATAS ESPECIFICAS, PRAZOS ou DEADLINES que precisam de confirmacao humana
-
-=== QUANDO RESPONDER canRespond=TRUE ===
-- O lead faz perguntas gerais sobre produtos/servicos (que estao nos dados da empresa)
-- O lead quer saber mais sobre beneficios, funcionalidades, diferenciais
-- O lead envia cumprimentos ou mensagens simples
-- Voce pode agregar valor com informacoes que tem nos dados da empresa
-- O lead faz perguntas frequentes (FAQ) com respostas claras nos dados
 
 === FORMATACAO WHATSAPP ===
 - Paragrafos curtos (maximo 3 linhas cada). Evite blocos de texto densos.
@@ -286,7 +329,8 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
 - Emojis com moderacao (1-2 max por mensagem) para tom humano e profissional
 - Tom: ${tone}. Use "Oi", "Tudo bem?", "Com certeza". Evite "Prezado", "Estimado", "Cordialmente"
 - Fale SEMPRE em primeira pessoa ("Eu", "Nos"). NUNCA se identifique como IA, robo ou assistente automatico.
-- NUNCA invente informacoes que nao estao nos dados da empresa`
+- NUNCA invente informacoes que nao estao nos dados da empresa
+- Seja CONCISO. Mensagens longas assustam no WhatsApp.`
 
     // Company data
     if (companyData) {
@@ -324,12 +368,88 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
       systemPrompt += `\n\nCONVERSA ATUAL COM O LEAD (${contactName || contactPhone}):\n${conversationContext}`
     }
 
+    // Complement mode: add specific instructions with strong conservative bias
+    if (isComplement) {
+      // Count recent outbound messages to detect if seller already sent multiple
+      const recentOutbound = recentMessages?.filter(m => m.direction === 'outbound') || []
+      const lastMessages = recentMessages?.slice(-5) || []
+      const consecutiveOutbound = lastMessages.reverse().findIndex(m => m.direction !== 'outbound')
+      const sellerSentMultiple = consecutiveOutbound === -1 ? lastMessages.length : consecutiveOutbound
+
+      systemPrompt += `\n\n=== MODO COMPLEMENTO (ANALISE CRITICA OBRIGATORIA) ===
+O VENDEDOR acabou de enviar uma mensagem para este lead. Voce DEVE avaliar com RIGOR se um complemento e realmente necessario.
+
+VIES PADRAO: NAO COMPLEMENTAR. Na duvida, retorne canRespond: false.
+Complementar desnecessariamente e PIOR que nao complementar — parece robotico, ansioso e invasivo.
+
+CONTEXTO DO HISTORICO:
+- O vendedor mandou ${sellerSentMultiple} mensagem(ns) seguida(s) recentemente
+- Total de mensagens outbound no historico: ${recentOutbound.length}
+
+=== QUANDO *NAO* COMPLEMENTAR (canRespond: false) ===
+Retorne false em QUALQUER uma dessas situacoes:
+
+1. MENSAGEM JA TEM PERGUNTA — Se termina com "?", ja engaja. Nao precisa de complemento.
+   Ex: "Oi tudo bem? Como vai?" → NÃO complementar
+   Ex: "Posso te ajudar com algo?" → NÃO complementar
+
+2. VENDEDOR JA MANDOU 2+ MENSAGENS SEGUIDAS — Ja esta complementando sozinho. Mais uma msg pareceria spam.
+   ${sellerSentMultiple >= 2 ? '⚠️ ATENCAO: O vendedor JA mandou ' + sellerSentMultiple + ' msgs seguidas. NAO complementar.' : ''}
+
+3. MENSAGEM E INFORMATIVA E SUFICIENTE — Vendedor respondeu algo que o lead pediu. Nao precisa de gancho extra.
+   Ex: "O preco e R$299/mes" → Lead vai processar e responder. Nao complementar.
+   Ex: "Vou verificar e te retorno" → Vendedor sinalizou acao. Nao complementar.
+
+4. CONTEXTO DA CONVERSA JA E ENGAJADOR — Se a conversa ja tem boa cadencia (pergunta-resposta), nao precisa de intervencao.
+
+5. MENSAGEM E UM ENCERRAMENTO — Vendedor esta finalizando ou pausando.
+   Ex: "Valeu!", "Abraco!", "Qualquer coisa me chama" → Nao complementar.
+
+6. LEAD JA RESPONDEU RECENTEMENTE — Se a ultima msg do lead foi ha pouco tempo, o fluxo esta natural.
+
+7. E A PRIMEIRA MENSAGEM PARA O LEAD E JA E COMPLETA — Se o vendedor mandou "Oi Arthur, aqui e o Joao da empresa X, prazer! Como voce ta?" → JA e completa. Tem saudacao + identificacao + pergunta.
+
+=== QUANDO *SIM* COMPLEMENTAR (canRespond: true) — SOMENTE SE TODOS OS CRITERIOS FOREM ATENDIDOS ===
+
+Todos esses criterios devem ser TRUE simultaneamente:
+✅ A mensagem do vendedor NAO termina com pergunta
+✅ O vendedor mandou APENAS 1 mensagem (nao 2+ seguidas)
+✅ A mensagem e um "beco sem saida conversacional" — o lead NAO tem razao clara para responder
+✅ Nao e uma mensagem de encerramento ou pausa intencional
+✅ O complemento vai GENUINAMENTE melhorar a chance de resposta do lead
+
+Exemplos CLAROS onde complementar:
+- "Oi, aqui e o Arthur da Ramppy, prazer!" → SEM pergunta, sem gancho. Lead pensa "ok, e dai?". Complementar com pergunta.
+- "Mandei o material por email" → Informacao solta sem proximo passo. Complementar com "Conseguiu dar uma olhada?"
+- "Bom dia!" → Cumprimento isolado sem contexto. Complementar com identificacao + pergunta.
+
+Exemplos onde PARECE que deveria complementar MAS NAO DEVE:
+- "Oi tudo bem?" → Ja tem pergunta implicita. Lead vai responder "tudo e voce?". NAO complementar.
+- "Te mandei uma proposta, da uma olhada quando puder" → Ja tem CTA. NAO complementar.
+- "Obrigado pelo retorno! Vou analisar aqui." → Vendedor esta processando. NAO complementar.
+
+=== SE DECIDIR COMPLEMENTAR ===
+- APENAS 1 mensagem curta (1-2 linhas MAXIMO)
+- Deve parecer continuacao 100% natural (como se o vendedor tivesse digitado mais uma msg)
+- Geralmente sera UMA pergunta simples e leve
+- Use o mesmo tom e linguagem do vendedor
+- NAO repita informacoes que o vendedor ja deu
+- NAO seja formal demais nem de menos — espelhe o estilo do vendedor
+- response DEVE ser um array: ["mensagem complementar"]
+
+LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a conversa, NAO ENVIE.`
+    }
+
     // 8. Call GPT-4.1 with structured JSON output
+    const userMessage = isComplement
+      ? `O VENDEDOR enviou para o lead: "${incomingMessage}"\n\nAvalie se precisa de complemento. Responda em JSON.`
+      : `O lead enviou: "${incomingMessage}"\n\nResponda em JSON.`
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4.1',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `O lead enviou: "${incomingMessage}"\n\nResponda em JSON.` }
+        { role: 'user', content: userMessage }
       ],
       max_tokens: 500,
       temperature: 0.5,
@@ -361,6 +481,7 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
         supabaseAdmin
           .from('autopilot_contacts')
           .update({
+            enabled: false,
             needs_human: true,
             needs_human_reason: aiDecision.reason || 'IA não soube responder',
             needs_human_at: new Date().toISOString()
@@ -386,6 +507,7 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
         })
       ])
 
+      pushAutopilotEvent('flagged_human', userId, contactPhone, contactName, aiDecision.reason || 'IA não soube responder')
       return NextResponse.json({
         action: 'flagged_human',
         reason: aiDecision.reason
@@ -461,6 +583,7 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
         supabaseAdmin
           .from('autopilot_contacts')
           .update({
+            enabled: false,
             objective_reached: true,
             objective_reached_reason: 'Lead aceitou o objetivo',
             objective_reached_at: new Date().toISOString()
@@ -481,15 +604,17 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
       ])
     }
 
-    // 13. Update contact stats
-    await supabaseAdmin
-      .from('autopilot_contacts')
-      .update({
-        auto_responses_today: dailyCount + 1,
-        last_auto_response_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('contact_phone', storedPhone)
+    // 13. Update contact stats (skip for complements — they don't count as AI responses)
+    if (!isComplement) {
+      await supabaseAdmin
+        .from('autopilot_contacts')
+        .update({
+          auto_responses_today: dailyCount + 1,
+          last_auto_response_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('contact_phone', storedPhone)
+    }
 
     // 14. Consume 1 credit
     if (companyCredits) {
@@ -500,21 +625,28 @@ Voce nao e apenas um FAQ ambulante. Voce e um orientador de fluxo que conduz o l
     }
 
     // 15. Log success
+    const logAction = isComplement ? 'complemented' : 'responded'
     await supabaseAdmin.from('autopilot_log').insert({
       user_id: userId,
       company_id: companyId,
       contact_phone: contactPhone,
       contact_name: contactName,
       incoming_message: incomingMessage.slice(0, 2000),
-      action: 'responded',
+      action: logAction,
       ai_response: messages.join(' | '),
       credits_used: 1
     })
 
-    console.log(`[Autopilot] Successfully responded to ${contactPhone} with ${messages.length} bubble(s)`)
+    console.log(`[Autopilot] Successfully ${logAction} ${contactPhone} with ${messages.length} bubble(s)`)
+
+    if (aiDecision.objectiveReached) {
+      pushAutopilotEvent('objective_reached', userId, contactPhone, contactName, `Objetivo alcançado! Autopilot encerrado.`)
+    } else {
+      pushAutopilotEvent('response_sent', userId, contactPhone, contactName, `${isComplement ? 'Complemento' : 'Resposta'} enviada (${messages.length} balão${messages.length > 1 ? 'ões' : ''})`)
+    }
 
     return NextResponse.json({
-      action: aiDecision.objectiveReached ? 'objective_reached' : 'responded',
+      action: aiDecision.objectiveReached ? 'objective_reached' : logAction,
       response: messages
     })
 

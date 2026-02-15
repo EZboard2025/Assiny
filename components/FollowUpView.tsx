@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, ArrowLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users, MoreVertical, Camera, Headphones, Contact, Sticker, Star, Bell, Lock, Shield, Heart, Ban, Flag, MapPin, Mail, Globe, Clock, Share2, Building2, Pencil, MessageCirclePlus, EllipsisVertical, Sparkles, Zap } from 'lucide-react'
 import SalesCopilot from './SalesCopilot'
 import AutopilotPanel from './AutopilotPanel'
+import AutopilotActivityIndicator from './AutopilotActivityIndicator'
 
 interface FollowUpAnalysis {
   notas: {
@@ -99,7 +100,7 @@ export default function FollowUpView() {
   const [copilotOpen, setCopilotOpen] = useState(true)
   const [showAutopilotPanel, setShowAutopilotPanel] = useState(false)
   const [autopilotEnabled, setAutopilotEnabled] = useState(false)
-  const [autopilotPhones, setAutopilotPhones] = useState<Set<string>>(new Set())
+  const [autopilotPhones, setAutopilotPhones] = useState<Map<string, { objective_reached: boolean, needs_human: boolean }>>(new Map())
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null)
@@ -423,14 +424,18 @@ export default function FollowUpView() {
       .then(res => res.json())
       .then(data => {
         if (data.contacts) {
-          const suffixes = new Set<string>()
+          const phoneMap = new Map<string, { objective_reached: boolean, needs_human: boolean }>()
           data.contacts.forEach((c: any) => {
-            if (c.enabled) {
+            // Include enabled contacts AND disabled contacts that have objective_reached/needs_human (for status indicators)
+            if (c.enabled || c.objective_reached || c.needs_human) {
               const suffix = c.contact_phone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)
-              suffixes.add(suffix)
+              phoneMap.set(suffix, {
+                objective_reached: !!c.objective_reached,
+                needs_human: !!c.needs_human
+              })
             }
           })
-          setAutopilotPhones(suffixes)
+          setAutopilotPhones(phoneMap)
         }
       })
       .catch(() => {})
@@ -552,6 +557,18 @@ export default function FollowUpView() {
           })
 
           if (response.status === 404) {
+            const heartbeatData = await response.json().catch(() => ({}))
+
+            // Client exists but lost connection (session expired → qr_ready, error, etc.)
+            // Immediately show disconnected so user can re-scan QR
+            if (heartbeatData.status === 'not_connected') {
+              console.warn(`[Heartbeat] Client lost connection: ${heartbeatData.clientStatus}`)
+              setConnectionStatus('disconnected')
+              setPhoneNumber(null)
+              setError('Sessão expirou. Reconecte o WhatsApp.')
+              return
+            }
+
             // Server has no client — try silent auto-reconnect using cached LocalAuth session
             console.warn('[Heartbeat] Server returned 404 — attempting silent auto-reconnect...')
             try {
@@ -2304,15 +2321,31 @@ export default function FollowUpView() {
                         {conv.unread_count}
                       </span>
                     )}
-                    {(conv as any).autopilot_needs_human ? (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center border-2 border-[#111b21]" title="Autopiloto: precisa resposta humana">
-                        <AlertCircle className="w-3 h-3 text-white" />
-                      </div>
-                    ) : autopilotEnabled && autopilotPhones.has(conv.contact_phone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)) ? (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-[#00a884] rounded-full flex items-center justify-center border-2 border-[#111b21]" title="Autopiloto ativo">
-                        <Zap className="w-2.5 h-2.5 text-white" />
-                      </div>
-                    ) : null}
+                    {(() => {
+                      if (!autopilotEnabled) return null
+                      const phoneSuffix = conv.contact_phone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)
+                      const apStatus = autopilotPhones.get(phoneSuffix)
+                      if (!apStatus) return null
+                      if (apStatus.objective_reached) {
+                        return (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-purple-500 rounded-full flex items-center justify-center border-2 border-[#111b21]" title="Objetivo alcançado — intervenção necessária">
+                            <Zap className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )
+                      }
+                      if (apStatus.needs_human) {
+                        return (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-amber-500 rounded-full flex items-center justify-center border-2 border-[#111b21]" title="Precisa atenção humana">
+                            <Zap className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )
+                      }
+                      return (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-[#00a884] rounded-full flex items-center justify-center border-2 border-[#111b21]" title="Autopiloto ativo">
+                          <Zap className="w-2.5 h-2.5 text-white" />
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Content */}
@@ -2330,6 +2363,27 @@ export default function FollowUpView() {
                         {formatTime(conv.last_message_at)}
                       </span>
                     </div>
+                    {/* Autopilot status text */}
+                    {(() => {
+                      if (!autopilotEnabled) return null
+                      const phoneSuffix = conv.contact_phone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)
+                      const apStatus = autopilotPhones.get(phoneSuffix)
+                      if (apStatus?.objective_reached) {
+                        return (
+                          <p className="text-purple-400 text-[11px] font-medium mb-0.5 truncate">
+                            Necessária intervenção do vendedor
+                          </p>
+                        )
+                      }
+                      if (apStatus?.needs_human) {
+                        return (
+                          <p className="text-amber-400 text-[11px] font-medium mb-0.5 truncate">
+                            Precisa da sua atenção
+                          </p>
+                        )
+                      }
+                      return null
+                    })()}
                     <div className="flex items-center justify-between">
                       <p className="text-[#8696a0] text-sm truncate pr-2 leading-5">
                         {conv.last_message_sender && (
@@ -2431,39 +2485,6 @@ export default function FollowUpView() {
             </div>
           </div>
 
-          {/* Autopilot Needs Human Banner */}
-          {(selectedConversation as any)?.autopilot_needs_human && (
-            <div className="px-4 py-2 bg-amber-500/20 border-b border-amber-500/30 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400" />
-                <span className="text-amber-300 text-[13px]">O Autopiloto não soube responder. Precisa da sua atenção.</span>
-              </div>
-              <button
-                onClick={async () => {
-                  if (!authToken || !selectedConversation) return
-                  try {
-                    await fetch('/api/autopilot/resolve-human', {
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ contactPhone: selectedConversation.contact_phone })
-                    })
-                    // Update local state
-                    setConversations(prev => prev.map(c =>
-                      c.contact_phone === selectedConversation.contact_phone
-                        ? { ...c, autopilot_needs_human: false } as any
-                        : c
-                    ))
-                    setSelectedConversation(prev => prev ? { ...prev, autopilot_needs_human: false } as any : null)
-                  } catch (err) {
-                    console.error('Error resolving human flag:', err)
-                  }
-                }}
-                className="px-3 py-1 bg-amber-500/20 text-amber-300 text-[12px] rounded-full hover:bg-amber-500/30 transition-colors"
-              >
-                Resolver
-              </button>
-            </div>
-          )}
 
           {/* Message Search Bar */}
           {isSearchingMessages && (
@@ -3549,6 +3570,7 @@ export default function FollowUpView() {
             onClose={() => setCopilotOpen(false)}
             onSendToChat={(text) => handleSendMessage(text)}
           />
+          <AutopilotActivityIndicator authToken={authToken} />
         </>
       ) : connectionStatus === 'checking' ? (
         <div className="flex-1 flex items-center justify-center bg-[#222e35]">

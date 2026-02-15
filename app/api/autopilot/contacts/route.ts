@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { triggerAutopilotScan } from '@/lib/whatsapp-client'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -83,6 +84,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
+      // Fire-and-forget: scan this contact for pending messages via in-memory client
+      triggerAutopilotScan(user.id, contactPhone)
+
       return NextResponse.json({ success: true, contact })
     }
 
@@ -106,13 +110,19 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (existing) {
+        const newEnabled = !existing.enabled
         const { data: contact } = await supabaseAdmin
           .from('autopilot_contacts')
-          .update({ enabled: !existing.enabled })
+          .update({ enabled: newEnabled })
           .eq('user_id', user.id)
           .eq('contact_phone', contactPhone)
           .select()
           .single()
+
+        // If toggling ON, scan this contact for pending messages
+        if (newEnabled) {
+          triggerAutopilotScan(user.id, contactPhone)
+        }
 
         return NextResponse.json({ success: true, contact })
       } else {
@@ -128,6 +138,9 @@ export async function POST(req: NextRequest) {
           })
           .select()
           .single()
+
+        // New contact = enabled, scan for pending messages
+        triggerAutopilotScan(user.id, contactPhone)
 
         return NextResponse.json({ success: true, contact })
       }
@@ -200,3 +213,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
