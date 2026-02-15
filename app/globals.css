@@ -348,6 +348,33 @@
     100% { background-position: -200% 0; }
   }
 
+  /* Autopilot shiny button (reuses foilShine keyframe) */
+  .autopilot-foil-btn {
+    background: linear-gradient(135deg, #00a884 0%, #25d366 50%, #00a884 100%);
+    transition: all 0.2s ease;
+  }
+
+  .autopilot-foil-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.35) 45%,
+      rgba(255, 255, 255, 0.1) 55%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: foilShine 2.5s ease-in-out infinite;
+  }
+
+  .autopilot-foil-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(0, 168, 132, 0.4);
+  }
+
   /* Gemini-style sparkle thinking ring */
   .copilot-thinking-ring {
     position: relative;

@@ -18,7 +18,12 @@ import {
   X,
   BookOpen,
   FileText,
-  Save
+  Save,
+  Link,
+  UserPlus,
+  Mic,
+  BarChart3,
+  Sparkles
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -77,9 +82,9 @@ interface MeetEvaluation {
       required_scripts?: { score: number; status: string; dimension_feedback: string }
       process?: { score: number; status: string; dimension_feedback: string }
     }
-    violations: string[]
-    missed_requirements: string[]
-    exemplary_moments: string[]
+    violations: any[]
+    missed_requirements: any[]
+    exemplary_moments: any[]
     coaching_notes: string
   }
 }
@@ -117,6 +122,48 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
   return consolidated
 }
 
+// Speaker avatar colors
+const speakerColors = [
+  { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
+  { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200' },
+  { bg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-200' },
+  { bg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200' },
+  { bg: 'bg-rose-100', text: 'text-rose-600', border: 'border-rose-200' },
+  { bg: 'bg-cyan-100', text: 'text-cyan-600', border: 'border-cyan-200' },
+]
+
+const getSpeakerColor = (speaker: string, speakerMap: Map<string, number>) => {
+  const key = speaker.trim().toLowerCase()
+  if (!speakerMap.has(key)) {
+    speakerMap.set(key, speakerMap.size % speakerColors.length)
+  }
+  return speakerColors[speakerMap.get(key)!]
+}
+
+const getScoreColor = (score: number) => {
+  if (score >= 7) return 'text-green-600'
+  if (score >= 5) return 'text-amber-600'
+  return 'text-red-600'
+}
+
+const getScoreBg = (score: number) => {
+  if (score >= 7) return 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
+  if (score >= 5) return 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200'
+  return 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
+}
+
+const getPerformanceLabel = (level: string) => {
+  const labels: Record<string, string> = {
+    'legendary': 'Lendário',
+    'excellent': 'Excelente',
+    'very_good': 'Muito Bom',
+    'good': 'Bom',
+    'needs_improvement': 'Precisa Melhorar',
+    'poor': 'Em Desenvolvimento'
+  }
+  return labels[level] || level
+}
+
 export default function MeetAnalysisView() {
   const [meetUrl, setMeetUrl] = useState('')
   const [session, setSession] = useState<MeetingSession | null>(null)
@@ -131,12 +178,16 @@ export default function MeetAnalysisView() {
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
+  const speakerMapRef = useRef<Map<string, number>>(new Map())
+  const sessionRef = useRef<MeetingSession | null>(null)
+
+  // Keep ref in sync with state so async callbacks always see latest session
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
 
   // Validate Google Meet URL
   const isValidMeetUrl = (url: string): boolean => {
-    // Patterns:
-    // https://meet.google.com/abc-defg-hij
-    // meet.google.com/abc-defg-hij
     const pattern = /meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i
     return pattern.test(url)
   }
@@ -154,7 +205,6 @@ export default function MeetAnalysisView() {
       return
     }
 
-    // Ensure URL is properly formatted
     let fullUrl = meetUrl.trim()
     if (!fullUrl.startsWith('http')) {
       fullUrl = 'https://' + fullUrl
@@ -165,10 +215,10 @@ export default function MeetAnalysisView() {
       return
     }
 
-    // Clear any previous evaluation state
     setEvaluation(null)
     setSavedToHistory(false)
     hasTriggeredAutoEvalRef.current = false
+    speakerMapRef.current = new Map()
 
     setSession({
       botId: '',
@@ -205,7 +255,6 @@ export default function MeetAnalysisView() {
         startTime: new Date()
       } : null)
 
-      // Start polling for status and transcripts
       startPolling(data.botId)
 
     } catch (err: any) {
@@ -223,14 +272,12 @@ export default function MeetAnalysisView() {
 
     const poll = async () => {
       try {
-        // Get bot status
         const statusRes = await fetch(`/api/recall/bot-status?botId=${botId}`)
 
         if (statusRes.ok) {
           const statusData = await statusRes.json()
           console.log('📊 Bot status:', statusData.status, '(recall:', statusData.recallStatus, ')')
 
-          // Update session status
           setSession(prev => {
             if (!prev) return null
 
@@ -248,12 +295,10 @@ export default function MeetAnalysisView() {
                 newStatus = 'transcribing'
                 break
               case 'ended':
-                // Bot left automatically - trigger auto-evaluation
                 if (!hasTriggeredAutoEvalRef.current && prev.status !== 'ended') {
                   console.log('🤖 Bot saiu automaticamente, iniciando avaliação...')
                   hasTriggeredAutoEvalRef.current = true
                   stopPolling()
-                  // Trigger auto-evaluation after a short delay
                   setTimeout(() => triggerAutoEvaluation(botId), 500)
                 }
                 newStatus = 'ended'
@@ -268,27 +313,23 @@ export default function MeetAnalysisView() {
           })
         }
 
-        // Get transcript from webhook storage
         const transcriptRes = await fetch(`/api/recall/webhook?botId=${botId}`)
 
         if (transcriptRes.ok) {
           const transcriptData = await transcriptRes.json()
 
           if (transcriptData.transcript && transcriptData.transcript.length > 0) {
-            // Map segments to our format
             const segments: TranscriptSegment[] = transcriptData.transcript.map((seg: any) => ({
               speaker: seg.speaker || 'Participante',
               text: seg.text || '',
               timestamp: seg.timestamp || ''
             }))
 
-            // Consolidate consecutive messages from same speaker
             const consolidatedTranscript = consolidateTranscript(segments)
 
             setSession(prev => {
               if (!prev) return null
 
-              // Update to transcribing status if we have content
               const newStatus = prev.status === 'in_meeting' || prev.status === 'joining'
                 ? 'transcribing'
                 : prev.status
@@ -307,14 +348,10 @@ export default function MeetAnalysisView() {
       }
     }
 
-    // Initial poll
     poll()
-
-    // Poll every 2 seconds
     pollIntervalRef.current = setInterval(poll, 2000)
   }
 
-  // Stop polling
   const stopPolling = () => {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current)
@@ -322,32 +359,19 @@ export default function MeetAnalysisView() {
     }
   }
 
-  // Auto-evaluation when bot leaves automatically
   const triggerAutoEvaluation = async (botId: string) => {
     console.log('🔄 Iniciando avaliação automática...')
 
-    // Set status to evaluating
     setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
 
-    // Wait for Recall.ai to process the final transcript
     console.log('⏳ Aguardando processamento da transcrição final...')
-    await new Promise(resolve => setTimeout(resolve, 5000)) // Increased wait time
+    await new Promise(resolve => setTimeout(resolve, 5000))
 
-    // Fetch the final transcript
-    let transcriptToEvaluate: TranscriptSegment[] = []
-    let localTranscriptLength = 0
+    // Use ref to read the latest session state (avoids stale closure + React 18 batching issues)
+    const currentSession = sessionRef.current
+    let transcriptToEvaluate: TranscriptSegment[] = currentSession?.transcript || []
 
-    // First, get current session transcript
-    setSession(prev => {
-      if (prev) {
-        transcriptToEvaluate = prev.transcript
-        localTranscriptLength = prev.transcript.length
-      }
-      return prev
-    })
-
-    // Only fetch from API if we have NO local transcript (avoid getting old data)
-    if (localTranscriptLength === 0) {
+    if (transcriptToEvaluate.length === 0) {
       console.log(`📡 Sem transcrição local, buscando da API...`)
       try {
         const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
@@ -361,19 +385,17 @@ export default function MeetAnalysisView() {
         console.error('Error fetching final transcript:', err)
       }
     } else {
-      console.log(`📝 Usando transcrição local: ${localTranscriptLength} segmentos`)
+      console.log(`📝 Usando transcrição local: ${transcriptToEvaluate.length} segmentos`)
     }
 
-    // Evaluate if we have transcript
     if (transcriptToEvaluate.length > 0) {
-      await evaluateTranscript(transcriptToEvaluate)
+      await evaluateTranscript(transcriptToEvaluate, botId)
     } else {
       console.log('⚠️ Nenhuma transcrição encontrada para avaliar')
       setSession(prev => prev ? { ...prev, status: 'ended' } : null)
       setError('Nenhuma transcrição foi capturada. A reunião pode não ter tido áudio ou o bot não conseguiu gravar.')
     }
 
-    // Clean up transcript storage
     try {
       await fetch(`/api/recall/webhook?botId=${botId}`, {
         method: 'DELETE'
@@ -383,42 +405,41 @@ export default function MeetAnalysisView() {
     }
   }
 
-  // End session and evaluate (manual)
   const endSession = async () => {
-    // Mark as triggered to prevent double-evaluation
     hasTriggeredAutoEvalRef.current = true
     setIsEnding(true)
     stopPolling()
 
-    if (session?.botId) {
+    // Use ref to get the latest session (avoids stale closure)
+    const currentSession = sessionRef.current
+    const botId = currentSession?.botId
+
+    if (botId) {
       try {
-        console.log('🛑 Parando bot:', session.botId)
+        console.log('🛑 Parando bot:', botId)
         await fetch('/api/recall/stop-bot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ botId: session.botId })
+          body: JSON.stringify({ botId })
         })
       } catch (err) {
         console.error('Error stopping bot:', err)
       }
     }
 
-    // Set status to fetching transcript
     setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
 
-    // Wait a moment for Recall.ai to process the final transcript
     console.log('⏳ Aguardando processamento da transcrição...')
-    await new Promise(resolve => setTimeout(resolve, 5000)) // Increased wait time
+    await new Promise(resolve => setTimeout(resolve, 5000))
 
-    // Get local transcript length
-    let transcriptToEvaluate = session?.transcript || []
-    const localTranscriptLength = transcriptToEvaluate.length
+    // Re-read ref after the 5s wait to get any transcript updates
+    const latestSession = sessionRef.current
+    let transcriptToEvaluate = latestSession?.transcript || []
 
-    // Only fetch from API if we have NO local transcript (avoid getting old data)
-    if (session?.botId && localTranscriptLength === 0) {
+    if (botId && transcriptToEvaluate.length === 0) {
       console.log(`📡 Sem transcrição local, buscando da API...`)
       try {
-        const response = await fetch(`/api/recall/webhook?botId=${session.botId}&fallback=true`)
+        const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
         const data = await response.json()
         if (data.transcript && data.transcript.length > 0) {
           transcriptToEvaluate = data.transcript
@@ -428,23 +449,21 @@ export default function MeetAnalysisView() {
       } catch (err) {
         console.error('Error fetching final transcript:', err)
       }
-    } else if (localTranscriptLength > 0) {
-      console.log(`📝 Usando transcrição local: ${localTranscriptLength} segmentos`)
+    } else if (transcriptToEvaluate.length > 0) {
+      console.log(`📝 Usando transcrição local: ${transcriptToEvaluate.length} segmentos`)
     }
 
-    // Only evaluate if there's a transcript
     if (transcriptToEvaluate.length > 0) {
-      await evaluateTranscript(transcriptToEvaluate)
+      await evaluateTranscript(transcriptToEvaluate, botId)
     } else {
       console.log('⚠️ Nenhuma transcrição encontrada para avaliar')
       setSession(prev => prev ? { ...prev, status: 'ended' } : null)
       setError('Nenhuma transcrição foi capturada. A reunião pode não ter tido áudio ou o bot não conseguiu gravar.')
     }
 
-    // Clean up transcript storage
-    if (session?.botId) {
+    if (botId) {
       try {
-        await fetch(`/api/recall/webhook?botId=${session.botId}`, {
+        await fetch(`/api/recall/webhook?botId=${botId}`, {
           method: 'DELETE'
         })
       } catch (err) {
@@ -455,7 +474,6 @@ export default function MeetAnalysisView() {
     setIsEnding(false)
   }
 
-  // Save evaluation to database
   const saveEvaluationToHistory = async (
     evalData: MeetEvaluation,
     transcriptData: TranscriptSegment[],
@@ -463,27 +481,23 @@ export default function MeetAnalysisView() {
   ) => {
     setIsSaving(true)
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         console.error('❌ User not authenticated, cannot save evaluation')
         return false
       }
 
-      // Get company ID
       const companyId = await getCompanyId()
       if (!companyId) {
         console.error('❌ Company ID not found, cannot save evaluation')
         return false
       }
 
-      // Calculate overall_score as integer 0-100
       let overallScore = evalData.overall_score
       if (overallScore && overallScore <= 10) {
-        overallScore = overallScore * 10 // Convert from 0-10 to 0-100
+        overallScore = overallScore * 10
       }
 
-      // Prepare data for insertion
       const insertData = {
         user_id: user.id,
         company_id: companyId,
@@ -523,23 +537,27 @@ export default function MeetAnalysisView() {
     }
   }
 
-  // Evaluate the transcript
-  const evaluateTranscript = async (transcriptData?: TranscriptSegment[]) => {
-    const transcriptToUse = transcriptData || session?.transcript || []
-    if (!session || transcriptToUse.length === 0) return
+  const evaluateTranscript = async (transcriptData?: TranscriptSegment[], botIdOverride?: string) => {
+    // Use ref for latest session to avoid stale closure issues
+    const currentSession = sessionRef.current
+    const transcriptToUse = transcriptData || currentSession?.transcript || []
+    const botId = botIdOverride || currentSession?.botId
+
+    if (transcriptToUse.length === 0) {
+      console.log('⚠️ evaluateTranscript: sem transcrição para avaliar')
+      return
+    }
 
     setIsEvaluating(true)
     setError('')
 
     try {
-      // Format transcript for evaluation
       const transcriptText = transcriptToUse
         .map(s => `${s.speaker}: ${s.text}`)
         .join('\n')
 
-      console.log('📊 Enviando transcrição para avaliação...')
+      console.log('📊 Enviando transcrição para avaliação...', { botId, segments: transcriptToUse.length })
 
-      // Get company ID for playbook evaluation
       const companyId = await getCompanyId()
       console.log('🏢 Company ID para avaliação:', companyId || 'não encontrado')
 
@@ -548,7 +566,7 @@ export default function MeetAnalysisView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcript: transcriptText,
-          meetingId: session.botId,
+          meetingId: botId,
           companyId
         })
       })
@@ -568,9 +586,8 @@ export default function MeetAnalysisView() {
         setEvaluation(data.evaluation)
         setShowEvaluationModal(true)
 
-        // Save to history
-        if (session?.botId) {
-          await saveEvaluationToHistory(data.evaluation, transcriptToUse, session.botId)
+        if (botId) {
+          await saveEvaluationToHistory(data.evaluation, transcriptToUse, botId)
         }
       } else {
         throw new Error('Resposta inválida da API')
@@ -585,10 +602,10 @@ export default function MeetAnalysisView() {
     }
   }
 
-  // Reset session
   const resetSession = () => {
     stopPolling()
     hasTriggeredAutoEvalRef.current = false
+    speakerMapRef.current = new Map()
     setSession(null)
     setMeetUrl('')
     setError('')
@@ -597,308 +614,349 @@ export default function MeetAnalysisView() {
     setSavedToHistory(false)
   }
 
-  // Copy meeting URL
   const copyMeetUrl = () => {
     navigator.clipboard.writeText(meetUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Scroll to bottom of transcript
   useEffect(() => {
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight
     }
   }, [session?.transcript])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => stopPolling()
   }, [])
 
-  // Get status display
-  const getStatusDisplay = () => {
+  // Get status config
+  const getStatusConfig = () => {
     if (!session) return null
 
-    const statusConfig: Record<BotStatus, { icon: any; text: string; color: string }> = {
-      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500' },
-      sending: { icon: Loader2, text: 'Criando bot...', color: 'text-amber-600' },
-      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600' },
-      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600' },
-      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600' },
-      evaluating: { icon: Loader2, text: 'Avaliando performance...', color: 'text-purple-600' },
-      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600' },
-      error: { icon: XCircle, text: 'Erro', color: 'text-red-600' }
+    const statusConfig: Record<BotStatus, { icon: any; text: string; color: string; dotColor: string; bgColor: string }> = {
+      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500', dotColor: 'bg-gray-400', bgColor: 'bg-gray-50' },
+      sending: { icon: Loader2, text: 'Criando bot...', color: 'text-amber-600', dotColor: 'bg-amber-500', bgColor: 'bg-amber-50' },
+      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600', dotColor: 'bg-amber-500', bgColor: 'bg-amber-50' },
+      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600', dotColor: 'bg-green-500', bgColor: 'bg-green-50' },
+      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600', dotColor: 'bg-green-500', bgColor: 'bg-green-50' },
+      evaluating: { icon: Loader2, text: 'Avaliando performance...', color: 'text-emerald-600', dotColor: 'bg-emerald-500', bgColor: 'bg-emerald-50' },
+      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600', dotColor: 'bg-blue-500', bgColor: 'bg-blue-50' },
+      error: { icon: XCircle, text: 'Erro', color: 'text-red-600', dotColor: 'bg-red-500', bgColor: 'bg-red-50' }
     }
 
-    const config = statusConfig[session.status]
-    const Icon = config.icon
-
-    return (
-      <div className={`flex items-center gap-2 ${config.color}`}>
-        <Icon className={`w-5 h-5 ${session.status === 'sending' || session.status === 'joining' || session.status === 'evaluating' ? 'animate-spin' : ''}`} />
-        <span className="font-medium">{config.text}</span>
-      </div>
-    )
+    return statusConfig[session.status]
   }
 
+  const isLive = session?.status === 'in_meeting' || session?.status === 'transcribing' || session?.status === 'sending' || session?.status === 'joining'
+  const isSpinning = session?.status === 'sending' || session?.status === 'joining' || session?.status === 'evaluating'
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-6">
+    <div className="min-h-screen bg-[#F8F9FA] py-8 px-6">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-2xl flex items-center justify-center">
-            <Video className="w-8 h-8 text-green-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Análise de Google Meet
-          </h1>
-          <p className="text-gray-500">
-            Cole o link da reunião e nosso bot entrará para transcrever a conversa
-          </p>
-        </div>
 
-        {/* Input Section */}
+        {/* ==================== HERO / INITIAL STATE ==================== */}
         {!session && (
-          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Link do Google Meet
-            </label>
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={meetUrl}
-                  onChange={(e) => handleUrlChange(e.target.value)}
-                  placeholder="https://meet.google.com/abc-defg-hij"
-                  className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
-                />
-                {meetUrl && isValidMeetUrl(meetUrl) && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
-                      Válido
-                    </span>
-                    <button
-                      onClick={copyMeetUrl}
-                      className="text-gray-400 hover:text-green-600 transition-colors"
-                    >
-                      {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  </div>
-                )}
+          <div className="animate-fade-in pt-10">
+            {/* Header */}
+            <div className="text-center mb-10">
+              <div className="w-20 h-20 mx-auto mb-5 bg-gradient-to-br from-emerald-500/20 to-green-400/10 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                <Video className="w-10 h-10 text-emerald-600" />
               </div>
-              <button
-                onClick={sendBot}
-                disabled={!meetUrl}
-                className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-              >
-                <Send className="w-5 h-5" />
-                Enviar Bot
-              </button>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-500 bg-clip-text text-transparent mb-3">
+                Análise de Google Meet
+              </h1>
+              <p className="text-gray-500 text-lg max-w-md mx-auto">
+                Cole o link da reunião e nosso bot entrará para transcrever e avaliar a conversa
+              </p>
             </div>
-            {error && (
-              <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-                <AlertTriangle className="w-4 h-4" />
-                {error}
+
+            {/* Input Card */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 shadow-lg mb-8">
+              <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Link className="w-4 h-4 text-emerald-600" />
+                Link do Google Meet
+              </label>
+              <div className="flex gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={meetUrl}
+                    onChange={(e) => handleUrlChange(e.target.value)}
+                    placeholder="https://meet.google.com/abc-defg-hij"
+                    className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  />
+                  {meetUrl && isValidMeetUrl(meetUrl) && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full font-medium">
+                        Válido
+                      </span>
+                      <button
+                        onClick={copyMeetUrl}
+                        className="text-gray-400 hover:text-emerald-600 transition-colors"
+                      >
+                        {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={sendBot}
+                  disabled={!meetUrl}
+                  className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl font-semibold text-white transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Send className="w-5 h-5" />
+                  Enviar Bot
+                </button>
               </div>
-            )}
+              {error && (
+                <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-4 py-2.5 rounded-xl border border-red-200">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  {error}
+                </div>
+              )}
+            </div>
 
-            {/* Instructions */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Como funciona:</h3>
-              <ol className="text-sm text-gray-600 space-y-1.5">
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">1.</span>
-                  Cole o link da reunião do Google Meet acima
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">2.</span>
-                  Clique em "Enviar Bot" - um participante chamado "Ramppy" pedirá para entrar
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">3.</span>
-                  <strong className="text-amber-600">Aceite o bot na reunião</strong> quando ele pedir para participar
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">4.</span>
-                  Realize a reunião normalmente - o bot irá gravar e transcrever
-                </li>
-              </ol>
-
-              {/* Warning about ending the call */}
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-500 text-lg">⚠️</span>
-                  <div>
-                    <p className="text-sm font-semibold text-amber-700">Importante:</p>
-                    <p className="text-sm text-amber-600">
-                      Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação.
-                    </p>
+            {/* Step Cards */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              {[
+                { icon: Link, label: 'Cole o link', desc: 'Insira o link da reunião do Google Meet', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                { icon: Send, label: 'Envie o bot', desc: 'Clique em "Enviar Bot" e "Ramppy" pedirá para entrar', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+                { icon: UserPlus, label: 'Aceite na reunião', desc: 'Aceite o participante "Ramppy" no Google Meet', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+                { icon: BarChart3, label: 'Receba a análise', desc: 'Encerre e receba a avaliação SPIN completa', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
+              ].map((step, idx) => (
+                <div
+                  key={idx}
+                  className={`${step.bg} border ${step.border} rounded-2xl p-4 text-center hover:shadow-md transition-all duration-300`}
+                  style={{ animationDelay: `${idx * 100}ms` }}
+                >
+                  <div className={`w-10 h-10 mx-auto mb-3 rounded-xl ${step.bg} flex items-center justify-center`}>
+                    <step.icon className={`w-5 h-5 ${step.color}`} />
                   </div>
+                  <div className={`text-xs font-bold ${step.color} mb-0.5`}>Passo {idx + 1}</div>
+                  <h4 className="text-sm font-bold text-gray-900 mb-1">{step.label}</h4>
+                  <p className="text-xs text-gray-500 leading-relaxed">{step.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Warning */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-amber-700">Importante</p>
+                  <p className="text-sm text-amber-600 mt-0.5">
+                    Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação automaticamente.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Session Active */}
+        {/* ==================== ACTIVE SESSION ==================== */}
         {session && (
-          <div className="space-y-6">
+          <div className="space-y-5 animate-fade-in">
             {/* Status Bar */}
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  {getStatusDisplay()}
-                  {session.startTime && (
-                    <span className="text-sm text-gray-500">
-                      Iniciado às {session.startTime.toLocaleTimeString('pt-BR')}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {session.status !== 'ended' && session.status !== 'error' && (
-                    <button
-                      onClick={endSession}
-                      disabled={isEnding}
-                      className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 border ${
-                        isEnding
-                          ? 'bg-amber-50 text-amber-600 border-amber-200 cursor-not-allowed'
-                          : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
-                      }`}
-                    >
-                      {isEnding ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Encerrando...
-                        </>
-                      ) : (
-                        <>
-                          <StopCircle className="w-4 h-4" />
-                          Encerrar
-                        </>
+            {(() => {
+              const config = getStatusConfig()
+              if (!config) return null
+              const Icon = config.icon
+              return (
+                <div className={`bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg overflow-hidden`}>
+                  <div className={`h-1 ${isLive ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-green-400 animate-shimmer' : session.status === 'evaluating' ? 'bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 animate-shimmer' : session.status === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                  <div className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`flex items-center gap-2.5 ${config.color}`}>
+                        {isLive && (
+                          <span className="relative flex h-3 w-3">
+                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotColor} opacity-75`} />
+                            <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotColor}`} />
+                          </span>
+                        )}
+                        <Icon className={`w-5 h-5 ${isSpinning ? 'animate-spin' : ''}`} />
+                        <span className="font-semibold text-sm">{config.text}</span>
+                      </div>
+                      {session.startTime && (
+                        <span className="text-sm text-gray-400 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          Iniciado às {session.startTime.toLocaleTimeString('pt-BR')}
+                        </span>
                       )}
-                    </button>
-                  )}
-                  {(session.status === 'ended' || session.status === 'error') && (
-                    <button
-                      onClick={resetSession}
-                      className="px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-green-200"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Nova Análise
-                    </button>
-                  )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {session.status !== 'ended' && session.status !== 'error' && (
+                        <button
+                          onClick={endSession}
+                          disabled={isEnding}
+                          className={`px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold ${
+                            isEnding
+                              ? 'bg-amber-50 text-amber-600 border border-amber-200 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md shadow-red-500/20 hover:shadow-red-500/30 hover:scale-[1.02] active:scale-[0.98]'
+                          }`}
+                        >
+                          {isEnding ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Encerrando...
+                            </>
+                          ) : (
+                            <>
+                              <StopCircle className="w-4 h-4" />
+                              Encerrar
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {(session.status === 'ended' || session.status === 'error') && (
+                        <button
+                          onClick={resetSession}
+                          className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Nova Análise
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })()}
 
-            {/* Transcript */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  Transcrição em Tempo Real
-                  {session.transcript.length > 0 && (
-                    <span className="text-xs text-gray-500">
-                      ({session.transcript.length} {session.transcript.length === 1 ? 'fala' : 'falas'})
-                    </span>
-                  )}
-                </h3>
+            {/* Error display */}
+            {error && session.status === 'ended' && (
+              <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-4 py-2.5 rounded-xl border border-red-200">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                {error}
               </div>
+            )}
 
-              <div
-                ref={transcriptRef}
-                className="h-[400px] overflow-y-auto p-4 space-y-4 bg-white"
-              >
+            {/* In Progress / Transcript - Hidden during evaluation */}
+            {session.status !== 'evaluating' && !isEvaluating && session.status !== 'ended' && session.status !== 'error' && (
+              <>
                 {session.transcript.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-12 flex flex-col items-center justify-center">
                     {session.status === 'joining' || session.status === 'sending' ? (
                       <>
-                        <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
-                        <p className="text-gray-600">Aguardando bot entrar na reunião...</p>
-                        <p className="text-sm text-gray-500 mt-2">
+                        <div className="w-14 h-14 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin mb-5" />
+                        <p className="text-gray-800 font-semibold text-lg">Entrando na reunião...</p>
+                        <p className="text-sm text-gray-400 mt-1">
                           Isso geralmente leva de 10 a 30 segundos
                         </p>
-                        <p className="text-sm text-amber-600 mt-2 font-medium">
-                          Lembre-se de aceitar o "Ramppy" quando ele pedir para entrar!
-                        </p>
+                        <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+                          <p className="text-sm text-amber-600 font-medium flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            Lembre-se de aceitar o "Ramppy" quando ele pedir para entrar!
+                          </p>
+                        </div>
                       </>
-                    ) : session.status === 'in_meeting' ? (
+                    ) : session.status === 'in_meeting' || session.status === 'transcribing' ? (
                       <>
-                        <Video className="w-8 h-8 mb-3 text-green-600" />
-                        <p className="text-gray-600">Bot na reunião. Aguardando transcrição...</p>
+                        <div className="w-14 h-14 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin mb-5" />
+                        <p className="text-gray-800 font-semibold text-lg">Reunião em andamento</p>
+                        <p className="text-sm text-gray-400 mt-1">Gravando e transcrevendo a conversa...</p>
                       </>
                     ) : (
                       <>
-                        <Clock className="w-8 h-8 mb-3 text-gray-400" />
-                        <p className="text-gray-500">Nenhuma transcrição ainda</p>
+                        <div className="w-14 h-14 rounded-full border-4 border-gray-200 border-t-gray-400 animate-spin mb-5" />
+                        <p className="text-gray-400 font-medium">Aguardando...</p>
                       </>
                     )}
                   </div>
                 ) : (
-                  session.transcript.map((segment, idx) => (
-                    <div key={idx} className="flex gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <User className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="font-semibold text-green-700 text-sm">
-                            {segment.speaker}
-                          </span>
-                          {segment.timestamp && (
-                            <span className="text-xs text-gray-400">
-                              {segment.timestamp}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                          {segment.text}
-                        </p>
-                      </div>
+                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <div className="w-1.5 h-5 bg-gradient-to-b from-emerald-500 to-green-400 rounded-full" />
+                        <Users className="w-4 h-4 text-emerald-600" />
+                        Transcrição
+                      </h3>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
+                        {session.transcript.length} {session.transcript.length === 1 ? 'fala' : 'falas'}
+                      </span>
                     </div>
-                  ))
+
+                    <div
+                      ref={transcriptRef}
+                      className="h-[420px] overflow-y-auto p-5 space-y-4 custom-scrollbar"
+                    >
+                      {session.transcript.map((segment, idx) => {
+                        const color = getSpeakerColor(segment.speaker, speakerMapRef.current)
+                        return (
+                          <div key={idx} className="flex gap-3 animate-fade-in">
+                            <div className={`flex-shrink-0 w-9 h-9 rounded-full ${color.bg} flex items-center justify-center`}>
+                              <span className={`text-xs font-bold ${color.text}`}>
+                                {segment.speaker.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-2 mb-0.5">
+                                <span className={`font-semibold text-sm ${color.text}`}>
+                                  {segment.speaker}
+                                </span>
+                                {segment.timestamp && (
+                                  <span className="text-xs text-gray-300">
+                                    {segment.timestamp}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-gray-700 text-sm leading-relaxed">
+                                {segment.text}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
+              </>
+            )}
 
             {/* Evaluation Loading */}
             {(session.status === 'evaluating' || isEvaluating) && (
-              <div className="bg-green-50 rounded-xl p-6 border border-green-200">
-                <div className="flex items-center gap-3">
-                  <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">Avaliando Performance...</h3>
-                    <p className="text-gray-600 text-sm">Analisando a reunião com metodologia SPIN Selling</p>
-                  </div>
+              <div className="bg-gradient-to-br from-emerald-500/5 to-green-400/5 rounded-2xl p-8 border border-emerald-500/20 shadow-lg flex flex-col items-center justify-center">
+                <div className="w-16 h-16 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin mb-6" />
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Avaliando Performance...</h3>
+                <p className="text-gray-500 text-sm mb-5">Analisando a reunião com metodologia SPIN Selling</p>
+                <div className="w-full max-w-xs h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full animate-shimmer" style={{ width: '60%' }} />
                 </div>
               </div>
             )}
 
             {/* Evaluation Results - Compact View */}
             {session.status === 'ended' && evaluation && (
-              <div className="space-y-4">
-                {/* Score Header - Click to open modal */}
+              <div className="space-y-4 animate-fade-in">
+                {/* Score Header */}
                 <div
                   onClick={() => setShowEvaluationModal(true)}
-                  className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all"
+                  className="bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg cursor-pointer hover:shadow-xl hover:border-emerald-500/30 transition-all duration-300 overflow-hidden"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500" />
+                  <div className="p-6 flex items-center justify-between">
                     <div>
                       <h3 className="text-xl font-bold text-gray-900 mb-1">Avaliação da Reunião</h3>
                       {evaluation.seller_identification?.name && (
-                        <p className="text-gray-600 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
+                        <p className="text-gray-500 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
                       )}
-                      <p className="text-green-600 text-sm mt-2 font-medium">Clique para ver detalhes completos →</p>
+                      <p className="text-emerald-600 text-sm mt-2 font-medium flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        Clique para ver detalhes completos
+                      </p>
                     </div>
                     <div className="text-right">
-                      <div className={`text-5xl font-bold ${
-                        (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
-                        (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
-                      }`}>{evaluation.overall_score?.toFixed(1)}</div>
-                      <div className="text-gray-500 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
+                      <div className={`text-5xl font-black ${getScoreColor(evaluation.overall_score || 0)}`}>
+                        {evaluation.overall_score?.toFixed(1)}
+                      </div>
+                      <div className="text-gray-500 text-sm font-medium mt-1">
+                        {getPerformanceLabel(evaluation.performance_level || '')}
+                      </div>
                       {evaluation.playbook_adherence && (
-                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-600">
+                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-500">
                           <BookOpen className="w-4 h-4" />
                           <span className="text-sm">
                             Playbook: {evaluation.playbook_adherence.overall_adherence_score}%
@@ -906,15 +964,15 @@ export default function MeetAnalysisView() {
                         </div>
                       )}
                       {savedToHistory && (
-                        <div className="mt-2 flex items-center gap-1 justify-end text-green-600">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm">Salvo no histórico</span>
+                        <div className="mt-1.5 flex items-center gap-1 justify-end text-green-600">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span className="text-xs font-medium">Salvo no histórico</span>
                         </div>
                       )}
                       {isSaving && (
-                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-500">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span className="text-sm">Salvando...</span>
+                        <div className="mt-1.5 flex items-center gap-1 justify-end text-gray-400">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span className="text-xs">Salvando...</span>
                         </div>
                       )}
                     </div>
@@ -922,16 +980,15 @@ export default function MeetAnalysisView() {
                 </div>
 
                 {/* Quick SPIN Scores */}
-                <div className="bg-white rounded-xl p-4 border border-gray-200">
+                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 border border-gray-200 shadow-lg">
                   <div className="grid grid-cols-4 gap-3">
                     {['S', 'P', 'I', 'N'].map((letter) => {
                       const score = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]?.final_score || 0
-                      const color = score >= 7 ? 'text-green-600 bg-green-50' : score >= 5 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50'
-                      const labels: Record<string, string> = { S: 'S', P: 'P', I: 'I', N: 'N' }
+                      const labels: Record<string, string> = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
                       return (
-                        <div key={letter} className={`rounded-lg p-3 text-center ${color.split(' ')[1]}`}>
-                          <div className={`text-2xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
-                          <div className="text-gray-600 text-xs font-medium">{labels[letter]}</div>
+                        <div key={letter} className={`rounded-xl p-3.5 text-center border ${getScoreBg(score)}`}>
+                          <div className={`text-2xl font-black ${getScoreColor(score)}`}>{score.toFixed(1)}</div>
+                          <div className="text-gray-600 text-xs font-semibold mt-0.5">{labels[letter]}</div>
                         </div>
                       )
                     })}
@@ -942,7 +999,7 @@ export default function MeetAnalysisView() {
                 <div className="flex gap-3 justify-center">
                   <button
                     onClick={() => setShowEvaluationModal(true)}
-                    className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <FileText className="w-4 h-4" />
                     Ver Avaliação Completa
@@ -954,14 +1011,14 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
+                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 flex items-center gap-2 font-medium border border-gray-200 hover:border-gray-300 shadow-sm"
                   >
                     <Copy className="w-4 h-4" />
                     Copiar Transcrição
                   </button>
                   <button
                     onClick={resetSession}
-                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-gray-200 font-medium"
+                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-emerald-600 rounded-xl transition-all duration-200 flex items-center gap-2 border border-gray-200 hover:border-emerald-500/30 font-medium shadow-sm"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Nova Análise
@@ -970,23 +1027,43 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {/* Session ended without evaluation (no transcript) */}
+            {/* Session ended without evaluation and without transcript */}
+            {session.status === 'ended' && !evaluation && session.transcript.length === 0 && !isEvaluating && (
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 shadow-lg text-center">
+                <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle className="w-7 h-7 text-amber-500" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Sessão encerrada sem transcrição</h3>
+                <p className="text-gray-500 mb-5 text-sm">
+                  Não foi possível capturar a transcrição desta reunião. Isso pode acontecer se o bot não conseguiu gravar ou se houve um erro na conexão.
+                </p>
+                <button
+                  onClick={resetSession}
+                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] mx-auto"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Tentar Novamente
+                </button>
+              </div>
+            )}
+
+            {/* Session ended without evaluation (has transcript) */}
             {session.status === 'ended' && !evaluation && session.transcript.length > 0 && !isEvaluating && (
-              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Sessão Encerrada</h3>
-                <p className="text-gray-600 mb-4">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Sessão Encerrada</h3>
+                <p className="text-gray-500 mb-5">
                   A transcrição foi capturada. Você pode avaliar a performance ou copiar a transcrição.
                 </p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => evaluateTranscript()}
                     disabled={isEvaluating}
-                    className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium disabled:opacity-50"
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold disabled:opacity-50 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
                   >
                     {isEvaluating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <CheckCircle className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4" />
                     )}
                     Avaliar Performance
                   </button>
@@ -997,14 +1074,14 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
+                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 flex items-center gap-2 font-medium border border-gray-200 hover:border-gray-300 shadow-sm"
                   >
                     <Copy className="w-4 h-4" />
                     Copiar Transcrição
                   </button>
                   <button
                     onClick={resetSession}
-                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-gray-200 font-medium"
+                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-emerald-600 rounded-xl transition-all duration-200 flex items-center gap-2 border border-gray-200 hover:border-emerald-500/30 font-medium shadow-sm"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Nova Análise
@@ -1016,43 +1093,44 @@ export default function MeetAnalysisView() {
         )}
       </div>
 
-      {/* Modal de Avaliação Flutuante */}
+      {/* ==================== EVALUATION MODAL ==================== */}
       {showEvaluationModal && evaluation && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] overflow-y-auto">
           <div className="min-h-screen py-8 px-4 sm:px-6">
-            <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-200">
+            <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-200 animate-scale-in">
               {/* Header */}
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-white rounded-t-2xl">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                      <Video className="w-5 h-5 text-green-600" />
+                    <div className="w-11 h-11 bg-gradient-to-br from-emerald-500/20 to-green-400/10 rounded-xl flex items-center justify-center">
+                      <Video className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
                       <h2 className="text-xl font-bold text-gray-900">Avaliação da Reunião</h2>
                       {evaluation.seller_identification?.name && (
-                        <p className="text-gray-500 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
+                        <p className="text-gray-400 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
                       )}
                     </div>
                   </div>
                   {savedToHistory && (
-                    <div className="mt-2 flex items-center gap-1 text-green-600 text-sm">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Salvo no histórico</span>
+                    <div className="mt-2 flex items-center gap-1 text-green-600 text-sm ml-14">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">Salvo no histórico</span>
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className={`text-4xl font-bold ${
-                      (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
-                      (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
-                    }`}>{evaluation.overall_score?.toFixed(1)}</div>
-                    <div className="text-gray-500 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
+                    <div className={`text-4xl font-black ${getScoreColor(evaluation.overall_score || 0)}`}>
+                      {evaluation.overall_score?.toFixed(1)}
+                    </div>
+                    <div className="text-gray-400 text-sm font-medium">
+                      {getPerformanceLabel(evaluation.performance_level || '')}
+                    </div>
                   </div>
                   <button
                     onClick={() => setShowEvaluationModal(false)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+                    className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-600"
                   >
                     <X className="w-6 h-6" />
                   </button>
@@ -1060,22 +1138,24 @@ export default function MeetAnalysisView() {
               </div>
 
               {/* Content */}
-              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 {/* SPIN Scores */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Metodologia SPIN</h3>
+                <div className="rounded-2xl p-5 border border-gray-200">
+                  <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-emerald-600" />
+                    Metodologia SPIN
+                  </h3>
                   <div className="grid grid-cols-4 gap-4">
                     {['S', 'P', 'I', 'N'].map((letter) => {
                       const spinData = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]
                       const score = spinData?.final_score || 0
-                      const color = score >= 7 ? 'text-green-600 bg-green-50 border-green-200' : score >= 5 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'
                       const labels: Record<string, string> = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
                       return (
-                        <div key={letter} className={`rounded-xl p-4 border ${color.split(' ').slice(1).join(' ')}`}>
-                          <div className={`text-3xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
-                          <div className="text-gray-600 text-sm font-medium">{labels[letter]}</div>
+                        <div key={letter} className={`rounded-xl p-4 border ${getScoreBg(score)}`}>
+                          <div className={`text-3xl font-black ${getScoreColor(score)}`}>{score.toFixed(1)}</div>
+                          <div className="text-gray-600 text-sm font-semibold">{labels[letter]}</div>
                           {spinData?.technical_feedback && (
-                            <p className="text-xs text-gray-500 mt-2 line-clamp-3">{spinData.technical_feedback}</p>
+                            <p className="text-xs text-gray-500 mt-2 line-clamp-3 leading-relaxed">{spinData.technical_feedback}</p>
                           )}
                         </div>
                       )
@@ -1085,10 +1165,10 @@ export default function MeetAnalysisView() {
 
                 {/* Playbook Adherence */}
                 {evaluation.playbook_adherence && (
-                  <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <div className="rounded-2xl p-5 border border-gray-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <BookOpen className="w-5 h-5 text-green-600" />
-                      <h3 className="text-lg font-bold text-gray-900">Aderência ao Playbook</h3>
+                      <BookOpen className="w-5 h-5 text-emerald-600" />
+                      <h3 className="text-base font-bold text-gray-900">Aderência ao Playbook</h3>
                       <span className={`ml-auto px-3 py-1 rounded-full text-sm font-bold ${
                         evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-800' :
                         evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-green-50 text-green-700' :
@@ -1103,7 +1183,6 @@ export default function MeetAnalysisView() {
                       </span>
                     </div>
 
-                    {/* Dimensions */}
                     <div className="grid grid-cols-5 gap-3 mb-4">
                       {Object.entries(evaluation.playbook_adherence.dimensions || {}).map(([key, dim]) => {
                         if (!dim) return null
@@ -1114,91 +1193,99 @@ export default function MeetAnalysisView() {
                           required_scripts: 'Scripts',
                           process: 'Processo'
                         }
-                        const scoreColor = dim.score >= 70 ? 'text-green-600 bg-green-50 border-green-200' : dim.score >= 50 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'
+                        const dimScoreBg = dim.score >= 70 ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200' : dim.score >= 50 ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200' : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
+                        const dimScoreColor = dim.score >= 70 ? 'text-green-600' : dim.score >= 50 ? 'text-amber-600' : 'text-red-600'
                         return (
-                          <div key={key} className={`rounded-lg p-3 text-center border ${scoreColor.split(' ').slice(1).join(' ')}`}>
-                            <div className={`text-xl font-bold ${scoreColor.split(' ')[0]}`}>{dim.score}%</div>
-                            <div className="text-xs text-gray-600">{dimLabels[key] || key}</div>
+                          <div key={key} className={`rounded-xl p-3 text-center border ${dimScoreBg}`}>
+                            <div className={`text-xl font-black ${dimScoreColor}`}>{dim.score}%</div>
+                            <div className="text-xs text-gray-600 font-medium">{dimLabels[key] || key}</div>
                           </div>
                         )
                       })}
                     </div>
 
-                    {/* Violations */}
                     {evaluation.playbook_adherence.violations && evaluation.playbook_adherence.violations.length > 0 && (
-                      <div className="bg-red-50 rounded-lg p-3 mb-3 border border-red-200">
+                      <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-4 mb-3 border border-red-200">
                         <h4 className="text-sm font-bold text-red-800 mb-2">Violações</h4>
-                        <ul className="space-y-1">
-                          {evaluation.playbook_adherence.violations.map((v, i) => (
-                            <li key={i} className="text-sm text-red-700 flex items-start gap-1">
+                        <ul className="space-y-1.5">
+                          {evaluation.playbook_adherence.violations.map((v: any, i: number) => (
+                            <li key={i} className="text-sm text-red-700 flex items-start gap-1.5">
                               <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              {v}
+                              {typeof v === 'string' ? v : v.criterion || v.evidence || JSON.stringify(v)}
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
 
-                    {/* Exemplary Moments */}
                     {evaluation.playbook_adherence.exemplary_moments && evaluation.playbook_adherence.exemplary_moments.length > 0 && (
-                      <div className="bg-green-50 rounded-lg p-3 mb-3 border border-green-200">
+                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 mb-3 border border-green-200">
                         <h4 className="text-sm font-bold text-green-800 mb-2">Momentos Exemplares</h4>
-                        <ul className="space-y-1">
-                          {evaluation.playbook_adherence.exemplary_moments.map((m, i) => (
-                            <li key={i} className="text-sm text-green-700 flex items-start gap-1">
-                              <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              {m}
+                        <ul className="space-y-2">
+                          {evaluation.playbook_adherence.exemplary_moments.map((m: any, i: number) => (
+                            <li key={i} className="text-sm text-green-700">
+                              <div className="flex items-start gap-1.5">
+                                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <span className="font-medium">{typeof m === 'string' ? m : m.criterion || ''}</span>
+                                  {typeof m === 'object' && m.evidence && (
+                                    <p className="text-green-600 text-xs mt-0.5 italic">"{m.evidence}"</p>
+                                  )}
+                                </div>
+                              </div>
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
 
-                    {/* Coaching Notes */}
                     {evaluation.playbook_adherence.coaching_notes && (
-                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <h4 className="text-sm font-bold text-gray-700 mb-1">Notas de Coaching</h4>
-                        <p className="text-sm text-gray-600">{evaluation.playbook_adherence.coaching_notes}</p>
+                        <p className="text-sm text-gray-600 leading-relaxed">{evaluation.playbook_adherence.coaching_notes}</p>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Executive Summary */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Resumo Executivo</h3>
-                  <p className="text-gray-700 whitespace-pre-line">{evaluation.executive_summary}</p>
+                <div className="rounded-2xl p-5 border border-gray-200">
+                  <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-emerald-600" />
+                    Resumo Executivo
+                  </h3>
+                  <p className="text-gray-700 whitespace-pre-line leading-relaxed text-sm">{evaluation.executive_summary}</p>
                 </div>
 
                 {/* Strengths & Gaps */}
                 <div className="grid grid-cols-2 gap-4">
                   {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
-                    <div className="bg-white rounded-xl p-5 border border-gray-200">
-                      <h4 className="text-md font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-200">
+                      <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-green-600" />
                         Pontos Fortes
                       </h4>
                       <ul className="space-y-2">
-                        {evaluation.top_strengths.map((strength, idx) => (
+                        {evaluation.top_strengths.map((strength: any, idx: number) => (
                           <li key={idx} className="flex items-start gap-2 text-gray-700 text-sm">
-                            <span className="text-green-500 mt-0.5">•</span>
-                            <span>{strength}</span>
+                            <span className="text-green-500 mt-0.5 font-bold">•</span>
+                            <span>{typeof strength === 'string' ? strength : strength?.text || strength?.description || JSON.stringify(strength)}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
                   {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                    <div className="bg-white rounded-xl p-5 border border-gray-200">
-                      <h4 className="text-md font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-5 border border-amber-200">
+                      <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5 text-amber-600" />
                         Gaps Críticos
                       </h4>
                       <ul className="space-y-2">
-                        {evaluation.critical_gaps.map((gap, idx) => (
+                        {evaluation.critical_gaps.map((gap: any, idx: number) => (
                           <li key={idx} className="flex items-start gap-2 text-gray-700 text-sm">
-                            <span className="text-amber-500 mt-0.5">•</span>
-                            <span>{gap}</span>
+                            <span className="text-amber-500 mt-0.5 font-bold">•</span>
+                            <span>{typeof gap === 'string' ? gap : gap?.text || gap?.description || JSON.stringify(gap)}</span>
                           </li>
                         ))}
                       </ul>
@@ -1208,21 +1295,24 @@ export default function MeetAnalysisView() {
 
                 {/* Objections Analysis */}
                 {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
-                  <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Análise de Objeções</h3>
+                  <div className="rounded-2xl p-5 border border-gray-200">
+                    <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-emerald-600" />
+                      Análise de Objeções
+                    </h3>
                     <div className="space-y-4">
                       {evaluation.objections_analysis.map((obj, idx) => (
-                        <div key={idx} className="border-l-4 border-green-400 pl-4 py-2 bg-gray-50 rounded-r-lg">
+                        <div key={idx} className="border-l-4 border-emerald-500/40 pl-4 py-2 bg-gray-50 rounded-r-xl">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
+                            <span className="text-xs bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
                               {obj.objection_type}
                             </span>
-                            <span className={`text-sm font-bold ${obj.score >= 7 ? 'text-green-600' : obj.score >= 5 ? 'text-amber-600' : 'text-red-600'}`}>
+                            <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
                               Nota: {obj.score}/10
                             </span>
                           </div>
-                          <p className="text-gray-600 text-sm italic mb-2">"{obj.objection_text}"</p>
-                          <p className="text-gray-700 text-sm">{obj.detailed_analysis}</p>
+                          <p className="text-gray-500 text-sm italic mb-2">"{obj.objection_text}"</p>
+                          <p className="text-gray-700 text-sm leading-relaxed">{obj.detailed_analysis}</p>
                         </div>
                       ))}
                     </div>
@@ -1231,23 +1321,26 @@ export default function MeetAnalysisView() {
 
                 {/* Priority Improvements */}
                 {evaluation.priority_improvements && evaluation.priority_improvements.length > 0 && (
-                  <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Melhorias Prioritárias</h3>
+                  <div className="rounded-2xl p-5 border border-gray-200">
+                    <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-emerald-600" />
+                      Melhorias Prioritárias
+                    </h3>
                     <div className="space-y-3">
                       {evaluation.priority_improvements.map((imp, idx) => (
-                        <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                           <div className="flex items-center gap-2 mb-2">
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
                               imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
                               imp.priority === 'high' ? 'bg-amber-100 text-amber-700' :
                               'bg-green-100 text-green-700'
                             }`}>
                               {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
                             </span>
-                            <span className="font-semibold text-gray-900">{imp.area}</span>
+                            <span className="font-semibold text-gray-900 text-sm">{imp.area}</span>
                           </div>
-                          <p className="text-gray-600 text-sm mb-1"><strong>Gap:</strong> {imp.current_gap}</p>
-                          <p className="text-gray-700 text-sm"><strong>Plano:</strong> {imp.action_plan}</p>
+                          <p className="text-gray-500 text-sm mb-1"><strong className="text-gray-700">Gap:</strong> {imp.current_gap}</p>
+                          <p className="text-gray-600 text-sm"><strong className="text-gray-700">Plano:</strong> {imp.action_plan}</p>
                         </div>
                       ))}
                     </div>
@@ -1256,7 +1349,7 @@ export default function MeetAnalysisView() {
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t border-gray-200 flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
+              <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
                 <button
                   onClick={() => {
                     if (session) {
@@ -1266,14 +1359,14 @@ export default function MeetAnalysisView() {
                       navigator.clipboard.writeText(text)
                     }
                   }}
-                  className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
+                  className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 flex items-center gap-2 font-medium border border-gray-200 hover:border-gray-300"
                 >
                   <Copy className="w-4 h-4" />
                   Copiar Transcrição
                 </button>
                 <button
                   onClick={() => setShowEvaluationModal(false)}
-                  className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
                 >
                   Fechar
                 </button>
