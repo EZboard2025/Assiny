@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   Copy,
   Check,
-  X,
   BookOpen,
   FileText,
   Save,
@@ -121,6 +120,17 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
   return consolidated
 }
 
+// Strip GPT markdown formatting from text (bold **text**, em dashes —, etc.)
+function cleanGptText(text: string): string {
+  return text
+    .replace(/\*\*/g, '')       // Remove **bold**
+    .replace(/\*/g, '')         // Remove *italic*
+    .replace(/\s*—\s*/g, ': ') // Replace em dash with colon
+    .replace(/\s*–\s*/g, ': ') // Replace en dash with colon
+    .replace(/^Tecnica:\s*/i, '') // Remove leading "Tecnica:" if already have colon from dash
+    .trim()
+}
+
 export default function MeetAnalysisView() {
   const router = useRouter()
   const [meetUrl, setMeetUrl] = useState('')
@@ -138,52 +148,116 @@ export default function MeetAnalysisView() {
   const [isGeneratingSimulation, setIsGeneratingSimulation] = useState(false)
   const [simulationConfig, setSimulationConfig] = useState<any>(null)
   const [savedSimulation, setSavedSimulation] = useState<any>(null)
+  const [isSavingSimulation, setIsSavingSimulation] = useState(false)
+  const [currentSimSaved, setCurrentSimSaved] = useState(false)
   const simulationRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
 
-  // Load saved simulation from localStorage on mount
+  // Load saved simulation from Supabase on mount
   useEffect(() => {
-    const stored = localStorage.getItem('savedMeetSimulation')
-    if (stored) {
+    const loadSaved = async () => {
       try {
-        setSavedSimulation(JSON.parse(stored))
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data, error } = await supabase
+          .from('saved_simulations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (error) {
+          console.error('Error loading saved simulation:', error)
+          return
+        }
+        if (data) {
+          setSavedSimulation(data)
+        }
       } catch (e) {
-        console.error('Error parsing saved simulation:', e)
-        localStorage.removeItem('savedMeetSimulation')
+        console.error('Error loading saved simulation:', e)
       }
     }
+    loadSaved()
   }, [])
 
-  // Save simulation for later
-  const saveSimulationForLater = () => {
+  // Save simulation for later (Supabase)
+  const saveSimulationForLater = async () => {
     if (!simulationConfig || !evaluation) return
-    const data = {
-      simulation_config: simulationConfig,
-      source_evaluation: {
-        overall_score: evaluation.overall_score,
-        performance_level: evaluation.performance_level,
-        meeting_id: session?.botId
-      },
-      saved_at: new Date().toISOString()
+    setIsSavingSimulation(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const companyId = await getCompanyId()
+      if (!companyId) return
+
+      const { data, error } = await supabase
+        .from('saved_simulations')
+        .insert({
+          user_id: user.id,
+          company_id: companyId,
+          simulation_config: simulationConfig,
+          simulation_justification: simulationConfig.simulation_justification || null,
+          meeting_context: simulationConfig.meeting_context || null,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error saving simulation:', error)
+        return
+      }
+
+      setSavedSimulation(data)
+      setCurrentSimSaved(true)
+      setShowEvaluationModal(false)
+    } catch (e) {
+      console.error('Error saving simulation:', e)
+    } finally {
+      setIsSavingSimulation(false)
     }
-    localStorage.setItem('savedMeetSimulation', JSON.stringify(data))
-    setSavedSimulation(data)
-    setShowEvaluationModal(false)
   }
 
-  // Discard saved simulation
-  const discardSavedSimulation = () => {
-    localStorage.removeItem('savedMeetSimulation')
+  // Discard saved simulation (Supabase)
+  const discardSavedSimulation = async () => {
+    if (!savedSimulation?.id) return
+    try {
+      await supabase
+        .from('saved_simulations')
+        .delete()
+        .eq('id', savedSimulation.id)
+    } catch (e) {
+      console.error('Error deleting saved simulation:', e)
+    }
     setSavedSimulation(null)
   }
 
   // Start saved simulation
-  const startSavedSimulation = () => {
+  const startSavedSimulation = async () => {
     if (!savedSimulation) return
-    sessionStorage.setItem('meetSimulation', JSON.stringify(savedSimulation))
-    localStorage.removeItem('savedMeetSimulation')
+    // Pass simulation data to roleplay page via sessionStorage
+    const meetSimData = {
+      simulation_config: savedSimulation.simulation_config,
+    }
+    sessionStorage.setItem('meetSimulation', JSON.stringify(meetSimData))
+
+    // Delete from Supabase (or mark as completed)
+    if (savedSimulation.id) {
+      try {
+        await supabase
+          .from('saved_simulations')
+          .delete()
+          .eq('id', savedSimulation.id)
+      } catch (e) {
+        console.error('Error deleting saved simulation:', e)
+      }
+    }
+
     setSavedSimulation(null)
     router.push('/roleplay')
   }
@@ -756,6 +830,7 @@ export default function MeetAnalysisView() {
       const data = await response.json()
       if (data.success && data.simulationConfig) {
         setSimulationConfig(data.simulationConfig)
+        setCurrentSimSaved(false)
         // Auto-scroll to simulation section after render
         setTimeout(() => {
           simulationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -847,103 +922,7 @@ export default function MeetAnalysisView() {
           </p>
         </div>
 
-        {/* Saved Simulation Card - Visible on Main Page */}
-        {savedSimulation && !session && (
-          <div className="bg-white rounded-xl border border-purple-200 shadow-sm mb-6 overflow-hidden">
-            {/* Purple accent bar */}
-            <div className="h-1.5 bg-gradient-to-r from-purple-500 to-purple-600" />
-            <div className="p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <Target className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">Simulacao de Treino Pendente</h3>
-                    <p className="text-xs text-gray-500">
-                      Salva em {new Date(savedSimulation.saved_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      {savedSimulation.source_evaluation?.overall_score && (
-                        <> &middot; Nota da reuniao: <span className={`font-semibold ${
-                          savedSimulation.source_evaluation.overall_score >= 7 ? 'text-green-600' :
-                          savedSimulation.source_evaluation.overall_score >= 5 ? 'text-amber-600' : 'text-red-600'
-                        }`}>{savedSimulation.source_evaluation.overall_score.toFixed(1)}</span></>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={discardSavedSimulation}
-                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
-                  title="Descartar simulacao"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Summary Grid */}
-              <div className="grid grid-cols-4 gap-3 mb-4">
-                {/* Persona */}
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <User className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Persona</span>
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 line-clamp-1">
-                    {savedSimulation.simulation_config?.persona?.cargo || savedSimulation.simulation_config?.persona?.profissao || 'Cliente'}
-                  </p>
-                  <div className="flex gap-1 mt-1">
-                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
-                      {savedSimulation.simulation_config?.age} anos
-                    </span>
-                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
-                      {savedSimulation.simulation_config?.temperament}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Objective */}
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Target className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Objetivo</span>
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                    {savedSimulation.simulation_config?.objective?.name || 'Simulacao'}
-                  </p>
-                </div>
-
-                {/* Objections */}
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Objecoes</span>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{savedSimulation.simulation_config?.objections?.length || 0}</p>
-                  <p className="text-[10px] text-gray-500">para treinar</p>
-                </div>
-
-                {/* Coaching */}
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                    <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide">Coaching</span>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{savedSimulation.simulation_config?.coaching_focus?.length || 0}</p>
-                  <p className="text-[10px] text-gray-500">areas de foco</p>
-                </div>
-              </div>
-
-              {/* Action Button */}
-              <button
-                onClick={startSavedSimulation}
-                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:shadow-lg"
-              >
-                <Play className="w-5 h-5" />
-                Iniciar Simulacao de Treino
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Saved simulation card removed - now shown on Dashboard */}
 
         {/* Input Section */}
         {!session && (
@@ -1397,12 +1376,6 @@ export default function MeetAnalysisView() {
                     }`}>{evaluation.overall_score?.toFixed(1)}</div>
                     <div className="text-gray-500 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
                   </div>
-                  <button
-                    onClick={() => setShowEvaluationModal(false)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
                 </div>
               </div>
 
@@ -1640,52 +1613,106 @@ export default function MeetAnalysisView() {
                       </div>
                     )}
 
-                    {/* Cards Grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Persona Card */}
-                      <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-purple-300 transition-colors">
-                        <div className="flex items-center gap-2 mb-3">
-                          <User className="w-4 h-4 text-purple-600" />
-                          <h4 className="text-sm font-bold text-gray-900">Persona do Cliente</h4>
-                        </div>
-                        {simulationConfig.persona?.business_type === 'B2B' ? (
-                          <div className="space-y-1.5 text-sm text-gray-700">
-                            {simulationConfig.persona.cargo && <p><span className="text-gray-500">Cargo:</span> {simulationConfig.persona.cargo}</p>}
-                            {simulationConfig.persona.tipo_empresa_faturamento && <p><span className="text-gray-500">Empresa:</span> {simulationConfig.persona.tipo_empresa_faturamento}</p>}
-                            {simulationConfig.persona.contexto && <p><span className="text-gray-500">Contexto:</span> {simulationConfig.persona.contexto}</p>}
-                            {simulationConfig.persona.busca && <p><span className="text-gray-500">Busca:</span> {simulationConfig.persona.busca}</p>}
-                            {simulationConfig.persona.dores && <p><span className="text-gray-500">Dores:</span> {simulationConfig.persona.dores}</p>}
-                          </div>
-                        ) : (
-                          <div className="space-y-1.5 text-sm text-gray-700">
-                            {simulationConfig.persona?.profissao && <p><span className="text-gray-500">Perfil:</span> {simulationConfig.persona.profissao}</p>}
-                            {simulationConfig.persona?.perfil_socioeconomico && <p><span className="text-gray-500">Perfil Socioeconomico:</span> {simulationConfig.persona.perfil_socioeconomico}</p>}
-                            {simulationConfig.persona?.contexto && <p><span className="text-gray-500">Contexto:</span> {simulationConfig.persona.contexto}</p>}
-                            {simulationConfig.persona?.busca && <p><span className="text-gray-500">Busca:</span> {simulationConfig.persona.busca}</p>}
-                            {simulationConfig.persona?.dores && <p><span className="text-gray-500">Dores:</span> {simulationConfig.persona.dores}</p>}
-                          </div>
-                        )}
-                        <div className="mt-3 flex gap-2">
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
-                            {simulationConfig.age} anos
-                          </span>
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
-                            {simulationConfig.temperament}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Objective Card */}
-                      <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-purple-300 transition-colors">
-                        <div className="flex items-center gap-2 mb-3">
+                    {/* Simulation Justification Banner */}
+                    {simulationConfig.simulation_justification && (
+                      <div className="bg-purple-50 rounded-xl p-4 border-l-4 border-purple-500 border-t border-r border-b border-t-purple-200 border-r-purple-200 border-b-purple-200">
+                        <div className="flex items-center gap-2 mb-2">
                           <Target className="w-4 h-4 text-purple-600" />
-                          <h4 className="text-sm font-bold text-gray-900">Objetivo</h4>
+                          <h4 className="text-sm font-bold text-gray-900">Por que esta simulacao?</h4>
                         </div>
-                        <p className="text-sm font-medium text-gray-900 mb-1">{simulationConfig.objective?.name}</p>
-                        {simulationConfig.objective?.description && (
-                          <p className="text-sm text-gray-600">{simulationConfig.objective.description}</p>
-                        )}
+                        <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.simulation_justification}</p>
                       </div>
+                    )}
+
+                    {/* Persona Header with badges */}
+                    <div className="flex items-center gap-3">
+                      <User className="w-4 h-4 text-purple-600" />
+                      <h4 className="text-sm font-bold text-gray-900">Persona do Cliente</h4>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                        {simulationConfig.age} anos
+                      </span>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                        {simulationConfig.temperament}
+                      </span>
+                    </div>
+
+                    {/* Persona Fields - Individual Cards */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {simulationConfig.persona?.business_type === 'B2B' ? (<>
+                        {simulationConfig.persona.cargo && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Cargo</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.cargo}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.tipo_empresa_faturamento && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Empresa</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.tipo_empresa_faturamento}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.contexto && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200 col-span-2">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Contexto</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.contexto}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.busca && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">O que busca</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.busca}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.dores && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide mb-1.5">Dores</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.dores}</p>
+                          </div>
+                        )}
+                      </>) : (<>
+                        {simulationConfig.persona?.profissao && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Perfil</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.profissao}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.perfil_socioeconomico && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Perfil Socioeconomico</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.perfil_socioeconomico}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.contexto && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200 col-span-2">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Contexto</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.contexto}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.busca && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">O que busca</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.busca}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.dores && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide mb-1.5">Dores</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.dores}</p>
+                          </div>
+                        )}
+                      </>)}
+                    </div>
+
+                    {/* Objective Card */}
+                    <div className="bg-white rounded-xl p-5 border border-gray-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Target className="w-4 h-4 text-purple-600" />
+                        <h4 className="text-sm font-bold text-gray-900">Objetivo</h4>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 mb-1">{simulationConfig.objective?.name}</p>
+                      {simulationConfig.objective?.description && (
+                        <p className="text-sm text-gray-600">{simulationConfig.objective.description}</p>
+                      )}
                     </div>
 
                     {/* Objections Card */}
@@ -1700,7 +1727,7 @@ export default function MeetAnalysisView() {
                           {simulationConfig.objections.map((obj: any, idx: number) => (
                             <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                               <div className="flex items-start gap-2 mb-1.5">
-                                <p className="text-sm font-medium text-gray-900 flex-1">{obj.name}</p>
+                                <p className="text-sm font-medium text-gray-900 flex-1">{cleanGptText(obj.name)}</p>
                                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
                                   obj.source === 'meeting'
                                     ? 'bg-blue-100 text-blue-700'
@@ -1715,7 +1742,7 @@ export default function MeetAnalysisView() {
                                   {obj.rebuttals.map((r: string, ri: number) => (
                                     <p key={ri} className="text-xs text-green-700 flex items-start gap-1.5 bg-green-50 rounded px-2 py-1">
                                       <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                      {r}
+                                      {cleanGptText(r)}
                                     </p>
                                   ))}
                                 </div>
@@ -1726,31 +1753,95 @@ export default function MeetAnalysisView() {
                       </div>
                     )}
 
-                    {/* Coaching Focus Card */}
+                    {/* Coaching Focus Cards */}
                     {simulationConfig.coaching_focus && simulationConfig.coaching_focus.length > 0 && (
-                      <div className="bg-white rounded-xl p-5 border border-gray-200">
-                        <div className="flex items-center gap-2 mb-3">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
                           <Lightbulb className="w-4 h-4 text-amber-500" />
                           <h4 className="text-sm font-bold text-gray-900">Foco de Coaching</h4>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{simulationConfig.coaching_focus.length} {simulationConfig.coaching_focus.length === 1 ? 'area' : 'areas'}</span>
                         </div>
-                        <div className="space-y-3">
-                          {simulationConfig.coaching_focus.map((focus: any, idx: number) => (
-                            <div key={idx} className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-                              <p className="text-sm font-semibold text-gray-900">{focus.area}</p>
-                              <p className="text-xs text-gray-600 mt-0.5">{focus.what_to_improve}</p>
-                              {focus.tips && focus.tips.length > 0 && (
-                                <ul className="mt-2 space-y-1">
-                                  {focus.tips.map((tip: string, i: number) => (
-                                    <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
-                                      <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                      {tip}
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+
+                        {simulationConfig.coaching_focus.map((focus: any, idx: number) => {
+                          const severityColors = {
+                            critical: { border: 'border-l-red-500', badge: 'bg-red-100 text-red-700', label: 'Critico', impact: 'bg-red-50 border-red-100', dot: 'bg-red-500' },
+                            high: { border: 'border-l-amber-500', badge: 'bg-amber-100 text-amber-700', label: 'Alto', impact: 'bg-amber-50 border-amber-100', dot: 'bg-amber-500' },
+                            medium: { border: 'border-l-yellow-500', badge: 'bg-yellow-100 text-yellow-700', label: 'Medio', impact: 'bg-yellow-50 border-yellow-100', dot: 'bg-yellow-500' }
+                          }
+                          const sev = severityColors[focus.severity as keyof typeof severityColors] || severityColors.high
+                          const phrases = focus.example_phrases || focus.tips || []
+                          const diagnosisText = focus.diagnosis || focus.what_to_improve || ''
+
+                          return (
+                            <div key={idx} className={`bg-white rounded-xl border border-gray-200 border-l-4 ${sev.border} overflow-hidden`}>
+                              {/* Header: Severity + Area + Score */}
+                              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                                <div className="flex items-center gap-2">
+                                  {focus.severity && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${sev.badge}`}>
+                                      {sev.label}
+                                    </span>
+                                  )}
+                                  <span className="text-sm font-bold text-gray-900">{focus.area}</span>
+                                </div>
+                                {focus.spin_score !== undefined && (
+                                  <span className={`text-sm font-bold ${focus.spin_score < 4 ? 'text-red-600' : focus.spin_score < 6 ? 'text-amber-600' : 'text-yellow-600'}`}>
+                                    {focus.spin_score.toFixed(1)}/10
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="p-4 space-y-3">
+                                {/* Diagnosis */}
+                                {diagnosisText && (
+                                  <div>
+                                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Diagnostico</p>
+                                    <p className="text-sm text-gray-700 leading-relaxed">{cleanGptText(diagnosisText)}</p>
+                                  </div>
+                                )}
+
+                                {/* Transcript Evidence */}
+                                {focus.transcript_evidence && (
+                                  <div className="bg-gray-50 rounded-lg p-3 border-l-3 border-l-gray-300 border border-gray-100">
+                                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Evidencia da Reuniao</p>
+                                    <p className="text-xs text-gray-600 italic leading-relaxed">{cleanGptText(focus.transcript_evidence)}</p>
+                                  </div>
+                                )}
+
+                                {/* Business Impact */}
+                                {focus.business_impact && (
+                                  <div className={`rounded-lg p-3 border ${sev.impact}`}>
+                                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Por que importa</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{cleanGptText(focus.business_impact)}</p>
+                                  </div>
+                                )}
+
+                                {/* Practice Goal */}
+                                {focus.practice_goal && (
+                                  <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">O que praticar</p>
+                                    <p className="text-xs text-green-800 leading-relaxed font-medium">{cleanGptText(focus.practice_goal)}</p>
+                                  </div>
+                                )}
+
+                                {/* Example Phrases */}
+                                {phrases.length > 0 && (
+                                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                    <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide mb-1.5">Frases para usar</p>
+                                    <div className="space-y-1.5">
+                                      {phrases.map((phrase: string, pi: number) => (
+                                        <p key={pi} className="text-xs text-blue-800 flex items-start gap-1.5">
+                                          <span className="text-blue-400 mt-0.5 flex-shrink-0">&ldquo;</span>
+                                          <span className="leading-relaxed">{cleanGptText(phrase)}</span>
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                          )
+                        })}
                       </div>
                     )}
 
@@ -1765,10 +1856,11 @@ export default function MeetAnalysisView() {
                       </button>
                       <button
                         onClick={saveSimulationForLater}
-                        className="flex-1 py-3.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border-2 border-gray-200 hover:border-purple-300"
+                        disabled={isSavingSimulation}
+                        className="flex-1 py-3.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border-2 border-gray-200 hover:border-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Save className="w-5 h-5" />
-                        Deixar para Depois
+                        {isSavingSimulation ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        {isSavingSimulation ? 'Salvando...' : 'Deixar para Depois'}
                       </button>
                     </div>
                   </div>
@@ -1792,10 +1884,27 @@ export default function MeetAnalysisView() {
                   Copiar Transcricao
                 </button>
                 <button
-                  onClick={() => setShowEvaluationModal(false)}
-                  className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+                  onClick={async () => {
+                    if (simulationConfig && !currentSimSaved) {
+                      await saveSimulationForLater()
+                    } else {
+                      setShowEvaluationModal(false)
+                    }
+                  }}
+                  disabled={isGeneratingSimulation && !simulationConfig || isSavingSimulation}
+                  className={`px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 font-medium ${
+                    isGeneratingSimulation && !simulationConfig || isSavingSimulation
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
                 >
-                  Fechar
+                  {isSavingSimulation ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
+                  ) : isGeneratingSimulation && !simulationConfig ? (
+                    'Aguarde...'
+                  ) : (
+                    'Fechar'
+                  )}
                 </button>
               </div>
             </div>

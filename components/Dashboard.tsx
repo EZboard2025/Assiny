@@ -28,6 +28,7 @@ import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PlanType } from '@/lib/types/plans'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
 import ConfigurationRequired from './ConfigurationRequired'
+import SavedSimulationCard from './dashboard/SavedSimulationCard'
 
 // Lazy load RoleplayLinksView to prevent it from executing on public pages
 const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), {
@@ -528,6 +529,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               />
             )}
           </div>
+
+          {/* Saved Simulation Card */}
+          {userId && (
+            <SavedSimulationCard userId={userId} />
+          )}
         </div>
       </div>
     )

@@ -144,12 +144,95 @@ A persona DEVE permitir que o vendedor pratique as 4 etapas SPIN:
    - RUIM: "Use prova social" (so nomeia a tecnica)
    - BOM: "**Tecnica: Prova Social Especifica** — Cite um caso real do mesmo segmento. Exemplo: 'A [empresa similar] tinha exatamente essa preocupacao. Eles comecaram com um piloto de 30 dias, e no segundo mes ja tinham expandido pra equipe toda. Posso compartilhar o case com voce?'"
 
+### REGRAS CRITICAS PARA REBUTTALS:
+
+**PROIBIDO INVENTAR DADOS:**
+- NAO invente numeros, porcentagens, valores ou estatisticas que NAO foram mencionados na transcricao
+- Se a transcricao menciona "18% de aumento", voce pode usar. Se NAO menciona, NAO invente
+- Quando quiser dar exemplos com numeros, use termos genericos: "um aumento significativo", "reducao consideravel", "varios clientes relatam"
+- Se precisar de numeros para prova social, use: "um cliente do mesmo segmento", "empresas similares" — NUNCA invente porcentagens ou valores especificos
+
+**APENAS TECNICAS VERBAIS (EXECUTAVEIS NO ROLEPLAY):**
+- O roleplay e uma conversa de VOZ. O vendedor so pode FALAR. Nada mais.
+- TECNICAS PERMITIDAS: reframing, perguntas estrategicas, prova social verbal, concessao estrategica, isolamento de objecao, espelhamento, storytelling verbal, ancoragem de valor, provocacao consultiva, silencio estrategico
+- TECNICAS PROIBIDAS (nao funcionam no roleplay): demonstracao pratica, enviar documento, compartilhar tela, mostrar case por email, enviar proposta, apresentar planilha, fazer teste/piloto ao vivo, mostrar dashboard
+- Cada rebuttal deve ser algo que o vendedor consegue executar APENAS FALANDO
+
 ### REGRAS PARA OBJECOES DA REUNIAO vs COACHING:
 
 - **Objecoes "Da reuniao" (source: 'meeting')**: Extraidas DIRETAMENTE da transcricao. Use as palavras e o tom que o cliente real usou. Adapte para ser mais articulada se necessario, mas mantenha a essencia.
 - **Objecoes "Coaching" (source: 'coaching')**: Objecoes que o cliente PODERIA ter feito com base nos gaps do vendedor. Criadas para treinar os pontos fracos identificados na avaliacao.
 - Minimo 2 objecoes da reuniao, maximo 2 de coaching
 - Total: 3-5 objecoes, cada uma com 3-4 rebuttals DISTINTOS
+
+---
+
+## COMO CRIAR A JUSTIFICATIVA DA SIMULACAO (simulation_justification)
+
+Escreva um paragrafo de 3-5 frases que explique ao vendedor POR QUE esta simulacao foi criada ESPECIFICAMENTE para ele. O vendedor precisa ler isso e pensar: "Faz sentido, eu preciso treinar isso."
+
+**DEVE conter:**
+- Referencia ao cliente da reuniao (cargo/nome se disponivel)
+- O score SPIN mais critico (com numero)
+- Um momento REAL da reuniao onde o vendedor falhou (citando o que aconteceu)
+- O que o vendedor vai praticar nesta simulacao
+
+**Tom:** Direto, empatico, sem julgamento, focado em crescimento. Como um coach experiente falaria.
+
+**RUIM:** "Voce precisa melhorar suas perguntas de implicacao. Esta simulacao vai ajudar."
+**BOM:** "Na sua reuniao com o Diretor Comercial da TechCorp, voce obteve 2.5/10 em Implicacao. Quando o cliente mencionou que perde 3 vendedores por trimestre, voce seguiu direto para a apresentacao do produto em vez de explorar o custo dessa rotatividade. Nesta simulacao, voce vai reviver essa conversa e praticar como aprofundar as consequencias dos problemas que o cliente ja revelou — a chave para criar urgencia real."
+
+---
+
+## COMO CRIAR COACHING FOCUS DE ALTA QUALIDADE
+
+**OBJETIVO CENTRAL**: O vendedor deve olhar o coaching e imediatamente entender: "Eu errei X no momento Y, isso me prejudica porque Z, e nesta simulacao vou praticar fazendo [exemplo]."
+
+### PASSO 1: IDENTIFICAR AREAS CRITICAS (obrigatorio)
+Analise os scores SPIN da avaliacao e selecione as 2-3 areas com scores MAIS BAIXOS (abaixo de 6). Se todas estiverem acima de 6, selecione as 2 mais baixas. NUNCA crie coaching para areas com score acima de 8 — essas sao pontos fortes.
+
+**Severity mapping:**
+- **critical**: score abaixo de 4 — falha grave
+- **high**: score entre 4 e 5.9 — gap significativo
+- **medium**: score entre 6 e 7.9 — espaco para melhoria
+
+### PASSO 2: DIAGNOSTICAR CADA AREA (obrigatorio)
+Para cada area, RELEIA a transcricao e identifique o MOMENTO ESPECIFICO onde o vendedor falhou. O diagnostico deve ser concreto — o vendedor deve reconhecer o erro.
+
+- RUIM (generico): "Voce nao explorou as implicacoes dos problemas."
+- BOM (especifico): "Quando o cliente disse 'perdemos 3 vendedores no ultimo trimestre', voce respondeu com uma apresentacao do produto em vez de perguntar 'E qual o custo de treinar cada novo vendedor? Quanto tempo leva ate ele performar?'. Isso fez o cliente nao sentir urgencia."
+
+### PASSO 3: EXTRAIR EVIDENCIA DA TRANSCRICAO (obrigatorio)
+Para cada area, copie um trecho CURTO (1-2 falas) da transcricao real que evidencia o erro. Deve ser a fala real — nao resuma, COPIE.
+
+- RUIM: "O vendedor nao fez perguntas de implicacao"
+- BOM: "Cliente: 'Temos perdido uns 3 vendedores por trimestre.' Vendedor: 'Entendo. Deixa eu te mostrar como nosso produto resolve isso...'"
+
+### PASSO 4: EXPLICAR O IMPACTO NO NEGOCIO (obrigatorio)
+Para cada area, explique em 1-2 frases por que essa falha PREJUDICA o vendedor em fechar negocios. Linguagem de consequencia comercial, nao academica.
+
+- RUIM: "Implicacoes sao importantes na metodologia SPIN."
+- BOM: "Sem explorar as implicacoes, o cliente nao sente urgencia para agir. Ele sai da reuniao achando que o problema e 'gerenciavel' e adia a decisao por meses."
+
+### PASSO 5: DEFINIR META DE PRATICA (obrigatorio)
+Para cada area, escreva 1-2 frases descrevendo o que EXATAMENTE o vendedor deve fazer diferente nesta simulacao. Foco em ACAO concreta.
+
+- RUIM: "Pratique fazer mais perguntas de implicacao."
+- BOM: "Quando o cliente mencionar um problema, faca pelo menos 2 perguntas consecutivas sobre o IMPACTO desse problema antes de apresentar qualquer solucao."
+
+### PASSO 6: CRIAR FRASES-EXEMPLO (obrigatorio)
+Para cada area, crie 2-3 frases que o vendedor pode DIZER LITERALMENTE durante o roleplay de voz. Devem ser:
+- Perguntas ou falas naturais e conversacionais
+- Aplicaveis ao contexto especifico da reuniao real
+- DIFERENTES entre si (cada uma com abordagem distinta)
+
+- RUIM: ["Faca perguntas abertas", "Explore o problema", "Mostre empatia"]
+- BOM: ["E quando isso acontece, como impacta o resultado do trimestre?", "Se voce perder mais 3 vendedores no proximo trimestre, quanto custa em treinamento e oportunidades perdidas?", "O que acontece com os clientes que esses vendedores atendiam? Eles ficam sem atendimento?"]
+
+### REGRAS CRITICAS PARA COACHING:
+- **APENAS TECNICAS VERBAIS**: O roleplay e uma conversa de voz. Frases devem ser coisas que o vendedor pode FALAR. PROIBIDO: "mostre um grafico", "envie um email", "faca uma demo".
+- **PROIBIDO INVENTAR DADOS**: Nao invente numeros ou estatisticas. Use termos genericos se necessario.
+- **MAXIMO 3 AREAS**: Foco e melhor que quantidade. Se a reuniao teve 1-2 gaps reais, crie coaching apenas para esses.
 
 ---
 
@@ -249,9 +332,10 @@ ${truncatedTranscript}
 INSTRUCOES FINAIS:
 1. PRIMEIRO leia a transcricao e identifique o cliente real — nome, cargo, empresa, problemas, contexto, tom de voz. Use ESSES dados reais como base da persona. Enriqueca com detalhes coerentes (cada campo com 2-4 frases).
 2. As objecoes devem ser EXTRAIDAS da transcricao (use as palavras reais do cliente, source: "meeting") + 1-2 extras para gaps (source: "coaching"). Cada rebuttal deve ser pratico e acionavel.
-3. O coaching_focus deve enderecar os scores SPIN mais baixos com dicas especificas.
-4. Idade e temperamento devem ser DEDUZIDOS do comportamento do cliente na transcricao.
-5. O vendedor quer REVIVER a reuniao para corrigir erros — a simulacao deve parecer que ele esta falando com o MESMO cliente novamente.
+3. A simulation_justification deve ser um paragrafo motivacional de 3-5 frases que convence o vendedor a fazer esta simulacao — referencie o cliente, o score mais critico, o momento da falha, e o que sera praticado.
+4. O coaching_focus deve ter 2-3 areas com TODOS os campos preenchidos: area, spin_score, severity, diagnosis (referenciando momento real), transcript_evidence (trecho copiado), business_impact, practice_goal, example_phrases (2-3 frases verbais). Siga os 6 passos detalhados no system prompt.
+5. Idade e temperamento devem ser DEDUZIDOS do comportamento do cliente na transcricao.
+6. O vendedor quer REVIVER a reuniao para corrigir erros — a simulacao deve parecer que ele esta falando com o MESMO cliente novamente.
 
 Retorne JSON com esta estrutura exata:
 {
@@ -260,7 +344,19 @@ Retorne JSON com esta estrutura exata:
   "age": 30,
   "temperament": "Analitico",
   "objective": { "name": "nome do objetivo", "description": "descricao detalhada" },
-  "coaching_focus": [{ "area": "area", "what_to_improve": "oque melhorar", "tips": ["dica 1", "dica 2"] }],
+  "simulation_justification": "Paragrafo de 3-5 frases explicando por que esta simulacao foi criada para este vendedor. Referencie o cliente, o score critico com numero, o momento da falha, e o que sera praticado.",
+  "coaching_focus": [
+    {
+      "area": "Implicacao",
+      "spin_score": 3.5,
+      "severity": "critical",
+      "diagnosis": "Diagnostico especifico do que o vendedor fez errado, referenciando momento real da transcricao. 2-3 frases.",
+      "transcript_evidence": "Trecho curto real da transcricao evidenciando o erro (copie as falas reais).",
+      "business_impact": "Por que isso prejudica o vendedor em fechar negocios. 1-2 frases.",
+      "practice_goal": "O que exatamente praticar nesta simulacao. 1-2 frases acionaveis.",
+      "example_phrases": ["Frase verbal 1 para dizer no roleplay", "Frase verbal 2 com abordagem diferente"]
+    }
+  ],
   "meeting_context": "breve descricao do contexto da reuniao original"
 }`
 }
@@ -316,7 +412,7 @@ export async function POST(request: Request) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0.5,
-      max_tokens: 6000
+      max_tokens: 8000
     })
 
     const content = response.choices[0]?.message?.content

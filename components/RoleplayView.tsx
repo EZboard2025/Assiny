@@ -53,10 +53,19 @@ interface MeetSimulationConfig {
     name: string
     description: string
   }
+  simulation_justification?: string
   coaching_focus: Array<{
     area: string
-    what_to_improve: string
-    tips: string[]
+    spin_score?: number
+    severity?: 'critical' | 'high' | 'medium'
+    diagnosis?: string
+    transcript_evidence?: string
+    business_impact?: string
+    practice_goal?: string
+    example_phrases?: string[]
+    // Legacy fields (backward compat)
+    what_to_improve?: string
+    tips?: string[]
   }>
   meeting_context: string
 }
@@ -1975,26 +1984,58 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     <p className="text-xs text-gray-600 italic leading-relaxed">{meetSimulationConfig.meeting_context}</p>
                   )}
 
-                  {/* Coaching Focus */}
-                  {meetSimulationConfig.coaching_focus.map((focus, idx) => (
-                    <div key={idx} className="p-3 bg-amber-50 rounded-lg border border-amber-100">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Lightbulb size={14} className="text-amber-600" />
-                        <span className="text-xs font-semibold text-amber-700">{focus.area}</span>
-                      </div>
-                      <p className="text-xs text-gray-700 leading-relaxed">{focus.what_to_improve}</p>
-                      {focus.tips && focus.tips.length > 0 && (
-                        <ul className="mt-1.5 space-y-0.5">
-                          {focus.tips.map((tip, i) => (
-                            <li key={i} className="text-[11px] text-amber-600 flex items-start gap-1">
-                              <span className="text-amber-400 mt-0.5">-</span>
-                              {tip}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                  {/* Simulation Justification */}
+                  {meetSimulationConfig.simulation_justification && (
+                    <div className="p-2.5 bg-purple-50 rounded-lg border border-purple-100">
+                      <p className="text-[11px] text-gray-700 leading-relaxed line-clamp-4">{meetSimulationConfig.simulation_justification}</p>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Coaching Focus */}
+                  {meetSimulationConfig.coaching_focus.map((focus, idx) => {
+                    const sevDot = focus.severity === 'critical' ? 'bg-red-500' : focus.severity === 'high' ? 'bg-amber-500' : 'bg-yellow-500'
+                    const diagnosisText = focus.diagnosis || focus.what_to_improve || ''
+                    const phrases = focus.example_phrases || focus.tips || []
+
+                    return (
+                      <div key={idx} className="p-3 bg-white rounded-lg border border-gray-200">
+                        {/* Header: severity dot + area + score */}
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${sevDot}`} />
+                          <span className="text-xs font-semibold text-gray-900 flex-1">{focus.area}</span>
+                          {focus.spin_score !== undefined && (
+                            <span className={`text-[10px] font-bold ${focus.spin_score < 4 ? 'text-red-600' : focus.spin_score < 6 ? 'text-amber-600' : 'text-yellow-600'}`}>
+                              {focus.spin_score.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Diagnosis */}
+                        {diagnosisText && (
+                          <p className="text-[11px] text-gray-600 leading-relaxed mb-2">{diagnosisText}</p>
+                        )}
+
+                        {/* Practice Goal */}
+                        {focus.practice_goal && (
+                          <div className="p-2 bg-green-50 rounded border border-green-100 mb-2">
+                            <p className="text-[10px] text-green-700 font-medium leading-relaxed">{focus.practice_goal}</p>
+                          </div>
+                        )}
+
+                        {/* Example Phrases */}
+                        {phrases.length > 0 && (
+                          <div className="space-y-0.5">
+                            {phrases.map((phrase: string, i: number) => (
+                              <p key={i} className="text-[11px] text-blue-700 flex items-start gap-1">
+                                <span className="text-blue-400 mt-0.5 flex-shrink-0">&ldquo;</span>
+                                <span className="leading-relaxed">{phrase}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
 
                   {/* Objections summary */}
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -2351,7 +2392,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                             {meetSimulationConfig.coaching_focus.map((f, i) => (
                               <p key={i} className="text-xs text-amber-600 flex items-start gap-1">
                                 <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                <span><strong>{f.area}:</strong> {f.what_to_improve}</span>
+                                <span><strong>{f.area}{f.spin_score !== undefined ? ` (${f.spin_score.toFixed(1)})` : ''}:</strong> {f.diagnosis || f.what_to_improve}</span>
                               </p>
                             ))}
                           </div>
