@@ -56,8 +56,16 @@ export default function AutopilotActivityIndicator({ authToken }: { authToken: s
   const fetchEvents = useCallback(async () => {
     if (!authToken) return
     try {
+      // Get current token from Supabase client (auto-refreshed internally)
+      let token = authToken
+      try {
+        const { supabase } = await import('@/lib/supabase')
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) token = session.access_token
+      } catch {}
+
       const res = await fetch(`/api/autopilot/events?since=${lastTimestamp.current}`, {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: { Authorization: `Bearer ${token}` }
       })
       if (!res.ok) return
       const data = await res.json()

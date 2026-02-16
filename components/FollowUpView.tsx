@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, CheckCircle, AlertCircle, X, FileText, Lightbulb, BarChart3, MessageSquare, RefreshCw, LogOut, Smartphone, Search, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, ArrowLeft, Send, Smile, Paperclip, Mic, Trash2, Image as ImageIcon, Users, MoreVertical, Camera, Headphones, Contact, Sticker, Star, Bell, Lock, Shield, Heart, Ban, Flag, MapPin, Mail, Globe, Clock, Share2, Building2, Pencil, MessageCirclePlus, EllipsisVertical, Sparkles, Zap } from 'lucide-react'
 import SalesCopilot from './SalesCopilot'
-import AutopilotPanel from './AutopilotPanel'
+import AutopilotPanel from './autopilot/AutopilotPanel'
 import AutopilotActivityIndicator from './AutopilotActivityIndicator'
 
 interface FollowUpAnalysis {
@@ -309,9 +309,12 @@ export default function FollowUpView() {
     let subscription: any
     ;(async () => {
       const { supabase } = await import('@/lib/supabase')
-      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
         if (session?.access_token) {
           setAuthToken(session.access_token)
+        } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          // Session expired or user signed out - clear stale token
+          setAuthToken(null)
         }
       })
       subscription = data.subscription

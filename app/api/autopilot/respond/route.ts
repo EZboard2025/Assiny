@@ -241,9 +241,22 @@ export async function POST(req: NextRequest) {
     const companyKnowledge = ragResults[1].status === 'fulfilled' ? (ragResults[1].value.data || []) : []
     const companyData = ragResults[2].status === 'fulfilled' ? ragResults[2].value.data : null
 
-    // 7. Build system prompt
+    // 7. Build system prompt — profile-specific instructions with fallback
     const tone = settings.tone || 'consultivo'
-    const instructions = config.custom_instructions || ''
+    let instructions = config.custom_instructions || ''
+
+    // If contact has a profile, use profile-specific instructions
+    if (contactRecord?.profile_id) {
+      const { data: profile } = await supabaseAdmin
+        .from('autopilot_profiles')
+        .select('custom_instructions')
+        .eq('id', contactRecord.profile_id)
+        .single()
+
+      if (profile?.custom_instructions) {
+        instructions = profile.custom_instructions
+      }
+    }
     // Extract objetivo from structured instructions (first line starting with "Objetivo:")
     const objetivoMatch = instructions.match(/^Objetivo:\s*(.+)$/m)
     const objetivoVendedor = objetivoMatch?.[1]?.trim() || instructions.split('\n')[0] || 'qualificar o lead e entender suas necessidades'
