@@ -345,7 +345,7 @@ function ConfigurationInterface({
 
   // Plano Individual não tem acesso à aba de funcionários
   const isIndividualPlan = trainingPlan === PlanType.INDIVIDUAL
-  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'funnel' | 'usage'>(isIndividualPlan ? 'personas' : 'employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'usage'>(isIndividualPlan ? 'personas' : 'employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
@@ -3195,17 +3195,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             <span>Dados da Empresa</span>
           </button>
           <button
-            onClick={() => setActiveTab('funnel')}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'funnel'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-            <span>Fases do Funil</span>
-          </button>
-          <button
             onClick={() => setActiveTab('usage')}
             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'usage'
@@ -5289,128 +5278,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Fases do Funil Tab */}
-        {activeTab === 'funnel' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Fases do Funil de Vendas</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  Configure as fases do seu processo de vendas.
-                </p>
-              </div>
-
-              {/* Formulário para adicionar nova fase */}
-              <div className="p-4 border-b border-gray-100">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Adicionar Nova Fase</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Nome da Fase *
-                    </label>
-                    <input
-                      type="text"
-                      value={newStageName}
-                      onChange={(e) => setNewStageName(e.target.value)}
-                      placeholder="Ex: Primeiro Contato, Qualificação..."
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Descrição
-                    </label>
-                    <textarea
-                      value={newStageDescription}
-                      onChange={(e) => setNewStageDescription(e.target.value)}
-                      placeholder="O que caracteriza essa fase do funil..."
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Objetivo
-                    </label>
-                    <textarea
-                      value={newStageObjective}
-                      onChange={(e) => setNewStageObjective(e.target.value)}
-                      placeholder="Como passar para próxima fase"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-                  <button
-                    onClick={handleAddFunnelStage}
-                    className="w-full px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Adicionar Fase
-                  </button>
-                </div>
-              </div>
-
-              {/* Lista de fases */}
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Fases Cadastradas</h4>
-                  {funnelStages.length > 0 && (
-                    <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                      {funnelStages.length}
-                    </div>
-                  )}
-                </div>
-
-                {funnelStages.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Target className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Nenhuma fase cadastrada.</p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-xs text-gray-500 mb-3 flex items-center gap-2">
-                      <GripVertical className="w-3 h-3" />
-                      Arraste para reordenar
-                    </p>
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEndFunnelStages}
-                    >
-                      <SortableContext
-                        items={funnelStages.map((s) => s.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="space-y-3">
-                          {funnelStages.map((stage, index) => (
-                            <SortableStageCard
-                              key={stage.id}
-                              stage={stage}
-                              index={index}
-                              totalStages={funnelStages.length}
-                              isEditing={editingStage === stage.id}
-                              editStageName={editStageName}
-                              editStageDescription={editStageDescription}
-                              editStageObjective={editStageObjective}
-                              onStartEdit={startEditingStage}
-                              onCancelEdit={cancelEditingStage}
-                              onUpdate={handleUpdateFunnelStage}
-                              onDelete={handleDeleteFunnelStage}
-                              setEditStageName={setEditStageName}
-                              setEditStageDescription={setEditStageDescription}
-                              setEditStageObjective={setEditStageObjective}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
-                  </>
-                )}
               </div>
             </div>
           </div>
