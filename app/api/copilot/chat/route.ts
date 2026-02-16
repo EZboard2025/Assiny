@@ -339,11 +339,11 @@ CONTEXTO B2B:
       feedbackRecord = data
     }
 
-    // 10. Consume 1 credit
+    // 10. Consume 0.2 credits
     if (companyCredits) {
       await supabaseAdmin
         .from('companies')
-        .update({ monthly_credits_used: (companyCredits.monthly_credits_used || 0) + 1 })
+        .update({ monthly_credits_used: (companyCredits.monthly_credits_used || 0) + 0.2 })
         .eq('id', companyId)
     }
 
