@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
+import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -361,7 +362,7 @@ Retorne JSON com esta estrutura exata:
 }`
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { evaluation, transcript, companyId } = await request.json()
 
@@ -370,6 +371,48 @@ export async function POST(request: Request) {
         { error: 'evaluation and transcript are required' },
         { status: 400 }
       )
+    }
+
+    // Check credits before processing
+    if (companyId) {
+      const { data: companyCredits } = await supabaseAdmin
+        .from('companies')
+        .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+        .eq('id', companyId)
+        .single()
+
+      if (companyCredits) {
+        const lastReset = new Date(companyCredits.monthly_credits_reset_at)
+        const now = new Date()
+        const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
+                           now.getFullYear() !== lastReset.getFullYear()
+
+        let currentCreditsUsed = companyCredits.monthly_credits_used || 0
+
+        if (isNewMonth) {
+          await supabaseAdmin
+            .from('companies')
+            .update({ monthly_credits_used: 0, extra_monthly_credits: 0, monthly_credits_reset_at: now.toISOString() })
+            .eq('id', companyId)
+          currentCreditsUsed = 0
+        }
+
+        const planConfig = PLAN_CONFIGS[companyCredits.training_plan as PlanType]
+        const baseLimit = planConfig?.monthlyCredits
+
+        if (baseLimit !== null) {
+          const currentExtraCredits = isNewMonth ? 0 : (companyCredits.extra_monthly_credits || 0)
+          const totalLimit = baseLimit + currentExtraCredits
+          const remaining = totalLimit - currentCreditsUsed
+
+          if (remaining <= 0) {
+            return NextResponse.json(
+              { error: 'Limite de créditos atingido', message: 'Sua empresa atingiu o limite de créditos mensais.' },
+              { status: 403 }
+            )
+          }
+        }
+      }
     }
 
     // Fetch company type + full company data for richer context
@@ -441,6 +484,22 @@ export async function POST(request: Request) {
     // Ensure age is in range
     if (!simulationConfig.age || simulationConfig.age < 18 || simulationConfig.age > 60) {
       simulationConfig.age = 35
+    }
+
+    // Deduct 1 credit after successful generation
+    if (companyId) {
+      const { data: companyNow } = await supabaseAdmin
+        .from('companies')
+        .select('monthly_credits_used')
+        .eq('id', companyId)
+        .single()
+
+      if (companyNow) {
+        await supabaseAdmin
+          .from('companies')
+          .update({ monthly_credits_used: (companyNow.monthly_credits_used || 0) + 1 })
+          .eq('id', companyId)
+      }
     }
 
     return NextResponse.json({ success: true, simulationConfig })
