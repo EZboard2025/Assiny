@@ -5435,307 +5435,55 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
                 </div>
               ) : usageData ? (
-                <div className="p-4 space-y-6">
-                  {/* Resumo Principal */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Créditos Disponíveis */}
-                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Zap className="w-4 h-4 text-amber-600" />
-                        <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Limite Mensal</span>
-                      </div>
-                      <div className="text-2xl font-bold text-amber-900">
-                        {usageData.monthlyCredits === null ? (
-                          <span className="text-lg">Ilimitado</span>
-                        ) : (
-                          <>
-                            {usageData.monthlyCredits + usageData.extraCredits}
-                            {usageData.extraCredits > 0 && (
-                              <span className="text-sm font-normal text-amber-600 ml-1">
-                                (+{usageData.extraCredits} extras)
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
+                <div className="p-6 space-y-6">
+                  {(() => {
+                    const totalLimit = usageData.monthlyCredits === null
+                      ? null
+                      : usageData.monthlyCredits + usageData.extraCredits
+                    const percentage = totalLimit
+                      ? Math.min((usageData.creditsUsed / totalLimit) * 100, 100)
+                      : 0
 
-                    {/* Créditos Usados */}
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <BarChart3 className="w-4 h-4 text-blue-600" />
-                        <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Usados</span>
-                      </div>
-                      <div className="text-2xl font-bold text-blue-900">
-                        {usageData.creditsUsed}
-                      </div>
-                    </div>
-
-                    {/* Créditos Restantes */}
-                    <div className={`bg-gradient-to-br rounded-xl p-4 border ${
-                      usageData.monthlyCredits === null
-                        ? 'from-green-50 to-emerald-50 border-green-200'
-                        : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
-                          ? 'from-red-50 to-rose-50 border-red-200'
-                          : 'from-green-50 to-emerald-50 border-green-200'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle className={`w-4 h-4 ${
-                          usageData.monthlyCredits === null
-                            ? 'text-green-600'
-                            : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
-                              ? 'text-red-600'
-                              : 'text-green-600'
-                        }`} />
-                        <span className={`text-xs font-semibold uppercase tracking-wider ${
-                          usageData.monthlyCredits === null
-                            ? 'text-green-700'
-                            : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
-                              ? 'text-red-700'
-                              : 'text-green-700'
-                        }`}>Restantes</span>
-                      </div>
-                      <div className={`text-2xl font-bold ${
-                        usageData.monthlyCredits === null
-                          ? 'text-green-900'
-                          : (usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed) <= 5
-                            ? 'text-red-900'
-                            : 'text-green-900'
-                      }`}>
-                        {usageData.monthlyCredits === null ? (
-                          <span className="text-lg">Ilimitado</span>
-                        ) : (
-                          Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed)
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gráfico de Donut + Legenda */}
-                  {usageData.monthlyCredits !== null && (
-                    <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                      <div className="flex flex-col md:flex-row items-center gap-8">
-                        {/* Donut Chart */}
-                        <div className="relative w-48 h-48 flex-shrink-0">
-                          <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
-                            {(() => {
-                              const total = usageData.monthlyCredits + usageData.extraCredits
-                              const remaining = Math.max(0, total - usageData.creditsUsed)
-
-                              // Calculate credits used per feature (considering cost multipliers)
-                              const roleplayCredits = usageData.breakdown.roleplay * 1
-                              const publicRoleplayCredits = usageData.breakdown.publicRoleplay * 1
-                              const followupCredits = usageData.breakdown.followup * 1
-                              const meetCredits = usageData.breakdown.meet * 3
-                              const pdiCredits = usageData.breakdown.pdi * 1
-                              const aiGenerationCredits = usageData.breakdown.aiGeneration * 0.5
-
-                              const segments = [
-                                { value: roleplayCredits, color: '#9333ea', label: 'Roleplay' },
-                                { value: publicRoleplayCredits, color: '#ec4899', label: 'Roleplay Público' },
-                                { value: followupCredits, color: '#3b82f6', label: 'Follow-up' },
-                                { value: meetCredits, color: '#22c55e', label: 'Meet' },
-                                { value: pdiCredits, color: '#f59e0b', label: 'PDI' },
-                                { value: aiGenerationCredits, color: '#06b6d4', label: 'IA' },
-                                { value: remaining, color: '#e5e7eb', label: 'Disponível' }
-                              ].filter(s => s.value > 0)
-
-                              const radius = 40
-                              const circumference = 2 * Math.PI * radius
-                              let currentOffset = 0
-
-                              return segments.map((segment, index) => {
-                                const percentage = segment.value / total
-                                const dashLength = percentage * circumference
-                                const dashOffset = -currentOffset
-                                currentOffset += dashLength
-
-                                return (
-                                  <circle
-                                    key={index}
-                                    cx="50"
-                                    cy="50"
-                                    r={radius}
-                                    fill="none"
-                                    stroke={segment.color}
-                                    strokeWidth="16"
-                                    strokeDasharray={`${dashLength} ${circumference - dashLength}`}
-                                    strokeDashoffset={dashOffset}
-                                    className="transition-all duration-500"
-                                  />
-                                )
-                              })
-                            })()}
-                          </svg>
-                          {/* Center text */}
-                          <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-2xl font-bold text-gray-900">{usageData.creditsUsed}</span>
-                            <span className="text-xs text-gray-500">de {usageData.monthlyCredits + usageData.extraCredits}</span>
-                          </div>
-                        </div>
-
-                        {/* Legend */}
-                        <div className="flex-1 grid grid-cols-2 gap-3">
-                          {[
-                            { label: 'Roleplay (Treino)', value: usageData.breakdown.roleplay, credits: usageData.breakdown.roleplay * 1, color: 'bg-purple-500' },
-                            { label: 'Roleplay Público', value: usageData.breakdown.publicRoleplay, credits: usageData.breakdown.publicRoleplay * 1, color: 'bg-pink-500' },
-                            { label: 'Follow-up', value: usageData.breakdown.followup, credits: usageData.breakdown.followup * 1, color: 'bg-blue-500' },
-                            { label: 'Análise de Meet', value: usageData.breakdown.meet, credits: usageData.breakdown.meet * 3, color: 'bg-green-500' },
-                            { label: 'PDI', value: usageData.breakdown.pdi, credits: usageData.breakdown.pdi * 1, color: 'bg-amber-500' },
-                            { label: 'Geração com IA', value: usageData.breakdown.aiGeneration, credits: usageData.breakdown.aiGeneration * 0.5, color: 'bg-cyan-500' },
-                            { label: 'Desafios Diários', value: usageData.breakdown.dailyChallenges, credits: usageData.breakdown.dailyChallenges * 1, color: 'bg-orange-500' },
-                            { label: 'Disponível', value: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), credits: Math.max(0, usageData.monthlyCredits + usageData.extraCredits - usageData.creditsUsed), color: 'bg-gray-300' }
-                          ].filter(item => item.credits > 0 || item.label === 'Disponível').map((item, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div className={`w-3 h-3 rounded-full ${item.color} flex-shrink-0`} />
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium text-gray-700 truncate">{item.label}</p>
-                                <p className="text-xs text-gray-500">{item.credits} crédito{item.credits !== 1 ? 's' : ''}</p>
-                              </div>
+                    return (
+                      <div className="space-y-6">
+                        {/* Uso mensal */}
+                        <div>
+                          <div className="flex items-baseline justify-between mb-1">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Créditos mensais</p>
+                              {usageData.monthlyCredits !== null && (
+                                <p className="text-xs text-gray-500">
+                                  Reseta em {(() => {
+                                    const now = new Date()
+                                    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+                                    const diffDays = Math.ceil((nextMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                                    return `${diffDays} dia${diffDays !== 1 ? 's' : ''}`
+                                  })()}
+                                </p>
+                              )}
                             </div>
-                          ))}
+                            <span className="text-sm text-gray-600">
+                              {usageData.monthlyCredits === null
+                                ? `${usageData.creditsUsed} usados`
+                                : `${Math.round(percentage)}% usado`
+                              }
+                            </span>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${
+                                usageData.monthlyCredits === null
+                                  ? 'bg-amber-500'
+                                  : percentage > 80 ? 'bg-red-500' : percentage > 50 ? 'bg-amber-500' : 'bg-amber-500'
+                              }`}
+                              style={{ width: totalLimit ? `${Math.max(percentage, 1)}%` : '2%' }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Breakdown por Tipo */}
-                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <div className="p-3 border-b border-gray-100 bg-gray-50">
-                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Detalhamento por Tipo</h4>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {/* Roleplay Interno */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <MessageSquare className="w-5 h-5 text-purple-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Roleplay (Treino)</p>
-                            <p className="text-xs text-gray-500">1 crédito por sessão</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-purple-600">{usageData.breakdown.roleplay}</p>
-                          <p className="text-xs text-gray-500">sessões</p>
-                        </div>
-                      </div>
-
-                      {/* Roleplay Público */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-                            <Link2 className="w-5 h-5 text-pink-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Roleplay Público</p>
-                            <p className="text-xs text-gray-500">1 crédito por candidato</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-pink-600">{usageData.breakdown.publicRoleplay}</p>
-                          <p className="text-xs text-gray-500">candidatos</p>
-                        </div>
-                      </div>
-
-                      {/* Follow-up */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <Zap className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Follow-up</p>
-                            <p className="text-xs text-gray-500">1 crédito por análise</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-blue-600">{usageData.breakdown.followup}</p>
-                          <p className="text-xs text-gray-500">análises</p>
-                        </div>
-                      </div>
-
-                      {/* Meet Analysis */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                            <Video className="w-5 h-5 text-green-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Análise de Meet</p>
-                            <p className="text-xs text-gray-500">3 créditos por análise</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-green-600">{usageData.breakdown.meet}</p>
-                          <p className="text-xs text-gray-500">análises</p>
-                        </div>
-                      </div>
-
-                      {/* PDI */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-amber-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">PDI</p>
-                            <p className="text-xs text-gray-500">1 crédito por geração</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-amber-600">{usageData.breakdown.pdi}</p>
-                          <p className="text-xs text-gray-500">gerados</p>
-                        </div>
-                      </div>
-
-                      {/* Geração com IA */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center">
-                            <Sparkles className="w-5 h-5 text-cyan-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Geração com IA</p>
-                            <p className="text-xs text-gray-500">0.5 crédito por geração</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-cyan-600">{usageData.breakdown.aiGeneration}</p>
-                          <p className="text-xs text-gray-500">gerações</p>
-                        </div>
-                      </div>
-
-                      {/* Desafios Diários */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                            <Target className="w-5 h-5 text-orange-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Desafios Diários</p>
-                            <p className="text-xs text-gray-500">1 crédito por desafio</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-orange-600">{usageData.breakdown.dailyChallenges}</p>
-                          <p className="text-xs text-gray-500">desafios</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Data de Reset */}
-                  {usageData.monthlyCredits !== null && (
-                    <div className="text-center text-xs text-gray-500">
-                      Próximo reset: {(() => {
-                        const now = new Date()
-                        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-                        return nextMonth.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-                      })()}
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
               ) : (
                 <div className="p-8 text-center text-gray-500">
