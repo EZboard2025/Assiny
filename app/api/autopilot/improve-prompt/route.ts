@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { answers, currentInstructions } = await req.json()
+    const { answers, currentInstructions, profileName } = await req.json()
 
     if (!answers) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -53,7 +53,7 @@ ${company ? `DADOS DA EMPRESA:
 - Funcao: ${company.funcao_produtos || 'N/A'}
 - Diferenciais: ${company.diferenciais || 'N/A'}` : ''}
 
-${currentInstructions ? `INSTRUCAO ATUAL (para melhorar, nao repetir):\n${currentInstructions}` : ''}
+${profileName ? `PERFIL DE LEAD: Este prompt e para leads do tipo "${profileName}". Adapte a instrucao especificamente para esse perfil de lead.\n` : ''}${currentInstructions ? `INSTRUCAO ATUAL (para melhorar, nao repetir):\n${currentInstructions}` : ''}
 
 RESPOSTAS DO VENDEDOR:
 1. Objetivo (pra onde levar a conversa): ${answers.objetivo || 'Nao informado'}

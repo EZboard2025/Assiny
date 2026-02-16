@@ -59,7 +59,29 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { action, contactPhone, contactName } = body
+    const { action, contactPhone, contactName, profileId } = body
+
+    // assign_profile action doesn't require contactPhone
+    if (action === 'assign_profile') {
+      const { contactPhones, profileId: assignProfileId } = body
+      if (!Array.isArray(contactPhones)) {
+        return NextResponse.json({ error: 'contactPhones array é obrigatório' }, { status: 400 })
+      }
+
+      try {
+        for (const phone of contactPhones) {
+          await supabaseAdmin
+            .from('autopilot_contacts')
+            .update({ profile_id: assignProfileId || null })
+            .eq('user_id', user.id)
+            .eq('contact_phone', phone)
+        }
+      } catch (err: any) {
+        console.error('[Autopilot Contacts] assign_profile error (column may not exist yet):', err?.message)
+      }
+
+      return NextResponse.json({ success: true })
+    }
 
     if (!contactPhone) {
       return NextResponse.json({ error: 'contactPhone é obrigatório' }, { status: 400 })
@@ -67,15 +89,18 @@ export async function POST(req: NextRequest) {
 
     if (action === 'add') {
       // Upsert contact (UNIQUE on user_id + contact_phone)
+      const upsertData: Record<string, any> = {
+        user_id: user.id,
+        company_id: companyId,
+        contact_phone: contactPhone,
+        contact_name: contactName || null,
+        enabled: true
+      }
+      if (profileId) upsertData.profile_id = profileId
+
       const { data: contact, error } = await supabaseAdmin
         .from('autopilot_contacts')
-        .upsert({
-          user_id: user.id,
-          company_id: companyId,
-          contact_phone: contactPhone,
-          contact_name: contactName || null,
-          enabled: true
-        }, { onConflict: 'user_id,contact_phone' })
+        .upsert(upsertData, { onConflict: 'user_id,contact_phone' })
         .select()
         .single()
 
@@ -153,13 +178,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'contacts array é obrigatório' }, { status: 400 })
       }
 
-      const records = contacts.map((c: { phone: string; name?: string }) => ({
-        user_id: user.id,
-        company_id: companyId,
-        contact_phone: c.phone,
-        contact_name: c.name || null,
-        enabled: true
-      }))
+      const records = contacts.map((c: { phone: string; name?: string; profileId?: string }) => {
+        const record: Record<string, any> = {
+          user_id: user.id,
+          company_id: companyId,
+          contact_phone: c.phone,
+          contact_name: c.name || null,
+          enabled: true
+        }
+        const pid = c.profileId || profileId
+        if (pid) record.profile_id = pid
+        return record
+      })
 
       const { error } = await supabaseAdmin
         .from('autopilot_contacts')

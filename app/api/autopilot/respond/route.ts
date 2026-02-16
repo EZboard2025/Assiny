@@ -31,13 +31,13 @@ export async function POST(req: NextRequest) {
     const phoneSuffix9 = contactPhone.replace(/[^0-9]/g, '').slice(-9)
     const dedupKey = `${userId}:${phoneSuffix9}:${mode}`
     const lastProcessed = respondDedup.get(dedupKey)
-    if (lastProcessed && Date.now() - lastProcessed < 90_000) {
+    if (lastProcessed && Date.now() - lastProcessed < 20_000) {
       console.log(`[Autopilot] Dedup: ${contactPhone} ${mode} was processed ${Math.round((Date.now() - lastProcessed) / 1000)}s ago — skipping`)
       return NextResponse.json({ action: 'skipped_dedup' })
     }
     // Mark as processing NOW (before the AI call) to block concurrent requests
     respondDedup.set(dedupKey, Date.now())
-    setTimeout(() => respondDedup.delete(dedupKey), 120_000) // Auto-cleanup after 2 min
+    setTimeout(() => respondDedup.delete(dedupKey), 30_000) // Auto-cleanup after 30s
 
     const isComplement = mode === 'complement'
     console.log(`[Autopilot] Processing ${isComplement ? 'COMPLEMENT' : 'response'} for ${contactPhone} (user ${userId})`)
@@ -106,34 +106,6 @@ export async function POST(req: NextRequest) {
     // Use the stored phone for DB updates
     const storedPhone = contactRecord.contact_phone
 
-    // Reset daily counter if last response was on a different day
-    let dailyCount = contactRecord.auto_responses_today || 0
-    if (contactRecord.last_auto_response_at) {
-      const lastDate = new Date(contactRecord.last_auto_response_at).toDateString()
-      const today = new Date().toDateString()
-      if (lastDate !== today) {
-        dailyCount = 0
-      }
-    }
-
-    const maxPerDay = settings.max_responses_per_contact_per_day || 5
-    if (!isComplement && dailyCount >= maxPerDay) {
-      console.log(`[Autopilot] Daily limit reached for ${contactPhone} (${dailyCount}/${maxPerDay})`)
-
-      await supabaseAdmin.from('autopilot_log').insert({
-        user_id: userId,
-        company_id: companyId,
-        contact_phone: contactPhone,
-        contact_name: contactName,
-        incoming_message: incomingMessage.slice(0, 2000),
-        action: 'skipped_limit',
-        ai_reasoning: `Limite diário atingido (${dailyCount}/${maxPerDay})`
-      })
-
-      pushAutopilotEvent('response_skipped', userId, contactPhone, contactName, `Limite diário (${dailyCount}/${maxPerDay})`)
-      return NextResponse.json({ action: 'skipped_limit' })
-    }
-
     // 4. Check credits
     const { data: companyCredits } = await supabaseAdmin
       .from('companies')
@@ -199,7 +171,7 @@ export async function POST(req: NextRequest) {
     let conversationContext = ''
     if (recentMessages.length > 0) {
       conversationContext = recentMessages.map(m => {
-        const sender = m.direction === 'outbound' ? 'Vendedor' : (contactName || 'Lead')
+        const sender = m.direction === 'outbound' ? 'Vendedor' : 'Lead'
         const text = m.content || (m.transcription ? `[Áudio transcrito]: ${m.transcription}` : '[mídia]')
         return `${sender}: ${text}`
       }).join('\n')
@@ -241,17 +213,66 @@ export async function POST(req: NextRequest) {
     const companyKnowledge = ragResults[1].status === 'fulfilled' ? (ragResults[1].value.data || []) : []
     const companyData = ragResults[2].status === 'fulfilled' ? ragResults[2].value.data : null
 
-    // 7. Build system prompt
+    // 7. Build system prompt — profile-specific instructions with fallback
     const tone = settings.tone || 'consultivo'
-    const instructions = config.custom_instructions || ''
+    let instructions = config.custom_instructions || ''
+    let profileName: string | null = null
+
+    // If contact has a profile, use profile-specific instructions (PRIORITY over global config)
+    if (contactRecord?.profile_id) {
+      console.log(`[Autopilot] Contact ${contactPhone} has profile_id: ${contactRecord.profile_id}`)
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('autopilot_profiles')
+        .select('name, custom_instructions')
+        .eq('id', contactRecord.profile_id)
+        .single()
+
+      if (profileError) {
+        console.error(`[Autopilot] Profile lookup error for ${contactRecord.profile_id}:`, profileError.message)
+      } else if (profile?.custom_instructions) {
+        instructions = profile.custom_instructions
+        profileName = profile.name
+        console.log(`[Autopilot] Using profile "${profile.name}" instructions (${instructions.length} chars)`)
+      } else {
+        console.log(`[Autopilot] Profile found but no custom_instructions, using global config`)
+      }
+    } else {
+      console.log(`[Autopilot] Contact ${contactPhone} has NO profile_id, using global config`)
+    }
+
     // Extract objetivo from structured instructions (first line starting with "Objetivo:")
     const objetivoMatch = instructions.match(/^Objetivo:\s*(.+)$/m)
     const objetivoVendedor = objetivoMatch?.[1]?.trim() || instructions.split('\n')[0] || 'qualificar o lead e entender suas necessidades'
 
+    const profileDirective = profileName
+      ? `\nEste lead pertence ao perfil "${profileName}". As instrucoes abaixo sao ESPECIFICAS para este tipo de lead e tem PRIORIDADE MAXIMA sobre qualquer outra informacao.`
+      : ''
+
+    // Determine safe display name for the contact
+    // Basic validation only — AI will handle name vs CRM tag differentiation in the prompt
+    const rawName = contactName || ''
+    const looksLikeRealName = rawName.length >= 2 && !/^\+?\d[\d\s\-()]+$/.test(rawName) && !/^(null|undefined)$/i.test(rawName)
+    const safeContactName: string | null = looksLikeRealName ? rawName.trim() : null
+
     let systemPrompt = `Voce e um vendedor ${tone} que conversa com leads no WhatsApp. Voce atua como se fosse o proprio vendedor — humano, natural, nunca robotico.
 
-=== INSTRUCOES DO VENDEDOR ===
+=== NOME DO LEAD (CRITICO — NUNCA INVENTE) ===
+${safeContactName ? `O nome salvo no contato WhatsApp e: "${safeContactName}".
+IMPORTANTE: Esse nome pode conter TAGS DE CRM junto com o nome real (ex: "Matheus Lead", "Gawbs Socio", "Ana Cliente", "Pedro SDR", "Carla Closer").
+Voce DEVE identificar qual parte e o NOME REAL da pessoa e qual parte e uma classificacao/tag comercial.
+Exemplos:
+- "Matheus Lead" → nome real: "Matheus" (Lead e tag de CRM)
+- "Gawbs Socio" → nome real: "Gawbs" (Socio e tag de cargo/classificacao)
+- "Ana Maria" → nome real: "Ana Maria" (Maria NAO e tag, e parte do nome)
+- "Pedro SDR" → nome real: "Pedro" (SDR e tag de funcao comercial)
+- "Joao Carlos" → nome real: "Joao Carlos" (dois nomes proprios, use completo)
+Use APENAS o nome real identificado. NUNCA inclua tags/classificacoes ao se dirigir ao lead.
+Se o nome inteiro parecer ser APENAS tags sem nome real (ex: "Lead", "Cliente", "Prospect"), trate como se nao tivesse nome.` : `O nome do lead NAO e conhecido. NAO use nenhum nome. Use apenas "voce" ou "vc". NUNCA invente um nome.`}
+REGRA ABSOLUTA: NUNCA invente, adivinhe ou assuma o nome do lead. Se o nome nao foi fornecido acima, NAO USE NENHUM NOME. Chamar o lead pelo nome errado DESTROI a confianca e a venda.
+${profileDirective}
+=== INSTRUCOES DO VENDEDOR${profileName ? ` (PERFIL: ${profileName})` : ''} ===
 ${instructions || `Objetivo: ${objetivoVendedor}`}
+${profileName ? `\nIMPORTANTE: Siga as instrucoes acima RIGOROSAMENTE. Elas definem como voce deve abordar este tipo especifico de lead. NAO use uma abordagem generica — adapte sua conversa ao perfil "${profileName}".` : ''}
 
 === FORMATO DE RESPOSTA (OBRIGATORIO) ===
 Voce DEVE responder em JSON valido. SEM markdown, SEM code blocks, APENAS JSON puro.
@@ -259,8 +280,11 @@ Voce DEVE responder em JSON valido. SEM markdown, SEM code blocks, APENAS JSON p
 Se PODE responder:
 {"canRespond": true, "response": ["mensagem 1", "mensagem 2"], "objectiveReached": false}
 
-Se NAO pode responder:
-{"canRespond": false, "reason": "motivo"}
+Se NAO pode responder E PRECISA de intervencao humana (precos, agenda, reclamacao seria):
+{"canRespond": false, "needsHuman": true, "reason": "motivo claro"}
+
+Se NAO tem certeza mas NAO precisa de humano (apenas pule, o autopilot continua ativo):
+{"canRespond": false, "needsHuman": false, "reason": "motivo"}
 
 REGRAS DE SEPARACAO DE MENSAGENS:
 - Separe a resposta em 2-3 mensagens curtas (como um vendedor real faria no WhatsApp)
@@ -313,15 +337,34 @@ Em todos os outros casos, retorne "objectiveReached": false.
 - NUNCA mande duas informacoes sobre o produto na mesma resposta — dosifique
 - Se o lead fez uma pergunta, responda ELA primeiro, depois faca sua pergunta
 
-=== QUANDO RESPONDER canRespond=FALSE ===
-- O lead pergunta sobre AGENDA, HORARIOS DISPONIVEIS ou DISPONIBILIDADE para reuniao/ligacao
-- O lead pergunta sobre PRECOS ESPECIFICOS, DESCONTOS ou CONDICOES DE PAGAMENTO que NAO estao nos dados da empresa
-- O lead pede para FALAR COM ALGUEM ESPECIFICO (gerente, diretor, outra pessoa)
-- O lead faz uma PERGUNTA TECNICA MUITO ESPECIFICA que nao esta nos dados da empresa
-- O lead expressa uma RECLAMACAO SERIA ou INSATISFACAO que precisa de tratamento humano
-- O lead pede algo que REQUER ACAO HUMANA (enviar contrato, agendar visita, enviar proposta personalizada)
-- Voce NAO TEM CERTEZA da resposta correta. NUNCA invente informacoes.
-- A conversa esta num ponto de NEGOCIACAO AVANCADA que precisa de decisao humana
+=== VIES PADRAO: SEMPRE TENTE RESPONDER ===
+Sua tendencia PADRAO deve ser canRespond: true. Voce e um vendedor — vendedores SEMPRE encontram algo para dizer.
+Se o lead fez uma pergunta que voce nao sabe a resposta exata, NAO retorne canRespond: false.
+Em vez disso, responda de forma consultiva: reconheca a pergunta, mostre interesse, e faca uma pergunta de volta para entender melhor.
+Exemplo: Lead pergunta "Quanto custa?" → Voce responde: "Depende do cenario! Me conta um pouco sobre sua operacao que eu te passo a opcao que faz mais sentido pra voce 😊"
+
+=== QUANDO RESPONDER canRespond=FALSE + needsHuman=TRUE (RARO — so em casos CRITICOS) ===
+Use APENAS quando o vendedor PRECISA agir pessoalmente. Isso DESATIVA o autopilot para este contato:
+- O lead quer AGENDAR reuniao/ligacao e pede HORARIOS ESPECIFICOS do vendedor
+- O lead pede para FALAR COM OUTRA PESSOA ESPECIFICA (gerente, diretor, suporte)
+- O lead expressa RECLAMACAO SERIA, RAIVA ou INSATISFACAO que precisa de empatia humana real
+- O lead pede uma ACAO que so o vendedor pode fazer (enviar contrato assinado, liberar acesso, fazer visita presencial)
+- A conversa esta em NEGOCIACAO FINAL com valores e condicoes que precisam de aprovacao
+
+=== QUANDO RESPONDER canRespond=FALSE + needsHuman=FALSE (PULAR SEM ESCALAR) ===
+Use quando voce realmente nao consegue agregar valor na resposta, MAS nao precisa de humano:
+- A mensagem e incompreensivel (caracteres aleatorios, idioma diferente)
+- O lead mandou apenas uma midia sem contexto e voce nao sabe como reagir
+NAO use isso para perguntas normais sobre o produto — tente responder de forma consultiva!
+
+=== O QUE NAO E MOTIVO PARA canRespond=FALSE ===
+Estes cenarios DEVEM ser respondidos com canRespond=true:
+- Lead pergunta sobre precos → Responda de forma consultiva ("Depende do cenario, me conta mais...")
+- Lead pergunta sobre funcionalidades → Use os dados da empresa ou responda de forma geral
+- Lead faz pergunta que voce nao tem resposta exata → Reconheca e redirecione com pergunta
+- Lead manda "oi", "tudo bem", cumprimentos → Responda normalmente
+- Lead pergunta algo generico sobre a empresa → Use o que voce sabe e pergunte mais
+- Lead pede informacoes que nao estao nos dados → Diga que vai verificar e pergunte algo relevante
 
 === FORMATACAO WHATSAPP ===
 - Paragrafos curtos (maximo 3 linhas cada). Evite blocos de texto densos.
@@ -330,6 +373,7 @@ Em todos os outros casos, retorne "objectiveReached": false.
 - Tom: ${tone}. Use "Oi", "Tudo bem?", "Com certeza". Evite "Prezado", "Estimado", "Cordialmente"
 - Fale SEMPRE em primeira pessoa ("Eu", "Nos"). NUNCA se identifique como IA, robo ou assistente automatico.
 - NUNCA invente informacoes que nao estao nos dados da empresa
+- NUNCA invente ou adivinhe o nome do lead. Identifique o nome REAL a partir da secao "NOME DO LEAD" acima (ignorando tags CRM). Se nenhum nome foi fornecido ou o nome e apenas tags, use "voce/vc".
 - Seja CONCISO. Mensagens longas assustam no WhatsApp.`
 
     // Company data
@@ -363,9 +407,17 @@ Em todos os outros casos, retorne "objectiveReached": false.
       })
     }
 
+    // Profile reminder (placed AFTER company data so AI doesn't forget profile instructions)
+    if (profileName && instructions) {
+      systemPrompt += `\n\n=== LEMBRETE: PERFIL "${profileName.toUpperCase()}" ===
+VOCE ESTA ATENDENDO um lead do perfil "${profileName}". Suas instrucoes ESPECIFICAS sao:
+${instructions.split('\n').slice(0, 3).join('\n')}
+Siga ESTAS instrucoes como prioridade. Use os dados da empresa apenas como suporte, nao como guia principal.`
+    }
+
     // Conversation context
     if (conversationContext) {
-      systemPrompt += `\n\nCONVERSA ATUAL COM O LEAD (${contactName || contactPhone}):\n${conversationContext}`
+      systemPrompt += `\n\nCONVERSA ATUAL COM O LEAD (${safeContactName || contactPhone}):\n${conversationContext}`
     }
 
     // Complement mode: add specific instructions with strong conservative bias
@@ -464,6 +516,7 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
       response?: string | string[]
       reason?: string
       objectiveReached?: boolean
+      needsHuman?: boolean
     }
     try {
       aiDecision = JSON.parse(rawResponse)
@@ -474,44 +527,65 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
 
     // 9. Act on AI decision
     if (!aiDecision.canRespond) {
-      // Flag contact as needs human
-      console.log(`[Autopilot] Flagging ${contactPhone} as needs human: ${aiDecision.reason}`)
+      const genuinelyNeedsHuman = aiDecision.needsHuman === true
 
-      await Promise.all([
-        supabaseAdmin
-          .from('autopilot_contacts')
-          .update({
-            enabled: false,
-            needs_human: true,
-            needs_human_reason: aiDecision.reason || 'IA não soube responder',
-            needs_human_at: new Date().toISOString()
+      if (genuinelyNeedsHuman) {
+        // ESCALATE: Truly needs human attention — disable autopilot and flag
+        console.log(`[Autopilot] ESCALATING ${contactPhone} to human: ${aiDecision.reason}`)
+
+        await Promise.all([
+          supabaseAdmin
+            .from('autopilot_contacts')
+            .update({
+              enabled: false,
+              needs_human: true,
+              needs_human_reason: aiDecision.reason || 'Lead precisa de atendimento humano',
+              needs_human_at: new Date().toISOString()
+            })
+            .eq('user_id', userId)
+            .eq('contact_phone', storedPhone),
+
+          supabaseAdmin
+            .from('whatsapp_conversations')
+            .update({ autopilot_needs_human: true })
+            .like('contact_phone', `%${phoneSuffix}`),
+
+          supabaseAdmin.from('autopilot_log').insert({
+            user_id: userId,
+            company_id: companyId,
+            contact_phone: contactPhone,
+            contact_name: contactName,
+            incoming_message: incomingMessage.slice(0, 2000),
+            action: 'flagged_human',
+            ai_reasoning: aiDecision.reason
           })
-          .eq('user_id', userId)
-          .eq('contact_phone', storedPhone),
+        ])
 
-        // Update conversation indicator (suffix match for phone format)
-        supabaseAdmin
-          .from('whatsapp_conversations')
-          .update({ autopilot_needs_human: true })
-          .like('contact_phone', `%${phoneSuffix}`),
+        pushAutopilotEvent('flagged_human', userId, contactPhone, contactName, aiDecision.reason || 'Lead precisa de atendimento humano')
+        return NextResponse.json({
+          action: 'flagged_human',
+          reason: aiDecision.reason
+        })
+      } else {
+        // SKIP: AI couldn't respond well, but doesn't need human — keep autopilot active
+        console.log(`[Autopilot] Skipping response for ${contactPhone} (no escalation): ${aiDecision.reason}`)
 
-        // Log
-        supabaseAdmin.from('autopilot_log').insert({
+        await supabaseAdmin.from('autopilot_log').insert({
           user_id: userId,
           company_id: companyId,
           contact_phone: contactPhone,
           contact_name: contactName,
           incoming_message: incomingMessage.slice(0, 2000),
-          action: 'flagged_human',
-          ai_reasoning: aiDecision.reason
+          action: 'skipped_uncertain',
+          ai_reasoning: aiDecision.reason || 'IA pulou sem escalar'
         })
-      ])
 
-      pushAutopilotEvent('flagged_human', userId, contactPhone, contactName, aiDecision.reason || 'IA não soube responder')
-      return NextResponse.json({
-        action: 'flagged_human',
-        reason: aiDecision.reason
-      })
+        pushAutopilotEvent('response_skipped', userId, contactPhone, contactName, `Pulou: ${aiDecision.reason || 'sem certeza'}`)
+        return NextResponse.json({
+          action: 'skipped_uncertain',
+          reason: aiDecision.reason
+        })
+      }
     }
 
     // AI can respond - normalize response to array of messages
@@ -602,16 +676,18 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
           ai_reasoning: 'Objetivo alcancado — autopilot encerrado para este contato'
         })
       ])
+
+      // Save winning conversation as high-quality RAG example (fire-and-forget)
+      saveWinningConversation(userId, companyId, contactPhone, contactName, conversationContext, messages).catch((err: any) =>
+        console.error('[Autopilot] Failed to save winning conversation:', err.message || err)
+      )
     }
 
-    // 13. Update contact stats (skip for complements — they don't count as AI responses)
+    // 13. Update contact last response timestamp
     if (!isComplement) {
       await supabaseAdmin
         .from('autopilot_contacts')
-        .update({
-          auto_responses_today: dailyCount + 1,
-          last_auto_response_at: new Date().toISOString()
-        })
+        .update({ last_auto_response_at: new Date().toISOString() })
         .eq('user_id', userId)
         .eq('contact_phone', storedPhone)
     }
@@ -626,7 +702,7 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
 
     // 15. Log success
     const logAction = isComplement ? 'complemented' : 'responded'
-    await supabaseAdmin.from('autopilot_log').insert({
+    const logData: Record<string, any> = {
       user_id: userId,
       company_id: companyId,
       contact_phone: contactPhone,
@@ -635,9 +711,11 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
       action: logAction,
       ai_response: messages.join(' | '),
       credits_used: 1
-    })
+    }
+    if (contactRecord?.profile_id) logData.profile_id = contactRecord.profile_id
+    await supabaseAdmin.from('autopilot_log').insert(logData)
 
-    console.log(`[Autopilot] Successfully ${logAction} ${contactPhone} with ${messages.length} bubble(s)`)
+    console.log(`[Autopilot] Successfully ${logAction} ${contactPhone} with ${messages.length} bubble(s)${profileName ? ` (profile: ${profileName})` : ''}`)
 
     if (aiDecision.objectiveReached) {
       pushAutopilotEvent('objective_reached', userId, contactPhone, contactName, `Objetivo alcançado! Autopilot encerrado.`)
@@ -656,5 +734,51 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
       { error: error.message, action: 'skipped_error' },
       { status: 500 }
     )
+  }
+}
+
+// Save winning conversation as high-quality RAG example when objective is reached
+async function saveWinningConversation(
+  userId: string,
+  companyId: string,
+  contactPhone: string,
+  contactName: string | null,
+  conversationContext: string,
+  finalMessages: string[]
+): Promise<void> {
+  try {
+    const winningText = `CONVERSA QUE ALCANÇOU O OBJETIVO:\n\n${conversationContext}\n\nÚLTIMA RESPOSTA (que levou ao objetivo):\nVendedor: ${finalMessages.join('\nVendedor: ')}`
+
+    const embeddingResponse = await openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: winningText.slice(0, 8000)
+    })
+    const embedding = embeddingResponse.data[0].embedding
+
+    await supabaseAdmin
+      .from('followup_examples_success')
+      .insert({
+        company_id: companyId,
+        user_id: userId,
+        tipo_venda: 'WhatsApp',
+        canal: 'WhatsApp',
+        content: winningText.slice(0, 5000),
+        nota_original: 9.5,
+        embedding,
+        metadata: {
+          source: 'autopilot_objective_reached',
+          company_id: companyId,
+          tipo_venda: 'WhatsApp',
+          canal: 'WhatsApp',
+          contact_phone: contactPhone,
+          contact_name: contactName,
+          is_autopilot: true,
+          quality_score: 9.5
+        }
+      })
+
+    console.log(`[Autopilot ML] Winning conversation saved to RAG for ${contactPhone}`)
+  } catch (err: any) {
+    console.error(`[Autopilot ML] Error saving winning conversation:`, err.message || err)
   }
 }

@@ -122,14 +122,15 @@ IMPORTANTE: Avalie também a qualidade da abordagem do vendedor:
               nota_original: nota,
               embedding,
               metadata: {
-                source: 'auto_analysis',
+                source: msg.is_autopilot ? 'autopilot_auto_analysis' : 'auto_analysis',
                 company_id: msg.company_id || companyId,
                 tipo_venda: 'WhatsApp',
                 canal: 'WhatsApp',
                 outcome: classification.outcome,
                 reason: classification.reason,
                 quality_score: qualityScore,
-                tracking_id: msg.id
+                tracking_id: msg.id,
+                is_autopilot: msg.is_autopilot || false
               }
             })
 
