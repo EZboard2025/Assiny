@@ -206,8 +206,8 @@ export async function getUserRoleplaySessions(
       query = query.not('id', 'in', `(${challengeSessionIds.join(',')})`)
     }
 
-    // Excluir sessões de correção Meet
-    query = query.neq('config->>is_meet_correction', 'true')
+    // Excluir sessões de correção Meet (usar contains para não filtrar sessões sem a chave)
+    query = query.not('config', 'cs', '{"is_meet_correction":true}')
 
     const { data, error } = await query
 
