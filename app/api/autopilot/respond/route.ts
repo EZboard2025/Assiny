@@ -669,11 +669,12 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
         .eq('contact_phone', storedPhone)
     }
 
-    // 14. Consume 1 credit
+    // 14. Consume 0.1 credit per bubble sent
     if (companyCredits) {
+      const creditCost = messages.length * 0.1
       await supabaseAdmin
         .from('companies')
-        .update({ monthly_credits_used: (companyCredits.monthly_credits_used || 0) + 1 })
+        .update({ monthly_credits_used: (companyCredits.monthly_credits_used || 0) + creditCost })
         .eq('id', companyId)
     }
 
