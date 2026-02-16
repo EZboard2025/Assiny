@@ -1687,20 +1687,20 @@ async function triggerAutopilotResponse(
     if (contact.needs_human && mode === 'respond') {
       console.log(`[WA Autopilot] Contact ${contactPhone} was needs_human, but lead sent new msg — auto-clearing and re-evaluating`)
       pushAutopilotEvent('message_detected', state.userId, contactPhone, contactName, 'Lead enviou nova msg — needs_human limpo automaticamente')
-      supabaseAdmin
-        .from('autopilot_contacts')
-        .update({ needs_human: false, needs_human_reason: null, needs_human_at: null })
-        .eq('user_id', state.userId)
-        .eq('contact_phone', contact.contact_phone)
-        .then(() => {})
-        .catch(err => console.error(`[WA Autopilot] Failed to clear needs_human:`, err))
+      Promise.resolve(
+        supabaseAdmin
+          .from('autopilot_contacts')
+          .update({ needs_human: false, needs_human_reason: null, needs_human_at: null })
+          .eq('user_id', state.userId)
+          .eq('contact_phone', contact.contact_phone)
+      ).catch(err => console.error(`[WA Autopilot] Failed to clear needs_human:`, err))
       // Also clear the conversation indicator
-      supabaseAdmin
-        .from('whatsapp_conversations')
-        .update({ autopilot_needs_human: false })
-        .like('contact_phone', `%${phoneSuffix}`)
-        .then(() => {})
-        .catch(() => {})
+      Promise.resolve(
+        supabaseAdmin
+          .from('whatsapp_conversations')
+          .update({ autopilot_needs_human: false })
+          .like('contact_phone', `%${phoneSuffix}`)
+      ).catch(() => {})
     } else if (contact.needs_human) {
       console.log(`[WA Autopilot] Contact ${contactPhone} flagged as needs_human — skipping complement`)
       return
