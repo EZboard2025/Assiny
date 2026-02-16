@@ -1,14 +1,11 @@
 'use client'
 
-import { Check, Loader2, Clock, MessageSquare, Timer, Shield, Info } from 'lucide-react'
+import { Check, Loader2, MessageSquare, Timer, Shield, Info } from 'lucide-react'
 
 interface AutopilotSettings {
   response_delay_min: number
   response_delay_max: number
   max_responses_per_contact_per_day: number
-  working_hours_only: boolean
-  working_hours_start: string
-  working_hours_end: string
   tone: 'consultivo' | 'informal' | 'formal'
 }
 
@@ -39,47 +36,6 @@ export default function AutopilotSettingsTab({
 
   return (
     <div className="p-4 space-y-4">
-
-      {/* Working hours */}
-      <div className="bg-[#202c33] rounded-xl p-4">
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 rounded-lg bg-[#00a884]/15 flex items-center justify-center">
-            <Clock className="w-4 h-4 text-[#00a884]" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[#e9edef] text-[13px] font-medium">Horário comercial</p>
-            <p className="text-[#8696a0] text-[11px]">
-              {settings.working_hours_only
-                ? `Responde entre ${settings.working_hours_start} e ${settings.working_hours_end}`
-                : 'Responde a qualquer hora do dia'
-              }
-            </p>
-          </div>
-          <button
-            onClick={() => updateSetting('working_hours_only', !settings.working_hours_only)}
-            className={`w-10 h-[22px] rounded-full transition-colors relative flex-shrink-0 ${settings.working_hours_only ? 'bg-[#00a884]' : 'bg-[#364147]'}`}
-          >
-            <div className={`w-[18px] h-[18px] bg-white rounded-full absolute top-[2px] transition-transform shadow-sm ${settings.working_hours_only ? 'translate-x-[20px]' : 'translate-x-[2px]'}`} />
-          </button>
-        </div>
-        {settings.working_hours_only && (
-          <div className="flex items-center gap-2 bg-[#111b21] rounded-lg px-3 py-2.5">
-            <input
-              type="time"
-              value={settings.working_hours_start}
-              onChange={(e) => updateSetting('working_hours_start', e.target.value)}
-              className="bg-[#2a3942] text-[#e9edef] text-[13px] rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-[#00a884]/40"
-            />
-            <span className="text-[#8696a0] text-[13px]">até</span>
-            <input
-              type="time"
-              value={settings.working_hours_end}
-              onChange={(e) => updateSetting('working_hours_end', e.target.value)}
-              className="bg-[#2a3942] text-[#e9edef] text-[13px] rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-[#00a884]/40"
-            />
-          </div>
-        )}
-      </div>
 
       {/* Tone */}
       <div className="bg-[#202c33] rounded-xl p-4">

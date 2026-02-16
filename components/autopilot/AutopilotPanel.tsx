@@ -22,9 +22,6 @@ interface AutopilotSettings {
   response_delay_min: number
   response_delay_max: number
   max_responses_per_contact_per_day: number
-  working_hours_only: boolean
-  working_hours_start: string
-  working_hours_end: string
   tone: 'consultivo' | 'informal' | 'formal'
 }
 
@@ -60,9 +57,6 @@ const DEFAULT_SETTINGS: AutopilotSettings = {
   response_delay_min: 5,
   response_delay_max: 15,
   max_responses_per_contact_per_day: 999,
-  working_hours_only: true,
-  working_hours_start: '08:00',
-  working_hours_end: '18:00',
   tone: 'consultivo'
 }
 

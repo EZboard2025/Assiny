@@ -23,9 +23,6 @@ interface AutopilotSettings {
   response_delay_min: number
   response_delay_max: number
   max_responses_per_contact_per_day: number
-  working_hours_only: boolean
-  working_hours_start: string
-  working_hours_end: string
   tone: 'consultivo' | 'informal' | 'formal'
 }
 
@@ -72,9 +69,6 @@ const DEFAULT_SETTINGS: AutopilotSettings = {
   response_delay_min: 5,
   response_delay_max: 15,
   max_responses_per_contact_per_day: 999,
-  working_hours_only: true,
-  working_hours_start: '08:00',
-  working_hours_end: '18:00',
   tone: 'consultivo'
 }
 
@@ -624,42 +618,6 @@ export default function AutopilotPanel({
               </div>
 
               <div className="px-4 pb-4 space-y-4">
-                  {/* Working hours */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="text-[#e9edef] text-[13px]">Horário comercial</p>
-                        <p className="text-[#8696a0] text-[11px]">Responde só no horário que você definir</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSettings(prev => ({ ...prev, working_hours_only: !prev.working_hours_only }))
-                          setHasChanges(true)
-                        }}
-                        className={`w-10 h-[22px] rounded-full transition-colors relative ${settings.working_hours_only ? 'bg-[#00a884]' : 'bg-[#364147]'}`}
-                      >
-                        <div className={`w-[18px] h-[18px] bg-white rounded-full absolute top-[2px] transition-transform shadow-sm ${settings.working_hours_only ? 'translate-x-[20px]' : 'translate-x-[2px]'}`} />
-                      </button>
-                    </div>
-                    {settings.working_hours_only && (
-                      <div className="flex items-center gap-2 ml-0.5">
-                        <input
-                          type="time"
-                          value={settings.working_hours_start}
-                          onChange={(e) => { setSettings(prev => ({ ...prev, working_hours_start: e.target.value })); setHasChanges(true) }}
-                          className="bg-[#2a3942] text-[#e9edef] text-[13px] rounded-lg px-3 py-2 outline-none"
-                        />
-                        <span className="text-[#8696a0] text-[13px]">até</span>
-                        <input
-                          type="time"
-                          value={settings.working_hours_end}
-                          onChange={(e) => { setSettings(prev => ({ ...prev, working_hours_end: e.target.value })); setHasChanges(true) }}
-                          className="bg-[#2a3942] text-[#e9edef] text-[13px] rounded-lg px-3 py-2 outline-none"
-                        />
-                      </div>
-                    )}
-                  </div>
-
                   {/* Tone */}
                   <div>
                     <p className="text-[#e9edef] text-[13px] mb-2">Tom das respostas</p>

@@ -62,30 +62,7 @@ export async function POST(req: NextRequest) {
 
     const settings = config.settings || {}
 
-    // 2. Check working hours
-    if (settings.working_hours_only) {
-      const now = new Date()
-      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-      const start = settings.working_hours_start || '08:00'
-      const end = settings.working_hours_end || '18:00'
 
-      if (currentTime < start || currentTime > end) {
-        console.log(`[Autopilot] Outside working hours (${currentTime}, range ${start}-${end})`)
-
-        await supabaseAdmin.from('autopilot_log').insert({
-          user_id: userId,
-          company_id: companyId,
-          contact_phone: contactPhone,
-          contact_name: contactName,
-          incoming_message: incomingMessage.slice(0, 2000),
-          action: 'skipped_hours',
-          ai_reasoning: `Fora do horário comercial (${currentTime})`
-        })
-
-        pushAutopilotEvent('response_skipped', userId, contactPhone, contactName, `Fora do horário (${currentTime})`)
-        return NextResponse.json({ action: 'skipped_hours' })
-      }
-    }
 
     // 3. Check daily limit for this contact (suffix match for phone format compatibility)
     const phoneSuffix = contactPhone.replace(/[^0-9]/g, '').slice(-9)
