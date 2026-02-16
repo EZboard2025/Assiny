@@ -1118,75 +1118,38 @@ export default function MeetAnalysisView() {
               </div>
             </div>
 
-            {/* Transcript */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  Transcrição em Tempo Real
-                  {session.transcript.length > 0 && (
-                    <span className="text-xs text-gray-500">
-                      ({session.transcript.length} {session.transcript.length === 1 ? 'fala' : 'falas'})
-                    </span>
-                  )}
-                </h3>
+            {/* Status indicator while waiting/in meeting */}
+            {session.transcript.length === 0 && (session.status === 'joining' || session.status === 'sending') && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex flex-col items-center justify-center text-gray-500">
+                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
+                  <p className="text-gray-600">Aguardando bot entrar na reunião...</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Isso geralmente leva de 10 a 30 segundos
+                  </p>
+                  <p className="text-sm text-amber-600 mt-2 font-medium">
+                    Lembre-se de aceitar o "Ramppy" quando ele pedir para entrar!
+                  </p>
+                </div>
               </div>
-
-              <div
-                ref={transcriptRef}
-                className="h-[400px] overflow-y-auto p-4 space-y-4 bg-white"
-              >
-                {session.transcript.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                    {session.status === 'joining' || session.status === 'sending' ? (
-                      <>
-                        <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
-                        <p className="text-gray-600">Aguardando bot entrar na reunião...</p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Isso geralmente leva de 10 a 30 segundos
-                        </p>
-                        <p className="text-sm text-amber-600 mt-2 font-medium">
-                          Lembre-se de aceitar o "Ramppy" quando ele pedir para entrar!
-                        </p>
-                      </>
-                    ) : session.status === 'in_meeting' ? (
-                      <>
-                        <Video className="w-8 h-8 mb-3 text-green-600" />
-                        <p className="text-gray-600">Bot na reunião. Aguardando transcrição...</p>
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="w-8 h-8 mb-3 text-gray-400" />
-                        <p className="text-gray-500">Nenhuma transcrição ainda</p>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  session.transcript.map((segment, idx) => (
-                    <div key={idx} className="flex gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <User className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="font-semibold text-green-700 text-sm">
-                            {segment.speaker}
-                          </span>
-                          {segment.timestamp && (
-                            <span className="text-xs text-gray-400">
-                              {segment.timestamp}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                          {segment.text}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
+            )}
+            {session.transcript.length === 0 && session.status === 'in_meeting' && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex flex-col items-center justify-center text-gray-500">
+                  <Video className="w-8 h-8 mb-3 text-green-600" />
+                  <p className="text-gray-600">Bot na reunião. Gravando...</p>
+                </div>
               </div>
-            </div>
+            )}
+            {session.transcript.length > 0 && !(session.status === 'evaluating' || isEvaluating) && !evaluation && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex flex-col items-center justify-center text-gray-500">
+                  <Video className="w-8 h-8 mb-3 text-green-600" />
+                  <p className="text-gray-600">Reunião em andamento...</p>
+                  <p className="text-sm text-gray-500 mt-1">{session.transcript.length} falas capturadas</p>
+                </div>
+              </div>
+            )}
 
             {/* Evaluation Loading */}
             {(session.status === 'evaluating' || isEvaluating) && (
