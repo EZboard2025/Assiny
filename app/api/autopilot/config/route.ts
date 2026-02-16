@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
         enabled: enabled ?? false,
         custom_instructions: customInstructions ?? '',
         settings: settings ?? {
-          response_delay_min: 15,
-          response_delay_max: 60,
+          response_delay_min: 5,
+          response_delay_max: 15,
           max_responses_per_contact_per_day: 5,
           working_hours_only: true,
           working_hours_start: '08:00',

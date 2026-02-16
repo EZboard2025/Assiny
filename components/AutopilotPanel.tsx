@@ -69,7 +69,7 @@ interface AutopilotPanelProps {
 }
 
 const DEFAULT_SETTINGS: AutopilotSettings = {
-  response_delay_min: 15,
+  response_delay_min: 5,
   response_delay_max: 15,
   max_responses_per_contact_per_day: 999,
   working_hours_only: true,

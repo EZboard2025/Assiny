@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import {
-  Search, Plus, Check, X, AlertCircle, Users, ArrowRight, Minus, UserPlus, GripVertical
+  Search, Plus, Check, X, AlertCircle, Users, GripVertical, UserPlus, Zap, ChevronDown, ChevronUp
 } from 'lucide-react'
 import { AutopilotProfile } from './AutopilotProfilesTab'
 
@@ -56,6 +56,7 @@ export default function AutopilotContactsTab({
   const [searchQuery, setSearchQuery] = useState('')
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
   const [draggingPhone, setDraggingPhone] = useState<string | null>(null)
+  const [availableExpanded, setAvailableExpanded] = useState(true)
   const dragDataRef = useRef<DragData | null>(null)
 
   // Build contacts by profile
@@ -86,12 +87,24 @@ export default function AutopilotContactsTab({
     return c.name.toLowerCase().includes(q) || c.phone.includes(q)
   })
 
+  // Columns for active section (profiles + "sem perfil" if needed)
+  const activeColumns: Array<{ id: string | null; name: string; color: string }> = [
+    ...profiles.map(p => ({ id: p.id, name: p.name, color: p.color })),
+  ]
+  const unassignedContacts = contactsByProfile.get(null) || []
+  if (unassignedContacts.length > 0) {
+    activeColumns.push({ id: null, name: 'Sem perfil', color: '#8696a0' })
+  }
+
+  // Status counts
+  const needsAttention = Array.from(monitoredContacts.values()).filter(c => c.needs_human).length
+  const objectiveReached = Array.from(monitoredContacts.values()).filter(c => c.objective_reached).length
+
   // --- Drag & Drop handlers ---
   const handleDragStart = useCallback((e: React.DragEvent, data: DragData) => {
     dragDataRef.current = data
     setDraggingPhone(data.phone)
     e.dataTransfer.effectAllowed = 'move'
-    // Required for Firefox
     e.dataTransfer.setData('text/plain', data.phone)
   }, [])
 
@@ -108,7 +121,6 @@ export default function AutopilotContactsTab({
   }, [])
 
   const handleDragLeave = useCallback((e: React.DragEvent, columnId: string) => {
-    // Only clear if we're actually leaving the column (not entering a child)
     const relatedTarget = e.relatedTarget as HTMLElement | null
     const currentTarget = e.currentTarget as HTMLElement
     if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
@@ -129,13 +141,26 @@ export default function AutopilotContactsTab({
     if (data.isMonitored && data.sourceProfileId === targetProfileId) return
 
     if (data.isMonitored) {
-      // Move between profiles
       onContactProfileChanged(data.phone, targetProfileId)
     } else {
-      // Add from "Disponíveis" to a profile
       onContactAdded(data.phone, data.name, targetProfileId)
     }
   }, [onContactProfileChanged, onContactAdded])
+
+  // Drop on "available" section = remove from monitored
+  const handleDropOnAvailable = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOverColumn(null)
+    setDraggingPhone(null)
+
+    const data = dragDataRef.current
+    if (!data) return
+    dragDataRef.current = null
+
+    if (data.isMonitored) {
+      onContactRemoved(data.phone)
+    }
+  }, [onContactRemoved])
 
   const renderAvatar = (name: string, profilePic: string | null, size: string = 'w-8 h-8') => {
     if (profilePic) {
@@ -167,16 +192,6 @@ export default function AutopilotContactsTab({
     return null
   }
 
-  // All columns: profiles + "sem perfil"
-  const columns: Array<{ id: string | null; name: string; color: string }> = [
-    ...profiles.map(p => ({ id: p.id, name: p.name, color: p.color })),
-  ]
-  // Only show "Sem perfil" column if there are unassigned contacts
-  const unassignedContacts = contactsByProfile.get(null) || []
-  if (unassignedContacts.length > 0) {
-    columns.push({ id: null, name: 'Sem perfil', color: '#8696a0' })
-  }
-
   // No profiles yet
   if (profiles.length === 0) {
     return (
@@ -193,136 +208,220 @@ export default function AutopilotContactsTab({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Kanban columns - horizontal scroll */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full min-w-max">
-          {/* Profile columns */}
-          {columns.map(col => {
-            const contacts = contactsByProfile.get(col.id) || []
-            const isUnassigned = col.id === null
-            const columnKey = col.id || '__null'
-            const isDragOver = dragOverColumn === columnKey
+    <div className="flex flex-col h-full overflow-hidden">
 
-            return (
-              <div
-                key={columnKey}
-                className={`w-[220px] flex-shrink-0 flex flex-col border-r border-[#1a2630] last:border-r-0 transition-colors duration-150 ${
-                  isDragOver ? 'bg-[#00a884]/5' : ''
-                }`}
-                onDragOver={(e) => handleDragOver(e, columnKey)}
-                onDragLeave={(e) => handleDragLeave(e, columnKey)}
-                onDrop={(e) => handleDrop(e, col.id)}
-              >
-                {/* Column header */}
-                <div
-                  className="px-3 py-2.5 flex items-center gap-2 flex-shrink-0"
-                  style={{ borderBottom: `2px solid ${isDragOver ? '#00a884' : col.color}` }}
-                >
-                  <div
-                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors ${isDragOver ? 'scale-125' : ''}`}
-                    style={{ backgroundColor: isDragOver ? '#00a884' : col.color }}
-                  />
-                  <span
-                    className="text-[12px] font-medium truncate transition-colors"
-                    style={{ color: isDragOver ? '#00a884' : col.color }}
-                  >
-                    {col.name}
-                  </span>
-                  <span className="text-[10px] text-[#8696a0] flex-shrink-0">
-                    {contacts.length}
-                  </span>
-                </div>
-
-                {/* Contact cards */}
-                <div className="flex-1 overflow-y-auto whatsapp-scrollbar p-2 space-y-1.5">
-                  {contacts.length === 0 && (
-                    <div className={`text-center py-6 border-2 border-dashed rounded-lg transition-colors ${
-                      isDragOver
-                        ? 'border-[#00a884]/50 bg-[#00a884]/5'
-                        : 'border-[#2a3942]/50'
-                    }`}>
-                      <p className={`text-[11px] ${isDragOver ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
-                        {isDragOver ? 'Solte aqui' : 'Arraste contatos para ca'}
-                      </p>
-                    </div>
-                  )}
-
-                  {contacts.map(contact => {
-                    const isDragging = draggingPhone === contact.contact_phone
-
-                    return (
-                      <div
-                        key={contact.contact_phone}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, {
-                          phone: contact.contact_phone,
-                          name: contact.displayName,
-                          sourceProfileId: col.id,
-                          isMonitored: true
-                        })}
-                        onDragEnd={handleDragEnd}
-                        className={`bg-[#202c33] rounded-lg p-2.5 transition-all cursor-grab active:cursor-grabbing select-none ${
-                          isDragging ? 'opacity-40 scale-95' : 'hover:bg-[#263845]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <GripVertical className="w-3 h-3 text-[#8696a0]/40 flex-shrink-0" />
-                          <div className="relative flex-shrink-0">
-                            {renderAvatar(contact.displayName, contact.profilePic)}
-                            {renderStatusBadge(contact)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[#e9edef] text-[12px] truncate leading-tight">{contact.displayName}</p>
-                            {contact.objective_reached && (
-                              <p className="text-emerald-400 text-[9px]">Objetivo alcancado</p>
-                            )}
-                            {contact.needs_human && !contact.objective_reached && (
-                              <p className="text-amber-400 text-[9px]">Precisa atencao</p>
-                            )}
-                          </div>
-                          {/* Remove button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onContactRemoved(contact.contact_phone)
-                            }}
-                            className="p-1 rounded text-[#8696a0] hover:text-red-400 transition-colors flex-shrink-0"
-                            title="Remover"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-
-          {/* "Disponíveis" column - unmonitored contacts */}
-          <div className="w-[220px] flex-shrink-0 flex flex-col bg-[#0b141a]/50">
-            {/* Column header */}
-            <div className="px-3 py-2.5 flex items-center gap-2 flex-shrink-0 border-b-2 border-[#364147]">
-              <UserPlus className="w-3.5 h-3.5 text-[#364147]" />
-              <span className="text-[12px] font-medium text-[#8696a0]">
-                Disponíveis
-              </span>
-              <span className="text-[10px] text-[#8696a0]">
-                {unmonitored.length}
-              </span>
+      {/* ===== SECTION 1: ACTIVE AUTOPILOT CONTACTS ===== */}
+      <div className="flex-shrink-0">
+        {/* Section header */}
+        <div className="px-3 py-2.5 bg-[#00a884]/8 border-b border-[#00a884]/20">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-[#00a884]/20 flex items-center justify-center">
+              <Zap className="w-3.5 h-3.5 text-[#00a884]" />
             </div>
+            <div className="flex-1">
+              <p className="text-[#00a884] text-[12px] font-semibold">
+                Piloto Automatico Ativo
+              </p>
+              <p className="text-[#8696a0] text-[10px]">
+                {monitoredContacts.size} contato{monitoredContacts.size !== 1 ? 's' : ''} monitorado{monitoredContacts.size !== 1 ? 's' : ''}
+                {needsAttention > 0 && (
+                  <span className="text-amber-400 ml-2">{needsAttention} precisa{needsAttention !== 1 ? 'm' : ''} atencao</span>
+                )}
+                {objectiveReached > 0 && (
+                  <span className="text-emerald-400 ml-2">{objectiveReached} objetivo{objectiveReached !== 1 ? 's' : ''} alcancado{objectiveReached !== 1 ? 's' : ''}</span>
+                )}
+              </p>
+            </div>
+            {monitoredContacts.size > 0 && (
+              <button
+                onClick={onBatchRemove}
+                className="text-[10px] px-2 py-1 text-red-400/60 hover:text-red-400 hover:bg-red-900/20 rounded-full transition-colors"
+                title="Remover todos os contatos monitorados"
+              >
+                Remover todos
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
+      {/* Active kanban columns */}
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+        {monitoredContacts.size === 0 && activeColumns.length > 0 ? (
+          /* Empty state for active section */
+          <div className="flex items-center justify-center h-full px-6">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-[#00a884]/10 flex items-center justify-center mx-auto mb-3">
+                <UserPlus className="w-6 h-6 text-[#00a884]/40" />
+              </div>
+              <p className="text-[#8696a0] text-[12px]">
+                Arraste contatos da lista abaixo para ativar o piloto automatico
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-full min-w-max">
+            {activeColumns.map(col => {
+              const contacts = contactsByProfile.get(col.id) || []
+              const columnKey = col.id || '__null'
+              const isDragOver = dragOverColumn === columnKey
+
+              return (
+                <div
+                  key={columnKey}
+                  className={`w-[220px] flex-shrink-0 flex flex-col border-r border-[#1a2630] last:border-r-0 transition-colors duration-150 ${
+                    isDragOver ? 'bg-[#00a884]/5' : ''
+                  }`}
+                  onDragOver={(e) => handleDragOver(e, columnKey)}
+                  onDragLeave={(e) => handleDragLeave(e, columnKey)}
+                  onDrop={(e) => handleDrop(e, col.id)}
+                >
+                  {/* Column header */}
+                  <div
+                    className="px-3 py-2 flex items-center gap-2 flex-shrink-0"
+                    style={{ borderBottom: `2px solid ${isDragOver ? '#00a884' : col.color}` }}
+                  >
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors ${isDragOver ? 'scale-125' : ''}`}
+                      style={{ backgroundColor: isDragOver ? '#00a884' : col.color }}
+                    />
+                    <span
+                      className="text-[12px] font-medium truncate transition-colors"
+                      style={{ color: isDragOver ? '#00a884' : col.color }}
+                    >
+                      {col.name}
+                    </span>
+                    <span className="text-[10px] text-[#8696a0] flex-shrink-0">
+                      {contacts.length}
+                    </span>
+                  </div>
+
+                  {/* Contact cards */}
+                  <div className="flex-1 overflow-y-auto whatsapp-scrollbar p-2 space-y-1.5">
+                    {contacts.length === 0 && (
+                      <div className={`text-center py-6 border-2 border-dashed rounded-lg transition-colors ${
+                        isDragOver
+                          ? 'border-[#00a884]/50 bg-[#00a884]/5'
+                          : 'border-[#2a3942]/50'
+                      }`}>
+                        <p className={`text-[11px] ${isDragOver ? 'text-[#00a884]' : 'text-[#8696a0]'}`}>
+                          {isDragOver ? 'Solte aqui' : 'Arraste contatos para ca'}
+                        </p>
+                      </div>
+                    )}
+
+                    {contacts.map(contact => {
+                      const isDragging = draggingPhone === contact.contact_phone
+
+                      return (
+                        <div
+                          key={contact.contact_phone}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, {
+                            phone: contact.contact_phone,
+                            name: contact.displayName,
+                            sourceProfileId: col.id,
+                            isMonitored: true
+                          })}
+                          onDragEnd={handleDragEnd}
+                          className={`bg-[#202c33] rounded-lg p-2.5 transition-all cursor-grab active:cursor-grabbing select-none ${
+                            isDragging ? 'opacity-40 scale-95' : 'hover:bg-[#263845]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <GripVertical className="w-3 h-3 text-[#8696a0]/40 flex-shrink-0" />
+                            <div className="relative flex-shrink-0">
+                              {renderAvatar(contact.displayName, contact.profilePic)}
+                              {renderStatusBadge(contact)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[#e9edef] text-[12px] truncate leading-tight">{contact.displayName}</p>
+                              {contact.objective_reached && (
+                                <p className="text-emerald-400 text-[9px]">Objetivo alcancado</p>
+                              )}
+                              {contact.needs_human && !contact.objective_reached && (
+                                <p className="text-amber-400 text-[9px]">Precisa atencao</p>
+                              )}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onContactRemoved(contact.contact_phone)
+                              }}
+                              className="p-1 rounded text-[#8696a0] hover:text-red-400 transition-colors flex-shrink-0"
+                              title="Remover"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ===== DIVIDER ===== */}
+      <div className="flex-shrink-0 h-[2px] bg-gradient-to-r from-[#00a884]/30 via-[#364147] to-[#364147]/30" />
+
+      {/* ===== SECTION 2: AVAILABLE CONTACTS (not monitored) ===== */}
+      <div
+        className={`flex-shrink-0 flex flex-col transition-all ${
+          dragOverColumn === '__available' ? 'bg-[#2a3942]/30' : 'bg-[#0b141a]/50'
+        }`}
+        style={{ maxHeight: availableExpanded ? '45%' : '42px' }}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverColumn('__available') }}
+        onDragLeave={(e) => {
+          const relatedTarget = e.relatedTarget as HTMLElement | null
+          const currentTarget = e.currentTarget as HTMLElement
+          if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+            setDragOverColumn(prev => prev === '__available' ? null : prev)
+          }
+        }}
+        onDrop={handleDropOnAvailable}
+      >
+        {/* Section header - collapsible */}
+        <div
+          className="px-3 py-2.5 flex items-center gap-2 cursor-pointer hover:bg-[#111b21]/50 transition-colors border-b border-[#222d35]"
+          onClick={() => setAvailableExpanded(!availableExpanded)}
+        >
+          <div className="w-6 h-6 rounded-full bg-[#364147]/50 flex items-center justify-center">
+            <Users className="w-3.5 h-3.5 text-[#8696a0]" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[#8696a0] text-[12px] font-semibold">
+              Contatos Disponiveis
+            </p>
+            <p className="text-[#8696a0]/60 text-[10px]">
+              {unmonitored.length} contato{unmonitored.length !== 1 ? 's' : ''} sem piloto automatico
+            </p>
+          </div>
+          {dragOverColumn === '__available' && draggingPhone && (
+            <span className="text-red-400 text-[10px] animate-pulse">Solte para desativar</span>
+          )}
+          {availableExpanded ? (
+            <ChevronDown className="w-4 h-4 text-[#8696a0]" />
+          ) : (
+            <ChevronUp className="w-4 h-4 text-[#8696a0]" />
+          )}
+        </div>
+
+        {/* Expanded content */}
+        {availableExpanded && (
+          <>
             {/* Search */}
-            <div className="px-2 pt-2 pb-1 flex-shrink-0">
-              <div className="flex items-center bg-[#2a3942] rounded-lg px-2 py-1.5 gap-1.5">
+            <div className="px-3 pt-2 pb-1 flex-shrink-0">
+              <div className="flex items-center bg-[#2a3942] rounded-lg px-2.5 py-1.5 gap-1.5">
                 <Search className="w-3 h-3 text-[#8696a0]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar..."
+                  placeholder="Buscar contato..."
                   className="flex-1 bg-transparent text-[#e9edef] text-[11px] placeholder-[#8696a0]/60 outline-none"
                 />
                 {searchQuery && (
@@ -334,11 +433,11 @@ export default function AutopilotContactsTab({
             </div>
 
             {/* Available contacts list */}
-            <div className="flex-1 overflow-y-auto whatsapp-scrollbar p-2 space-y-1">
+            <div className="flex-1 overflow-y-auto whatsapp-scrollbar px-3 py-1.5 space-y-1">
               {filteredUnmonitored.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-[#8696a0] text-[11px]">
-                    {searchQuery ? 'Nenhum resultado' : 'Nenhum contato disponível'}
+                    {searchQuery ? 'Nenhum resultado' : 'Todos os contatos ja estao monitorados'}
                   </p>
                 </div>
               ) : (
@@ -356,73 +455,62 @@ export default function AutopilotContactsTab({
                         isMonitored: false
                       })}
                       onDragEnd={handleDragEnd}
-                      className={`bg-[#202c33]/60 rounded-lg p-2 transition-all cursor-grab active:cursor-grabbing select-none ${
+                      className={`bg-[#202c33]/40 rounded-lg px-2.5 py-2 transition-all cursor-grab active:cursor-grabbing select-none ${
                         isDragging ? 'opacity-40 scale-95' : 'hover:bg-[#202c33]'
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         <GripVertical className="w-3 h-3 text-[#8696a0]/30 flex-shrink-0" />
                         {renderAvatar(c.name, c.profilePic, 'w-7 h-7')}
-                        <p className="text-[#e9edef] text-[11px] truncate flex-1">{c.name}</p>
-                      </div>
-                      {/* Profile destination buttons still available as fallback */}
-                      {profiles.length > 1 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5 ml-5">
-                          {profiles.map(p => (
-                            <button
-                              key={p.id}
-                              onClick={() => onContactAdded(c.phone, c.name, p.id)}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium transition-colors hover:brightness-125"
-                              style={{
-                                backgroundColor: `${p.color}20`,
-                                color: p.color
-                              }}
-                            >
-                              <Plus className="w-2.5 h-2.5" />
-                              {p.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {profiles.length === 1 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5 ml-5">
+                        <p className="text-[#e9edef]/70 text-[11px] truncate flex-1">{c.name}</p>
+
+                        {/* Quick-add buttons */}
+                        {profiles.length === 1 ? (
                           <button
                             onClick={() => onContactAdded(c.phone, c.name, profiles[0].id)}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium transition-colors hover:brightness-125"
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium transition-colors hover:brightness-125 flex-shrink-0"
                             style={{
-                              backgroundColor: `${profiles[0].color}20`,
+                              backgroundColor: `${profiles[0].color}15`,
                               color: profiles[0].color
                             }}
                           >
                             <Plus className="w-2.5 h-2.5" />
-                            Adicionar
+                            Ativar
                           </button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="flex gap-1 flex-shrink-0">
+                            {profiles.map(p => (
+                              <button
+                                key={p.id}
+                                onClick={() => onContactAdded(c.phone, c.name, p.id)}
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium transition-colors hover:brightness-125"
+                                style={{
+                                  backgroundColor: `${p.color}15`,
+                                  color: p.color
+                                }}
+                                title={p.name}
+                              >
+                                <Plus className="w-2.5 h-2.5" />
+                                <span className="max-w-[60px] truncate">{p.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )
                 })
               )}
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
-      {/* Bottom bar with batch actions */}
-      <div className="flex-shrink-0 px-3 py-2 border-t border-[#222d35] flex items-center justify-between bg-[#111b21]">
-        <span className="text-[#8696a0] text-[11px]">
+      {/* Bottom status bar */}
+      <div className="flex-shrink-0 px-3 py-1.5 border-t border-[#222d35] bg-[#111b21]">
+        <span className="text-[#8696a0] text-[10px]">
           {monitoredContacts.size} ativo{monitoredContacts.size !== 1 ? 's' : ''} / {mergedContacts.length} total
         </span>
-        <div className="flex gap-1.5">
-          {monitoredContacts.size > 0 && (
-            <button
-              onClick={onBatchRemove}
-              className="text-[10px] px-2.5 py-1 text-red-400/70 hover:text-red-400 hover:bg-red-900/20 rounded-full transition-colors"
-            >
-              Remover todos
-            </button>
-          )}
-        </div>
       </div>
     </div>
   )

@@ -1591,14 +1591,9 @@ function debounceAutopilotResponse(
     const messages = autopilotPendingMsgs.get(key) || []
     autopilotPendingMsgs.delete(key)
 
-    // Check if contact was recently responded to (another trigger may have handled it)
-    const pSuffix = contactPhone.replace(/\D/g, '').slice(-9)
-    const lockKey = `${state.userId}:${pSuffix}`
-    const lastResp = autopilotRecentResponses.get(lockKey)
-    if (lastResp && Date.now() - lastResp < 120_000) {
-      console.log(`[WA Autopilot] Debounce fired but ${contactPhone} was responded ${Math.round((Date.now() - lastResp) / 1000)}s ago — skipping`)
-      return
-    }
+    // No recently-responded check here — if the lead sent NEW messages after a response,
+    // the debounce accumulated them and they MUST be processed. The in-flight lock in
+    // triggerAutopilotResponse prevents true concurrent duplicates.
 
     // Join all accumulated messages into one block
     const combinedMessage = messages.join('\n')
@@ -1611,7 +1606,7 @@ function debounceAutopilotResponse(
   }, AUTOPILOT_DEBOUNCE_MS)
 
   autopilotTimers.set(key, timer)
-  console.log(`[WA Autopilot] Debounce set for ${contactPhone}: will fire in 60s (${pending.length} msg(s) queued)`)
+  console.log(`[WA Autopilot] Debounce set for ${contactPhone}: will fire in ${AUTOPILOT_DEBOUNCE_MS / 1000}s (${pending.length} msg(s) queued)`)
 }
 
 async function triggerAutopilotResponse(
@@ -1628,13 +1623,15 @@ async function triggerAutopilotResponse(
   // Check if already processing this contact (in-flight lock)
   if (autopilotInFlight.has(lockKey)) {
     console.log(`[WA Autopilot] Skipping ${contactPhone} (${mode}): already in-flight`)
+    pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, `Já em processamento (in-flight lock)`)
     return
   }
 
-  // Check if recently responded to this contact (within 2 minutes)
+  // Check if recently responded to this contact (within 15s — only to prevent true duplicate triggers)
   const lastResponse = autopilotRecentResponses.get(lockKey)
-  if (lastResponse && Date.now() - lastResponse < 120_000) {
+  if (lastResponse && Date.now() - lastResponse < 15_000) {
     console.log(`[WA Autopilot] Skipping ${contactPhone} (${mode}): responded ${Math.round((Date.now() - lastResponse) / 1000)}s ago`)
+    pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, `Respondido há ${Math.round((Date.now() - lastResponse) / 1000)}s — ignorando duplicata`)
     return
   }
 
@@ -1646,12 +1643,14 @@ async function triggerAutopilotResponse(
     const config = await getAutopilotConfig(state.userId)
     if (!config?.enabled) {
       console.log(`[WA Autopilot] Skipped: config not enabled (config=${JSON.stringify(config ? { enabled: config.enabled } : null)})`)
+      pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, 'Config desativada')
       return
     }
     console.log(`[WA Autopilot] Config enabled, companyId=${state.companyId}`)
 
     if (!state.companyId) {
       console.error(`[WA Autopilot] No companyId in state for user ${state.userId}`)
+      pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, 'Sem companyId')
       return
     }
 
@@ -1673,13 +1672,18 @@ async function triggerAutopilotResponse(
     })
 
     if (!contact?.enabled) {
-      if (!contact) console.log(`[WA Autopilot] Contact ${contactPhone} NOT matched to any monitored contact`)
-      else console.log(`[WA Autopilot] Contact ${contactPhone} is disabled`)
+      if (!contact) {
+        console.log(`[WA Autopilot] Contact ${contactPhone} NOT matched to any monitored contact`)
+        pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, 'Contato não monitorado')
+      } else {
+        console.log(`[WA Autopilot] Contact ${contactPhone} is disabled`)
+        pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, 'Contato desativado')
+      }
       return
     }
     if (contact.objective_reached) {
       console.log(`[WA Autopilot] Contact ${contactPhone} objective already reached — skipping`)
-      pushAutopilotEvent('response_skipped', state.userId, contactPhone, null, 'Objetivo já alcançado')
+      pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, 'Objetivo já alcançado')
       return
     }
     // Auto-clear needs_human when the LEAD sends a new message (context changed, AI should re-evaluate)
@@ -1707,19 +1711,19 @@ async function triggerAutopilotResponse(
     }
     console.log(`[WA Autopilot] Contact ${contactPhone} matched to monitored: ${contact.contact_phone}`)
 
-    // 3. Apply random delay for natural feel
+    // 3. Apply random delay for natural feel (capped at 30s to prevent excessive waits)
     const settings = config.settings || {}
-    const delayMin = (settings.response_delay_min || 5) * 1000
-    const delayMax = (settings.response_delay_max || 15) * 1000
+    const delayMin = Math.min((settings.response_delay_min || 5), 30) * 1000
+    const delayMax = Math.min((settings.response_delay_max || 15), 30) * 1000
     const delay = delayMin + Math.random() * (delayMax - delayMin)
     const delaySec = Math.round(delay / 1000)
     console.log(`[WA Autopilot] Waiting ${delaySec}s before responding to ${contactPhone}`)
-    pushAutopilotEvent('waiting_delay', state.userId, contactPhone, null, `Aguardando ${delaySec}s antes de responder`)
+    pushAutopilotEvent('waiting_delay', state.userId, contactPhone, contactName, `Aguardando ${delaySec}s antes de responder`)
     await new Promise(resolve => setTimeout(resolve, delay))
 
-    // Re-check recently-responded after delay (another trigger might have resolved this contact during the wait)
+    // Re-check: another trigger might have responded during the delay
     const lastResponseAfterDelay = autopilotRecentResponses.get(lockKey)
-    if (lastResponseAfterDelay && Date.now() - lastResponseAfterDelay < 120_000) {
+    if (lastResponseAfterDelay && Date.now() - lastResponseAfterDelay < 15_000) {
       console.log(`[WA Autopilot] Skipping ${contactPhone} (${mode}): another trigger responded during delay (${Math.round((Date.now() - lastResponseAfterDelay) / 1000)}s ago)`)
       pushAutopilotEvent('response_skipped', state.userId, contactPhone, contactName, 'Já respondido por outro trigger')
       return
@@ -1732,7 +1736,7 @@ async function triggerAutopilotResponse(
     // complement checks — the autopilot's own outbound messages would otherwise be
     // mistaken for seller messages due to a race condition with autopilotSentMsgIds.
     autopilotRecentResponses.set(lockKey, Date.now())
-    setTimeout(() => autopilotRecentResponses.delete(lockKey), 180_000)
+    setTimeout(() => autopilotRecentResponses.delete(lockKey), 60_000)
 
     // 4. Call the autopilot respond API (always use localhost for internal server-to-server call)
     const port = process.env.PORT || 3000

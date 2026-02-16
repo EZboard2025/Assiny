@@ -125,13 +125,15 @@ export default function AutopilotSettingsTab({
           <span className="text-[#8696a0] text-[12px] flex-shrink-0">Mínimo</span>
           <input
             type="number"
-            min={5}
-            max={120}
+            min={3}
+            max={30}
             value={settings.response_delay_min}
             onChange={(e) => {
-              const val = parseInt(e.target.value) || 15
-              updateSetting('response_delay_min', val)
-              if (val > settings.response_delay_max) updateSetting('response_delay_max', val)
+              const val = parseInt(e.target.value)
+              if (isNaN(val)) return
+              const clamped = Math.max(3, Math.min(30, val))
+              const newMax = Math.max(clamped, settings.response_delay_max)
+              onSettingsChange({ ...settings, response_delay_min: clamped, response_delay_max: Math.min(newMax, 30) })
             }}
             className="w-16 bg-[#2a3942] text-[#e9edef] text-[13px] rounded-lg px-2 py-1.5 outline-none text-center focus:ring-1 focus:ring-[#00a884]/40"
           />
@@ -140,13 +142,15 @@ export default function AutopilotSettingsTab({
           <span className="text-[#8696a0] text-[12px] flex-shrink-0">Máximo</span>
           <input
             type="number"
-            min={5}
-            max={120}
+            min={3}
+            max={30}
             value={settings.response_delay_max}
             onChange={(e) => {
-              const val = parseInt(e.target.value) || 60
-              updateSetting('response_delay_max', val)
-              if (val < settings.response_delay_min) updateSetting('response_delay_min', val)
+              const val = parseInt(e.target.value)
+              if (isNaN(val)) return
+              const clamped = Math.max(3, Math.min(30, val))
+              const newMin = Math.min(clamped, settings.response_delay_min)
+              onSettingsChange({ ...settings, response_delay_max: clamped, response_delay_min: Math.max(newMin, 3) })
             }}
             className="w-16 bg-[#2a3942] text-[#e9edef] text-[13px] rounded-lg px-2 py-1.5 outline-none text-center focus:ring-1 focus:ring-[#00a884]/40"
           />
