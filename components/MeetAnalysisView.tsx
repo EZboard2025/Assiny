@@ -143,8 +143,6 @@ export default function MeetAnalysisView() {
   const [showEvaluationModal, setShowEvaluationModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [savedToHistory, setSavedToHistory] = useState(false)
-  const [inputMode, setInputMode] = useState<'link' | 'paste'>('link')
-  const [pastedTranscript, setPastedTranscript] = useState('')
   const [isGeneratingSimulation, setIsGeneratingSimulation] = useState(false)
   const [simulationConfig, setSimulationConfig] = useState<any>(null)
   const [savedSimulation, setSavedSimulation] = useState<any>(null)
@@ -726,88 +724,11 @@ export default function MeetAnalysisView() {
     hasTriggeredAutoEvalRef.current = false
     setSession(null)
     setMeetUrl('')
-    setPastedTranscript('')
     setError('')
     setEvaluation(null)
     setIsEvaluating(false)
     setSavedToHistory(false)
     setSimulationConfig(null)
-  }
-
-  // Evaluate pasted transcript directly (no bot needed)
-  const evaluatePastedTranscript = async () => {
-    const text = pastedTranscript.trim()
-    if (!text) {
-      setError('Cole a transcrição da reunião antes de avaliar')
-      return
-    }
-
-    // Parse pasted text into segments for display
-    // Supports formats like "Speaker: text" or plain text
-    const lines = text.split('\n').filter(l => l.trim())
-    const segments: TranscriptSegment[] = lines.map(line => {
-      const match = line.match(/^([^:]{1,40}):\s*(.+)/)
-      if (match) {
-        return { speaker: match[1].trim(), text: match[2].trim(), timestamp: '' }
-      }
-      return { speaker: 'Participante', text: line.trim(), timestamp: '' }
-    })
-
-    const consolidated = consolidateTranscript(segments)
-
-    // Create a fake session to reuse the existing evaluation flow
-    const fakeId = `paste_${Date.now()}`
-    setSession({
-      botId: fakeId,
-      meetingUrl: '',
-      status: 'evaluating',
-      startTime: new Date(),
-      transcript: consolidated
-    })
-    setError('')
-    setEvaluation(null)
-    setSavedToHistory(false)
-    hasTriggeredAutoEvalRef.current = true
-    setIsEvaluating(true)
-
-    try {
-      const companyId = await getCompanyId()
-
-      const response = await fetch('/api/meet/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: text,
-          meetingId: fakeId,
-          companyId
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao avaliar reunião')
-      }
-
-      const data = await response.json()
-
-      if (data.success && data.evaluation) {
-        setEvaluation(data.evaluation)
-        setShowEvaluationModal(true)
-
-        // Save to history + generate simulation in parallel
-        await Promise.all([
-          saveEvaluationToHistory(data.evaluation, consolidated, fakeId),
-          generateSimulation(data.evaluation, text)
-        ])
-      } else {
-        throw new Error('Resposta inválida da API')
-      }
-    } catch (err: any) {
-      setError(`Erro ao avaliar: ${err.message}`)
-    } finally {
-      setIsEvaluating(false)
-      setSession(prev => prev ? { ...prev, status: 'ended' } : null)
-    }
   }
 
   // Generate simulation from evaluation (accepts params directly to avoid stale state)
@@ -927,38 +848,9 @@ export default function MeetAnalysisView() {
         {/* Input Section */}
         {!session && (
           <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
-            {/* Mode Toggle */}
-            <div className="flex gap-1 mb-5 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => { setInputMode('link'); setError('') }}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                  inputMode === 'link'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Video className="w-4 h-4" />
-                Enviar Bot ao Meet
-              </button>
-              <button
-                onClick={() => { setInputMode('paste'); setError('') }}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                  inputMode === 'paste'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                Colar Transcrição
-              </button>
-            </div>
-
-            {/* Link Mode */}
-            {inputMode === 'link' && (
-              <>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Link do Google Meet
-                </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              Link do Google Meet
+            </label>
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
                     <input
@@ -1027,36 +919,6 @@ export default function MeetAnalysisView() {
                     </div>
                   </div>
                 </div>
-              </>
-            )}
-
-            {/* Paste Mode */}
-            {inputMode === 'paste' && (
-              <>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Transcrição da Reunião
-                </label>
-                <textarea
-                  value={pastedTranscript}
-                  onChange={(e) => { setPastedTranscript(e.target.value); setError('') }}
-                  placeholder={"Cole a transcrição aqui...\n\nFormato sugerido:\nVendedor: Olá, tudo bem?\nCliente: Tudo sim, obrigado.\nVendedor: Gostaria de entender melhor sua situação..."}
-                  className="w-full h-[250px] px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all resize-none text-sm leading-relaxed"
-                />
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-xs text-gray-400">
-                    {pastedTranscript.trim() ? `${pastedTranscript.trim().split('\n').filter(l => l.trim()).length} linhas` : 'Nenhum texto colado'}
-                  </span>
-                  <button
-                    onClick={evaluatePastedTranscript}
-                    disabled={!pastedTranscript.trim()}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                    Avaliar Transcrição
-                  </button>
-                </div>
-              </>
-            )}
 
             {error && (
               <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
