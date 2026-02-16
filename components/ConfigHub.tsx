@@ -4601,7 +4601,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                     handleAddRebuttal(objection.id)
                                   }
                                 }}
-                                className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-white text-xs placeholder-gray-500 focus:outline-none focus:border-green-500/50"
+                                className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs placeholder-gray-400 focus:outline-none focus:border-green-500/50"
                                 placeholder="Ex: Apresentar cálculo de ROI detalhado..."
                               />
                               <button
@@ -4638,10 +4638,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     onChange={(e) => setNewObjection(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && !objectionLimitReached && handleAddObjection()}
                     disabled={objectionLimitReached}
-                    className={`flex-1 px-3 py-2 bg-gray-900/50 border rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none ${
+                    className={`flex-1 px-3 py-2 bg-white border rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none ${
                       objectionLimitReached
-                        ? 'border-gray-700 opacity-50 cursor-not-allowed'
-                        : 'border-gray-700 focus:border-green-500/50'
+                        ? 'border-gray-200 opacity-50 cursor-not-allowed'
+                        : 'border-gray-200 focus:border-green-500/50'
                     }`}
                     placeholder={
                       objectionLimitReached
