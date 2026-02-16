@@ -1339,7 +1339,9 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
           console.log(`[WA] Media saved: ${mediaId}`)
 
           if (messageType === 'audio') {
-            transcribeAudioMessage(buffer, msg.id._serialized, state.userId).catch(() => {})
+            transcribeAudioMessage(buffer, msg.id._serialized, state.userId, {
+              state, contactPhone, contactName, fromMe, isGroup
+            }).catch(() => {})
           }
         }
       } catch (err) {
@@ -1967,7 +1969,8 @@ export async function sendAutopilotMessage(
 async function transcribeAudioMessage(
   mediaBuffer: Buffer,
   messageId: string,
-  userId: string
+  userId: string,
+  autopilotCtx?: { state: ClientState; contactPhone: string; contactName: string | null; fromMe: boolean; isGroup: boolean }
 ): Promise<void> {
   try {
     const file = await toFile(mediaBuffer, 'audio.ogg', { type: 'audio/ogg' })
@@ -1989,6 +1992,13 @@ async function transcribeAudioMessage(
       .eq('user_id', userId)
 
     console.log(`[WA] Transcribed audio ${messageId}: ${text.substring(0, 80)}...`)
+
+    // Trigger autopilot for incoming audio messages after transcription
+    if (autopilotCtx && !autopilotCtx.fromMe && !autopilotCtx.isGroup) {
+      console.log(`[WA Autopilot] Audio transcribed for ${autopilotCtx.contactPhone}: "${text.slice(0, 50)}"`)
+      pushAutopilotEvent('message_detected', autopilotCtx.state.userId, autopilotCtx.contactPhone, autopilotCtx.contactName, `Lead (áudio): "${text.slice(0, 80)}"`)
+      debounceAutopilotResponse(autopilotCtx.state, autopilotCtx.contactPhone, autopilotCtx.contactName, text)
+    }
   } catch (err: any) {
     console.error(`[WA] Transcription failed for ${messageId}:`, err.message || err)
   }
