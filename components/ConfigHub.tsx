@@ -5440,9 +5440,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     const totalLimit = usageData.monthlyCredits === null
                       ? null
                       : usageData.monthlyCredits + usageData.extraCredits
-                    const percentage = totalLimit
+                    const usedPercent = totalLimit
                       ? Math.min((usageData.creditsUsed / totalLimit) * 100, 100)
                       : 0
+                    const remainingPercent = 100 - usedPercent
 
                     return (
                       <div className="space-y-6">
@@ -5465,19 +5466,19 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             <span className="text-sm text-gray-600">
                               {usageData.monthlyCredits === null
                                 ? `${usageData.creditsUsed} usados`
-                                : `${Math.round(percentage)}% usado`
+                                : `${Math.round(remainingPercent)}% restante`
                               }
                             </span>
                           </div>
-                          {/* Progress bar */}
+                          {/* Progress bar — shows remaining (shrinks as credits are used) */}
                           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all duration-700 ${
                                 usageData.monthlyCredits === null
                                   ? 'bg-green-500'
-                                  : percentage > 80 ? 'bg-red-500' : percentage > 50 ? 'bg-amber-500' : 'bg-green-500'
+                                  : remainingPercent < 20 ? 'bg-red-500' : remainingPercent < 50 ? 'bg-amber-500' : 'bg-green-500'
                               }`}
-                              style={{ width: totalLimit ? `${Math.max(percentage, 1)}%` : '2%' }}
+                              style={{ width: totalLimit ? `${Math.max(remainingPercent, 0)}%` : '98%' }}
                             />
                           </div>
                         </div>
