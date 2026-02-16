@@ -42,14 +42,16 @@ export async function POST(request: Request) {
         recording_config: {
           transcript: {
             provider: {
-              // Use Deepgram for better Portuguese transcription accuracy
               deepgram_streaming: {
-                language: 'pt-BR',  // Brazilian Portuguese
-                model: 'nova-2',    // Best accuracy model
-                smart_format: true, // Auto-formatting (numbers, dates, etc.)
-                punctuate: true,    // Add punctuation
-                diarize: true       // Speaker identification
+                language: 'pt-BR',
+                model: 'nova-3',
+                smart_format: true,
+                punctuate: true,
+                diarize: true
               }
+            },
+            diarization: {
+              use_separate_streams_when_available: true
             }
           },
           // Configure real-time webhook endpoints
