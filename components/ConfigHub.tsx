@@ -3209,7 +3209,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             onClick={() => setActiveTab('usage')}
             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'usage'
-                ? 'bg-amber-500 text-white shadow-md'
+                ? 'bg-green-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -5420,9 +5420,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {activeTab === 'usage' && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-white">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-white">
                 <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-amber-600" />
+                  <BarChart3 className="w-4 h-4 text-green-600" />
                   Uso de Créditos
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
@@ -5432,7 +5432,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
               {loadingUsage ? (
                 <div className="p-8 flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
+                  <Loader2 className="w-6 h-6 animate-spin text-green-600" />
                 </div>
               ) : usageData ? (
                 <div className="p-6 space-y-6">
@@ -5474,8 +5474,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                             <div
                               className={`h-full rounded-full transition-all duration-700 ${
                                 usageData.monthlyCredits === null
-                                  ? 'bg-amber-500'
-                                  : percentage > 80 ? 'bg-red-500' : percentage > 50 ? 'bg-amber-500' : 'bg-amber-500'
+                                  ? 'bg-green-500'
+                                  : percentage > 80 ? 'bg-red-500' : percentage > 50 ? 'bg-amber-500' : 'bg-green-500'
                               }`}
                               style={{ width: totalLimit ? `${Math.max(percentage, 1)}%` : '2%' }}
                             />
@@ -5495,9 +5495,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
             {/* Seção de Configurações */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-white">
                 <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-purple-600" />
+                  <Settings className="w-4 h-4 text-green-600" />
                   Configurações
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
@@ -5507,10 +5507,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
               <div className="p-4">
                 {/* Toggle Desafios Diários */}
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50/50 to-pink-50/50 rounded-xl border border-purple-100">
+                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50/50 to-emerald-50/50 rounded-xl border border-green-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Target className="w-5 h-5 text-purple-600" />
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Target className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Desafios Diários</h4>
@@ -5544,7 +5544,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       }
                     }}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      usageData?.challengesEnabled !== false ? 'bg-purple-600' : 'bg-gray-300'
+                      usageData?.challengesEnabled !== false ? 'bg-green-600' : 'bg-gray-300'
                     }`}
                   >
                     <span
@@ -5577,7 +5577,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           }
                         }}
                         placeholder="https://www.suaempresa.com.br"
-                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
                       />
                       <button
                         onClick={async () => {
@@ -5604,7 +5604,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           }
                         }}
                         disabled={!usageData?.websiteUrl}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Salvar
                       </button>
