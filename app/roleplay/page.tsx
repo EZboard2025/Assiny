@@ -6,15 +6,26 @@ import RoleplayView from '@/components/RoleplayView'
 
 export default function RoleplayPage() {
   const [activeChallenge, setActiveChallenge] = useState<any>(null)
+  const [meetSimulation, setMeetSimulation] = useState<any>(null)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('activeChallenge')
-    if (stored) {
+    const storedChallenge = sessionStorage.getItem('activeChallenge')
+    if (storedChallenge) {
       try {
-        setActiveChallenge(JSON.parse(stored))
+        setActiveChallenge(JSON.parse(storedChallenge))
         sessionStorage.removeItem('activeChallenge')
       } catch (e) {
         console.error('Error parsing challenge:', e)
+      }
+    }
+
+    const storedSimulation = sessionStorage.getItem('meetSimulation')
+    if (storedSimulation) {
+      try {
+        setMeetSimulation(JSON.parse(storedSimulation))
+        sessionStorage.removeItem('meetSimulation')
+      } catch (e) {
+        console.error('Error parsing meet simulation:', e)
       }
     }
   }, [])
@@ -25,6 +36,7 @@ export default function RoleplayPage() {
         challengeConfig={activeChallenge?.challenge_config}
         challengeId={activeChallenge?.id}
         onChallengeComplete={() => setActiveChallenge(null)}
+        meetSimulationConfig={meetSimulation?.simulation_config}
       />
     </DashboardLayout>
   )

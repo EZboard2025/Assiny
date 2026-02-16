@@ -407,7 +407,7 @@ const getScoreColor = (score: number | null) => {
                             {selectedEvaluation.evaluation.playbook_adherence.violations?.length > 0 ? (
                               <ul className="space-y-1">
                                 {selectedEvaluation.evaluation.playbook_adherence.violations.slice(0, 3).map((v: any, i: number) => (
-                                  <li key={i} className="text-xs text-gray-700">{v.criterion}</li>
+                                  <li key={i} className="text-xs text-gray-700">{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</li>
                                 ))}
                               </ul>
                             ) : (
@@ -427,7 +427,7 @@ const getScoreColor = (score: number | null) => {
                             {selectedEvaluation.evaluation.playbook_adherence.missed_requirements?.length > 0 ? (
                               <ul className="space-y-1">
                                 {selectedEvaluation.evaluation.playbook_adherence.missed_requirements.slice(0, 3).map((m: any, i: number) => (
-                                  <li key={i} className="text-xs text-gray-700">{m.criterion}</li>
+                                  <li key={i} className="text-xs text-gray-700">{typeof m === 'string' ? m : m?.criterion || m?.description || JSON.stringify(m)}</li>
                                 ))}
                               </ul>
                             ) : (

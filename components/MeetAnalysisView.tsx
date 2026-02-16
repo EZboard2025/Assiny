@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Video,
   Loader2,
@@ -15,15 +16,12 @@ import {
   AlertTriangle,
   Copy,
   Check,
-  X,
   BookOpen,
   FileText,
   Save,
-  Link,
-  UserPlus,
-  Mic,
-  BarChart3,
-  Sparkles
+  Target,
+  Play,
+  Lightbulb
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -122,49 +120,19 @@ const consolidateTranscript = (segments: TranscriptSegment[]): TranscriptSegment
   return consolidated
 }
 
-// Speaker avatar colors
-const speakerColors = [
-  { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
-  { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200' },
-  { bg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-200' },
-  { bg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200' },
-  { bg: 'bg-rose-100', text: 'text-rose-600', border: 'border-rose-200' },
-  { bg: 'bg-cyan-100', text: 'text-cyan-600', border: 'border-cyan-200' },
-]
-
-const getSpeakerColor = (speaker: string, speakerMap: Map<string, number>) => {
-  const key = speaker.trim().toLowerCase()
-  if (!speakerMap.has(key)) {
-    speakerMap.set(key, speakerMap.size % speakerColors.length)
-  }
-  return speakerColors[speakerMap.get(key)!]
-}
-
-const getScoreColor = (score: number) => {
-  if (score >= 7) return 'text-green-600'
-  if (score >= 5) return 'text-amber-600'
-  return 'text-red-600'
-}
-
-const getScoreBg = (score: number) => {
-  if (score >= 7) return 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
-  if (score >= 5) return 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200'
-  return 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
-}
-
-const getPerformanceLabel = (level: string) => {
-  const labels: Record<string, string> = {
-    'legendary': 'Lendário',
-    'excellent': 'Excelente',
-    'very_good': 'Muito Bom',
-    'good': 'Bom',
-    'needs_improvement': 'Precisa Melhorar',
-    'poor': 'Em Desenvolvimento'
-  }
-  return labels[level] || level
+// Strip GPT markdown formatting from text (bold **text**, em dashes —, etc.)
+function cleanGptText(text: string): string {
+  return text
+    .replace(/\*\*/g, '')       // Remove **bold**
+    .replace(/\*/g, '')         // Remove *italic*
+    .replace(/\s*—\s*/g, ': ') // Replace em dash with colon
+    .replace(/\s*–\s*/g, ': ') // Replace en dash with colon
+    .replace(/^Tecnica:\s*/i, '') // Remove leading "Tecnica:" if already have colon from dash
+    .trim()
 }
 
 export default function MeetAnalysisView() {
+  const router = useRouter()
   const [meetUrl, setMeetUrl] = useState('')
   const [session, setSession] = useState<MeetingSession | null>(null)
   const [error, setError] = useState('')
@@ -175,19 +143,130 @@ export default function MeetAnalysisView() {
   const [showEvaluationModal, setShowEvaluationModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [savedToHistory, setSavedToHistory] = useState(false)
+  const [inputMode, setInputMode] = useState<'link' | 'paste'>('link')
+  const [pastedTranscript, setPastedTranscript] = useState('')
+  const [isGeneratingSimulation, setIsGeneratingSimulation] = useState(false)
+  const [simulationConfig, setSimulationConfig] = useState<any>(null)
+  const [savedSimulation, setSavedSimulation] = useState<any>(null)
+  const [isSavingSimulation, setIsSavingSimulation] = useState(false)
+  const [currentSimSaved, setCurrentSimSaved] = useState(false)
+  const simulationRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
-  const speakerMapRef = useRef<Map<string, number>>(new Map())
-  const sessionRef = useRef<MeetingSession | null>(null)
 
-  // Keep ref in sync with state so async callbacks always see latest session
+  // Load saved simulation from Supabase on mount
   useEffect(() => {
-    sessionRef.current = session
-  }, [session])
+    const loadSaved = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data, error } = await supabase
+          .from('saved_simulations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (error) {
+          console.error('Error loading saved simulation:', error)
+          return
+        }
+        if (data) {
+          setSavedSimulation(data)
+        }
+      } catch (e) {
+        console.error('Error loading saved simulation:', e)
+      }
+    }
+    loadSaved()
+  }, [])
+
+  // Save simulation for later (Supabase)
+  const saveSimulationForLater = async () => {
+    if (!simulationConfig || !evaluation) return
+    setIsSavingSimulation(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const companyId = await getCompanyId()
+      if (!companyId) return
+
+      const { data, error } = await supabase
+        .from('saved_simulations')
+        .insert({
+          user_id: user.id,
+          company_id: companyId,
+          simulation_config: simulationConfig,
+          simulation_justification: simulationConfig.simulation_justification || null,
+          meeting_context: simulationConfig.meeting_context || null,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error saving simulation:', error)
+        return
+      }
+
+      setSavedSimulation(data)
+      setCurrentSimSaved(true)
+      setShowEvaluationModal(false)
+    } catch (e) {
+      console.error('Error saving simulation:', e)
+    } finally {
+      setIsSavingSimulation(false)
+    }
+  }
+
+  // Discard saved simulation (Supabase)
+  const discardSavedSimulation = async () => {
+    if (!savedSimulation?.id) return
+    try {
+      await supabase
+        .from('saved_simulations')
+        .delete()
+        .eq('id', savedSimulation.id)
+    } catch (e) {
+      console.error('Error deleting saved simulation:', e)
+    }
+    setSavedSimulation(null)
+  }
+
+  // Start saved simulation
+  const startSavedSimulation = async () => {
+    if (!savedSimulation) return
+    // Pass simulation data to roleplay page via sessionStorage
+    const meetSimData = {
+      simulation_config: savedSimulation.simulation_config,
+    }
+    sessionStorage.setItem('meetSimulation', JSON.stringify(meetSimData))
+
+    // Delete from Supabase (or mark as completed)
+    if (savedSimulation.id) {
+      try {
+        await supabase
+          .from('saved_simulations')
+          .delete()
+          .eq('id', savedSimulation.id)
+      } catch (e) {
+        console.error('Error deleting saved simulation:', e)
+      }
+    }
+
+    setSavedSimulation(null)
+    router.push('/roleplay')
+  }
 
   // Validate Google Meet URL
   const isValidMeetUrl = (url: string): boolean => {
+    // Patterns:
+    // https://meet.google.com/abc-defg-hij
+    // meet.google.com/abc-defg-hij
     const pattern = /meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i
     return pattern.test(url)
   }
@@ -205,6 +284,7 @@ export default function MeetAnalysisView() {
       return
     }
 
+    // Ensure URL is properly formatted
     let fullUrl = meetUrl.trim()
     if (!fullUrl.startsWith('http')) {
       fullUrl = 'https://' + fullUrl
@@ -215,10 +295,10 @@ export default function MeetAnalysisView() {
       return
     }
 
+    // Clear any previous evaluation state
     setEvaluation(null)
     setSavedToHistory(false)
     hasTriggeredAutoEvalRef.current = false
-    speakerMapRef.current = new Map()
 
     setSession({
       botId: '',
@@ -255,6 +335,7 @@ export default function MeetAnalysisView() {
         startTime: new Date()
       } : null)
 
+      // Start polling for status and transcripts
       startPolling(data.botId)
 
     } catch (err: any) {
@@ -272,12 +353,14 @@ export default function MeetAnalysisView() {
 
     const poll = async () => {
       try {
+        // Get bot status
         const statusRes = await fetch(`/api/recall/bot-status?botId=${botId}`)
 
         if (statusRes.ok) {
           const statusData = await statusRes.json()
           console.log('📊 Bot status:', statusData.status, '(recall:', statusData.recallStatus, ')')
 
+          // Update session status
           setSession(prev => {
             if (!prev) return null
 
@@ -295,10 +378,12 @@ export default function MeetAnalysisView() {
                 newStatus = 'transcribing'
                 break
               case 'ended':
+                // Bot left automatically - trigger auto-evaluation
                 if (!hasTriggeredAutoEvalRef.current && prev.status !== 'ended') {
                   console.log('🤖 Bot saiu automaticamente, iniciando avaliação...')
                   hasTriggeredAutoEvalRef.current = true
                   stopPolling()
+                  // Trigger auto-evaluation after a short delay
                   setTimeout(() => triggerAutoEvaluation(botId), 500)
                 }
                 newStatus = 'ended'
@@ -313,23 +398,27 @@ export default function MeetAnalysisView() {
           })
         }
 
+        // Get transcript from webhook storage
         const transcriptRes = await fetch(`/api/recall/webhook?botId=${botId}`)
 
         if (transcriptRes.ok) {
           const transcriptData = await transcriptRes.json()
 
           if (transcriptData.transcript && transcriptData.transcript.length > 0) {
+            // Map segments to our format
             const segments: TranscriptSegment[] = transcriptData.transcript.map((seg: any) => ({
               speaker: seg.speaker || 'Participante',
               text: seg.text || '',
               timestamp: seg.timestamp || ''
             }))
 
+            // Consolidate consecutive messages from same speaker
             const consolidatedTranscript = consolidateTranscript(segments)
 
             setSession(prev => {
               if (!prev) return null
 
+              // Update to transcribing status if we have content
               const newStatus = prev.status === 'in_meeting' || prev.status === 'joining'
                 ? 'transcribing'
                 : prev.status
@@ -348,10 +437,14 @@ export default function MeetAnalysisView() {
       }
     }
 
+    // Initial poll
     poll()
+
+    // Poll every 2 seconds
     pollIntervalRef.current = setInterval(poll, 2000)
   }
 
+  // Stop polling
   const stopPolling = () => {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current)
@@ -359,19 +452,32 @@ export default function MeetAnalysisView() {
     }
   }
 
+  // Auto-evaluation when bot leaves automatically
   const triggerAutoEvaluation = async (botId: string) => {
     console.log('🔄 Iniciando avaliação automática...')
 
+    // Set status to evaluating
     setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
 
+    // Wait for Recall.ai to process the final transcript
     console.log('⏳ Aguardando processamento da transcrição final...')
-    await new Promise(resolve => setTimeout(resolve, 5000))
+    await new Promise(resolve => setTimeout(resolve, 5000)) // Increased wait time
 
-    // Use ref to read the latest session state (avoids stale closure + React 18 batching issues)
-    const currentSession = sessionRef.current
-    let transcriptToEvaluate: TranscriptSegment[] = currentSession?.transcript || []
+    // Fetch the final transcript
+    let transcriptToEvaluate: TranscriptSegment[] = []
+    let localTranscriptLength = 0
 
-    if (transcriptToEvaluate.length === 0) {
+    // First, get current session transcript
+    setSession(prev => {
+      if (prev) {
+        transcriptToEvaluate = prev.transcript
+        localTranscriptLength = prev.transcript.length
+      }
+      return prev
+    })
+
+    // Only fetch from API if we have NO local transcript (avoid getting old data)
+    if (localTranscriptLength === 0) {
       console.log(`📡 Sem transcrição local, buscando da API...`)
       try {
         const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
@@ -385,17 +491,19 @@ export default function MeetAnalysisView() {
         console.error('Error fetching final transcript:', err)
       }
     } else {
-      console.log(`📝 Usando transcrição local: ${transcriptToEvaluate.length} segmentos`)
+      console.log(`📝 Usando transcrição local: ${localTranscriptLength} segmentos`)
     }
 
+    // Evaluate if we have transcript
     if (transcriptToEvaluate.length > 0) {
-      await evaluateTranscript(transcriptToEvaluate, botId)
+      await evaluateTranscript(transcriptToEvaluate)
     } else {
       console.log('⚠️ Nenhuma transcrição encontrada para avaliar')
       setSession(prev => prev ? { ...prev, status: 'ended' } : null)
       setError('Nenhuma transcrição foi capturada. A reunião pode não ter tido áudio ou o bot não conseguiu gravar.')
     }
 
+    // Clean up transcript storage
     try {
       await fetch(`/api/recall/webhook?botId=${botId}`, {
         method: 'DELETE'
@@ -405,41 +513,42 @@ export default function MeetAnalysisView() {
     }
   }
 
+  // End session and evaluate (manual)
   const endSession = async () => {
+    // Mark as triggered to prevent double-evaluation
     hasTriggeredAutoEvalRef.current = true
     setIsEnding(true)
     stopPolling()
 
-    // Use ref to get the latest session (avoids stale closure)
-    const currentSession = sessionRef.current
-    const botId = currentSession?.botId
-
-    if (botId) {
+    if (session?.botId) {
       try {
-        console.log('🛑 Parando bot:', botId)
+        console.log('🛑 Parando bot:', session.botId)
         await fetch('/api/recall/stop-bot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ botId })
+          body: JSON.stringify({ botId: session.botId })
         })
       } catch (err) {
         console.error('Error stopping bot:', err)
       }
     }
 
+    // Set status to fetching transcript
     setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
 
+    // Wait a moment for Recall.ai to process the final transcript
     console.log('⏳ Aguardando processamento da transcrição...')
-    await new Promise(resolve => setTimeout(resolve, 5000))
+    await new Promise(resolve => setTimeout(resolve, 5000)) // Increased wait time
 
-    // Re-read ref after the 5s wait to get any transcript updates
-    const latestSession = sessionRef.current
-    let transcriptToEvaluate = latestSession?.transcript || []
+    // Get local transcript length
+    let transcriptToEvaluate = session?.transcript || []
+    const localTranscriptLength = transcriptToEvaluate.length
 
-    if (botId && transcriptToEvaluate.length === 0) {
+    // Only fetch from API if we have NO local transcript (avoid getting old data)
+    if (session?.botId && localTranscriptLength === 0) {
       console.log(`📡 Sem transcrição local, buscando da API...`)
       try {
-        const response = await fetch(`/api/recall/webhook?botId=${botId}&fallback=true`)
+        const response = await fetch(`/api/recall/webhook?botId=${session.botId}&fallback=true`)
         const data = await response.json()
         if (data.transcript && data.transcript.length > 0) {
           transcriptToEvaluate = data.transcript
@@ -449,21 +558,23 @@ export default function MeetAnalysisView() {
       } catch (err) {
         console.error('Error fetching final transcript:', err)
       }
-    } else if (transcriptToEvaluate.length > 0) {
-      console.log(`📝 Usando transcrição local: ${transcriptToEvaluate.length} segmentos`)
+    } else if (localTranscriptLength > 0) {
+      console.log(`📝 Usando transcrição local: ${localTranscriptLength} segmentos`)
     }
 
+    // Only evaluate if there's a transcript
     if (transcriptToEvaluate.length > 0) {
-      await evaluateTranscript(transcriptToEvaluate, botId)
+      await evaluateTranscript(transcriptToEvaluate)
     } else {
       console.log('⚠️ Nenhuma transcrição encontrada para avaliar')
       setSession(prev => prev ? { ...prev, status: 'ended' } : null)
       setError('Nenhuma transcrição foi capturada. A reunião pode não ter tido áudio ou o bot não conseguiu gravar.')
     }
 
-    if (botId) {
+    // Clean up transcript storage
+    if (session?.botId) {
       try {
-        await fetch(`/api/recall/webhook?botId=${botId}`, {
+        await fetch(`/api/recall/webhook?botId=${session.botId}`, {
           method: 'DELETE'
         })
       } catch (err) {
@@ -474,6 +585,7 @@ export default function MeetAnalysisView() {
     setIsEnding(false)
   }
 
+  // Save evaluation to database
   const saveEvaluationToHistory = async (
     evalData: MeetEvaluation,
     transcriptData: TranscriptSegment[],
@@ -481,23 +593,27 @@ export default function MeetAnalysisView() {
   ) => {
     setIsSaving(true)
     try {
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         console.error('❌ User not authenticated, cannot save evaluation')
         return false
       }
 
+      // Get company ID
       const companyId = await getCompanyId()
       if (!companyId) {
         console.error('❌ Company ID not found, cannot save evaluation')
         return false
       }
 
+      // Calculate overall_score as integer 0-100
       let overallScore = evalData.overall_score
       if (overallScore && overallScore <= 10) {
-        overallScore = overallScore * 10
+        overallScore = overallScore * 10 // Convert from 0-10 to 0-100
       }
 
+      // Prepare data for insertion
       const insertData = {
         user_id: user.id,
         company_id: companyId,
@@ -537,27 +653,23 @@ export default function MeetAnalysisView() {
     }
   }
 
-  const evaluateTranscript = async (transcriptData?: TranscriptSegment[], botIdOverride?: string) => {
-    // Use ref for latest session to avoid stale closure issues
-    const currentSession = sessionRef.current
-    const transcriptToUse = transcriptData || currentSession?.transcript || []
-    const botId = botIdOverride || currentSession?.botId
-
-    if (transcriptToUse.length === 0) {
-      console.log('⚠️ evaluateTranscript: sem transcrição para avaliar')
-      return
-    }
+  // Evaluate the transcript
+  const evaluateTranscript = async (transcriptData?: TranscriptSegment[]) => {
+    const transcriptToUse = transcriptData || session?.transcript || []
+    if (!session || transcriptToUse.length === 0) return
 
     setIsEvaluating(true)
     setError('')
 
     try {
+      // Format transcript for evaluation
       const transcriptText = transcriptToUse
         .map(s => `${s.speaker}: ${s.text}`)
         .join('\n')
 
-      console.log('📊 Enviando transcrição para avaliação...', { botId, segments: transcriptToUse.length })
+      console.log('📊 Enviando transcrição para avaliação...')
 
+      // Get company ID for playbook evaluation
       const companyId = await getCompanyId()
       console.log('🏢 Company ID para avaliação:', companyId || 'não encontrado')
 
@@ -566,7 +678,7 @@ export default function MeetAnalysisView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcript: transcriptText,
-          meetingId: botId,
+          meetingId: session.botId,
           companyId
         })
       })
@@ -586,9 +698,15 @@ export default function MeetAnalysisView() {
         setEvaluation(data.evaluation)
         setShowEvaluationModal(true)
 
-        if (botId) {
-          await saveEvaluationToHistory(data.evaluation, transcriptToUse, botId)
-        }
+        // Save to history + generate simulation in parallel
+        const savePromise = session?.botId
+          ? saveEvaluationToHistory(data.evaluation, transcriptToUse, session.botId)
+          : Promise.resolve()
+
+        // Auto-generate simulation based on evaluation
+        const simPromise = generateSimulation(data.evaluation, transcriptText)
+
+        await Promise.all([savePromise, simPromise])
       } else {
         throw new Error('Resposta inválida da API')
       }
@@ -602,361 +720,511 @@ export default function MeetAnalysisView() {
     }
   }
 
+  // Reset session
   const resetSession = () => {
     stopPolling()
     hasTriggeredAutoEvalRef.current = false
-    speakerMapRef.current = new Map()
     setSession(null)
     setMeetUrl('')
+    setPastedTranscript('')
     setError('')
     setEvaluation(null)
     setIsEvaluating(false)
     setSavedToHistory(false)
+    setSimulationConfig(null)
   }
 
+  // Evaluate pasted transcript directly (no bot needed)
+  const evaluatePastedTranscript = async () => {
+    const text = pastedTranscript.trim()
+    if (!text) {
+      setError('Cole a transcrição da reunião antes de avaliar')
+      return
+    }
+
+    // Parse pasted text into segments for display
+    // Supports formats like "Speaker: text" or plain text
+    const lines = text.split('\n').filter(l => l.trim())
+    const segments: TranscriptSegment[] = lines.map(line => {
+      const match = line.match(/^([^:]{1,40}):\s*(.+)/)
+      if (match) {
+        return { speaker: match[1].trim(), text: match[2].trim(), timestamp: '' }
+      }
+      return { speaker: 'Participante', text: line.trim(), timestamp: '' }
+    })
+
+    const consolidated = consolidateTranscript(segments)
+
+    // Create a fake session to reuse the existing evaluation flow
+    const fakeId = `paste_${Date.now()}`
+    setSession({
+      botId: fakeId,
+      meetingUrl: '',
+      status: 'evaluating',
+      startTime: new Date(),
+      transcript: consolidated
+    })
+    setError('')
+    setEvaluation(null)
+    setSavedToHistory(false)
+    hasTriggeredAutoEvalRef.current = true
+    setIsEvaluating(true)
+
+    try {
+      const companyId = await getCompanyId()
+
+      const response = await fetch('/api/meet/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: text,
+          meetingId: fakeId,
+          companyId
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao avaliar reunião')
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.evaluation) {
+        setEvaluation(data.evaluation)
+        setShowEvaluationModal(true)
+
+        // Save to history + generate simulation in parallel
+        await Promise.all([
+          saveEvaluationToHistory(data.evaluation, consolidated, fakeId),
+          generateSimulation(data.evaluation, text)
+        ])
+      } else {
+        throw new Error('Resposta inválida da API')
+      }
+    } catch (err: any) {
+      setError(`Erro ao avaliar: ${err.message}`)
+    } finally {
+      setIsEvaluating(false)
+      setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+    }
+  }
+
+  // Generate simulation from evaluation (accepts params directly to avoid stale state)
+  const generateSimulation = async (evalData: MeetEvaluation, transcriptText: string) => {
+    setIsGeneratingSimulation(true)
+
+    try {
+      const companyId = await getCompanyId()
+
+      const response = await fetch('/api/meet/generate-simulation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluation: evalData,
+          transcript: transcriptText,
+          companyId
+        })
+      })
+
+      const data = await response.json()
+      if (data.success && data.simulationConfig) {
+        setSimulationConfig(data.simulationConfig)
+        setCurrentSimSaved(false)
+        // Auto-scroll to simulation section after render
+        setTimeout(() => {
+          simulationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
+      } else {
+        console.error('Erro ao gerar simulacao:', data.error)
+      }
+    } catch (err: any) {
+      console.error('Error generating simulation:', err)
+    } finally {
+      setIsGeneratingSimulation(false)
+    }
+  }
+
+  // Start simulation - navigate to roleplay with pre-configured params
+  const startSimulation = () => {
+    if (!simulationConfig) return
+
+    sessionStorage.setItem('meetSimulation', JSON.stringify({
+      simulation_config: simulationConfig,
+      source_evaluation: {
+        overall_score: evaluation?.overall_score,
+        meeting_id: session?.botId
+      }
+    }))
+
+    setShowEvaluationModal(false)
+    router.push('/roleplay')
+  }
+
+  // Copy meeting URL
   const copyMeetUrl = () => {
     navigator.clipboard.writeText(meetUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Scroll to bottom of transcript
   useEffect(() => {
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight
     }
   }, [session?.transcript])
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => stopPolling()
   }, [])
 
-  // Get status config
-  const getStatusConfig = () => {
+  // Get status display
+  const getStatusDisplay = () => {
     if (!session) return null
 
-    const statusConfig: Record<BotStatus, { icon: any; text: string; color: string; dotColor: string; bgColor: string }> = {
-      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500', dotColor: 'bg-gray-400', bgColor: 'bg-gray-50' },
-      sending: { icon: Loader2, text: 'Criando bot...', color: 'text-amber-600', dotColor: 'bg-amber-500', bgColor: 'bg-amber-50' },
-      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600', dotColor: 'bg-amber-500', bgColor: 'bg-amber-50' },
-      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600', dotColor: 'bg-green-500', bgColor: 'bg-green-50' },
-      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600', dotColor: 'bg-green-500', bgColor: 'bg-green-50' },
-      evaluating: { icon: Loader2, text: 'Avaliando performance...', color: 'text-emerald-600', dotColor: 'bg-emerald-500', bgColor: 'bg-emerald-50' },
-      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600', dotColor: 'bg-blue-500', bgColor: 'bg-blue-50' },
-      error: { icon: XCircle, text: 'Erro', color: 'text-red-600', dotColor: 'bg-red-500', bgColor: 'bg-red-50' }
+    const statusConfig: Record<BotStatus, { icon: any; text: string; color: string }> = {
+      idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500' },
+      sending: { icon: Loader2, text: 'Criando bot...', color: 'text-amber-600' },
+      joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600' },
+      in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600' },
+      transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600' },
+      evaluating: { icon: Loader2, text: 'Avaliando performance...', color: 'text-purple-600' },
+      ended: { icon: CheckCircle, text: 'Encerrado', color: 'text-blue-600' },
+      error: { icon: XCircle, text: 'Erro', color: 'text-red-600' }
     }
 
-    return statusConfig[session.status]
+    const config = statusConfig[session.status]
+    const Icon = config.icon
+
+    return (
+      <div className={`flex items-center gap-2 ${config.color}`}>
+        <Icon className={`w-5 h-5 ${session.status === 'sending' || session.status === 'joining' || session.status === 'evaluating' ? 'animate-spin' : ''}`} />
+        <span className="font-medium">{config.text}</span>
+      </div>
+    )
   }
 
-  const isLive = session?.status === 'in_meeting' || session?.status === 'transcribing' || session?.status === 'sending' || session?.status === 'joining'
-  const isSpinning = session?.status === 'sending' || session?.status === 'joining' || session?.status === 'evaluating'
-
   return (
-    <div className="min-h-screen bg-[#F8F9FA] py-8 px-6">
+    <div className="min-h-screen bg-gray-50 py-8 px-6">
       <div className="max-w-4xl mx-auto">
-
-        {/* ==================== HERO / INITIAL STATE ==================== */}
-        {!session && (
-          <div className="animate-fade-in pt-10">
-            {/* Header */}
-            <div className="text-center mb-10">
-              <div className="w-20 h-20 mx-auto mb-5 bg-gradient-to-br from-emerald-500/20 to-green-400/10 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                <Video className="w-10 h-10 text-emerald-600" />
-              </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-500 bg-clip-text text-transparent mb-3">
-                Análise de Google Meet
-              </h1>
-              <p className="text-gray-500 text-lg max-w-md mx-auto">
-                Cole o link da reunião e nosso bot entrará para transcrever e avaliar a conversa
-              </p>
-            </div>
-
-            {/* Input Card */}
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 shadow-lg mb-8">
-              <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <Link className="w-4 h-4 text-emerald-600" />
-                Link do Google Meet
-              </label>
-              <div className="flex gap-3">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={meetUrl}
-                    onChange={(e) => handleUrlChange(e.target.value)}
-                    placeholder="https://meet.google.com/abc-defg-hij"
-                    className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                  />
-                  {meetUrl && isValidMeetUrl(meetUrl) && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                      <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full font-medium">
-                        Válido
-                      </span>
-                      <button
-                        onClick={copyMeetUrl}
-                        className="text-gray-400 hover:text-emerald-600 transition-colors"
-                      >
-                        {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={sendBot}
-                  disabled={!meetUrl}
-                  className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl font-semibold text-white transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <Send className="w-5 h-5" />
-                  Enviar Bot
-                </button>
-              </div>
-              {error && (
-                <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-4 py-2.5 rounded-xl border border-red-200">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  {error}
-                </div>
-              )}
-            </div>
-
-            {/* Step Cards */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              {[
-                { icon: Link, label: 'Cole o link', desc: 'Insira o link da reunião do Google Meet', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-                { icon: Send, label: 'Envie o bot', desc: 'Clique em "Enviar Bot" e "Ramppy" pedirá para entrar', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-                { icon: UserPlus, label: 'Aceite na reunião', desc: 'Aceite o participante "Ramppy" no Google Meet', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-                { icon: BarChart3, label: 'Receba a análise', desc: 'Encerre e receba a avaliação SPIN completa', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
-              ].map((step, idx) => (
-                <div
-                  key={idx}
-                  className={`${step.bg} border ${step.border} rounded-2xl p-4 text-center hover:shadow-md transition-all duration-300`}
-                  style={{ animationDelay: `${idx * 100}ms` }}
-                >
-                  <div className={`w-10 h-10 mx-auto mb-3 rounded-xl ${step.bg} flex items-center justify-center`}>
-                    <step.icon className={`w-5 h-5 ${step.color}`} />
-                  </div>
-                  <div className={`text-xs font-bold ${step.color} mb-0.5`}>Passo {idx + 1}</div>
-                  <h4 className="text-sm font-bold text-gray-900 mb-1">{step.label}</h4>
-                  <p className="text-xs text-gray-500 leading-relaxed">{step.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Warning */}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-amber-700">Importante</p>
-                  <p className="text-sm text-amber-600 mt-0.5">
-                    Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação automaticamente.
-                  </p>
-                </div>
-              </div>
-            </div>
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-2xl flex items-center justify-center">
+            <Video className="w-8 h-8 text-green-600" />
           </div>
-        )}
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Análise de Google Meet
+          </h1>
+          <p className="text-gray-500">
+            Cole o link da reunião e nosso bot entrará para transcrever a conversa
+          </p>
+        </div>
 
-        {/* ==================== ACTIVE SESSION ==================== */}
-        {session && (
-          <div className="space-y-5 animate-fade-in">
-            {/* Status Bar */}
-            {(() => {
-              const config = getStatusConfig()
-              if (!config) return null
-              const Icon = config.icon
-              return (
-                <div className={`bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg overflow-hidden`}>
-                  <div className={`h-1 ${isLive ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-green-400 animate-shimmer' : session.status === 'evaluating' ? 'bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 animate-shimmer' : session.status === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
-                  <div className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`flex items-center gap-2.5 ${config.color}`}>
-                        {isLive && (
-                          <span className="relative flex h-3 w-3">
-                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotColor} opacity-75`} />
-                            <span className={`relative inline-flex rounded-full h-3 w-3 ${config.dotColor}`} />
-                          </span>
-                        )}
-                        <Icon className={`w-5 h-5 ${isSpinning ? 'animate-spin' : ''}`} />
-                        <span className="font-semibold text-sm">{config.text}</span>
-                      </div>
-                      {session.startTime && (
-                        <span className="text-sm text-gray-400 flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" />
-                          Iniciado às {session.startTime.toLocaleTimeString('pt-BR')}
+        {/* Saved simulation card removed - now shown on Dashboard */}
+
+        {/* Input Section */}
+        {!session && (
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
+            {/* Mode Toggle */}
+            <div className="flex gap-1 mb-5 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => { setInputMode('link'); setError('') }}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  inputMode === 'link'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Video className="w-4 h-4" />
+                Enviar Bot ao Meet
+              </button>
+              <button
+                onClick={() => { setInputMode('paste'); setError('') }}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  inputMode === 'paste'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Colar Transcrição
+              </button>
+            </div>
+
+            {/* Link Mode */}
+            {inputMode === 'link' && (
+              <>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Link do Google Meet
+                </label>
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={meetUrl}
+                      onChange={(e) => handleUrlChange(e.target.value)}
+                      placeholder="https://meet.google.com/abc-defg-hij"
+                      className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
+                    />
+                    {meetUrl && isValidMeetUrl(meetUrl) && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
+                          Válido
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {session.status !== 'ended' && session.status !== 'error' && (
                         <button
-                          onClick={endSession}
-                          disabled={isEnding}
-                          className={`px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold ${
-                            isEnding
-                              ? 'bg-amber-50 text-amber-600 border border-amber-200 cursor-not-allowed'
-                              : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md shadow-red-500/20 hover:shadow-red-500/30 hover:scale-[1.02] active:scale-[0.98]'
-                          }`}
+                          onClick={copyMeetUrl}
+                          className="text-gray-400 hover:text-green-600 transition-colors"
                         >
-                          {isEnding ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Encerrando...
-                            </>
-                          ) : (
-                            <>
-                              <StopCircle className="w-4 h-4" />
-                              Encerrar
-                            </>
-                          )}
+                          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                         </button>
-                      )}
-                      {(session.status === 'ended' || session.status === 'error') && (
-                        <button
-                          onClick={resetSession}
-                          className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-200 flex items-center gap-2 text-sm font-semibold shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98]"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                          Nova Análise
-                        </button>
-                      )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={sendBot}
+                    disabled={!meetUrl}
+                    className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                  >
+                    <Send className="w-5 h-5" />
+                    Enviar Bot
+                  </button>
+                </div>
+
+                {/* Instructions */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Como funciona:</h3>
+                  <ol className="text-sm text-gray-600 space-y-1.5">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">1.</span>
+                      Cole o link da reunião do Google Meet acima
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">2.</span>
+                      Clique em "Enviar Bot" - um participante chamado "Ramppy" pedirá para entrar
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">3.</span>
+                      <strong className="text-amber-600">Aceite o bot na reunião</strong> quando ele pedir para participar
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-600 font-bold">4.</span>
+                      Realize a reunião normalmente - o bot irá gravar e transcrever
+                    </li>
+                  </ol>
+
+                  {/* Warning about ending the call */}
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-amber-500 text-lg">⚠️</span>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-700">Importante:</p>
+                        <p className="text-sm text-amber-600">
+                          Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              )
-            })()}
+              </>
+            )}
 
-            {/* Error display */}
-            {error && session.status === 'ended' && (
-              <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-4 py-2.5 rounded-xl border border-red-200">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            {/* Paste Mode */}
+            {inputMode === 'paste' && (
+              <>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Transcrição da Reunião
+                </label>
+                <textarea
+                  value={pastedTranscript}
+                  onChange={(e) => { setPastedTranscript(e.target.value); setError('') }}
+                  placeholder={"Cole a transcrição aqui...\n\nFormato sugerido:\nVendedor: Olá, tudo bem?\nCliente: Tudo sim, obrigado.\nVendedor: Gostaria de entender melhor sua situação..."}
+                  className="w-full h-[250px] px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all resize-none text-sm leading-relaxed"
+                />
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-xs text-gray-400">
+                    {pastedTranscript.trim() ? `${pastedTranscript.trim().split('\n').filter(l => l.trim()).length} linhas` : 'Nenhum texto colado'}
+                  </span>
+                  <button
+                    onClick={evaluatePastedTranscript}
+                    disabled={!pastedTranscript.trim()}
+                    className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Avaliar Transcrição
+                  </button>
+                </div>
+              </>
+            )}
+
+            {error && (
+              <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                <AlertTriangle className="w-4 h-4" />
                 {error}
               </div>
             )}
+          </div>
+        )}
 
-            {/* In Progress / Transcript - Hidden during evaluation */}
-            {session.status !== 'evaluating' && !isEvaluating && session.status !== 'ended' && session.status !== 'error' && (
-              <>
+        {/* Session Active */}
+        {session && (
+          <div className="space-y-6">
+            {/* Status Bar */}
+            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  {getStatusDisplay()}
+                  {session.startTime && (
+                    <span className="text-sm text-gray-500">
+                      Iniciado às {session.startTime.toLocaleTimeString('pt-BR')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {session.status !== 'ended' && session.status !== 'error' && (
+                    <button
+                      onClick={endSession}
+                      disabled={isEnding}
+                      className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 border ${
+                        isEnding
+                          ? 'bg-amber-50 text-amber-600 border-amber-200 cursor-not-allowed'
+                          : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
+                      }`}
+                    >
+                      {isEnding ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Encerrando...
+                        </>
+                      ) : (
+                        <>
+                          <StopCircle className="w-4 h-4" />
+                          Encerrar
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {(session.status === 'ended' || session.status === 'error') && (
+                    <button
+                      onClick={resetSession}
+                      className="px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-green-200"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Nova Análise
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Transcript */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-green-600" />
+                  Transcrição em Tempo Real
+                  {session.transcript.length > 0 && (
+                    <span className="text-xs text-gray-500">
+                      ({session.transcript.length} {session.transcript.length === 1 ? 'fala' : 'falas'})
+                    </span>
+                  )}
+                </h3>
+              </div>
+
+              <div
+                ref={transcriptRef}
+                className="h-[400px] overflow-y-auto p-4 space-y-4 bg-white"
+              >
                 {session.transcript.length === 0 ? (
-                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-12 flex flex-col items-center justify-center">
+                  <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     {session.status === 'joining' || session.status === 'sending' ? (
                       <>
-                        <div className="w-14 h-14 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin mb-5" />
-                        <p className="text-gray-800 font-semibold text-lg">Entrando na reunião...</p>
-                        <p className="text-sm text-gray-400 mt-1">
+                        <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
+                        <p className="text-gray-600">Aguardando bot entrar na reunião...</p>
+                        <p className="text-sm text-gray-500 mt-2">
                           Isso geralmente leva de 10 a 30 segundos
                         </p>
-                        <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
-                          <p className="text-sm text-amber-600 font-medium flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            Lembre-se de aceitar o "Ramppy" quando ele pedir para entrar!
-                          </p>
-                        </div>
+                        <p className="text-sm text-amber-600 mt-2 font-medium">
+                          Lembre-se de aceitar o "Ramppy" quando ele pedir para entrar!
+                        </p>
                       </>
-                    ) : session.status === 'in_meeting' || session.status === 'transcribing' ? (
+                    ) : session.status === 'in_meeting' ? (
                       <>
-                        <div className="w-14 h-14 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin mb-5" />
-                        <p className="text-gray-800 font-semibold text-lg">Reunião em andamento</p>
-                        <p className="text-sm text-gray-400 mt-1">Gravando e transcrevendo a conversa...</p>
+                        <Video className="w-8 h-8 mb-3 text-green-600" />
+                        <p className="text-gray-600">Bot na reunião. Aguardando transcrição...</p>
                       </>
                     ) : (
                       <>
-                        <div className="w-14 h-14 rounded-full border-4 border-gray-200 border-t-gray-400 animate-spin mb-5" />
-                        <p className="text-gray-400 font-medium">Aguardando...</p>
+                        <Clock className="w-8 h-8 mb-3 text-gray-400" />
+                        <p className="text-gray-500">Nenhuma transcrição ainda</p>
                       </>
                     )}
                   </div>
                 ) : (
-                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                        <div className="w-1.5 h-5 bg-gradient-to-b from-emerald-500 to-green-400 rounded-full" />
-                        <Users className="w-4 h-4 text-emerald-600" />
-                        Transcrição
-                      </h3>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
-                        {session.transcript.length} {session.transcript.length === 1 ? 'fala' : 'falas'}
-                      </span>
+                  session.transcript.map((segment, idx) => (
+                    <div key={idx} className="flex gap-3">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <User className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="font-semibold text-green-700 text-sm">
+                            {segment.speaker}
+                          </span>
+                          {segment.timestamp && (
+                            <span className="text-xs text-gray-400">
+                              {segment.timestamp}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                          {segment.text}
+                        </p>
+                      </div>
                     </div>
-
-                    <div
-                      ref={transcriptRef}
-                      className="h-[420px] overflow-y-auto p-5 space-y-4 custom-scrollbar"
-                    >
-                      {session.transcript.map((segment, idx) => {
-                        const color = getSpeakerColor(segment.speaker, speakerMapRef.current)
-                        return (
-                          <div key={idx} className="flex gap-3 animate-fade-in">
-                            <div className={`flex-shrink-0 w-9 h-9 rounded-full ${color.bg} flex items-center justify-center`}>
-                              <span className={`text-xs font-bold ${color.text}`}>
-                                {segment.speaker.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-baseline gap-2 mb-0.5">
-                                <span className={`font-semibold text-sm ${color.text}`}>
-                                  {segment.speaker}
-                                </span>
-                                {segment.timestamp && (
-                                  <span className="text-xs text-gray-300">
-                                    {segment.timestamp}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-gray-700 text-sm leading-relaxed">
-                                {segment.text}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                  ))
                 )}
-              </>
-            )}
+              </div>
+            </div>
 
             {/* Evaluation Loading */}
             {(session.status === 'evaluating' || isEvaluating) && (
-              <div className="bg-gradient-to-br from-emerald-500/5 to-green-400/5 rounded-2xl p-8 border border-emerald-500/20 shadow-lg flex flex-col items-center justify-center">
-                <div className="w-16 h-16 rounded-full border-4 border-emerald-100 border-t-emerald-500 animate-spin mb-6" />
-                <h3 className="text-lg font-bold text-gray-900 mb-1">Avaliando Performance...</h3>
-                <p className="text-gray-500 text-sm mb-5">Analisando a reunião com metodologia SPIN Selling</p>
-                <div className="w-full max-w-xs h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full animate-shimmer" style={{ width: '60%' }} />
+              <div className="bg-green-50 rounded-xl p-6 border border-green-200">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Avaliando Performance...</h3>
+                    <p className="text-gray-600 text-sm">Analisando a reunião com metodologia SPIN Selling</p>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Evaluation Results - Compact View */}
             {session.status === 'ended' && evaluation && (
-              <div className="space-y-4 animate-fade-in">
-                {/* Score Header */}
+              <div className="space-y-4">
+                {/* Score Header - Click to open modal */}
                 <div
                   onClick={() => setShowEvaluationModal(true)}
-                  className="bg-white/95 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg cursor-pointer hover:shadow-xl hover:border-emerald-500/30 transition-all duration-300 overflow-hidden"
+                  className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all"
                 >
-                  <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500" />
-                  <div className="p-6 flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-xl font-bold text-gray-900 mb-1">Avaliação da Reunião</h3>
                       {evaluation.seller_identification?.name && (
-                        <p className="text-gray-500 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
+                        <p className="text-gray-600 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
                       )}
-                      <p className="text-emerald-600 text-sm mt-2 font-medium flex items-center gap-1">
-                        <FileText className="w-3.5 h-3.5" />
-                        Clique para ver detalhes completos
-                      </p>
+                      <p className="text-green-600 text-sm mt-2 font-medium">Clique para ver detalhes completos →</p>
                     </div>
                     <div className="text-right">
-                      <div className={`text-5xl font-black ${getScoreColor(evaluation.overall_score || 0)}`}>
-                        {evaluation.overall_score?.toFixed(1)}
-                      </div>
-                      <div className="text-gray-500 text-sm font-medium mt-1">
-                        {getPerformanceLabel(evaluation.performance_level || '')}
-                      </div>
+                      <div className={`text-5xl font-bold ${
+                        (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
+                        (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
+                      }`}>{evaluation.overall_score?.toFixed(1)}</div>
+                      <div className="text-gray-500 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
                       {evaluation.playbook_adherence && (
-                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-500">
+                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-600">
                           <BookOpen className="w-4 h-4" />
                           <span className="text-sm">
                             Playbook: {evaluation.playbook_adherence.overall_adherence_score}%
@@ -964,15 +1232,15 @@ export default function MeetAnalysisView() {
                         </div>
                       )}
                       {savedToHistory && (
-                        <div className="mt-1.5 flex items-center gap-1 justify-end text-green-600">
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          <span className="text-xs font-medium">Salvo no histórico</span>
+                        <div className="mt-2 flex items-center gap-1 justify-end text-green-600">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm">Salvo no histórico</span>
                         </div>
                       )}
                       {isSaving && (
-                        <div className="mt-1.5 flex items-center gap-1 justify-end text-gray-400">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span className="text-xs">Salvando...</span>
+                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-500">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="text-sm">Salvando...</span>
                         </div>
                       )}
                     </div>
@@ -980,15 +1248,16 @@ export default function MeetAnalysisView() {
                 </div>
 
                 {/* Quick SPIN Scores */}
-                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 border border-gray-200 shadow-lg">
+                <div className="bg-white rounded-xl p-4 border border-gray-200">
                   <div className="grid grid-cols-4 gap-3">
                     {['S', 'P', 'I', 'N'].map((letter) => {
                       const score = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]?.final_score || 0
-                      const labels: Record<string, string> = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
+                      const color = score >= 7 ? 'text-green-600 bg-green-50' : score >= 5 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50'
+                      const labels: Record<string, string> = { S: 'S', P: 'P', I: 'I', N: 'N' }
                       return (
-                        <div key={letter} className={`rounded-xl p-3.5 text-center border ${getScoreBg(score)}`}>
-                          <div className={`text-2xl font-black ${getScoreColor(score)}`}>{score.toFixed(1)}</div>
-                          <div className="text-gray-600 text-xs font-semibold mt-0.5">{labels[letter]}</div>
+                        <div key={letter} className={`rounded-lg p-3 text-center ${color.split(' ')[1]}`}>
+                          <div className={`text-2xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
+                          <div className="text-gray-600 text-xs font-medium">{labels[letter]}</div>
                         </div>
                       )
                     })}
@@ -999,7 +1268,7 @@ export default function MeetAnalysisView() {
                 <div className="flex gap-3 justify-center">
                   <button
                     onClick={() => setShowEvaluationModal(true)}
-                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                    className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
                   >
                     <FileText className="w-4 h-4" />
                     Ver Avaliação Completa
@@ -1011,14 +1280,14 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 flex items-center gap-2 font-medium border border-gray-200 hover:border-gray-300 shadow-sm"
+                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
                   >
                     <Copy className="w-4 h-4" />
                     Copiar Transcrição
                   </button>
                   <button
                     onClick={resetSession}
-                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-emerald-600 rounded-xl transition-all duration-200 flex items-center gap-2 border border-gray-200 hover:border-emerald-500/30 font-medium shadow-sm"
+                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-gray-200 font-medium"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Nova Análise
@@ -1027,43 +1296,23 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {/* Session ended without evaluation and without transcript */}
-            {session.status === 'ended' && !evaluation && session.transcript.length === 0 && !isEvaluating && (
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 shadow-lg text-center">
-                <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
-                  <AlertTriangle className="w-7 h-7 text-amber-500" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Sessão encerrada sem transcrição</h3>
-                <p className="text-gray-500 mb-5 text-sm">
-                  Não foi possível capturar a transcrição desta reunião. Isso pode acontecer se o bot não conseguiu gravar ou se houve um erro na conexão.
-                </p>
-                <button
-                  onClick={resetSession}
-                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] mx-auto"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Tentar Novamente
-                </button>
-              </div>
-            )}
-
-            {/* Session ended without evaluation (has transcript) */}
+            {/* Session ended without evaluation (no transcript) */}
             {session.status === 'ended' && !evaluation && session.transcript.length > 0 && !isEvaluating && (
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 shadow-lg">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Sessão Encerrada</h3>
-                <p className="text-gray-500 mb-5">
+              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Sessão Encerrada</h3>
+                <p className="text-gray-600 mb-4">
                   A transcrição foi capturada. Você pode avaliar a performance ou copiar a transcrição.
                 </p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => evaluateTranscript()}
                     disabled={isEvaluating}
-                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold disabled:opacity-50 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                    className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium disabled:opacity-50"
                   >
                     {isEvaluating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Sparkles className="w-4 h-4" />
+                      <CheckCircle className="w-4 h-4" />
                     )}
                     Avaliar Performance
                   </button>
@@ -1074,14 +1323,14 @@ export default function MeetAnalysisView() {
                         .join('\n')
                       navigator.clipboard.writeText(text)
                     }}
-                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 flex items-center gap-2 font-medium border border-gray-200 hover:border-gray-300 shadow-sm"
+                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
                   >
                     <Copy className="w-4 h-4" />
                     Copiar Transcrição
                   </button>
                   <button
                     onClick={resetSession}
-                    className="px-5 py-2.5 bg-white hover:bg-gray-50 text-emerald-600 rounded-xl transition-all duration-200 flex items-center gap-2 border border-gray-200 hover:border-emerald-500/30 font-medium shadow-sm"
+                    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-green-600 rounded-lg transition-colors flex items-center gap-2 border border-gray-200 font-medium"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Nova Análise
@@ -1093,69 +1342,60 @@ export default function MeetAnalysisView() {
         )}
       </div>
 
-      {/* ==================== EVALUATION MODAL ==================== */}
+      {/* Modal de Avaliação Flutuante */}
       {showEvaluationModal && evaluation && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] overflow-y-auto">
           <div className="min-h-screen py-8 px-4 sm:px-6">
-            <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-200 animate-scale-in">
+            <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-200">
               {/* Header */}
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-white rounded-t-2xl">
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-11 h-11 bg-gradient-to-br from-emerald-500/20 to-green-400/10 rounded-xl flex items-center justify-center">
-                      <Video className="w-5 h-5 text-emerald-600" />
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                      <Video className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
                       <h2 className="text-xl font-bold text-gray-900">Avaliação da Reunião</h2>
                       {evaluation.seller_identification?.name && (
-                        <p className="text-gray-400 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
+                        <p className="text-gray-500 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
                       )}
                     </div>
                   </div>
                   {savedToHistory && (
-                    <div className="mt-2 flex items-center gap-1 text-green-600 text-sm ml-14">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span className="text-xs font-medium">Salvo no histórico</span>
+                    <div className="mt-2 flex items-center gap-1 text-green-600 text-sm">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Salvo no histórico</span>
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className={`text-4xl font-black ${getScoreColor(evaluation.overall_score || 0)}`}>
-                      {evaluation.overall_score?.toFixed(1)}
-                    </div>
-                    <div className="text-gray-400 text-sm font-medium">
-                      {getPerformanceLabel(evaluation.performance_level || '')}
-                    </div>
+                    <div className={`text-4xl font-bold ${
+                      (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
+                      (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
+                    }`}>{evaluation.overall_score?.toFixed(1)}</div>
+                    <div className="text-gray-500 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
                   </div>
-                  <button
-                    onClick={() => setShowEvaluationModal(false)}
-                    className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
                 </div>
               </div>
 
               {/* Content */}
-              <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                 {/* SPIN Scores */}
-                <div className="rounded-2xl p-5 border border-gray-200">
-                  <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-emerald-600" />
-                    Metodologia SPIN
-                  </h3>
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Metodologia SPIN</h3>
                   <div className="grid grid-cols-4 gap-4">
                     {['S', 'P', 'I', 'N'].map((letter) => {
                       const spinData = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]
                       const score = spinData?.final_score || 0
+                      const color = score >= 7 ? 'text-green-600 bg-green-50 border-green-200' : score >= 5 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'
                       const labels: Record<string, string> = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
                       return (
-                        <div key={letter} className={`rounded-xl p-4 border ${getScoreBg(score)}`}>
-                          <div className={`text-3xl font-black ${getScoreColor(score)}`}>{score.toFixed(1)}</div>
-                          <div className="text-gray-600 text-sm font-semibold">{labels[letter]}</div>
+                        <div key={letter} className={`rounded-xl p-4 border ${color.split(' ').slice(1).join(' ')}`}>
+                          <div className={`text-3xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
+                          <div className="text-gray-600 text-sm font-medium">{labels[letter]}</div>
                           {spinData?.technical_feedback && (
-                            <p className="text-xs text-gray-500 mt-2 line-clamp-3 leading-relaxed">{spinData.technical_feedback}</p>
+                            <p className="text-xs text-gray-500 mt-2 line-clamp-3">{spinData.technical_feedback}</p>
                           )}
                         </div>
                       )
@@ -1165,10 +1405,10 @@ export default function MeetAnalysisView() {
 
                 {/* Playbook Adherence */}
                 {evaluation.playbook_adherence && (
-                  <div className="rounded-2xl p-5 border border-gray-200">
+                  <div className="bg-white rounded-xl p-6 border border-gray-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <BookOpen className="w-5 h-5 text-emerald-600" />
-                      <h3 className="text-base font-bold text-gray-900">Aderência ao Playbook</h3>
+                      <BookOpen className="w-5 h-5 text-green-600" />
+                      <h3 className="text-lg font-bold text-gray-900">Aderência ao Playbook</h3>
                       <span className={`ml-auto px-3 py-1 rounded-full text-sm font-bold ${
                         evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-800' :
                         evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-green-50 text-green-700' :
@@ -1183,6 +1423,7 @@ export default function MeetAnalysisView() {
                       </span>
                     </div>
 
+                    {/* Dimensions */}
                     <div className="grid grid-cols-5 gap-3 mb-4">
                       {Object.entries(evaluation.playbook_adherence.dimensions || {}).map(([key, dim]) => {
                         if (!dim) return null
@@ -1193,99 +1434,96 @@ export default function MeetAnalysisView() {
                           required_scripts: 'Scripts',
                           process: 'Processo'
                         }
-                        const dimScoreBg = dim.score >= 70 ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200' : dim.score >= 50 ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200' : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
-                        const dimScoreColor = dim.score >= 70 ? 'text-green-600' : dim.score >= 50 ? 'text-amber-600' : 'text-red-600'
+                        const scoreColor = dim.score >= 70 ? 'text-green-600 bg-green-50 border-green-200' : dim.score >= 50 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'
                         return (
-                          <div key={key} className={`rounded-xl p-3 text-center border ${dimScoreBg}`}>
-                            <div className={`text-xl font-black ${dimScoreColor}`}>{dim.score}%</div>
-                            <div className="text-xs text-gray-600 font-medium">{dimLabels[key] || key}</div>
+                          <div key={key} className={`rounded-lg p-3 text-center border ${scoreColor.split(' ').slice(1).join(' ')}`}>
+                            <div className={`text-xl font-bold ${scoreColor.split(' ')[0]}`}>{dim.score}%</div>
+                            <div className="text-xs text-gray-600">{dimLabels[key] || key}</div>
                           </div>
                         )
                       })}
                     </div>
 
+                    {/* Violations */}
                     {evaluation.playbook_adherence.violations && evaluation.playbook_adherence.violations.length > 0 && (
-                      <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-4 mb-3 border border-red-200">
+                      <div className="bg-red-50 rounded-lg p-3 mb-3 border border-red-200">
                         <h4 className="text-sm font-bold text-red-800 mb-2">Violações</h4>
-                        <ul className="space-y-1.5">
+                        <ul className="space-y-1">
                           {evaluation.playbook_adherence.violations.map((v: any, i: number) => (
-                            <li key={i} className="text-sm text-red-700 flex items-start gap-1.5">
+                            <li key={i} className="text-sm text-red-700 flex items-start gap-1">
                               <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              {typeof v === 'string' ? v : v.criterion || v.evidence || JSON.stringify(v)}
+                              {typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
 
+                    {/* Exemplary Moments */}
                     {evaluation.playbook_adherence.exemplary_moments && evaluation.playbook_adherence.exemplary_moments.length > 0 && (
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 mb-3 border border-green-200">
+                      <div className="bg-green-50 rounded-lg p-3 mb-3 border border-green-200">
                         <h4 className="text-sm font-bold text-green-800 mb-2">Momentos Exemplares</h4>
                         <ul className="space-y-2">
                           {evaluation.playbook_adherence.exemplary_moments.map((m: any, i: number) => (
                             <li key={i} className="text-sm text-green-700">
-                              <div className="flex items-start gap-1.5">
+                              <div className="flex items-start gap-1">
                                 <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                                <div>
-                                  <span className="font-medium">{typeof m === 'string' ? m : m.criterion || ''}</span>
-                                  {typeof m === 'object' && m.evidence && (
-                                    <p className="text-green-600 text-xs mt-0.5 italic">"{m.evidence}"</p>
-                                  )}
-                                </div>
+                                <span className="font-medium">{typeof m === 'string' ? m : m?.criterion || ''}</span>
                               </div>
+                              {typeof m === 'object' && m?.evidence && (
+                                <p className="text-green-600 text-xs ml-5 mt-0.5">{m.evidence}</p>
+                              )}
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
 
+                    {/* Coaching Notes */}
                     {evaluation.playbook_adherence.coaching_notes && (
-                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                         <h4 className="text-sm font-bold text-gray-700 mb-1">Notas de Coaching</h4>
-                        <p className="text-sm text-gray-600 leading-relaxed">{evaluation.playbook_adherence.coaching_notes}</p>
+                        <p className="text-sm text-gray-600">{evaluation.playbook_adherence.coaching_notes}</p>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Executive Summary */}
-                <div className="rounded-2xl p-5 border border-gray-200">
-                  <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-emerald-600" />
-                    Resumo Executivo
-                  </h3>
-                  <p className="text-gray-700 whitespace-pre-line leading-relaxed text-sm">{evaluation.executive_summary}</p>
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Resumo Executivo</h3>
+                  <p className="text-gray-700 whitespace-pre-line">{evaluation.executive_summary}</p>
                 </div>
 
                 {/* Strengths & Gaps */}
                 <div className="grid grid-cols-2 gap-4">
                   {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-200">
-                      <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <div className="bg-white rounded-xl p-5 border border-gray-200">
+                      <h4 className="text-md font-bold text-gray-900 mb-3 flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-green-600" />
                         Pontos Fortes
                       </h4>
                       <ul className="space-y-2">
-                        {evaluation.top_strengths.map((strength: any, idx: number) => (
+                        {evaluation.top_strengths.map((strength, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-gray-700 text-sm">
-                            <span className="text-green-500 mt-0.5 font-bold">•</span>
-                            <span>{typeof strength === 'string' ? strength : strength?.text || strength?.description || JSON.stringify(strength)}</span>
+                            <span className="text-green-500 mt-0.5">•</span>
+                            <span>{strength}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
                   {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-5 border border-amber-200">
-                      <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <div className="bg-white rounded-xl p-5 border border-gray-200">
+                      <h4 className="text-md font-bold text-gray-900 mb-3 flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5 text-amber-600" />
                         Gaps Críticos
                       </h4>
                       <ul className="space-y-2">
-                        {evaluation.critical_gaps.map((gap: any, idx: number) => (
+                        {evaluation.critical_gaps.map((gap, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-gray-700 text-sm">
-                            <span className="text-amber-500 mt-0.5 font-bold">•</span>
-                            <span>{typeof gap === 'string' ? gap : gap?.text || gap?.description || JSON.stringify(gap)}</span>
+                            <span className="text-amber-500 mt-0.5">•</span>
+                            <span>{gap}</span>
                           </li>
                         ))}
                       </ul>
@@ -1295,24 +1533,21 @@ export default function MeetAnalysisView() {
 
                 {/* Objections Analysis */}
                 {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
-                  <div className="rounded-2xl p-5 border border-gray-200">
-                    <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-emerald-600" />
-                      Análise de Objeções
-                    </h3>
+                  <div className="bg-white rounded-xl p-6 border border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">Análise de Objeções</h3>
                     <div className="space-y-4">
                       {evaluation.objections_analysis.map((obj, idx) => (
-                        <div key={idx} className="border-l-4 border-emerald-500/40 pl-4 py-2 bg-gray-50 rounded-r-xl">
+                        <div key={idx} className="border-l-4 border-green-400 pl-4 py-2 bg-gray-50 rounded-r-lg">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
                               {obj.objection_type}
                             </span>
-                            <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
+                            <span className={`text-sm font-bold ${obj.score >= 7 ? 'text-green-600' : obj.score >= 5 ? 'text-amber-600' : 'text-red-600'}`}>
                               Nota: {obj.score}/10
                             </span>
                           </div>
-                          <p className="text-gray-500 text-sm italic mb-2">"{obj.objection_text}"</p>
-                          <p className="text-gray-700 text-sm leading-relaxed">{obj.detailed_analysis}</p>
+                          <p className="text-gray-600 text-sm italic mb-2">"{obj.objection_text}"</p>
+                          <p className="text-gray-700 text-sm">{obj.detailed_analysis}</p>
                         </div>
                       ))}
                     </div>
@@ -1321,35 +1556,319 @@ export default function MeetAnalysisView() {
 
                 {/* Priority Improvements */}
                 {evaluation.priority_improvements && evaluation.priority_improvements.length > 0 && (
-                  <div className="rounded-2xl p-5 border border-gray-200">
-                    <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-emerald-600" />
-                      Melhorias Prioritárias
-                    </h3>
+                  <div className="bg-white rounded-xl p-6 border border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">Melhorias Prioritárias</h3>
                     <div className="space-y-3">
                       {evaluation.priority_improvements.map((imp, idx) => (
-                        <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                           <div className="flex items-center gap-2 mb-2">
-                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
                               imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
                               imp.priority === 'high' ? 'bg-amber-100 text-amber-700' :
                               'bg-green-100 text-green-700'
                             }`}>
                               {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
                             </span>
-                            <span className="font-semibold text-gray-900 text-sm">{imp.area}</span>
+                            <span className="font-semibold text-gray-900">{imp.area}</span>
                           </div>
-                          <p className="text-gray-500 text-sm mb-1"><strong className="text-gray-700">Gap:</strong> {imp.current_gap}</p>
-                          <p className="text-gray-600 text-sm"><strong className="text-gray-700">Plano:</strong> {imp.action_plan}</p>
+                          <p className="text-gray-600 text-sm mb-1"><strong>Gap:</strong> {imp.current_gap}</p>
+                          <p className="text-gray-700 text-sm"><strong>Plano:</strong> {imp.action_plan}</p>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Simulation Loading */}
+                {isGeneratingSimulation && !simulationConfig && (
+                  <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                      <div>
+                        <h3 className="text-base font-bold text-gray-900">Gerando Simulacao de Treino...</h3>
+                        <p className="text-gray-600 text-sm">Criando cenario personalizado baseado nos erros identificados</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Simulation Proposal - Cards Layout */}
+                {simulationConfig && (
+                  <div ref={simulationRef} className="space-y-4">
+                    {/* Header */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <Target className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Simulacao de Treino Sugerida</h3>
+                        <p className="text-sm text-gray-500">Baseada nos erros identificados na reuniao</p>
+                      </div>
+                    </div>
+
+                    {/* Meeting Context */}
+                    {simulationConfig.meeting_context && (
+                      <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                        <p className="text-sm text-gray-700 italic">{simulationConfig.meeting_context}</p>
+                      </div>
+                    )}
+
+                    {/* Simulation Justification Banner */}
+                    {simulationConfig.simulation_justification && (
+                      <div className="bg-purple-50 rounded-xl p-4 border-l-4 border-purple-500 border-t border-r border-b border-t-purple-200 border-r-purple-200 border-b-purple-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Target className="w-4 h-4 text-purple-600" />
+                          <h4 className="text-sm font-bold text-gray-900">Por que esta simulacao?</h4>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.simulation_justification}</p>
+                      </div>
+                    )}
+
+                    {/* Persona Header with badges */}
+                    <div className="flex items-center gap-3">
+                      <User className="w-4 h-4 text-purple-600" />
+                      <h4 className="text-sm font-bold text-gray-900">Persona do Cliente</h4>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                        {simulationConfig.age} anos
+                      </span>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                        {simulationConfig.temperament}
+                      </span>
+                    </div>
+
+                    {/* Persona Fields - Individual Cards */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {simulationConfig.persona?.business_type === 'B2B' ? (<>
+                        {simulationConfig.persona.cargo && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Cargo</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.cargo}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.tipo_empresa_faturamento && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Empresa</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.tipo_empresa_faturamento}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.contexto && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200 col-span-2">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Contexto</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.contexto}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.busca && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">O que busca</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.busca}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona.dores && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide mb-1.5">Dores</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.dores}</p>
+                          </div>
+                        )}
+                      </>) : (<>
+                        {simulationConfig.persona?.profissao && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Perfil</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.profissao}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.perfil_socioeconomico && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Perfil Socioeconomico</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.perfil_socioeconomico}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.contexto && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200 col-span-2">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">Contexto</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.contexto}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.busca && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1.5">O que busca</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.busca}</p>
+                          </div>
+                        )}
+                        {simulationConfig.persona?.dores && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-200">
+                            <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide mb-1.5">Dores</p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{simulationConfig.persona.dores}</p>
+                          </div>
+                        )}
+                      </>)}
+                    </div>
+
+                    {/* Objective Card */}
+                    <div className="bg-white rounded-xl p-5 border border-gray-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Target className="w-4 h-4 text-purple-600" />
+                        <h4 className="text-sm font-bold text-gray-900">Objetivo</h4>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 mb-1">{simulationConfig.objective?.name}</p>
+                      {simulationConfig.objective?.description && (
+                        <p className="text-sm text-gray-600">{simulationConfig.objective.description}</p>
+                      )}
+                    </div>
+
+                    {/* Objections Card */}
+                    {simulationConfig.objections && simulationConfig.objections.length > 0 && (
+                      <div className="bg-white rounded-xl p-5 border border-gray-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertTriangle className="w-4 h-4 text-purple-600" />
+                          <h4 className="text-sm font-bold text-gray-900">Objecoes para Treinar</h4>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{simulationConfig.objections.length}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {simulationConfig.objections.map((obj: any, idx: number) => (
+                            <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                              <div className="flex items-start gap-2 mb-1.5">
+                                <p className="text-sm font-medium text-gray-900 flex-1">{cleanGptText(obj.name)}</p>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                                  obj.source === 'meeting'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {obj.source === 'meeting' ? 'Da reuniao' : 'Coaching'}
+                                </span>
+                              </div>
+                              {obj.rebuttals && obj.rebuttals.length > 0 && (
+                                <div className="space-y-1 mt-2">
+                                  <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-wide">Como quebrar:</p>
+                                  {obj.rebuttals.map((r: string, ri: number) => (
+                                    <p key={ri} className="text-xs text-green-700 flex items-start gap-1.5 bg-green-50 rounded px-2 py-1">
+                                      <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                      {cleanGptText(r)}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Coaching Focus Cards */}
+                    {simulationConfig.coaching_focus && simulationConfig.coaching_focus.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4 text-amber-500" />
+                          <h4 className="text-sm font-bold text-gray-900">Foco de Coaching</h4>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{simulationConfig.coaching_focus.length} {simulationConfig.coaching_focus.length === 1 ? 'area' : 'areas'}</span>
+                        </div>
+
+                        {simulationConfig.coaching_focus.map((focus: any, idx: number) => {
+                          const severityColors = {
+                            critical: { border: 'border-l-red-500', badge: 'bg-red-100 text-red-700', label: 'Critico', impact: 'bg-red-50 border-red-100', dot: 'bg-red-500' },
+                            high: { border: 'border-l-amber-500', badge: 'bg-amber-100 text-amber-700', label: 'Alto', impact: 'bg-amber-50 border-amber-100', dot: 'bg-amber-500' },
+                            medium: { border: 'border-l-yellow-500', badge: 'bg-yellow-100 text-yellow-700', label: 'Medio', impact: 'bg-yellow-50 border-yellow-100', dot: 'bg-yellow-500' }
+                          }
+                          const sev = severityColors[focus.severity as keyof typeof severityColors] || severityColors.high
+                          const phrases = focus.example_phrases || focus.tips || []
+                          const diagnosisText = focus.diagnosis || focus.what_to_improve || ''
+
+                          return (
+                            <div key={idx} className={`bg-white rounded-xl border border-gray-200 border-l-4 ${sev.border} overflow-hidden`}>
+                              {/* Header: Severity + Area + Score */}
+                              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                                <div className="flex items-center gap-2">
+                                  {focus.severity && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${sev.badge}`}>
+                                      {sev.label}
+                                    </span>
+                                  )}
+                                  <span className="text-sm font-bold text-gray-900">{focus.area}</span>
+                                </div>
+                                {focus.spin_score !== undefined && (
+                                  <span className={`text-sm font-bold ${focus.spin_score < 4 ? 'text-red-600' : focus.spin_score < 6 ? 'text-amber-600' : 'text-yellow-600'}`}>
+                                    {focus.spin_score.toFixed(1)}/10
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="p-4 space-y-3">
+                                {/* Diagnosis */}
+                                {diagnosisText && (
+                                  <div>
+                                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Diagnostico</p>
+                                    <p className="text-sm text-gray-700 leading-relaxed">{cleanGptText(diagnosisText)}</p>
+                                  </div>
+                                )}
+
+                                {/* Transcript Evidence */}
+                                {focus.transcript_evidence && (
+                                  <div className="bg-gray-50 rounded-lg p-3 border-l-3 border-l-gray-300 border border-gray-100">
+                                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Evidencia da Reuniao</p>
+                                    <p className="text-xs text-gray-600 italic leading-relaxed">{cleanGptText(focus.transcript_evidence)}</p>
+                                  </div>
+                                )}
+
+                                {/* Business Impact */}
+                                {focus.business_impact && (
+                                  <div className={`rounded-lg p-3 border ${sev.impact}`}>
+                                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Por que importa</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{cleanGptText(focus.business_impact)}</p>
+                                  </div>
+                                )}
+
+                                {/* Practice Goal */}
+                                {focus.practice_goal && (
+                                  <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">O que praticar</p>
+                                    <p className="text-xs text-green-800 leading-relaxed font-medium">{cleanGptText(focus.practice_goal)}</p>
+                                  </div>
+                                )}
+
+                                {/* Example Phrases */}
+                                {phrases.length > 0 && (
+                                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                    <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide mb-1.5">Frases para usar</p>
+                                    <div className="space-y-1.5">
+                                      {phrases.map((phrase: string, pi: number) => (
+                                        <p key={pi} className="text-xs text-blue-800 flex items-start gap-1.5">
+                                          <span className="text-blue-400 mt-0.5 flex-shrink-0">&ldquo;</span>
+                                          <span className="leading-relaxed">{cleanGptText(phrase)}</span>
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={startSimulation}
+                        className="flex-1 py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+                      >
+                        <Play className="w-5 h-5" />
+                        Fazer Agora
+                      </button>
+                      <button
+                        onClick={saveSimulationForLater}
+                        disabled={isSavingSimulation}
+                        className="flex-1 py-3.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border-2 border-gray-200 hover:border-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSavingSimulation ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        {isSavingSimulation ? 'Salvando...' : 'Deixar para Depois'}
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Footer */}
-              <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+              <div className="p-6 border-t border-gray-200 flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
                 <button
                   onClick={() => {
                     if (session) {
@@ -1359,16 +1878,33 @@ export default function MeetAnalysisView() {
                       navigator.clipboard.writeText(text)
                     }
                   }}
-                  className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-200 flex items-center gap-2 font-medium border border-gray-200 hover:border-gray-300"
+                  className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
                 >
                   <Copy className="w-4 h-4" />
-                  Copiar Transcrição
+                  Copiar Transcricao
                 </button>
                 <button
-                  onClick={() => setShowEvaluationModal(false)}
-                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
+                  onClick={async () => {
+                    if (simulationConfig && !currentSimSaved) {
+                      await saveSimulationForLater()
+                    } else {
+                      setShowEvaluationModal(false)
+                    }
+                  }}
+                  disabled={isGeneratingSimulation && !simulationConfig || isSavingSimulation}
+                  className={`px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 font-medium ${
+                    isGeneratingSimulation && !simulationConfig || isSavingSimulation
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
                 >
-                  Fechar
+                  {isSavingSimulation ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
+                  ) : isGeneratingSimulation && !simulationConfig ? (
+                    'Aguarde...'
+                  ) : (
+                    'Fechar'
+                  )}
                 </button>
               </div>
             </div>
