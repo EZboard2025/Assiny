@@ -1720,7 +1720,7 @@ async function triggerAutopilotResponse(
 
     // 3. Apply random delay for natural feel (capped at 30s to prevent excessive waits)
     const settings = config.settings || {}
-    const delayMin = Math.min((settings.response_delay_min || 5), 30) * 1000
+    const delayMin = Math.min((settings.response_delay_min || 20), 30) * 1000
     const delayMax = Math.min((settings.response_delay_max || 15), 30) * 1000
     const delay = delayMin + Math.random() * (delayMax - delayMin)
     const delaySec = Math.round(delay / 1000)
