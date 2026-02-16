@@ -554,7 +554,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 flex">
+    <div className={`min-h-screen text-gray-900 flex ${currentView === 'followup' ? 'bg-[#111b21]' : 'bg-white'}`}>
       {/* Sidebar */}
       <Sidebar
         currentView={currentView}
