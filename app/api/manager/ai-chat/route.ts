@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -42,6 +43,41 @@ export async function POST(request: Request) {
 
     if (!userMessage) {
       return NextResponse.json({ error: 'Mensagem é obrigatória' }, { status: 400 })
+    }
+
+    // Check credits
+    const { data: companyCredits } = await supabaseAdmin
+      .from('companies')
+      .select('training_plan, monthly_credits_used, monthly_credits_reset_at, extra_monthly_credits')
+      .eq('id', companyId)
+      .single()
+
+    if (companyCredits) {
+      const lastReset = new Date(companyCredits.monthly_credits_reset_at)
+      const now = new Date()
+      const isNewMonth = now.getMonth() !== lastReset.getMonth() ||
+                         now.getFullYear() !== lastReset.getFullYear()
+
+      let currentCreditsUsed = companyCredits.monthly_credits_used || 0
+
+      if (isNewMonth) {
+        await supabaseAdmin
+          .from('companies')
+          .update({ monthly_credits_used: 0, extra_monthly_credits: 0, monthly_credits_reset_at: now.toISOString() })
+          .eq('id', companyId)
+        currentCreditsUsed = 0
+      }
+
+      const planConfig = PLAN_CONFIGS[companyCredits.training_plan as PlanType]
+      const baseLimit = planConfig?.monthlyCredits
+      const extraCredits = companyCredits.extra_monthly_credits || 0
+
+      if (baseLimit !== null) {
+        const remaining = (baseLimit + extraCredits) - currentCreditsUsed
+        if (remaining <= 0) {
+          return NextResponse.json({ error: 'Créditos mensais esgotados' }, { status: 403 })
+        }
+      }
     }
 
     // Fetch ALL company data in parallel — NO LIMITS
@@ -537,6 +573,14 @@ VOCE TEM ACESSO A:
     const response = completion.choices[0]?.message?.content
     if (!response) {
       return NextResponse.json({ error: 'IA não gerou resposta' }, { status: 500 })
+    }
+
+    // Consume 0.2 credits
+    if (companyCredits) {
+      await supabaseAdmin
+        .from('companies')
+        .update({ monthly_credits_used: (companyCredits.monthly_credits_used || 0) + 0.2 })
+        .eq('id', companyId)
     }
 
     return NextResponse.json({
