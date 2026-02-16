@@ -690,7 +690,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
 
       {/* Side panel */}
       {isOpen && (
-        <div className="fixed top-0 right-0 h-screen w-full sm:w-[400px] bg-[#111b21] z-[65] flex flex-col shadow-2xl">
+        <div className="fixed top-0 right-0 h-screen w-full sm:w-[400px] bg-[#111b21] z-[65] flex flex-col shadow-2xl animate-slide-in-right">
           {/* Neon glow line */}
           <div className="absolute left-0 top-0 h-[60px] w-px bg-[#222d34]" />
           <div className="absolute left-0 top-[60px] bottom-0 w-px bg-[#00a884]/30 z-10 pointer-events-none" style={{ boxShadow: '-4px 0 20px 2px rgba(0, 200, 150, 0.25), -2px 0 8px rgba(0, 255, 180, 0.15)' }} />
