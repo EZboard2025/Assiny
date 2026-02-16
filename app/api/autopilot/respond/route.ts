@@ -106,34 +106,6 @@ export async function POST(req: NextRequest) {
     // Use the stored phone for DB updates
     const storedPhone = contactRecord.contact_phone
 
-    // Reset daily counter if last response was on a different day
-    let dailyCount = contactRecord.auto_responses_today || 0
-    if (contactRecord.last_auto_response_at) {
-      const lastDate = new Date(contactRecord.last_auto_response_at).toDateString()
-      const today = new Date().toDateString()
-      if (lastDate !== today) {
-        dailyCount = 0
-      }
-    }
-
-    const maxPerDay = settings.max_responses_per_contact_per_day || 5
-    if (!isComplement && dailyCount >= maxPerDay) {
-      console.log(`[Autopilot] Daily limit reached for ${contactPhone} (${dailyCount}/${maxPerDay})`)
-
-      await supabaseAdmin.from('autopilot_log').insert({
-        user_id: userId,
-        company_id: companyId,
-        contact_phone: contactPhone,
-        contact_name: contactName,
-        incoming_message: incomingMessage.slice(0, 2000),
-        action: 'skipped_limit',
-        ai_reasoning: `Limite diário atingido (${dailyCount}/${maxPerDay})`
-      })
-
-      pushAutopilotEvent('response_skipped', userId, contactPhone, contactName, `Limite diário (${dailyCount}/${maxPerDay})`)
-      return NextResponse.json({ action: 'skipped_limit' })
-    }
-
     // 4. Check credits
     const { data: companyCredits } = await supabaseAdmin
       .from('companies')
@@ -704,16 +676,18 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
           ai_reasoning: 'Objetivo alcancado — autopilot encerrado para este contato'
         })
       ])
+
+      // Save winning conversation as high-quality RAG example (fire-and-forget)
+      saveWinningConversation(userId, companyId, contactPhone, contactName, conversationContext, messages).catch((err: any) =>
+        console.error('[Autopilot] Failed to save winning conversation:', err.message || err)
+      )
     }
 
-    // 13. Update contact stats (skip for complements — they don't count as AI responses)
+    // 13. Update contact last response timestamp
     if (!isComplement) {
       await supabaseAdmin
         .from('autopilot_contacts')
-        .update({
-          auto_responses_today: dailyCount + 1,
-          last_auto_response_at: new Date().toISOString()
-        })
+        .update({ last_auto_response_at: new Date().toISOString() })
         .eq('user_id', userId)
         .eq('contact_phone', storedPhone)
     }
@@ -760,5 +734,51 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
       { error: error.message, action: 'skipped_error' },
       { status: 500 }
     )
+  }
+}
+
+// Save winning conversation as high-quality RAG example when objective is reached
+async function saveWinningConversation(
+  userId: string,
+  companyId: string,
+  contactPhone: string,
+  contactName: string | null,
+  conversationContext: string,
+  finalMessages: string[]
+): Promise<void> {
+  try {
+    const winningText = `CONVERSA QUE ALCANÇOU O OBJETIVO:\n\n${conversationContext}\n\nÚLTIMA RESPOSTA (que levou ao objetivo):\nVendedor: ${finalMessages.join('\nVendedor: ')}`
+
+    const embeddingResponse = await openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: winningText.slice(0, 8000)
+    })
+    const embedding = embeddingResponse.data[0].embedding
+
+    await supabaseAdmin
+      .from('followup_examples_success')
+      .insert({
+        company_id: companyId,
+        user_id: userId,
+        tipo_venda: 'WhatsApp',
+        canal: 'WhatsApp',
+        content: winningText.slice(0, 5000),
+        nota_original: 9.5,
+        embedding,
+        metadata: {
+          source: 'autopilot_objective_reached',
+          company_id: companyId,
+          tipo_venda: 'WhatsApp',
+          canal: 'WhatsApp',
+          contact_phone: contactPhone,
+          contact_name: contactName,
+          is_autopilot: true,
+          quality_score: 9.5
+        }
+      })
+
+    console.log(`[Autopilot ML] Winning conversation saved to RAG for ${contactPhone}`)
+  } catch (err: any) {
+    console.error(`[Autopilot ML] Error saving winning conversation:`, err.message || err)
   }
 }

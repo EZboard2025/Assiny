@@ -109,13 +109,14 @@ export async function GET(req: NextRequest) {
             nota_original: 2.0,
             embedding,
             metadata: {
-              source: 'auto_no_response',
+              source: msg.is_autopilot ? 'autopilot_no_response' : 'auto_no_response',
               company_id: msg.company_id,
               tipo_venda: 'WhatsApp',
               canal: 'WhatsApp',
               outcome: 'failure',
               reason: 'Sem resposta após 24h',
-              tracking_id: msg.id
+              tracking_id: msg.id,
+              is_autopilot: msg.is_autopilot || false
             }
           })
 

@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Zap, Loader2, Users, Settings, Clock, Sparkles } from 'lucide-react'
+import { X, Zap, Loader2, Users, Clock, Sparkles } from 'lucide-react'
 import AutopilotProfilesTab, { AutopilotProfile } from './AutopilotProfilesTab'
 import AutopilotContactsTab from './AutopilotContactsTab'
-import AutopilotSettingsTab from './AutopilotSettingsTab'
 import AutopilotActivityTab from './AutopilotActivityTab'
 
 interface WhatsAppConversation {
@@ -67,12 +66,11 @@ const DEFAULT_SETTINGS: AutopilotSettings = {
   tone: 'consultivo'
 }
 
-type TabKey = 'profiles' | 'contacts' | 'config' | 'activity'
+type TabKey = 'profiles' | 'contacts' | 'activity'
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<any> }[] = [
   { key: 'profiles', label: 'Perfis', icon: Sparkles },
   { key: 'contacts', label: 'Contatos', icon: Users },
-  { key: 'config', label: 'Config', icon: Settings },
   { key: 'activity', label: 'Atividade', icon: Clock },
 ]
 
@@ -91,8 +89,6 @@ export default function AutopilotPanel({
   const [monitoredContacts, setMonitoredContacts] = useState<Map<string, AutopilotContact>>(new Map())
   const [allContacts, setAllContacts] = useState<WAContact[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [hasSettingsChanges, setHasSettingsChanges] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [authExpired, setAuthExpired] = useState(false)
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -264,31 +260,6 @@ export default function AutopilotPanel({
     } catch {
       setEnabled(!newEnabled)
       showError('Erro ao salvar configuração')
-    }
-  }
-
-  // Save settings
-  const saveSettings = async () => {
-    setIsSaving(true)
-    try {
-      const headers = await getFreshHeaders()
-      const res = await fetch('/api/autopilot/config', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ enabled, customInstructions, settings })
-      })
-      if (res.status === 401) { handle401(); return }
-      if (res.ok) {
-        setHasSettingsChanges(false)
-        onConfigChange(enabled)
-      } else {
-        showError('Erro ao salvar configurações')
-      }
-    } catch (err) {
-      console.error('[AutopilotPanel] Save error:', err)
-      showError('Erro ao salvar configurações')
-    } finally {
-      setIsSaving(false)
     }
   }
 
@@ -631,19 +602,6 @@ export default function AutopilotPanel({
                 onContactProfileChanged={handleContactProfileChanged}
                 onBatchAdd={handleBatchAdd}
                 onBatchRemove={handleBatchRemove}
-              />
-            )}
-
-            {activeTab === 'config' && (
-              <AutopilotSettingsTab
-                settings={settings}
-                onSettingsChange={(newSettings) => {
-                  setSettings(newSettings)
-                  setHasSettingsChanges(true)
-                }}
-                hasChanges={hasSettingsChanges}
-                isSaving={isSaving}
-                onSave={saveSettings}
               />
             )}
 

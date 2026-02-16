@@ -1406,10 +1406,15 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     console.log(`[WA] Message processed: ${direction} ${messageType} from ${contactPhone}`)
 
     // === COPILOT AUTO-LEARNING HOOKS (non-blocking, skip groups) ===
+    // NOTE: This fires for ALL outbound messages including autopilot.
+    // Autopilot messages are detected via autopilotSentMsgIds and flagged is_autopilot=true
+    // in seller_message_tracking. This feeds the shared RAG pipeline for both copilot and autopilot.
     if (messageType === 'text' && content && !isGroup) {
       if (fromMe) {
-        // Seller sent a message → track it for outcome analysis
-        trackSellerMessage(state, contactPhone, contactName, content, msgTimestamp).catch((err: any) =>
+        // Detect if this is an autopilot-sent message
+        const isAutopilotMsg = autopilotSentMsgIds.has(msg.id._serialized)
+        // Track for outcome analysis (both seller and autopilot messages)
+        trackSellerMessage(state, contactPhone, contactName, content, msgTimestamp, isAutopilotMsg).catch((err: any) =>
           console.error('[WA] trackSellerMessage error:', err.message || err)
         )
       } else {
@@ -2063,7 +2068,8 @@ async function trackSellerMessage(
   contactPhone: string,
   contactName: string | null,
   content: string,
-  msgTimestamp: Date
+  msgTimestamp: Date,
+  isAutopilot: boolean = false
 ): Promise<void> {
   // Fetch recent conversation context from DB (including transcriptions for audio)
   const { data: recentMsgs } = await supabaseAdmin
@@ -2119,7 +2125,8 @@ async function trackSellerMessage(
       contact_name: contactName,
       seller_message: content.slice(0, 2000),
       conversation_context: context.slice(0, 5000),
-      message_timestamp: msgTimestamp.toISOString()
+      message_timestamp: msgTimestamp.toISOString(),
+      is_autopilot: isAutopilot
     })
 
   console.log(`[WA] Tracked seller message to ${contactPhone}`)
