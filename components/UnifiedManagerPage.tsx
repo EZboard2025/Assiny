@@ -15,9 +15,10 @@ type ViewState =
 export default function UnifiedManagerPage() {
   const router = useRouter()
   const [view, setView] = useState<ViewState>({ type: 'grid' })
+  const [chatOpen, setChatOpen] = useState(false)
 
   return (
-    <div className="min-h-screen py-8 px-6">
+    <div className="min-h-screen py-8 px-6 transition-all duration-300" style={{ paddingRight: chatOpen ? 'calc(400px + 1.5rem)' : '1.5rem' }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm">
@@ -60,8 +61,8 @@ export default function UnifiedManagerPage() {
         )}
       </div>
 
-      {/* Manager AI Chat - Floating panel */}
-      <ManagerAIChat />
+      {/* Manager AI Chat - Side panel */}
+      <ManagerAIChat onToggle={setChatOpen} />
     </div>
   )
 }

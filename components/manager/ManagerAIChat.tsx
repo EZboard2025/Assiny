@@ -327,8 +327,13 @@ function RichMessage({ content }: { content: string }) {
   )
 }
 
-export default function ManagerAIChat() {
+export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean) => void } = {}) {
   const [isOpen, setIsOpen] = useState(false)
+
+  const toggleOpen = (open: boolean) => {
+    setIsOpen(open)
+    onToggle?.(open)
+  }
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -675,7 +680,7 @@ export default function ManagerAIChat() {
       {/* Floating button */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => toggleOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-[#00a884] to-[#00d4aa] rounded-full shadow-lg hover:shadow-xl flex items-center justify-center z-[60] transition-all hover:scale-110"
           title="Assistente da Equipe"
         >
@@ -713,7 +718,7 @@ export default function ManagerAIChat() {
                   <ArrowLeft className="w-4 h-4" />
                 </button>
               )}
-              <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors" title="Fechar">
+              <button onClick={() => toggleOpen(false)} className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors" title="Fechar">
                 <X className="w-4 h-4" />
               </button>
             </div>
