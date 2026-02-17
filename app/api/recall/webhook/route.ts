@@ -106,12 +106,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // Handle status change events - trigger background evaluation
-    if (eventType === 'bot.status_change') {
-      const status = payload.data?.status?.code || payload.data?.status || payload.status
-      console.log(`📊 Bot status changed: ${status}`)
+    // Handle bot lifecycle events (Recall sends bot.joining_call, bot.in_call_recording, bot.done, bot.fatal, etc.)
+    if (eventType.startsWith('bot.')) {
+      const statusCode = payload.data?.data?.code || eventType.replace('bot.', '')
+      console.log(`📊 Bot event: ${eventType}, status code: ${statusCode}`)
 
-      // Update bot session status in DB
+      // Map Recall event types to our internal statuses
       const statusMap: Record<string, string> = {
         'ready': 'created',
         'joining_call': 'joining',
@@ -123,16 +123,16 @@ export async function POST(request: Request) {
         'analysis_done': 'processing'
       }
 
-      const mappedStatus = statusMap[status]
+      const mappedStatus = statusMap[statusCode]
       if (mappedStatus) {
         await supabaseAdmin
           .from('meet_bot_sessions')
-          .update({ recall_status: status, status: mappedStatus, updated_at: new Date().toISOString() })
+          .update({ recall_status: statusCode, status: mappedStatus, updated_at: new Date().toISOString() })
           .eq('bot_id', botId)
       }
 
-      // When bot finishes, trigger background evaluation (fire-and-forget)
-      if ((status === 'done' || status === 'call_ended' || status === 'analysis_done') && !processedBots.has(botId)) {
+      // When bot finishes (bot.done), trigger background evaluation (fire-and-forget)
+      if (eventType === 'bot.done' && !processedBots.has(botId)) {
         processedBots.add(botId)
         console.log(`🚀 [MeetBG] Dispatching background evaluation for bot ${botId}`)
 
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
         })
       }
 
-      if (status === 'fatal') {
+      if (eventType === 'bot.fatal') {
         console.error(`🏁 Bot ${botId} ended with FATAL status`)
         await supabaseAdmin
           .from('meet_bot_sessions')
