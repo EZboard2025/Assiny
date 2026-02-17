@@ -11,7 +11,6 @@ import {
   Clock,
   User,
   Users,
-  StopCircle,
   RefreshCw,
   AlertTriangle,
   Copy,
@@ -142,7 +141,6 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
   const [session, setSession] = useState<MeetingSession | null>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const [isEnding, setIsEnding] = useState(false)
   const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [showEvaluationModal, setShowEvaluationModal] = useState(false)
@@ -582,77 +580,6 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
     }
   }
 
-  // End session and evaluate (manual)
-  const endSession = async () => {
-    // Mark as triggered to prevent double-evaluation
-    hasTriggeredAutoEvalRef.current = true
-    setIsEnding(true)
-    stopPolling()
-
-    if (session?.botId) {
-      try {
-        console.log('🛑 Parando bot:', session.botId)
-        await fetch('/api/recall/stop-bot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ botId: session.botId })
-        })
-      } catch (err) {
-        console.error('Error stopping bot:', err)
-      }
-    }
-
-    // Set status to fetching transcript
-    setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
-
-    // Wait a moment for Recall.ai to process the final transcript
-    console.log('⏳ Aguardando processamento da transcrição...')
-    await new Promise(resolve => setTimeout(resolve, 5000)) // Increased wait time
-
-    // Get local transcript length
-    let transcriptToEvaluate = session?.transcript || []
-    const localTranscriptLength = transcriptToEvaluate.length
-
-    // Only fetch from API if we have NO local transcript (avoid getting old data)
-    if (session?.botId && localTranscriptLength === 0) {
-      console.log(`📡 Sem transcrição local, buscando da API...`)
-      try {
-        const response = await fetch(`/api/recall/webhook?botId=${session.botId}&fallback=true`)
-        const data = await response.json()
-        if (data.transcript && data.transcript.length > 0) {
-          transcriptToEvaluate = data.transcript
-          setSession(prev => prev ? { ...prev, transcript: data.transcript } : null)
-          console.log(`✅ Transcrição da API: ${data.transcript.length} segmentos`)
-        }
-      } catch (err) {
-        console.error('Error fetching final transcript:', err)
-      }
-    } else if (localTranscriptLength > 0) {
-      console.log(`📝 Usando transcrição local: ${localTranscriptLength} segmentos`)
-    }
-
-    // Only evaluate if there's a transcript
-    if (transcriptToEvaluate.length > 0) {
-      await evaluateTranscript(transcriptToEvaluate)
-    } else {
-      console.log('⚠️ Nenhuma transcrição encontrada para avaliar')
-      setSession(prev => prev ? { ...prev, status: 'ended' } : null)
-      setError('Nenhuma transcrição foi capturada. A reunião pode não ter tido áudio ou o bot não conseguiu gravar.')
-    }
-
-    // Clean up transcript storage
-    if (session?.botId) {
-      try {
-        await fetch(`/api/recall/webhook?botId=${session.botId}`, {
-          method: 'DELETE'
-        })
-      } catch (err) {
-        console.error('Error cleaning up transcript:', err)
-      }
-    }
-
-    setIsEnding(false)
-  }
 
   // Save evaluation to database
   const saveEvaluationToHistory = async (
@@ -910,7 +837,7 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
             Análise de Google Meet
           </h1>
           <p className="text-gray-500">
-            Cole o link da reunião e nosso bot entrará para transcrever a conversa
+            Cole o link da reunião e a avaliação será gerada automaticamente
           </p>
         </div>
 
@@ -982,7 +909,7 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
                     <div className="flex items-start gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                       <p className="text-sm text-green-700">
-                        A avaliacao e gerada automaticamente em background. Voce sera notificado quando estiver pronta.
+                        A avaliação é gerada automaticamente em background. Você será notificado quando estiver pronta.
                       </p>
                     </div>
                   </div>
@@ -1031,10 +958,10 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-green-800">
-                    Analise em background ativada
+                    Análise em background ativada
                   </p>
                   <p className="text-sm text-green-600 mt-0.5">
-                    Voce pode sair desta pagina ou navegar para outra area. A avaliacao sera gerada automaticamente quando a reuniao terminar e voce sera notificado.
+                    Você pode sair desta página ou navegar para outra área. A avaliação será gerada automaticamente quando a reunião terminar e você será notificado.
                   </p>
                 </div>
               </div>
