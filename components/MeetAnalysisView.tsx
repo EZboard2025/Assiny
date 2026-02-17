@@ -973,20 +973,17 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 font-bold">4.</span>
-                      Realize a reunião normalmente - o bot irá gravar e transcrever
+                      Pronto! O bot grava automaticamente e sai quando a reunião acabar
                     </li>
                   </ol>
 
-                  {/* Warning about ending the call */}
-                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  {/* Background info */}
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <span className="text-amber-500 text-lg">⚠️</span>
-                      <div>
-                        <p className="text-sm font-semibold text-amber-700">Importante:</p>
-                        <p className="text-sm text-amber-600">
-                          Ao terminar a reunião, clique no botão <strong>"Encerrar"</strong> para finalizar a gravação e gerar a avaliação.
-                        </p>
-                      </div>
+                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-green-700">
+                        A avaliacao e gerada automaticamente em background. Voce sera notificado quando estiver pronta.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1015,29 +1012,6 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {session.status !== 'ended' && session.status !== 'error' && (
-                    <button
-                      onClick={endSession}
-                      disabled={isEnding}
-                      className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 border ${
-                        isEnding
-                          ? 'bg-amber-50 text-amber-600 border-amber-200 cursor-not-allowed'
-                          : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
-                      }`}
-                    >
-                      {isEnding ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Encerrando...
-                        </>
-                      ) : (
-                        <>
-                          <StopCircle className="w-4 h-4" />
-                          Encerrar
-                        </>
-                      )}
-                    </button>
-                  )}
                   {(session.status === 'ended' || session.status === 'error') && (
                     <button
                       onClick={resetSession}
