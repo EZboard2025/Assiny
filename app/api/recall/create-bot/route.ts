@@ -1,16 +1,29 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const RECALL_API_URL = process.env.RECALL_API_REGION
   ? `https://${process.env.RECALL_API_REGION}.recall.ai/api/v1`
   : 'https://us-west-2.recall.ai/api/v1' // Pay-as-you-go region
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
 export async function POST(request: Request) {
   try {
-    const { meetingUrl, botName } = await request.json()
+    const { meetingUrl, botName, userId, companyId } = await request.json()
 
     if (!meetingUrl) {
       return NextResponse.json(
         { error: 'meetingUrl is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!userId || !companyId) {
+      return NextResponse.json(
+        { error: 'userId and companyId are required' },
         { status: 400 }
       )
     }
@@ -59,7 +72,7 @@ export async function POST(request: Request) {
             {
               type: 'webhook',
               url: webhookUrl,
-              events: ['transcript.data', 'transcript.partial_data']
+              events: ['transcript.data', 'transcript.partial_data', 'bot.status_change']
             }
           ]
         },
@@ -90,6 +103,25 @@ export async function POST(request: Request) {
 
     const data = await response.json()
     console.log('✅ Bot created:', data.id)
+
+    // Save bot session to database for background processing
+    const { error: sessionError } = await supabaseAdmin
+      .from('meet_bot_sessions')
+      .insert({
+        bot_id: data.id,
+        user_id: userId,
+        company_id: companyId,
+        meeting_url: meetingUrl,
+        status: 'created',
+        recall_status: data.status_changes?.[0]?.code || 'created'
+      })
+
+    if (sessionError) {
+      console.error('⚠️ Failed to save bot session:', sessionError)
+      // Don't fail the request - bot was already created
+    } else {
+      console.log('💾 Bot session saved to DB')
+    }
 
     return NextResponse.json({
       success: true,

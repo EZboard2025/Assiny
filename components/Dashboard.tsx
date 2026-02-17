@@ -29,6 +29,8 @@ import { PlanType } from '@/lib/types/plans'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
 import ConfigurationRequired from './ConfigurationRequired'
 import SavedSimulationCard from './dashboard/SavedSimulationCard'
+import NotificationBanner from './NotificationBanner'
+import { useNotifications, UserNotification } from '@/hooks/useNotifications'
 
 // Lazy load RoleplayLinksView to prevent it from executing on public pages
 const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), {
@@ -69,6 +71,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   // Training streak hook
   const { streak, loading: streakLoading } = useTrainingStreak(userId)
+
+  // Notifications hook
+  const { notifications, unreadCount, markAsRead } = useNotifications(userId)
+  const [pendingEvaluationId, setPendingEvaluationId] = useState<string | null>(null)
+
+  // Count meet-specific notifications for sidebar badge
+  const meetNotificationCount = notifications.filter(n =>
+    n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error'
+  ).length
 
   // Hook para verificar limites do plano
   const {
@@ -370,7 +381,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'meet-analysis') {
-      return <MeetAnalysisView />
+      return (
+        <MeetAnalysisView
+          pendingEvaluationId={pendingEvaluationId}
+          onEvaluationViewed={() => setPendingEvaluationId(null)}
+        />
+      )
     }
 
     if (currentView === 'challenge-history') {
@@ -392,6 +408,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     return (
       <div className="py-8 px-6 relative z-10">
         <div className="max-w-[1200px]">
+          {/* Meet evaluation notifications */}
+          <NotificationBanner
+            notifications={notifications.filter(n =>
+              n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error'
+            )}
+            onViewEvaluation={(notif: UserNotification) => {
+              const evaluationId = notif.data?.evaluationId
+              if (evaluationId) {
+                setPendingEvaluationId(evaluationId)
+                markAsRead(notif.id)
+                handleViewChange('meet-analysis')
+              }
+            }}
+            onDismiss={(id: string) => markAsRead(id)}
+          />
+
           {/* Header with banner and greeting */}
           <div className={`mb-8 flex flex-col lg:flex-row gap-4 items-stretch ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
             {/* Banner CTA with image */}
@@ -572,6 +604,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         onLogout={onLogout}
         isExpanded={isSidebarExpanded}
         onExpandChange={setIsSidebarExpanded}
+        meetNotificationCount={meetNotificationCount}
       />
 
       {/* Main Content */}

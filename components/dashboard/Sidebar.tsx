@@ -12,6 +12,7 @@ interface SidebarProps {
   onLogout: () => void
   isExpanded: boolean
   onExpandChange: (expanded: boolean) => void
+  meetNotificationCount?: number
 }
 
 export default function Sidebar({
@@ -23,7 +24,8 @@ export default function Sidebar({
   onOpenConfig,
   onLogout,
   isExpanded,
-  onExpandChange
+  onExpandChange,
+  meetNotificationCount = 0
 }: SidebarProps) {
   const isAdmin = userRole?.toLowerCase() === 'admin'
   const isGestor = userRole?.toLowerCase() === 'gestor'
@@ -99,7 +101,14 @@ export default function Sidebar({
                 {isActive && !isDisabled && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-green-500 rounded-r-full" />
                 )}
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                <div className="relative flex-shrink-0">
+                  <Icon className="w-5 h-5" />
+                  {item.view === 'meet-analysis' && meetNotificationCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                      {meetNotificationCount}
+                    </span>
+                  )}
+                </div>
                 <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${
                   isExpanded ? 'w-auto opacity-100' : 'w-0 opacity-0'
                 }`}>

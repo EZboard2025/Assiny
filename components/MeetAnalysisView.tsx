@@ -131,7 +131,12 @@ function cleanGptText(text: string): string {
     .trim()
 }
 
-export default function MeetAnalysisView() {
+interface MeetAnalysisViewProps {
+  pendingEvaluationId?: string | null
+  onEvaluationViewed?: () => void
+}
+
+export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationViewed }: MeetAnalysisViewProps = {}) {
   const router = useRouter()
   const [meetUrl, setMeetUrl] = useState('')
   const [session, setSession] = useState<MeetingSession | null>(null)
@@ -182,6 +187,40 @@ export default function MeetAnalysisView() {
     }
     loadSaved()
   }, [])
+
+  // Load evaluation from DB when navigating from notification
+  useEffect(() => {
+    if (!pendingEvaluationId) return
+
+    const loadPendingEvaluation = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('meet_evaluations')
+          .select('*')
+          .eq('id', pendingEvaluationId)
+          .single()
+
+        if (error || !data) {
+          console.error('Error loading pending evaluation:', error)
+          return
+        }
+
+        setEvaluation(data.evaluation)
+        setSession({
+          botId: data.meeting_id || '',
+          meetingUrl: '',
+          status: 'ended',
+          transcript: data.transcript || []
+        })
+        setSavedToHistory(true)
+        setShowEvaluationModal(true)
+        onEvaluationViewed?.()
+      } catch (e) {
+        console.error('Error loading pending evaluation:', e)
+      }
+    }
+    loadPendingEvaluation()
+  }, [pendingEvaluationId])
 
   // Save simulation for later (Supabase)
   const saveSimulationForLater = async () => {
@@ -309,12 +348,24 @@ export default function MeetAnalysisView() {
     try {
       console.log('🤖 Enviando bot para reunião:', fullUrl)
 
+      // Get user and company for background processing
+      const { data: { user } } = await supabase.auth.getUser()
+      const currentCompanyId = await getCompanyId()
+
+      if (!user?.id || !currentCompanyId) {
+        setError('Erro: usuário não autenticado ou empresa não encontrada')
+        setSession(null)
+        return
+      }
+
       const response = await fetch('/api/recall/create-bot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           meetingUrl: fullUrl,
-          botName: 'Ramppy'
+          botName: 'Ramppy',
+          userId: user.id,
+          companyId: currentCompanyId
         })
       })
 
@@ -453,6 +504,26 @@ export default function MeetAnalysisView() {
   // Auto-evaluation when bot leaves automatically
   const triggerAutoEvaluation = async (botId: string) => {
     console.log('🔄 Iniciando avaliação automática...')
+
+    // Check if background processing already created the evaluation
+    try {
+      const { data: existingEval } = await supabase
+        .from('meet_evaluations')
+        .select('id, evaluation')
+        .eq('meeting_id', botId)
+        .single()
+
+      if (existingEval) {
+        console.log('✅ Avaliação já existe (processada em background), carregando...')
+        setEvaluation(existingEval.evaluation)
+        setSavedToHistory(true)
+        setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+        setShowEvaluationModal(true)
+        return
+      }
+    } catch {
+      // No existing evaluation, proceed normally
+    }
 
     // Set status to evaluating
     setSession(prev => prev ? { ...prev, status: 'evaluating' } : null)
@@ -979,6 +1050,21 @@ export default function MeetAnalysisView() {
                 </div>
               </div>
             </div>
+
+            {/* Background processing notice */}
+            {session.status !== 'ended' && session.status !== 'error' && session.status !== 'sending' && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-green-800">
+                    Analise em background ativada
+                  </p>
+                  <p className="text-sm text-green-600 mt-0.5">
+                    Voce pode sair desta pagina ou navegar para outra area. A avaliacao sera gerada automaticamente quando a reuniao terminar e voce sera notificado.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Status indicator while waiting/in meeting */}
             {session.transcript.length === 0 && (session.status === 'joining' || session.status === 'sending') && (
