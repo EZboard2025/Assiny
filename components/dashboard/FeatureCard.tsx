@@ -19,6 +19,7 @@ interface FeatureCardProps {
   betaBadge?: boolean
   locked?: boolean
   secondaryAction?: SecondaryAction
+  notificationCount?: number
 }
 
 export default function FeatureCard({
@@ -31,7 +32,8 @@ export default function FeatureCard({
   adminBadge = false,
   betaBadge = false,
   locked = false,
-  secondaryAction
+  secondaryAction,
+  notificationCount = 0
 }: FeatureCardProps) {
   const SecondaryIcon = secondaryAction?.icon || History
 
@@ -41,16 +43,29 @@ export default function FeatureCard({
     }
   }
 
+  const hasNotification = notificationCount > 0
+
   return (
     <div className="text-left w-full">
       <div
         onClick={handleCardClick}
-        className={`relative bg-white rounded-xl p-5 border border-gray-200 h-full transition-all duration-200 ${
+        className={`relative bg-white rounded-xl p-5 border h-full transition-all duration-200 ${
           disabled || locked
-            ? 'opacity-60 cursor-not-allowed'
-            : 'cursor-pointer hover:border-green-300 hover:shadow-md'
+            ? 'opacity-60 cursor-not-allowed border-gray-200'
+            : hasNotification
+              ? 'cursor-pointer border-green-400 shadow-[0_0_15px_rgba(34,197,94,0.35)] hover:shadow-[0_0_20px_rgba(34,197,94,0.5)]'
+              : 'cursor-pointer border-gray-200 hover:border-green-300 hover:shadow-md'
         }`}
       >
+        {/* Notification badge */}
+        {hasNotification && (
+          <div className="absolute -top-2 -right-2 z-20">
+            <span className="flex items-center justify-center w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full shadow-md animate-pulse">
+              {notificationCount}
+            </span>
+          </div>
+        )}
+
         {/* Locked overlay */}
         {locked && (
           <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center z-10">

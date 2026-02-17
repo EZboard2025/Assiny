@@ -130,12 +130,7 @@ function cleanGptText(text: string): string {
     .trim()
 }
 
-interface MeetAnalysisViewProps {
-  pendingEvaluationId?: string | null
-  onEvaluationViewed?: () => void
-}
-
-export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationViewed }: MeetAnalysisViewProps = {}) {
+export default function MeetAnalysisView() {
   const router = useRouter()
   const [meetUrl, setMeetUrl] = useState('')
   const [session, setSession] = useState<MeetingSession | null>(null)
@@ -185,40 +180,6 @@ export default function MeetAnalysisView({ pendingEvaluationId, onEvaluationView
     }
     loadSaved()
   }, [])
-
-  // Load evaluation from DB when navigating from notification
-  useEffect(() => {
-    if (!pendingEvaluationId) return
-
-    const loadPendingEvaluation = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('meet_evaluations')
-          .select('*')
-          .eq('id', pendingEvaluationId)
-          .single()
-
-        if (error || !data) {
-          console.error('Error loading pending evaluation:', error)
-          return
-        }
-
-        setEvaluation(data.evaluation)
-        setSession({
-          botId: data.meeting_id || '',
-          meetingUrl: '',
-          status: 'ended',
-          transcript: data.transcript || []
-        })
-        setSavedToHistory(true)
-        setShowEvaluationModal(true)
-        onEvaluationViewed?.()
-      } catch (e) {
-        console.error('Error loading pending evaluation:', e)
-      }
-    }
-    loadPendingEvaluation()
-  }, [pendingEvaluationId])
 
   // Save simulation for later (Supabase)
   const saveSimulationForLater = async () => {

@@ -72,7 +72,7 @@ export async function POST(request: Request) {
             {
               type: 'webhook',
               url: webhookUrl,
-              events: ['transcript.data', 'transcript.partial_data', 'bot.status_change']
+              events: ['transcript.data', 'transcript.partial_data']
             }
           ]
         },
@@ -87,16 +87,18 @@ export async function POST(request: Request) {
         automatic_leave: {
           waiting_room_timeout: 300, // 5 minutes in waiting room
           noone_joined_timeout: 120, // 2 minutes if no one joins
-          everyone_left_timeout: 30  // 30 seconds after everyone leaves
+          everyone_left_timeout: {
+            timeout: 30 // 30 seconds after everyone leaves
+          }
         }
       })
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      console.error('❌ Recall.ai error:', response.status, errorData)
+      console.error('❌ Recall.ai error:', response.status, JSON.stringify(errorData))
       return NextResponse.json(
-        { error: errorData.detail || 'Failed to create bot' },
+        { error: errorData.detail || JSON.stringify(errorData) || 'Failed to create bot' },
         { status: response.status }
       )
     }

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target } from 'lucide-react'
 
 interface MeetEvaluation {
   id: string
@@ -20,11 +21,23 @@ interface MeetEvaluation {
   created_at: string
 }
 
+function cleanGptText(text: string): string {
+  return text
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/\s*—\s*/g, ': ')
+    .replace(/\s*–\s*/g, ': ')
+    .replace(/^Tecnica:\s*/i, '')
+    .trim()
+}
+
 export default function MeetHistoryContent() {
+  const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedEvaluation, setSelectedEvaluation] = useState<MeetEvaluation | null>(null)
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set())
+  const [simulations, setSimulations] = useState<Record<string, any>>({})
 
   useEffect(() => {
     loadHistory()
@@ -57,11 +70,49 @@ export default function MeetHistoryContent() {
       if (data && data.length > 0) {
         setSelectedEvaluation(data[0])
       }
+
+      // Load saved simulations linked to evaluations
+      if (data && data.length > 0) {
+        const evalIds = data.map((e: MeetEvaluation) => e.id)
+        const { data: sims } = await supabase
+          .from('saved_simulations')
+          .select('*')
+          .in('meet_evaluation_id', evalIds)
+
+        if (sims) {
+          const simMap: Record<string, any> = {}
+          sims.forEach((s: any) => {
+            if (s.meet_evaluation_id) {
+              simMap[s.meet_evaluation_id] = s
+            }
+          })
+          setSimulations(simMap)
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar histórico de Meet:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleStartSimulation = async (sim: any) => {
+    if (!sim) return
+    sessionStorage.setItem('meetSimulation', JSON.stringify({
+      simulation_config: sim.simulation_config,
+    }))
+
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase
+        .from('saved_simulations')
+        .delete()
+        .eq('id', sim.id)
+    } catch (e) {
+      console.error('Error deleting saved simulation:', e)
+    }
+
+    router.push('/roleplay')
   }
 
   const handleDelete = async (id: string) => {
@@ -453,6 +504,79 @@ const getScoreColor = (score: number | null) => {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Simulação de Correção */}
+            {simulations[selectedEvaluation.id] && (
+              <div className="p-6 border-t border-gray-100">
+                {(() => {
+                  const sim = simulations[selectedEvaluation.id]
+                  const config = sim.simulation_config
+                  const coaching = config?.coaching_focus || []
+                  const justification = sim.simulation_justification || config?.simulation_justification || null
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <Target className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-900">Simulação de Correção</h3>
+                            <p className="text-xs text-gray-500">Pratique com o mesmo cliente para corrigir os erros</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleStartSimulation(sim)}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <Play className="w-4 h-4" />
+                          Iniciar Simulação
+                        </button>
+                      </div>
+
+                      {justification && (
+                        <div className="bg-purple-50 rounded-lg p-3 border-l-4 border-purple-400">
+                          <p className="text-xs text-gray-700 leading-relaxed">{justification}</p>
+                        </div>
+                      )}
+
+                      {/* Coaching focus areas */}
+                      {coaching.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {coaching.map((c: any, i: number) => {
+                            const sevColor = c.severity === 'critical' ? 'bg-red-100 text-red-700 border-red-200' : c.severity === 'high' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                            return (
+                              <span key={i} className={`text-xs font-medium px-2.5 py-1 rounded-lg border ${sevColor}`}>
+                                {c.area} {c.spin_score !== undefined ? `· ${c.spin_score.toFixed(1)}` : ''}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Objections preview */}
+                      {config?.objections && config.objections.length > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-2">Objeções para treinar</p>
+                          <div className="space-y-1.5">
+                            {config.objections.slice(0, 3).map((obj: any, i: number) => (
+                              <p key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
+                                {cleanGptText(obj.name)}
+                              </p>
+                            ))}
+                            {config.objections.length > 3 && (
+                              <p className="text-[10px] text-gray-400 ml-4.5">+{config.objections.length - 3} mais</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             )}
           </div>

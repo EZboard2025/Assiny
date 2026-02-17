@@ -160,6 +160,43 @@ export async function processCompletedBot(botId: string): Promise<void> {
 
     console.log(`[MeetBG] Notification created for user ${user_id}`)
 
+    // 11. Generate correction simulation (fire-and-forget, don't fail evaluation)
+    try {
+      console.log(`[MeetBG] Generating correction simulation for bot ${botId}`)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+      const simResponse = await fetch(`${appUrl}/api/meet/generate-simulation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluation: evalData,
+          transcript: transcriptText,
+          companyId: company_id
+        })
+      })
+
+      if (simResponse.ok) {
+        const simData = await simResponse.json()
+        if (simData.success && simData.simulationConfig) {
+          await supabaseAdmin
+            .from('saved_simulations')
+            .insert({
+              user_id,
+              company_id,
+              simulation_config: simData.simulationConfig,
+              simulation_justification: simData.simulationConfig.simulation_justification || null,
+              meeting_context: simData.simulationConfig.meeting_context || null,
+              meet_evaluation_id: savedEval.id,
+              status: 'pending'
+            })
+          console.log(`[MeetBG] Simulation saved for evaluation ${savedEval.id}`)
+        }
+      } else {
+        console.error(`[MeetBG] Simulation generation failed: ${simResponse.status}`)
+      }
+    } catch (simError: any) {
+      console.error(`[MeetBG] Error generating simulation (non-fatal):`, simError.message)
+    }
+
   } catch (error: any) {
     console.error(`[MeetBG] Error processing bot ${botId}:`, error)
 

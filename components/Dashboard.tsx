@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import ChatInterface, { ChatInterfaceHandle } from './ChatInterface'
 import ConfigHub from './ConfigHub'
@@ -16,21 +15,18 @@ import MeetAnalysisView from './MeetAnalysisView'
 import RepresentanteView from './RepresentanteView'
 import Sidebar from './dashboard/Sidebar'
 import StatsPanel from './dashboard/StatsPanel'
-import TopBanner from './dashboard/TopBanner'
 import FeatureCard from './dashboard/FeatureCard'
 import StreakIndicator from './dashboard/StreakIndicator'
 import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
 import ChallengeHistoryView from './dashboard/ChallengeHistoryView'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
-import { Users, Target, Clock, User, Lock, FileSearch, History, Link2, Play, Video, MessageSquareMore, BarChart3 } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3 } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
-import { PlanType } from '@/lib/types/plans'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
 import ConfigurationRequired from './ConfigurationRequired'
 import SavedSimulationCard from './dashboard/SavedSimulationCard'
-import NotificationBanner from './NotificationBanner'
-import { useNotifications, UserNotification } from '@/hooks/useNotifications'
+import { useNotifications } from '@/hooks/useNotifications'
 
 // Lazy load RoleplayLinksView to prevent it from executing on public pages
 const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), {
@@ -74,7 +70,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   // Notifications hook
   const { notifications, unreadCount, markAsRead } = useNotifications(userId)
-  const [pendingEvaluationId, setPendingEvaluationId] = useState<string | null>(null)
 
   // Count meet-specific notifications for sidebar badge
   const meetNotificationCount = notifications.filter(n =>
@@ -381,12 +376,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'meet-analysis') {
-      return (
-        <MeetAnalysisView
-          pendingEvaluationId={pendingEvaluationId}
-          onEvaluationViewed={() => setPendingEvaluationId(null)}
-        />
-      )
+      return <MeetAnalysisView />
     }
 
     if (currentView === 'challenge-history') {
@@ -408,22 +398,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     return (
       <div className="py-8 px-6 relative z-10">
         <div className="max-w-[1200px]">
-          {/* Meet evaluation notifications */}
-          <NotificationBanner
-            notifications={notifications.filter(n =>
-              n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error'
-            )}
-            onViewEvaluation={(notif: UserNotification) => {
-              const evaluationId = notif.data?.evaluationId
-              if (evaluationId) {
-                setPendingEvaluationId(evaluationId)
-                markAsRead(notif.id)
-                handleViewChange('meet-analysis')
-              }
-            }}
-            onDismiss={(id: string) => markAsRead(id)}
-          />
-
           {/* Header with banner and greeting */}
           <div className={`mb-8 flex flex-col lg:flex-row gap-4 items-stretch ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
             {/* Banner CTA with image */}
@@ -538,7 +512,22 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Histórico"
               subtitle="Todas as sessões"
               description="Simulações, Follow-ups e análises de Meet."
-              onClick={() => router.push('/history')}
+              onClick={() => {
+                if (meetNotificationCount > 0) {
+                  // Mark all meet notifications as read
+                  notifications
+                    .filter(n => n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error')
+                    .forEach(n => markAsRead(n.id))
+                  // Navigate and open Meet tab
+                  router.push('/history')
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('setHistoryType', { detail: 'meet' }))
+                  }, 100)
+                } else {
+                  router.push('/history')
+                }
+              }}
+              notificationCount={meetNotificationCount}
             />
 
             <FeatureCard

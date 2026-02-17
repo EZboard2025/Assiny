@@ -26,8 +26,8 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
 
     // Listen for history type change event (from Dashboard)
     const handleSetHistoryType = (e: CustomEvent) => {
-      if (e.detail === 'desafios') {
-        setHistoryType('desafios')
+      if (e.detail === 'desafios' || e.detail === 'meet') {
+        setHistoryType(e.detail)
       }
     }
     window.addEventListener('setHistoryType', handleSetHistoryType as EventListener)
