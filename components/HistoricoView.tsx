@@ -1,12 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, History, CheckCircle, Video, Users, AlertCircle } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
-import FollowUpHistoryView from './FollowUpHistoryView'
-import MeetHistoryContent from './MeetHistoryContent'
-import ChallengeHistoryContent from './ChallengeHistoryContent'
-import CorrectionHistoryContent from './CorrectionHistoryContent'
+
+const FollowUpHistoryView = lazy(() => import('./FollowUpHistoryView'))
+const MeetHistoryContent = lazy(() => import('./MeetHistoryContent'))
+const ChallengeHistoryContent = lazy(() => import('./ChallengeHistoryContent'))
+const CorrectionHistoryContent = lazy(() => import('./CorrectionHistoryContent'))
+
+function LazySpinner() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-10 h-10 border-4 border-green-100 border-t-green-500 rounded-full animate-spin"></div>
+    </div>
+  )
+}
 
 interface HistoricoViewProps {
   onStartChallenge?: (challenge: any) => void
@@ -345,11 +354,17 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
 
         {/* Render content based on selected history type */}
         {historyType === 'meet' ? (
-          <MeetHistoryContent />
+          <Suspense fallback={<LazySpinner />}>
+            <MeetHistoryContent />
+          </Suspense>
         ) : historyType === 'correcoes' ? (
-          <CorrectionHistoryContent />
+          <Suspense fallback={<LazySpinner />}>
+            <CorrectionHistoryContent />
+          </Suspense>
         ) : historyType === 'desafios' ? (
-          <ChallengeHistoryContent onStartChallenge={onStartChallenge} />
+          <Suspense fallback={<LazySpinner />}>
+            <ChallengeHistoryContent onStartChallenge={onStartChallenge} />
+          </Suspense>
         ) : loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-10 h-10 border-4 border-green-100 border-t-green-500 rounded-full animate-spin"></div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface MeetEvaluation {
   id: string
@@ -45,7 +46,6 @@ export default function MeetHistoryContent() {
 
   const loadHistory = async () => {
     try {
-      const { supabase } = await import('@/lib/supabase')
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -103,7 +103,6 @@ export default function MeetHistoryContent() {
     }))
 
     try {
-      const { supabase } = await import('@/lib/supabase')
       await supabase
         .from('saved_simulations')
         .delete()
@@ -119,7 +118,6 @@ export default function MeetHistoryContent() {
     if (!confirm('Tem certeza que deseja excluir esta avaliação?')) return
 
     try {
-      const { supabase } = await import('@/lib/supabase')
       const { error } = await supabase
         .from('meet_evaluations')
         .delete()
@@ -154,19 +152,27 @@ export default function MeetHistoryContent() {
     })
   }
 
-const getScoreColor = (score: number | null) => {
+  // Normalize score to 0-10 scale (DB stores 0-100)
+  const normalizeScore = (score: number | null): number => {
+    if (score === null) return 0
+    return score > 10 ? Math.round(score / 10) : score
+  }
+
+  const getScoreColor = (score: number | null) => {
     if (score === null) return 'text-gray-400'
-    if (score >= 80) return 'text-green-600'
-    if (score >= 60) return 'text-yellow-600'
-    if (score >= 40) return 'text-orange-600'
+    const s = normalizeScore(score)
+    if (s >= 8) return 'text-green-600'
+    if (s >= 6) return 'text-yellow-600'
+    if (s >= 4) return 'text-orange-600'
     return 'text-red-600'
   }
 
   const getScoreBg = (score: number | null) => {
     if (score === null) return 'bg-gray-100'
-    if (score >= 80) return 'bg-green-50'
-    if (score >= 60) return 'bg-blue-50'
-    if (score >= 40) return 'bg-yellow-50'
+    const s = normalizeScore(score)
+    if (s >= 8) return 'bg-green-50'
+    if (s >= 6) return 'bg-blue-50'
+    if (s >= 4) return 'bg-yellow-50'
     return 'bg-red-50'
   }
 
