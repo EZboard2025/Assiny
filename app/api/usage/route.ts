@@ -78,20 +78,20 @@ export async function GET(request: NextRequest) {
         .select('*', { count: 'exact', head: true })
         .eq('company_id', companyId)
         .gte('created_at', startOfMonth),
-      supabaseAdmin
-        .from('daily_challenges')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .gte('created_at', startOfMonth)
-        .then(r => r)
-        .catch(() => ({ count: 0 })),
-      supabaseAdmin
-        .from('ai_generations')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .gte('created_at', startOfMonth)
-        .then(r => r)
-        .catch(() => ({ count: 0 })),
+      Promise.resolve(
+        supabaseAdmin
+          .from('daily_challenges')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .gte('created_at', startOfMonth)
+      ).catch(() => ({ count: 0 })),
+      Promise.resolve(
+        supabaseAdmin
+          .from('ai_generations')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .gte('created_at', startOfMonth)
+      ).catch(() => ({ count: 0 })),
     ])
 
     return NextResponse.json({
