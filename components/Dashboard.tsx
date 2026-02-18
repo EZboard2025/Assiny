@@ -558,7 +558,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               description="Bot transcreve reuniões do Google Meet automaticamente."
               onClick={() => handleViewChange('meet-analysis')}
               onMouseEnter={() => prefetchMap['meet-analysis']()}
-              betaBadge
             />
 
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') && (
