@@ -316,32 +316,32 @@ export default function SalesCopilot({
   const streamRef = useRef<MediaStream | null>(null)
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Split text into word-based chunks for animated reveal (strips visual tags)
-  const splitIntoChunks = (text: string): string[] => {
-    const plainText = text.replace(/\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/g, '')
-    const chunks: string[] = []
-    const lines = plainText.split('\n')
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
-      const appendNewline = i < lines.length - 1
-
-      if (line.trim() === '') {
-        chunks.push('\n')
+  // Compute reveal steps in the ORIGINAL text (preserving tags).
+  // Each step = a character position to slice to. Tags are one step.
+  const getRevealSteps = (text: string): { pos: number; isNewline: boolean }[] => {
+    const steps: { pos: number; isNewline: boolean }[] = []
+    let i = 0
+    while (i < text.length) {
+      if (text[i] === '\n') {
+        i++
+        steps.push({ pos: i, isNewline: true })
         continue
       }
-
-      const words = line.split(/(\s+)/).filter(w => w.length > 0)
-      for (let j = 0; j < words.length; j++) {
-        if (/^\s+$/.test(words[j])) continue
-        const trailing = j + 1 < words.length && /^\s+$/.test(words[j + 1]) ? words[j + 1] : ''
-        chunks.push(words[j] + trailing)
+      if (/\s/.test(text[i])) { i++; continue }
+      // Visual tag — reveal entire tag as one step
+      if (text[i] === '{' && text[i + 1] === '{') {
+        const tagMatch = text.slice(i).match(/^\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/)
+        if (tagMatch) {
+          i += tagMatch[0].length
+          steps.push({ pos: i, isNewline: false })
+          continue
+        }
       }
-
-      if (appendNewline) chunks.push('\n')
+      // Regular word
+      while (i < text.length && !/\s/.test(text[i])) i++
+      steps.push({ pos: i, isNewline: false })
     }
-
-    return chunks
+    return steps
   }
 
   // Cleanup recording on unmount
@@ -379,13 +379,13 @@ export default function SalesCopilot({
     }
   }, [selectedConversation?.contact_phone])
 
-  // Word-by-word reveal: animated fade-in during writing, then switch to rich design
+  // Progressive reveal: rich formatting from the start, content grows word by word
   useEffect(() => {
     if (copilotMessages.length === 0) return
     const lastMsg = copilotMessages[copilotMessages.length - 1]
     if (lastMsg.role !== 'assistant' || lastMsg.id === revealingMsgId) return
 
-    const chunks = splitIntoChunks(lastMsg.content)
+    const steps = getRevealSteps(lastMsg.content)
     setRevealingMsgId(lastMsg.id)
     setRevealedChunks(0)
 
@@ -393,9 +393,8 @@ export default function SalesCopilot({
     const revealNext = () => {
       current++
       setRevealedChunks(current)
-      if (current < chunks.length) {
-        const nextChunk = chunks[current]
-        const delay = nextChunk === '\n' ? 150 : 30 + Math.random() * 25
+      if (current < steps.length) {
+        const delay = steps[current].isNewline ? 150 : 30 + Math.random() * 25
         setTimeout(revealNext, delay)
       } else {
         setRevealingMsgId(null)
@@ -924,8 +923,11 @@ export default function SalesCopilot({
                   {msg.role === 'assistant' && (() => {
                     const isRevealing = revealingMsgId === msg.id
                     const doneRevealing = !isRevealing
-                    const chunks = splitIntoChunks(msg.content)
-                    const visibleCount = isRevealing ? revealedChunks : chunks.length
+
+                    // Always use rich formatting — grow content word by word during reveal
+                    const steps = getRevealSteps(msg.content)
+                    const stepIdx = isRevealing ? Math.min(revealedChunks, steps.length) - 1 : steps.length - 1
+                    const visibleContent = stepIdx >= 0 ? msg.content.slice(0, steps[stepIdx].pos) : ''
 
                     return (
                     <div className="flex gap-3 items-start">
@@ -934,24 +936,9 @@ export default function SalesCopilot({
                         <Sparkles className={`w-3.5 h-3.5 text-white ${isRevealing ? 'copilot-sparkle-thinking' : ''}`} />
                       </div>
 
-                      {/* Animated word-by-word during reveal, rich design after */}
+                      {/* Message content - always rich, progressively revealed */}
                       <div className="flex-1 min-w-0">
-                        {doneRevealing ? (
-                          <RichMessage content={msg.content} />
-                        ) : (
-                          <div className="text-[#e9edef] text-sm leading-relaxed whitespace-pre-wrap break-words">
-                            {chunks.map((chunk, i) => (
-                              <span
-                                key={i}
-                                className={
-                                  i >= visibleCount
-                                    ? 'invisible'
-                                    : 'copilot-chunk-reveal'
-                                }
-                              >{chunk === '\n' ? '\n' : chunk}</span>
-                            ))}
-                          </div>
-                        )}
+                        <RichMessage content={visibleContent} />
 
                         {/* Action bar - Gemini style icons row (only after reveal completes) */}
                         {doneRevealing && !msg.content.startsWith('Erro:') && (
