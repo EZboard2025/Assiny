@@ -677,13 +677,29 @@ export default function MeetAnalysisView() {
 
       console.log('💾 Salvando avaliação no histórico...', insertData.meeting_id)
 
-      const { error } = await supabase
+      // Check if evaluation already exists (background process may have saved it)
+      const { data: existingEval } = await supabase
         .from('meet_evaluations')
-        .insert(insertData)
+        .select('id')
+        .eq('meeting_id', botId)
+        .maybeSingle()
 
-      if (error) {
-        console.error('❌ Erro ao salvar avaliação:', error)
-        return false
+      if (existingEval) {
+        console.log('✅ Avaliação já existe (salva pelo background), pulando insert')
+      } else {
+        const { error } = await supabase
+          .from('meet_evaluations')
+          .insert(insertData)
+
+        if (error) {
+          // Ignore unique constraint violation (race condition with background process)
+          if (error.code === '23505') {
+            console.log('✅ Avaliação já existe (race condition), pulando')
+          } else {
+            console.error('❌ Erro ao salvar avaliação:', error)
+            return false
+          }
+        }
       }
 
       console.log('✅ Avaliação salva no histórico com sucesso!')

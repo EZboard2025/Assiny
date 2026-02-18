@@ -126,6 +126,23 @@ export async function processCompletedBot(botId: string): Promise<void> {
       .single()
 
     if (evalError) {
+      // Handle unique constraint violation (frontend may have saved first)
+      if (evalError.code === '23505') {
+        console.log(`[MeetBG] Evaluation already saved by frontend for bot ${botId}, skipping`)
+        const { data: existing } = await supabaseAdmin
+          .from('meet_evaluations')
+          .select('id')
+          .eq('meeting_id', botId)
+          .single()
+
+        if (existing) {
+          await supabaseAdmin
+            .from('meet_bot_sessions')
+            .update({ status: 'completed', evaluation_id: existing.id, updated_at: new Date().toISOString() })
+            .eq('bot_id', botId)
+        }
+        return
+      }
       throw new Error(`Erro ao salvar avaliação: ${evalError.message}`)
     }
 
