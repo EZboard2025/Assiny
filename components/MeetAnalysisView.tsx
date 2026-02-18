@@ -155,15 +155,62 @@ export default function MeetAnalysisView() {
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
+  const hasRestoredSessionRef = useRef<boolean>(false)
 
-  // Load saved simulation + recent evaluations on mount
+  // Restore active session from localStorage + load data on mount
   useEffect(() => {
+    let restoredBotId: string | null = null
+
+    // Restore session FIRST before any other effect can clear it
+    try {
+      const saved = localStorage.getItem('meetActiveSession')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        const restored: MeetingSession = {
+          ...parsed,
+          startTime: parsed.startTime ? new Date(parsed.startTime) : undefined
+        }
+        const activeStatuses: BotStatus[] = ['sending', 'joining', 'in_meeting', 'transcribing', 'evaluating']
+        if (activeStatuses.includes(restored.status) && restored.botId) {
+          setSession(restored)
+          setMeetUrl(restored.meetingUrl)
+          hasRestoredSessionRef.current = true
+          restoredBotId = restored.botId
+          setTimeout(() => startPolling(restored.botId), 0)
+        } else {
+          localStorage.removeItem('meetActiveSession')
+        }
+      }
+    } catch (e) {
+      console.error('Error restoring session:', e)
+      localStorage.removeItem('meetActiveSession')
+    }
+
+    // Load saved simulation + recent evaluations + check if evaluation already completed
     const loadSaved = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        // Load saved simulation
+        // If we restored a session, check if evaluation already completed in background
+        if (restoredBotId) {
+          const { data: existingEval } = await supabase
+            .from('meet_evaluations')
+            .select('evaluation')
+            .eq('user_id', user.id)
+            .eq('meeting_id', restoredBotId)
+            .maybeSingle()
+
+          if (existingEval?.evaluation) {
+            // Evaluation already done — show results instead of polling
+            stopPolling()
+            setEvaluation(existingEval.evaluation)
+            setSavedToHistory(true)
+            setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+            localStorage.removeItem('meetActiveSession')
+          }
+        }
+
         const { data, error } = await supabase
           .from('saved_simulations')
           .select('*')
@@ -177,7 +224,6 @@ export default function MeetAnalysisView() {
           setSavedSimulation(data)
         }
 
-        // Load recent evaluations
         const { data: evals } = await supabase
           .from('meet_evaluations')
           .select('id, overall_score, executive_summary, created_at, meeting_url')
@@ -193,7 +239,24 @@ export default function MeetAnalysisView() {
       }
     }
     loadSaved()
+
+    // Mark mount complete so persist effect can start working
+    hasRestoredSessionRef.current = true
   }, [])
+
+  // Persist session to localStorage (skip initial null before restore)
+  useEffect(() => {
+    if (!hasRestoredSessionRef.current) return
+    if (session) {
+      const toSave = {
+        ...session,
+        startTime: session.startTime?.toISOString() || null
+      }
+      localStorage.setItem('meetActiveSession', JSON.stringify(toSave))
+    } else {
+      localStorage.removeItem('meetActiveSession')
+    }
+  }, [session])
 
   // Save simulation for later (Supabase)
   const saveSimulationForLater = async () => {
@@ -695,6 +758,7 @@ export default function MeetAnalysisView() {
   const resetSession = () => {
     stopPolling()
     hasTriggeredAutoEvalRef.current = false
+    localStorage.removeItem('meetActiveSession')
     setSession(null)
     setMeetUrl('')
     setError('')
