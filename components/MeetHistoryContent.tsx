@@ -39,6 +39,7 @@ export default function MeetHistoryContent() {
   const [selectedEvaluation, setSelectedEvaluation] = useState<MeetEvaluation | null>(null)
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set())
   const [simulations, setSimulations] = useState<Record<string, any>>({})
+  const [correctionScores, setCorrectionScores] = useState<Record<string, number | null>>({})
 
   useEffect(() => {
     loadHistory()
@@ -87,6 +88,32 @@ export default function MeetHistoryContent() {
             }
           })
           setSimulations(simMap)
+
+          // Load roleplay scores for completed simulations
+          const completedSims = sims.filter((s: any) => s.status === 'completed' && s.roleplay_session_id)
+          if (completedSims.length > 0) {
+            const sessionIds = completedSims.map((s: any) => s.roleplay_session_id)
+            const { data: sessions } = await supabase
+              .from('roleplay_sessions')
+              .select('id, evaluation')
+              .in('id', sessionIds)
+
+            if (sessions) {
+              const scores: Record<string, number | null> = {}
+              completedSims.forEach((sim: any) => {
+                const session = sessions.find((s: any) => s.id === sim.roleplay_session_id)
+                if (session?.evaluation) {
+                  let evalData = session.evaluation
+                  if (typeof evalData === 'object' && 'output' in evalData) {
+                    try { evalData = JSON.parse(evalData.output) } catch {}
+                  }
+                  const score = evalData?.overall_score
+                  scores[sim.meet_evaluation_id] = score !== undefined ? (score > 10 ? score / 10 : score) : null
+                }
+              })
+              setCorrectionScores(scores)
+            }
+          }
         }
       }
     } catch (error) {
@@ -229,33 +256,53 @@ export default function MeetHistoryContent() {
             </h2>
           </div>
           <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
-            {evaluations.map((evaluation) => (
-              <button
-                key={evaluation.id}
-                onClick={() => setSelectedEvaluation(evaluation)}
-                className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
-                  selectedEvaluation?.id === evaluation.id
-                    ? 'bg-green-50 border-l-4 border-l-green-500'
-                    : 'hover:bg-gray-50 border-l-4 border-l-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {/* Score */}
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${getScoreBg(evaluation.overall_score)}`}>
-                    <span className={`text-lg font-bold ${getScoreColor(evaluation.overall_score)}`}>
-                      {evaluation.overall_score !== null ? Math.round(evaluation.overall_score / 10) : '--'}
-                    </span>
-                  </div>
+            {evaluations.map((evaluation) => {
+              const sim = simulations[evaluation.id]
+              const correctionScore = correctionScores[evaluation.id]
+              const hasSim = !!sim
+              const isCompleted = sim?.status === 'completed'
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatDate(evaluation.created_at)}
+              return (
+                <button
+                  key={evaluation.id}
+                  onClick={() => setSelectedEvaluation(evaluation)}
+                  className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
+                    selectedEvaluation?.id === evaluation.id
+                      ? 'bg-green-50 border-l-4 border-l-green-500'
+                      : 'hover:bg-gray-50 border-l-4 border-l-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Score */}
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${getScoreBg(evaluation.overall_score)}`}>
+                      <span className={`text-lg font-bold ${getScoreColor(evaluation.overall_score)}`}>
+                        {evaluation.overall_score !== null ? Math.round(evaluation.overall_score / 10) : '--'}
+                      </span>
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900">
+                        {formatDate(evaluation.created_at)}
+                      </div>
+                      {hasSim && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Target className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                          <span className={`text-[11px] font-medium ${isCompleted ? 'text-green-600' : 'text-purple-500'}`}>
+                            {isCompleted ? 'Correção feita' : 'Correção pendente'}
+                          </span>
+                          {isCompleted && correctionScore !== undefined && correctionScore !== null && (
+                            <span className={`text-[11px] font-bold ${getScoreColor(correctionScore)}`}>
+                              ({correctionScore.toFixed(1)})
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -518,27 +565,69 @@ export default function MeetHistoryContent() {
                   const config = sim.simulation_config
                   const coaching = config?.coaching_focus || []
                   const justification = sim.simulation_justification || config?.simulation_justification || null
+                  const isCompleted = sim.status === 'completed'
+                  const cScore = correctionScores[selectedEvaluation.id]
+                  const meetScore = selectedEvaluation.overall_score !== null ? normalizeScore(selectedEvaluation.overall_score) : null
 
                   return (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <Target className="w-5 h-5 text-purple-600" />
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isCompleted ? 'bg-green-100' : 'bg-purple-100'}`}>
+                            {isCompleted ? (
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                            ) : (
+                              <Target className="w-5 h-5 text-purple-600" />
+                            )}
                           </div>
                           <div>
-                            <h3 className="text-sm font-semibold text-gray-900">Simulação de Correção</h3>
-                            <p className="text-xs text-gray-500">Pratique com o mesmo cliente para corrigir os erros</p>
+                            <h3 className="text-sm font-semibold text-gray-900">
+                              {isCompleted ? 'Correção Concluída' : 'Simulação de Correção'}
+                            </h3>
+                            <p className="text-xs text-gray-500">
+                              {isCompleted ? 'Simulação de correção realizada' : 'Pratique com o mesmo cliente para corrigir os erros'}
+                            </p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleStartSimulation(sim)}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
-                        >
-                          <Play className="w-4 h-4" />
-                          Iniciar Simulação
-                        </button>
+                        {!isCompleted && (
+                          <button
+                            onClick={() => handleStartSimulation(sim)}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                          >
+                            <Play className="w-4 h-4" />
+                            Iniciar Simulação
+                          </button>
+                        )}
                       </div>
+
+                      {/* Score comparison - Meet vs Correção */}
+                      {isCompleted && cScore !== undefined && cScore !== null && meetScore !== null && (
+                        <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl border border-blue-200 p-4">
+                          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-3">Comparação de Performance</p>
+                          <div className="grid grid-cols-3 gap-3 items-center">
+                            <div className="text-center">
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Meet</div>
+                              <div className={`text-2xl font-bold ${getScoreColor(selectedEvaluation.overall_score)}`}>
+                                {meetScore.toFixed(1)}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className={`text-lg font-bold ${cScore > meetScore ? 'text-green-600' : cScore < meetScore ? 'text-red-500' : 'text-gray-400'}`}>
+                                {cScore > meetScore ? '→' : cScore < meetScore ? '→' : '='}
+                              </div>
+                              <div className={`text-[10px] font-medium ${cScore > meetScore ? 'text-green-600' : cScore < meetScore ? 'text-red-500' : 'text-gray-400'}`}>
+                                {cScore > meetScore ? `+${(cScore - meetScore).toFixed(1)}` : cScore < meetScore ? `${(cScore - meetScore).toFixed(1)}` : 'Igual'}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Correção</div>
+                              <div className={`text-2xl font-bold ${getScoreColor(cScore)}`}>
+                                {cScore.toFixed(1)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {justification && (
                         <div className="bg-purple-50 rounded-lg p-3 border-l-4 border-purple-400">
@@ -561,7 +650,7 @@ export default function MeetHistoryContent() {
                       )}
 
                       {/* Objections preview */}
-                      {config?.objections && config.objections.length > 0 && (
+                      {!isCompleted && config?.objections && config.objections.length > 0 && (
                         <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                           <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-2">Objeções para treinar</p>
                           <div className="space-y-1.5">
