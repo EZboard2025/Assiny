@@ -106,6 +106,19 @@ export default function AutopilotContactsTab({
     setDraggingPhone(data.phone)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', data.phone)
+
+    // Create compact drag ghost so available contacts don't appear oversized
+    const ghost = e.currentTarget.cloneNode(true) as HTMLElement
+    ghost.style.width = '160px'
+    ghost.style.position = 'absolute'
+    ghost.style.top = '-9999px'
+    ghost.style.left = '-9999px'
+    ghost.style.borderRadius = '8px'
+    ghost.style.backgroundColor = '#202c33'
+    ghost.style.padding = '8px 10px'
+    document.body.appendChild(ghost)
+    e.dataTransfer.setDragImage(ghost, 80, 16)
+    requestAnimationFrame(() => document.body.removeChild(ghost))
   }, [])
 
   const handleDragEnd = useCallback(() => {

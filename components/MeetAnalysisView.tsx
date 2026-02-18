@@ -1585,8 +1585,8 @@ export default function MeetAnalysisView() {
                     <div className="flex items-center gap-3">
                       <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
                       <div>
-                        <h3 className="text-base font-bold text-gray-900">Gerando Simulacao de Treino...</h3>
-                        <p className="text-gray-600 text-sm">Criando cenario personalizado baseado nos erros identificados</p>
+                        <h3 className="text-base font-bold text-gray-900">Gerando Simulação de Treino...</h3>
+                        <p className="text-gray-600 text-sm">Criando cenário personalizado baseado nos erros identificados</p>
                       </div>
                     </div>
                   </div>
@@ -1601,8 +1601,8 @@ export default function MeetAnalysisView() {
                         <Target className="w-5 h-5 text-purple-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">Simulacao de Treino Sugerida</h3>
-                        <p className="text-sm text-gray-500">Baseada nos erros identificados na reuniao</p>
+                        <h3 className="text-lg font-bold text-gray-900">Simulação de Treino Sugerida</h3>
+                        <p className="text-sm text-gray-500">Baseada nos erros identificados na reunião</p>
                       </div>
                     </div>
 

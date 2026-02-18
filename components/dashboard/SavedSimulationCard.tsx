@@ -100,7 +100,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-sm font-semibold text-gray-900">Simulacao de Correçao</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Simulação de Correção</h3>
               <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-medium rounded border border-amber-100">
                 Pendente
               </span>
@@ -133,10 +133,10 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
           <button
             type="button"
             onClick={() => openDetails(latest)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium rounded-lg transition-colors border border-green-200"
           >
             <Play className="w-4 h-4" />
-            Iniciar Simulacao
+            Iniciar Simulação
           </button>
         </div>
 
@@ -241,9 +241,9 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
 
       {/* Detail Modal */}
       {showDetails && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-[fadeIn_200ms_ease-out]" onClick={() => setShowDetails(false)}>
+        <div className="fixed inset-0 xl:right-80 bg-black/50 z-30 flex items-center justify-center p-4 animate-[fadeIn_200ms_ease-out]" onClick={() => setShowDetails(false)}>
           <div
-            className="bg-gray-50 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto animate-[modalSlideUp_300ms_ease-out]"
+            className="bg-gray-50 rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-[modalSlideUp_300ms_ease-out]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -253,8 +253,8 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                   <Target className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Simulacao de Correçao</h3>
-                  <p className="text-sm text-gray-500">Baseada nos erros identificados na reuniao</p>
+                  <h3 className="text-lg font-bold text-gray-900">Simulação de Correção</h3>
+                  <p className="text-sm text-gray-500">Baseada nos erros identificados na reunião</p>
                 </div>
               </div>
               <button
@@ -512,10 +512,10 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
               <button
                 type="button"
                 onClick={() => handleStart(sim)}
-                className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+                className="w-full py-3.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border border-green-200"
               >
                 <Play className="w-5 h-5" />
-                Iniciar Simulacao
+                Iniciar Simulação
               </button>
             </div>
           </div>

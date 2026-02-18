@@ -42,7 +42,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen bg-[#0D4A3A] z-50 flex flex-col transition-all duration-300 ease-in-out ${
+      className={`fixed left-0 top-0 h-screen bg-[#0D4A3A] z-[60] flex flex-col transition-all duration-300 ease-in-out ${
         isExpanded ? 'w-56' : 'w-16'
       }`}
       onMouseEnter={() => onExpandChange(true)}
@@ -116,9 +116,14 @@ export default function Sidebar({
         {/* Config - Admin only */}
         {isAdmin && (
           <button
-            onClick={onOpenConfig}
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenConfig()
+            }}
             title={!isExpanded ? 'Configurações' : undefined}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left"
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left relative z-10 ${
+              currentView === 'followup' ? 'hidden' : ''
+            }`}
           >
             <Settings className="w-5 h-5 flex-shrink-0" />
             <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${

@@ -2424,12 +2424,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                   </div>
                   <div>
                     <p className="text-sm font-medium text-purple-900">
-                      {isMeetSimulation ? 'Simulacao de Reuniao' : 'Configuracao do Desafio'}
+                      {isMeetSimulation ? 'Simulação de Reunião' : 'Configuração do Desafio'}
                     </p>
                     <p className="text-xs text-purple-600">
                       {isMeetSimulation
-                        ? 'Configuracao gerada automaticamente com base na avaliacao do Google Meet.'
-                        : 'Persona, idade, temperamento e objecoes foram definidos pelo desafio e nao podem ser alterados.'}
+                        ? 'Configuração gerada automaticamente com base na avaliação do Google Meet.'
+                        : 'Persona, idade, temperamento e objeções foram definidos pelo desafio e não podem ser alterados.'}
                     </p>
                     {isMeetSimulation && meetSimulationConfig && (
                       <div className="mt-2 space-y-1">
