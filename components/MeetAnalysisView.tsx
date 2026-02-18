@@ -20,7 +20,11 @@ import {
   Save,
   Target,
   Play,
-  Lightbulb
+  Lightbulb,
+  Link2,
+  UserCheck,
+  ChevronRight,
+  CalendarDays
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -146,18 +150,20 @@ export default function MeetAnalysisView() {
   const [savedSimulation, setSavedSimulation] = useState<any>(null)
   const [isSavingSimulation, setIsSavingSimulation] = useState(false)
   const [currentSimSaved, setCurrentSimSaved] = useState(false)
+  const [recentEvaluations, setRecentEvaluations] = useState<any[]>([])
   const simulationRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
 
-  // Load saved simulation from Supabase on mount
+  // Load saved simulation + recent evaluations on mount
   useEffect(() => {
     const loadSaved = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
+        // Load saved simulation
         const { data, error } = await supabase
           .from('saved_simulations')
           .select('*')
@@ -167,15 +173,23 @@ export default function MeetAnalysisView() {
           .limit(1)
           .maybeSingle()
 
-        if (error) {
-          console.error('Error loading saved simulation:', error)
-          return
-        }
-        if (data) {
+        if (!error && data) {
           setSavedSimulation(data)
         }
+
+        // Load recent evaluations
+        const { data: evals } = await supabase
+          .from('meet_evaluations')
+          .select('id, overall_score, executive_summary, created_at, meeting_url')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5)
+
+        if (evals) {
+          setRecentEvaluations(evals)
+        }
       } catch (e) {
-        console.error('Error loading saved simulation:', e)
+        console.error('Error loading data:', e)
       }
     }
     loadSaved()
@@ -787,102 +801,144 @@ export default function MeetAnalysisView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-2xl flex items-center justify-center">
-            <Video className="w-8 h-8 text-green-600" />
+    <div className="min-h-screen bg-gray-50 px-6 flex items-start justify-center pt-[22vh]">
+      <div className="max-w-4xl w-full">
+        {/* Compact Header */}
+        <div className="flex items-center justify-center gap-4 mb-6">
+          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Video className="w-5 h-5 text-green-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Análise de Google Meet
-          </h1>
-          <p className="text-gray-500">
-            Cole o link da reunião e a avaliação será gerada automaticamente
-          </p>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Análise Meet</h1>
+            <p className="text-sm text-gray-500">Avaliação automática de reuniões com IA</p>
+          </div>
         </div>
-
-        {/* Saved simulation card removed - now shown on Dashboard */}
 
         {/* Input Section */}
         {!session && (
-          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Link do Google Meet
-            </label>
-                <div className="flex gap-3">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      value={meetUrl}
-                      onChange={(e) => handleUrlChange(e.target.value)}
-                      placeholder="https://meet.google.com/abc-defg-hij"
-                      className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
-                    />
-                    {meetUrl && isValidMeetUrl(meetUrl) && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
-                          Válido
-                        </span>
-                        <button
-                          onClick={copyMeetUrl}
-                          className="text-gray-400 hover:text-green-600 transition-colors"
-                        >
-                          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+          <>
+            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
+              <div className="flex gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={meetUrl}
+                    onChange={(e) => handleUrlChange(e.target.value)}
+                    placeholder="https://meet.google.com/abc-defg-hij"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
+                  />
+                  {meetUrl && isValidMeetUrl(meetUrl) && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded font-medium">
+                        Válido
+                      </span>
+                      <button
+                        onClick={copyMeetUrl}
+                        className="text-gray-400 hover:text-green-600 transition-colors"
+                      >
+                        {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={sendBot}
+                  disabled={!meetUrl}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                >
+                  <Send className="w-5 h-5" />
+                  Enviar Bot
+                </button>
+              </div>
+
+              {error && (
+                <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                  <AlertTriangle className="w-4 h-4" />
+                  {error}
+                </div>
+              )}
+            </div>
+
+            {/* Steps - 3 horizontal cards */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Link2 className="w-4 h-4 text-green-600" />
+                </div>
+                <span className="text-sm text-gray-700">Cole o link da reunião</span>
+              </div>
+              <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+                <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <UserCheck className="w-4 h-4 text-amber-600" />
+                </div>
+                <span className="text-sm text-gray-700">Aceite o bot na reunião</span>
+              </div>
+              <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-4 h-4 text-blue-600" />
+                </div>
+                <span className="text-sm text-gray-700">Receba a avaliação</span>
+              </div>
+            </div>
+
+            {/* Background notice - subtle pill */}
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-8">
+              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+              <span>A avaliação é gerada em background automaticamente</span>
+            </div>
+
+            {/* Recent Analyses */}
+            {recentEvaluations.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-gray-700">Análises Recentes</h2>
                   <button
-                    onClick={sendBot}
-                    disabled={!meetUrl}
-                    className="px-6 py-3.5 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                    onClick={() => router.push('/history?tab=meet')}
+                    className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1 transition-colors"
                   >
-                    <Send className="w-5 h-5" />
-                    Enviar Bot
+                    Ver todo histórico
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-
-                {/* Instructions */}
-                <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Como funciona:</h3>
-                  <ol className="text-sm text-gray-600 space-y-1.5">
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold">1.</span>
-                      Cole o link da reunião do Google Meet acima
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold">2.</span>
-                      Clique em "Enviar Bot" - um participante chamado "Ramppy" pedirá para entrar
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold">3.</span>
-                      <strong className="text-amber-600">Aceite o bot na reunião</strong> quando ele pedir para participar
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-600 font-bold">4.</span>
-                      Pronto! O bot grava automaticamente e sai quando a reunião acabar
-                    </li>
-                  </ol>
-
-                  {/* Background info */}
-                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-green-700">
-                        A avaliação é gerada automaticamente em background. Você será notificado quando estiver pronta.
-                      </p>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  {recentEvaluations.map((ev) => {
+                    const score = ev.overall_score || 0
+                    const scoreColor = score >= 7 ? 'text-green-600 bg-green-50 border-green-200' :
+                      score >= 5 ? 'text-amber-600 bg-amber-50 border-amber-200' :
+                      'text-red-600 bg-red-50 border-red-200'
+                    const date = new Date(ev.created_at)
+                    return (
+                      <div
+                        key={ev.id}
+                        onClick={() => router.push('/history?tab=meet')}
+                        className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-4 cursor-pointer hover:border-green-300 hover:shadow-sm transition-all"
+                      >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border font-bold text-lg ${scoreColor}`}>
+                          {score.toFixed(1)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900 truncate">
+                            {ev.executive_summary || 'Avaliação de reunião'}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <CalendarDays className="w-3.5 h-3.5 text-gray-400" />
+                            <span className="text-xs text-gray-500">
+                              {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      </div>
+                    )
+                  })}
                 </div>
-
-            {error && (
-              <div className="mt-3 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-                <AlertTriangle className="w-4 h-4" />
-                {error}
               </div>
             )}
-          </div>
+
+            {recentEvaluations.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-6">Nenhuma análise ainda</p>
+            )}
+          </>
         )}
 
         {/* Session Active */}
