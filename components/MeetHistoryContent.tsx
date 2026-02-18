@@ -249,10 +249,7 @@ export default function MeetHistoryContent() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 mb-0.5 truncate">
-                      {evaluation.seller_name || 'Sem nome'}
-                    </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-sm font-medium text-gray-900">
                       {formatDate(evaluation.created_at)}
                     </div>
                   </div>
