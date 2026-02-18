@@ -1658,87 +1658,40 @@ function ConfigurationInterface({
         return
       }
 
-      // Calcular início do mês atual
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-      // Buscar breakdown de uso por tipo (roleplays internos deste mês - roleplay_sessions)
-      const { count: roleplayCount } = await supabase
-        .from('roleplay_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', userCompanyId)
-        .gte('created_at', startOfMonth)
-
-      // Buscar roleplays públicos deste mês (roleplays_unicos - links públicos)
-      const { count: publicRoleplayCount } = await supabase
-        .from('roleplays_unicos')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', userCompanyId)
-        .gte('created_at', startOfMonth)
-
-      // Buscar análises de follow-up deste mês
-      const { count: followupCount } = await supabase
-        .from('followup_analyses')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', userCompanyId)
-        .gte('created_at', startOfMonth)
-
-      // Buscar análises de Meet deste mês (cada uma custa 3 créditos)
-      const { count: meetCount } = await supabase
-        .from('meet_evaluations')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', userCompanyId)
-        .gte('created_at', startOfMonth)
-
-      // Buscar PDIs criados deste mês
-      const { count: pdiCount } = await supabase
-        .from('pdis')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', userCompanyId)
-        .gte('created_at', startOfMonth)
-
-      // Buscar gerações de IA deste mês (0.5 créditos cada)
-      let aiGenerationCount = 0
-      try {
-        const { count } = await supabase
-          .from('ai_generations')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', userCompanyId)
-          .gte('created_at', startOfMonth)
-        aiGenerationCount = count || 0
-      } catch (e) {
-        // Tabela pode não existir ainda
-        console.log('Tabela ai_generations não disponível')
+      // Buscar contagens via API (usa service role para bypasear RLS e contar TODA a empresa)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
       }
 
-      // Buscar desafios diários gerados deste mês (1 crédito cada)
-      let dailyChallengesCount = 0
-      try {
-        const { count } = await supabase
-          .from('daily_challenges')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', userCompanyId)
-          .gte('created_at', startOfMonth)
-        dailyChallengesCount = count || 0
-      } catch (e) {
-        // Tabela pode não existir ainda
-        console.log('Tabela daily_challenges não disponível')
+      const usageRes = await fetch(`/api/usage?companyId=${userCompanyId}`, {
+        headers: {
+          'Authorization': `Bearer ${token || (await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      })
+
+      if (!usageRes.ok) {
+        console.error('Erro ao buscar dados de uso:', usageRes.statusText)
+        return
       }
+
+      const breakdown = await usageRes.json()
 
       // Obter limite de créditos do plano
       const { PLAN_CONFIGS } = await import('@/lib/types/plans')
       const planConfig = PLAN_CONFIGS[companyData.training_plan as PlanType]
 
-      // Calcular créditos usados diretamente das tabelas de features
-      // (em vez de usar o contador monthly_credits_used que pode estar desatualizado)
+      // Calcular créditos usados a partir do breakdown da empresa inteira
       const calculatedCreditsUsed =
-        (roleplayCount || 0) * 1 +        // Roleplay interno: 1 crédito
-        (publicRoleplayCount || 0) * 1 +  // Roleplay público: 1 crédito
-        (followupCount || 0) * 1 +        // Follow-up: 1 crédito
-        (meetCount || 0) * 3 +            // Análise de Meet: 3 créditos
-        (pdiCount || 0) * 1 +             // PDI: 1 crédito
-        aiGenerationCount * 0.5 +         // Geração IA: 0.5 créditos
-        dailyChallengesCount * 1          // Desafios Diários: 1 crédito
+        breakdown.roleplay * 1 +        // Roleplay interno: 1 crédito
+        breakdown.publicRoleplay * 1 +  // Roleplay público: 1 crédito
+        breakdown.followup * 1 +        // Follow-up: 1 crédito
+        breakdown.meet * 3 +            // Análise de Meet: 3 créditos
+        breakdown.pdi * 1 +             // PDI: 1 crédito
+        breakdown.aiGeneration * 0.5 +  // Geração IA: 0.5 créditos
+        breakdown.dailyChallenges * 1   // Desafios Diários: 1 crédito
 
       setUsageData({
         monthlyCredits: planConfig?.monthlyCredits || null,
@@ -1747,15 +1700,7 @@ function ConfigurationInterface({
         resetDate: companyData.monthly_credits_reset_at,
         challengesEnabled: companyData.daily_challenges_enabled !== false,
         websiteUrl: companyData.website_url || null,
-        breakdown: {
-          roleplay: roleplayCount || 0,
-          publicRoleplay: publicRoleplayCount || 0,
-          followup: followupCount || 0,
-          meet: meetCount || 0,
-          pdi: pdiCount || 0,
-          aiGeneration: aiGenerationCount,
-          dailyChallenges: dailyChallengesCount
-        }
+        breakdown
       })
     } catch (error) {
       console.error('Erro ao carregar dados de uso:', error)
