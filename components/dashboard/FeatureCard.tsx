@@ -20,6 +20,7 @@ interface FeatureCardProps {
   locked?: boolean
   secondaryAction?: SecondaryAction
   notificationCount?: number
+  onMouseEnter?: () => void
 }
 
 export default function FeatureCard({
@@ -33,7 +34,8 @@ export default function FeatureCard({
   betaBadge = false,
   locked = false,
   secondaryAction,
-  notificationCount = 0
+  notificationCount = 0,
+  onMouseEnter
 }: FeatureCardProps) {
   const SecondaryIcon = secondaryAction?.icon || History
 
@@ -46,7 +48,7 @@ export default function FeatureCard({
   const hasNotification = notificationCount > 0
 
   return (
-    <div className="text-left w-full">
+    <div className="text-left w-full" onMouseEnter={onMouseEnter}>
       <div
         onClick={handleCardClick}
         className={`relative bg-white rounded-xl p-5 border h-full transition-all duration-200 ${

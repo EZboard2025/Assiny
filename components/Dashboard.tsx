@@ -3,22 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import ChatInterface, { ChatInterfaceHandle } from './ChatInterface'
-import ConfigHub from './ConfigHub'
-import RoleplayView from './RoleplayView'
-import HistoricoView from './HistoricoView'
-import PerfilView from './PerfilView'
-import PDIView from './PDIView'
-import FollowUpView from './FollowUpView'
-import FollowUpHistoryView from './FollowUpHistoryView'
-import MeetAnalysisView from './MeetAnalysisView'
-import RepresentanteView from './RepresentanteView'
+import type { ChatInterfaceHandle } from './ChatInterface'
 import Sidebar from './dashboard/Sidebar'
 import StatsPanel from './dashboard/StatsPanel'
 import FeatureCard from './dashboard/FeatureCard'
 import StreakIndicator from './dashboard/StreakIndicator'
 import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
-import ChallengeHistoryView from './dashboard/ChallengeHistoryView'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
 import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3 } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
@@ -28,18 +18,43 @@ import ConfigurationRequired from './ConfigurationRequired'
 import SavedSimulationCard from './dashboard/SavedSimulationCard'
 import { useNotifications } from '@/hooks/useNotifications'
 
-// Lazy load RoleplayLinksView to prevent it from executing on public pages
-const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-    </div>
-  )
-})
+// Loading skeleton for lazy-loaded views
+const ViewLoadingSkeleton = () => (
+  <div className="flex items-center justify-center h-[60vh]">
+    <div className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-green-500 animate-spin mx-auto" />
+  </div>
+)
+
+// Lazy-load all heavy view components (only loaded when user navigates to them)
+const ChatInterface = dynamic(() => import('./ChatInterface'), { ssr: false, loading: ViewLoadingSkeleton })
+const ConfigHub = dynamic(() => import('./ConfigHub'), { ssr: false, loading: ViewLoadingSkeleton })
+const RoleplayView = dynamic(() => import('./RoleplayView'), { ssr: false, loading: ViewLoadingSkeleton })
+const HistoricoView = dynamic(() => import('./HistoricoView'), { ssr: false, loading: ViewLoadingSkeleton })
+const PerfilView = dynamic(() => import('./PerfilView'), { ssr: false, loading: ViewLoadingSkeleton })
+const PDIView = dynamic(() => import('./PDIView'), { ssr: false, loading: ViewLoadingSkeleton })
+const FollowUpView = dynamic(() => import('./FollowUpView'), { ssr: false, loading: ViewLoadingSkeleton })
+const FollowUpHistoryView = dynamic(() => import('./FollowUpHistoryView'), { ssr: false, loading: ViewLoadingSkeleton })
+const MeetAnalysisView = dynamic(() => import('./MeetAnalysisView'), { ssr: false, loading: ViewLoadingSkeleton })
+const RepresentanteView = dynamic(() => import('./RepresentanteView'), { ssr: false, loading: ViewLoadingSkeleton })
+const ChallengeHistoryView = dynamic(() => import('./dashboard/ChallengeHistoryView'), { ssr: false, loading: ViewLoadingSkeleton })
+const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), { ssr: false, loading: ViewLoadingSkeleton })
 
 interface DashboardProps {
   onLogout: () => void
+}
+
+// Prefetch map: pre-load component on hover so it's ready when clicked
+const prefetchMap: Record<string, () => void> = {
+  roleplay: () => { import('./RoleplayView') },
+  perfil: () => { import('./PerfilView') },
+  historico: () => { import('./HistoricoView') },
+  pdi: () => { import('./PDIView') },
+  followup: () => { import('./FollowUpView') },
+  'meet-analysis': () => { import('./MeetAnalysisView') },
+  'roleplay-links': () => { import('./RoleplayLinksView') },
+  'followup-history': () => { import('./FollowUpHistoryView') },
+  'challenge-history': () => { import('./dashboard/ChallengeHistoryView') },
+  chat: () => { import('./ChatInterface') },
 }
 
 export default function Dashboard({ onLogout }: DashboardProps) {
@@ -295,6 +310,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (newView === 'roleplay') {
       setActiveChallenge(null)
     }
+    // Manager is a separate page, navigate directly
+    if (newView === 'manager') {
+      router.push('/manager')
+      return
+    }
     setCurrentView(newView as typeof currentView)
   }
 
@@ -389,11 +409,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       )
     }
 
-    if (currentView === 'manager') {
-      router.push('/manager')
-      return null
-    }
-
     // Home view
     return (
       <div className="py-8 px-6 relative z-10">
@@ -402,7 +417,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div className={`mb-8 flex flex-col lg:flex-row gap-4 items-stretch ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
             {/* Banner CTA with image */}
             <button
-              onClick={() => router.push('/roleplay')}
+              onClick={() => handleViewChange('roleplay')}
               className="group relative overflow-hidden rounded-2xl bg-green-800 p-5 text-left transition-all hover:shadow-xl hover:scale-[1.01] lg:w-[280px] flex-shrink-0 min-h-[100px]"
             >
               {/* Background Image */}
@@ -464,7 +479,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Simulação"
               subtitle="Treinamento ativo"
               description="Simule conversas reais de vendas com feedback SPIN."
-              onClick={() => router.push('/roleplay')}
+              onClick={() => handleViewChange('roleplay')}
+              onMouseEnter={() => prefetchMap.roleplay()}
             />
 
             <FeatureCard
@@ -472,7 +488,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Meu Perfil"
               subtitle="Desempenho"
               description="Acompanhe sua evolução e métricas SPIN."
-              onClick={() => router.push('/profile')}
+              onClick={() => handleViewChange('perfil')}
+              onMouseEnter={() => prefetchMap.perfil()}
             />
 
             <FeatureCard
@@ -480,7 +497,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="WhatsApp IA"
               subtitle="Copiloto de Vendas"
               description="Copiloto com IA para suas conversas no WhatsApp."
-              onClick={() => router.push('/followup')}
+              onClick={() => handleViewChange('followup')}
+              onMouseEnter={() => prefetchMap.followup()}
             />
 
             {(userRole?.toLowerCase() === 'admin' || userRole?.toLowerCase() === 'gestor') ? (
@@ -489,7 +507,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 title="Roleplay Público"
                 subtitle="Links externos"
                 description="Links públicos para roleplays externos."
-                onClick={() => router.push('/roleplay-links')}
+                onClick={() => handleViewChange('roleplay-links')}
+                onMouseEnter={() => prefetchMap['roleplay-links']()}
                 adminBadge
               />
             ) : (
@@ -503,7 +522,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 title="PDI"
                 subtitle="Plano de desenvolvimento"
                 description="Plano de 7 dias baseado na sua performance."
-                onClick={() => router.push('/pdi-page')}
+                onClick={() => handleViewChange('pdi')}
+                onMouseEnter={() => prefetchMap.pdi()}
               />
             )}
 
@@ -519,15 +539,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                     .filter(n => n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error')
                     .forEach(n => markAsRead(n.id))
                   // Navigate and open Meet tab
-                  router.push('/history')
+                  handleViewChange('historico')
                   setTimeout(() => {
                     window.dispatchEvent(new CustomEvent('setHistoryType', { detail: 'meet' }))
                   }, 100)
                 } else {
-                  router.push('/history')
+                  handleViewChange('historico')
                 }
               }}
               notificationCount={meetNotificationCount}
+              onMouseEnter={() => prefetchMap.historico()}
             />
 
             <FeatureCard
@@ -535,7 +556,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               title="Análise Google Meet"
               subtitle="Transcrição em tempo real"
               description="Bot transcreve reuniões do Google Meet automaticamente."
-              onClick={() => router.push('/meet-analysis')}
+              onClick={() => handleViewChange('meet-analysis')}
+              onMouseEnter={() => prefetchMap['meet-analysis']()}
               betaBadge
             />
 
@@ -545,7 +567,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 title="Gestão"
                 subtitle="Equipe e avaliações"
                 description="Avaliações e performance dos vendedores."
-                onClick={() => router.push('/manager')}
+                onClick={() => handleViewChange('manager')}
                 adminBadge
               />
             )}
