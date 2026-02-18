@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target } from 'lucide-react'
+import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target, MessageCircle, CheckCheck, Shield, ScrollText, Settings } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface MeetEvaluation {
@@ -474,17 +474,19 @@ export default function MeetHistoryContent() {
                         {selectedEvaluation.evaluation.playbook_adherence.dimensions && (
                           <div className="grid grid-cols-5 gap-2 mb-4">
                             {[
-                              { key: 'opening', label: 'Abertura', icon: '🎯' },
-                              { key: 'closing', label: 'Fechamento', icon: '🤝' },
-                              { key: 'conduct', label: 'Conduta', icon: '👔' },
-                              { key: 'required_scripts', label: 'Scripts', icon: '📝' },
-                              { key: 'process', label: 'Processo', icon: '⚙️' }
-                            ].map(({ key, label, icon }) => {
+                              { key: 'opening', label: 'Abertura', Icon: MessageCircle, color: 'text-blue-500' },
+                              { key: 'closing', label: 'Fechamento', Icon: CheckCheck, color: 'text-emerald-500' },
+                              { key: 'conduct', label: 'Conduta', Icon: Shield, color: 'text-purple-500' },
+                              { key: 'required_scripts', label: 'Scripts', Icon: ScrollText, color: 'text-amber-500' },
+                              { key: 'process', label: 'Processo', Icon: Settings, color: 'text-gray-500' }
+                            ].map(({ key, label, Icon, color }) => {
                               const dim = selectedEvaluation.evaluation.playbook_adherence?.dimensions?.[key]
                               if (!dim || dim.status === 'not_evaluated') return null
                               return (
                                 <div key={key} className="bg-white/70 rounded-lg p-2 text-center border border-purple-100">
-                                  <div className="text-lg">{icon}</div>
+                                  <div className="flex justify-center mb-1">
+                                    <Icon className={`w-4 h-4 ${color}`} />
+                                  </div>
                                   <div className={`text-lg font-bold ${
                                     (dim.score || 0) >= 70 ? 'text-green-600' :
                                     (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
