@@ -106,7 +106,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return null
   }
 
-  const isAdmin = user.role === 'admin'
+  const isAdmin = user.role?.toLowerCase() === 'admin'
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">

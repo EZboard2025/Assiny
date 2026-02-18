@@ -591,7 +591,8 @@ Retorne um JSON com esta estrutura:
                 busca: challengeConfig.new_persona.company_goals,
                 business_challenges: challengeConfig.new_persona.business_challenges,
                 main_pains: challengeConfig.new_persona.business_challenges,
-                dores: challengeConfig.new_persona.business_challenges
+                dores: challengeConfig.new_persona.business_challenges,
+                source: 'challenge'
               })
               .select('id')
               .single()
@@ -625,7 +626,8 @@ Retorne um JSON com esta estrutura:
                   .insert({
                     company_id: company.id,
                     name: newObj.name,
-                    rebuttals: newObj.rebuttals || []
+                    rebuttals: newObj.rebuttals || [],
+                    source: 'challenge'
                   })
                   .select('id')
                   .single()

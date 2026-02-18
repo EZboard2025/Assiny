@@ -511,6 +511,7 @@ function ConfigurationInterface({
   const [pdfUploading, setPdfUploading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [aiFillMode, setAiFillMode] = useState<'none' | 'pdf' | 'url'>('none')
   const [pdfPreviewData, setPdfPreviewData] = useState<typeof companyData | null>(null)
 
   // Estados para IA Geração de Conteúdo (Objeções, Personas, Objetivos)
@@ -3502,10 +3503,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     {/* Botão Gerar com IA */}
                     <button
                       onClick={() => setShowAIGenerateModal('personas')}
-                      className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg text-sm font-semibold text-white shadow-sm hover:shadow-md hover:from-purple-700 hover:to-purple-800 transition-all duration-200"
+                      className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
                     >
-                      <Sparkles className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4 animate-pulse" />
                       Gerar com IA
+                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
                     </button>
                     {/* Filtro por Tipo B2B/B2C */}
                     <select
@@ -4369,10 +4371,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                   <button
                     onClick={() => setShowAIGenerateModal('objections')}
-                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg text-sm font-semibold text-white shadow-sm hover:shadow-md hover:from-purple-700 hover:to-purple-800 transition-all duration-200"
+                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
                   >
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4 animate-pulse" />
                     Gerar com IA
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
                   </button>
                 </div>
                 <p className="text-gray-500 mt-2 text-xs">
@@ -4808,9 +4811,9 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           <div className="space-y-6">
             {/* Playbook de Vendas - No topo */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-white">
                 <h3 className="text-sm font-semibold text-gray-900 tracking-wider flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-purple-600" />
+                  <FileText className="w-4 h-4 text-green-600" />
                   Playbook de Vendas
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
@@ -4821,10 +4824,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               <div className="p-4">
                 {playbook ? (
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between p-4 bg-purple-50 rounded-lg border border-purple-100">
+                    <div className="flex items-start justify-between p-4 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-start gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                          <FileText className="w-5 h-5 text-purple-600" />
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <FileText className="w-5 h-5 text-green-600" />
                         </div>
                         <div>
                           <h4 className="font-medium text-gray-900">{playbook.title}</h4>
@@ -4853,7 +4856,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           className="hidden"
                           disabled={playbookFileUploading}
                         />
-                        <div className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-colors">
                           <Upload className="w-4 h-4" />
                           Substituir playbook
                         </div>
@@ -4870,17 +4873,17 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         className="hidden"
                         disabled={playbookFileUploading}
                       />
-                      <div className="border-2 border-dashed border-purple-200 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-colors">
+                      <div className="border-2 border-dashed border-green-200 rounded-xl p-6 text-center hover:border-green-400 hover:bg-green-50/50 transition-colors">
                         {playbookFileUploading ? (
                           <div className="flex flex-col items-center gap-2">
-                            <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
-                            <p className="text-sm text-purple-600">Processando...</p>
+                            <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
+                            <p className="text-sm text-green-600">Processando...</p>
                           </div>
                         ) : (
                           <>
-                            <Upload className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                            <Upload className="w-6 h-6 text-green-400 mx-auto mb-2" />
                             <p className="text-sm text-gray-600">
-                              <span className="font-semibold text-purple-600">Clique para upload</span> ou arraste
+                              <span className="font-semibold text-green-600">Clique para upload</span> ou arraste
                             </p>
                             <p className="text-xs text-gray-400 mt-1">PDF ou DOCX</p>
                           </>
@@ -4899,157 +4902,134 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Dados da Empresa</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  Preencha as informações para melhorar o treinamento da IA.
-                </p>
-              </div>
-
-              {/* Tipo de Empresa */}
-              <div className="p-4 border-b border-gray-100">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Tipo de Empresa</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => handleSetBusinessType('B2C')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      businessType === 'B2C'
-                        ? 'bg-green-100 text-green-700 border border-green-500/30'
-                        : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    B2C
-                  </button>
-                  <button
-                    onClick={() => handleSetBusinessType('B2B')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      businessType === 'B2B'
-                        ? 'bg-green-100 text-green-700 border border-green-500/30'
-                        : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    B2B
-                  </button>
-                  <button
-                    onClick={() => handleSetBusinessType('Ambos')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      businessType === 'Ambos'
-                        ? 'bg-green-100 text-green-700 border border-green-500/30'
-                        : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    Ambos
-                  </button>
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Dados da Empresa</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Preencha as informações para melhorar o treinamento da IA.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {['B2C', 'B2B', 'Ambos'].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => handleSetBusinessType(type as 'B2C' | 'B2B' | 'Ambos')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        businessType === type
+                          ? 'bg-green-100 text-green-700 border border-green-500/30'
+                          : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Upload de PDFs para Extração */}
+              {/* Preencher com IA */}
               <div className="p-4 border-b border-gray-100">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Preencher com IA</h4>
-                <p className="text-xs text-gray-500 mb-4">
-                  Faça upload de PDFs sobre sua empresa (apresentações, materiais, playbooks) e deixe a IA preencher automaticamente.
-                </p>
-
-                {/* Área de Upload */}
-                <div className="mb-4">
-                  <label
-                    htmlFor="pdf-upload"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 hover:border-purple-400 transition-all"
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setAiFillMode(aiFillMode === 'pdf' ? 'none' : 'pdf')}
+                    className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all duration-300 overflow-hidden ${
+                      aiFillMode === 'pdf'
+                        ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x shadow-lg shadow-purple-500/25'
+                        : 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x shadow-md shadow-purple-500/15 hover:shadow-lg hover:shadow-purple-500/25 hover:scale-[1.02]'
+                    }`}
                   >
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500">
-                        <span className="font-semibold text-purple-600">Clique para fazer upload</span> ou arraste PDFs
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">Apenas arquivos PDF</p>
-                    </div>
-                    <input
-                      id="pdf-upload"
-                      type="file"
-                      accept=".pdf"
-                      multiple
-                      onChange={handlePdfUpload}
-                      className="hidden"
-                    />
-                  </label>
+                    <Upload className="w-4 h-4 text-white flex-shrink-0" />
+                    <span className="text-sm font-semibold text-white">Extrair de Arquivos</span>
+                    {aiFillMode === 'pdf' && <ChevronUp className="w-3.5 h-3.5 text-white/70 ml-auto" />}
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                  </button>
+                  <button
+                    onClick={() => { setAiFillMode('none'); setShowAIModal(true) }}
+                    className="group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-[length:200%_100%] animate-gradient-x shadow-md shadow-blue-500/15 hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.02] text-left transition-all duration-300 overflow-hidden"
+                  >
+                    <Globe className="w-4 h-4 text-white flex-shrink-0" />
+                    <span className="text-sm font-semibold text-white">Extrair de URL</span>
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                  </button>
                 </div>
 
-                {/* Loading de Upload */}
-                {pdfUploading && (
-                  <div className="mb-4 flex items-center gap-2 text-purple-600">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Salvando arquivo(s)...</span>
-                  </div>
-                )}
+                {/* Expansão: Upload de PDFs */}
+                {aiFillMode === 'pdf' && (
+                  <div className="mt-3 bg-purple-50/50 rounded-xl border border-purple-200/50 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <label
+                      htmlFor="pdf-upload"
+                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-purple-300/60 rounded-lg cursor-pointer bg-white/80 hover:bg-white hover:border-purple-400 transition-all"
+                    >
+                      <Upload className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs text-gray-500">
+                        <span className="font-semibold text-purple-600">Clique para upload</span> — apresentações, materiais, playbooks
+                      </span>
+                      <input
+                        id="pdf-upload"
+                        type="file"
+                        accept=".pdf"
+                        multiple
+                        onChange={handlePdfUpload}
+                        className="hidden"
+                      />
+                    </label>
 
-                {/* Lista de PDFs Salvos */}
-                {savedPdfs.length > 0 && (
-                  <div className="mb-4 space-y-2">
-                    <p className="text-xs font-medium text-gray-600">{savedPdfs.length} arquivo(s) salvo(s):</p>
-                    {savedPdfs.map((pdf) => (
-                      <div key={pdf.id} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg border border-purple-100">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-purple-600" />
-                          <span className="text-sm text-gray-700 truncate max-w-[200px]">{pdf.file_name}</span>
-                          <span className="text-xs text-gray-400">({(pdf.file_size / 1024).toFixed(0)} KB)</span>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteSavedPdf(pdf.id)}
-                          className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                          title="Remover arquivo"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                    {pdfUploading && (
+                      <div className="mt-3 flex items-center gap-2 text-purple-600">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span className="text-xs">Salvando arquivo(s)...</span>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Erro de PDF */}
-                {pdfError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{pdfError}</p>
-                  </div>
-                )}
-
-                {/* Botões de Ação */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handlePdfExtract}
-                    disabled={savedPdfs.length === 0 || pdfExtracting || pdfUploading}
-                    className={`flex-1 group relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                      savedPdfs.length > 0 && !pdfExtracting && !pdfUploading
-                        ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02]'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {pdfExtracting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Extraindo...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        Extrair dos PDFs
-                      </>
                     )}
-                  </button>
-                  <button
-                    onClick={() => setShowAIModal(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
-                  >
-                    <Globe className="w-4 h-4" />
-                    Extrair de URL
-                  </button>
-                </div>
+
+                    {savedPdfs.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {savedPdfs.map((pdf) => (
+                          <div key={pdf.id} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white rounded-lg border border-purple-200 text-xs">
+                            <FileText className="w-3.5 h-3.5 text-purple-500" />
+                            <span className="text-gray-700 truncate max-w-[150px]">{pdf.file_name}</span>
+                            <button
+                              onClick={() => handleDeleteSavedPdf(pdf.id)}
+                              className="p-0.5 text-gray-400 hover:text-red-500 rounded transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {pdfError && (
+                      <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-xs text-red-600">{pdfError}</p>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handlePdfExtract}
+                      disabled={savedPdfs.length === 0 || pdfExtracting || pdfUploading}
+                      className={`mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                        savedPdfs.length > 0 && !pdfExtracting && !pdfUploading
+                          ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x text-white shadow-md shadow-purple-500/20 hover:shadow-purple-500/40 hover:scale-[1.01]'
+                          : 'bg-gray-200/80 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {pdfExtracting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Extraindo...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Extrair dos PDFs
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Formulário de Dados da Empresa */}
               <div className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Informações da Empresa</h4>
-                </div>
                 <div className="space-y-4">
                   {/* Nome da Empresa */}
                   <div>

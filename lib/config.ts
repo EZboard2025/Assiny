@@ -250,6 +250,7 @@ export async function getObjections(): Promise<Objection[]> {
     .from('objections')
     .select('*')
     .eq('company_id', companyId)
+    .or('source.is.null,source.eq.manual')
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -382,6 +383,7 @@ export async function getPersonas(): Promise<Persona[]> {
     .from('personas')
     .select('*')
     .eq('company_id', companyId)
+    .or('source.is.null,source.eq.manual')
     .order('created_at', { ascending: true })
 
   if (error) {
