@@ -1358,6 +1358,29 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       }
     }
 
+    // Extract quoted message info if present
+    let quotedMsgData: { body: string; fromMe: boolean; type: string; contactName?: string | null } | null = null
+    try {
+      if (msg.hasQuotedMsg) {
+        const quotedMsg = await msg.getQuotedMessage()
+        if (quotedMsg) {
+          quotedMsgData = {
+            body: quotedMsg.body || '',
+            fromMe: quotedMsg.fromMe,
+            type: quotedMsg.type || 'text',
+            contactName: null
+          }
+          // Try to get quoted message sender name (for group chats)
+          try {
+            const qContact = await quotedMsg.getContact()
+            quotedMsgData.contactName = qContact?.name || qContact?.pushname || null
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.error('[WA] Failed to get quoted message:', err)
+    }
+
     // Ensure connection_id is still valid (prevents FK violations after reconnection)
     const validConnId = await ensureValidConnectionId(state)
     if (!validConnId) {
@@ -1366,6 +1389,11 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
     }
 
     // Insert message and upsert conversation in parallel
+    const rawPayload: any = { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chat.id._serialized, is_lid: isLidContact, is_group: isGroup }
+    if (quotedMsgData) {
+      rawPayload.quotedMsg = quotedMsgData
+    }
+
     const messageInsert = supabaseAdmin
       .from('whatsapp_messages')
       .insert({
@@ -1382,7 +1410,7 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
         media_mime_type: mediaMimeType,
         message_timestamp: msgTimestamp.toISOString(),
         status: fromMe ? 'sent' : 'delivered',
-        raw_payload: { type: msg.type, hasMedia: msg.hasMedia, from: msg.from, to: msg.to, original_chat_id: chat.id._serialized, is_lid: isLidContact, is_group: isGroup }
+        raw_payload: rawPayload
       })
 
     const messagePreview = content?.substring(0, 100) || formatMediaPreview(messageType)

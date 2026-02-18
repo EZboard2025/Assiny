@@ -123,11 +123,14 @@ function TrendBadge({ trend }: { trend: string }) {
 }
 
 // Styled text renderer for plain text segments
-function StyledText({ text }: { text: string }) {
+function StyledText({ text, onSendBubble, sentBubbles }: { text: string; onSendBubble?: (text: string, idx: number) => void; sentBubbles?: Set<number> }) {
   const lines = text.split('\n')
   const elements: JSX.Element[] = []
   let bulletBuffer: string[] = []
   let numberedBuffer: { num: string; text: string }[] = []
+  let quoteBuffer: string[] = []
+  let quoteStartLine = -1
+  let bubbleIndex = 0
 
   const flushBullets = (key: string) => {
     if (bulletBuffer.length === 0) return
@@ -161,9 +164,75 @@ function StyledText({ text }: { text: string }) {
     numberedBuffer = []
   }
 
+  const flushQuote = (key: string) => {
+    if (quoteBuffer.length === 0) return
+    const quoteText = quoteBuffer.join('\n').replace(/^[""\u201c]+|[""\u201d]+$/g, '').trim()
+    if (quoteText.length < 10) {
+      // Too short to be a message bubble, render as normal text
+      elements.push(<p key={key} className="text-[#d1d7db] text-sm leading-relaxed">{quoteText}</p>)
+      quoteBuffer = []
+      return
+    }
+    const idx = bubbleIndex++
+    const isSent = sentBubbles?.has(idx)
+    elements.push(
+      <div key={key} className="my-2 ml-1">
+        <div className="bg-[#005c4b] rounded-lg rounded-tr-none px-3 py-2 relative max-w-[95%] shadow-md">
+          <p className="text-[#e9edef] text-[13.5px] leading-relaxed whitespace-pre-wrap">{quoteText}</p>
+          <div className="flex items-center justify-end gap-1 mt-1 -mb-0.5">
+            <span className="text-[10px] text-[#ffffff99]">Sugestão</span>
+          </div>
+        </div>
+        {onSendBubble && (
+          <div className="flex items-center gap-1 mt-1 ml-1">
+            <button
+              onClick={() => onSendBubble(quoteText, idx)}
+              disabled={isSent}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200 ${
+                isSent
+                  ? 'bg-[#00a884]/20 text-[#00a884]'
+                  : 'bg-[#2a3942] text-[#d1d7db] hover:bg-[#00a884] hover:text-white hover:scale-105'
+              }`}
+            >
+              <Send className="w-3 h-3" />
+              {isSent ? 'Enviada' : 'Enviar'}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+    quoteBuffer = []
+  }
+
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li]
     const trimmed = line.trim()
+
+    // Track multi-line quotes
+    if (quoteStartLine >= 0) {
+      quoteBuffer.push(line)
+      if (/[""\u201d]\s*$/.test(trimmed)) {
+        // End of quote
+        flushQuote(`q_${quoteStartLine}`)
+        quoteStartLine = -1
+      }
+      continue
+    }
+
+    // Detect start of a quoted block: line starts with " and either ends with " (single-line) or continues
+    if (/^[""\u201c]/.test(trimmed) && trimmed.length > 15) {
+      flushBullets(`bl_${li}`)
+      flushNumbered(`nl_${li}`)
+      quoteBuffer = [line]
+      if (/[""\u201d]\s*$/.test(trimmed) && trimmed.length > 1) {
+        // Single-line quote
+        flushQuote(`q_${li}`)
+        quoteStartLine = -1
+      } else {
+        quoteStartLine = li
+      }
+      continue
+    }
 
     if (!trimmed) {
       flushBullets(`bl_${li}`)
@@ -204,12 +273,13 @@ function StyledText({ text }: { text: string }) {
 
   flushBullets('bl_end')
   flushNumbered('nl_end')
+  flushQuote('q_end')
 
   return <>{elements}</>
 }
 
 // Parse and render message content with visual tags
-function RichMessage({ content }: { content: string }) {
+function RichMessage({ content, onSendBubble, sentBubbles }: { content: string; onSendBubble?: (text: string, idx: number) => void; sentBubbles?: Set<number> }) {
   const tagRegex = /\{\{(NOTA|BARRA|TENDENCIA):([^}]+)\}\}/g
   const parts: (string | JSX.Element)[] = []
   let lastIndex = 0
@@ -249,7 +319,7 @@ function RichMessage({ content }: { content: string }) {
     <div className="text-sm break-words space-y-0.5">
       {parts.map((part, i) =>
         typeof part === 'string'
-          ? <StyledText key={`text_${i}`} text={part} />
+          ? <StyledText key={`text_${i}`} text={part} onSendBubble={onSendBubble} sentBubbles={sentBubbles} />
           : part
       )}
     </div>
@@ -258,6 +328,20 @@ function RichMessage({ content }: { content: string }) {
 
 // Extract only the client-ready message from the AI response
 // Removes AI framing like "Sugestão de mensagem:" and strips surrounding quotes
+// Extract ALL quoted messages as separate items (for multi-bubble sending)
+function extractAllQuotedMessages(text: string): string[] {
+  const cleaned0 = text.replace(/\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
+  const quoteMatches = cleaned0.match(/"([^"]+)"/g) || cleaned0.match(/«([^»]+)»/g) || cleaned0.match(/"([^"]+)"/g)
+  if (quoteMatches && quoteMatches.length > 0) {
+    const msgs = quoteMatches
+      .map(q => q.replace(/^["«"]|["»"]$/g, '').trim())
+      .filter(q => q.length > 10)
+    if (msgs.length > 0) return msgs
+  }
+  // Fallback: return single cleaned message
+  return [extractCleanMessage(text)]
+}
+
 function extractCleanMessage(text: string): string {
   // First strip visual tags
   const cleaned0 = text.replace(/\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
@@ -299,6 +383,7 @@ export default function SalesCopilot({
   const [feedbackStates, setFeedbackStates] = useState<Record<string, 'up' | 'down' | null>>({})
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [sentMsgIds, setSentMsgIds] = useState<Set<string>>(new Set())
+  const [sentBubblesByMsg, setSentBubblesByMsg] = useState<Record<string, Set<number>>>({})
   const [revealingMsgId, setRevealingMsgId] = useState<string | null>(null)
   const [revealedChunks, setRevealedChunks] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -373,6 +458,7 @@ export default function SalesCopilot({
       setCopilotMessages([])
       setFeedbackStates({})
       setSentMsgIds(new Set())
+      setSentBubblesByMsg({})
       setInput('')
       setRevealingMsgId(null)
       setRevealedChunks(0)
@@ -779,6 +865,7 @@ export default function SalesCopilot({
                   setCopilotMessages([])
                   setFeedbackStates({})
                   setSentMsgIds(new Set())
+                  setSentBubblesByMsg({})
                   setInput('')
                 }}
                 className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors"
@@ -938,7 +1025,17 @@ export default function SalesCopilot({
 
                       {/* Message content - always rich, progressively revealed */}
                       <div className="flex-1 min-w-0">
-                        <RichMessage content={visibleContent} />
+                        <RichMessage
+                          content={visibleContent}
+                          onSendBubble={onSendToChat ? (text, idx) => {
+                            onSendToChat(text)
+                            setSentBubblesByMsg(prev => ({
+                              ...prev,
+                              [msg.id]: new Set([...(prev[msg.id] || []), idx])
+                            }))
+                          } : undefined}
+                          sentBubbles={sentBubblesByMsg[msg.id]}
+                        />
 
                         {/* Action bar - Gemini style icons row (only after reveal completes) */}
                         {doneRevealing && !msg.content.startsWith('Erro:') && (
@@ -946,8 +1043,22 @@ export default function SalesCopilot({
                             {/* Send to chat */}
                             {onSendToChat && (
                               <button
-                                onClick={() => {
-                                  onSendToChat(extractCleanMessage(msg.content))
+                                onClick={async () => {
+                                  const allQuotes = extractAllQuotedMessages(msg.content)
+                                  if (allQuotes.length > 1) {
+                                    for (let i = 0; i < allQuotes.length; i++) {
+                                      onSendToChat(allQuotes[i])
+                                      setSentBubblesByMsg(prev => ({
+                                        ...prev,
+                                        [msg.id]: new Set([...(prev[msg.id] || []), i])
+                                      }))
+                                      if (i < allQuotes.length - 1) {
+                                        await new Promise(r => setTimeout(r, 1500))
+                                      }
+                                    }
+                                  } else {
+                                    onSendToChat(extractCleanMessage(msg.content))
+                                  }
                                   setSentMsgIds(prev => new Set(prev).add(msg.id))
                                 }}
                                 disabled={sentMsgIds.has(msg.id)}

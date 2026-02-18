@@ -142,7 +142,8 @@ export async function GET(request: NextRequest) {
           contactName: msg.contact_name,
           status: msg.status,
           transcription: msg.transcription || null,
-          isAutopilot: msg.is_autopilot || false
+          isAutopilot: msg.is_autopilot || false,
+          quotedMsg: rawPayload.quotedMsg || null
         }
       })
     })

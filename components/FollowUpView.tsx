@@ -77,6 +77,12 @@ interface WhatsAppMessage {
   status?: string
   transcription?: string | null
   isAutopilot?: boolean
+  quotedMsg?: {
+    body: string
+    fromMe: boolean
+    type: string
+    contactName?: string | null
+  } | null
 }
 
 type ConnectionStatus = 'disconnected' | 'checking' | 'initializing' | 'qr_ready' | 'connecting' | 'connected'
@@ -158,6 +164,7 @@ export default function FollowUpView() {
   const [isDeletingMessage, setIsDeletingMessage] = useState(false)
   const [editingMessage, setEditingMessage] = useState<WhatsAppMessage | null>(null)
   const [editInput, setEditInput] = useState('')
+  const [replyingTo, setReplyingTo] = useState<WhatsAppMessage | null>(null)
   const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null)
   const [forwardingMessage, setForwardingMessage] = useState<WhatsAppMessage | null>(null)
   const [forwardSearch, setForwardSearch] = useState('')
@@ -661,13 +668,30 @@ export default function FollowUpView() {
                 return prev
               }
 
+              // Build lookup of existing quotedMsg data to preserve across reloads
+              const existingQuotedMsgs = new Map<string, WhatsAppMessage['quotedMsg']>()
+              realPrev.forEach(m => {
+                if (m.quotedMsg && (m.waMessageId || m.id)) {
+                  existingQuotedMsgs.set(m.waMessageId || m.id, m.quotedMsg)
+                }
+              })
+
+              // Merge: preserve quotedMsg from existing state if DB version doesn't have it yet
+              const mergedMessages = data.messages.map((m: WhatsAppMessage) => {
+                if (!m.quotedMsg) {
+                  const existing = existingQuotedMsgs.get(m.waMessageId || m.id)
+                  if (existing) return { ...m, quotedMsg: existing }
+                }
+                return m
+              })
+
               if (data.messages.length !== realPrev.length) {
-                return [...data.messages, ...tempMessages]
+                return [...mergedMessages, ...tempMessages]
               }
               const lastNew = data.messages[data.messages.length - 1]
               const lastOld = realPrev[realPrev.length - 1]
               if (lastNew && lastOld && lastNew.id !== lastOld.id) {
-                return [...data.messages, ...tempMessages]
+                return [...mergedMessages, ...tempMessages]
               }
               return prev
             })
@@ -1050,7 +1074,22 @@ export default function FollowUpView() {
         )
         const reloadData = await reloadResponse.json()
         if (reloadData.messages) {
-          setMessages(reloadData.messages)
+          setMessages(prev => {
+            // Preserve quotedMsg from existing state
+            const existingQuotes = new Map<string, WhatsAppMessage['quotedMsg']>()
+            prev.forEach(m => {
+              if (m.quotedMsg && (m.waMessageId || m.id)) {
+                existingQuotes.set(m.waMessageId || m.id, m.quotedMsg)
+              }
+            })
+            return reloadData.messages.map((m: WhatsAppMessage) => {
+              if (!m.quotedMsg) {
+                const existing = existingQuotes.get(m.waMessageId || m.id)
+                if (existing) return { ...m, quotedMsg: existing }
+              }
+              return m
+            })
+          })
         }
       }
     } catch (error) {
@@ -1064,6 +1103,8 @@ export default function FollowUpView() {
     if (!selectedConversation || !text || isSending) return
 
     if (!directText) setMessageInput('')
+    const currentReply = replyingTo
+    setReplyingTo(null)
     setIsSending(true)
 
     // Optimistic update
@@ -1073,18 +1114,29 @@ export default function FollowUpView() {
       fromMe: true,
       timestamp: new Date().toISOString(),
       type: 'text',
-      hasMedia: false
+      hasMedia: false,
+      quotedMsg: currentReply ? {
+        body: currentReply.body,
+        fromMe: currentReply.fromMe,
+        type: currentReply.type,
+        contactName: currentReply.contactName
+      } : null
     }
     setMessages(prev => [...prev, tempMsg])
 
     try {
+      const sendBody: any = {
+        to: selectedConversation.contact_phone,
+        message: text
+      }
+      if (currentReply?.waMessageId) {
+        sendBody.quotedMessageId = currentReply.waMessageId
+      }
+
       let response = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          to: selectedConversation.contact_phone,
-          message: text
-        })
+        body: JSON.stringify(sendBody)
       })
 
       if (handleApiDisconnect(response)) {
@@ -1098,9 +1150,9 @@ export default function FollowUpView() {
         throw new Error(data.error || 'Erro ao enviar mensagem')
       }
 
-      // Replace temp message with real one
+      // Replace temp message with real one (preserve quotedMsg from optimistic update)
       setMessages(prev => prev.map(msg =>
-        msg.id === tempMsg.id ? data.message : msg
+        msg.id === tempMsg.id ? { ...data.message, quotedMsg: tempMsg.quotedMsg } : msg
       ))
     } catch (err) {
       console.error('Error sending message:', err)
@@ -1118,10 +1170,17 @@ export default function FollowUpView() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && editingMessage) {
-      e.preventDefault()
-      cancelEdit()
-      return
+    if (e.key === 'Escape') {
+      if (editingMessage) {
+        e.preventDefault()
+        cancelEdit()
+        return
+      }
+      if (replyingTo) {
+        e.preventDefault()
+        setReplyingTo(null)
+        return
+      }
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -1317,6 +1376,8 @@ export default function FollowUpView() {
     setIsSending(true)
     const { file, type } = selectedFile
     const caption = mediaCaption.trim()
+    const currentReply = replyingTo
+    setReplyingTo(null)
 
     const tempMsg: WhatsAppMessage = {
       id: `temp_${Date.now()}`,
@@ -1327,6 +1388,12 @@ export default function FollowUpView() {
       hasMedia: true,
       mediaId: selectedFile.previewUrl || null,
       mimetype: file.type,
+      quotedMsg: currentReply ? {
+        body: currentReply.body,
+        fromMe: currentReply.fromMe,
+        type: currentReply.type,
+        contactName: currentReply.contactName
+      } : null
     }
     setMessages(prev => [...prev, tempMsg])
     clearSelectedFile()
@@ -1337,6 +1404,7 @@ export default function FollowUpView() {
       formData.append('file', file)
       formData.append('type', type)
       if (caption) formData.append('caption', caption)
+      if (currentReply?.waMessageId) formData.append('quotedMessageId', currentReply.waMessageId)
 
       let response = await fetch('/api/whatsapp/send', {
         method: 'POST',
@@ -1356,7 +1424,7 @@ export default function FollowUpView() {
       }
 
       setMessages(prev => prev.map(msg =>
-        msg.id === tempMsg.id ? data.message : msg
+        msg.id === tempMsg.id ? { ...data.message, quotedMsg: tempMsg.quotedMsg } : msg
       ))
     } catch (err) {
       console.error('Error sending media:', err)
@@ -1661,6 +1729,7 @@ export default function FollowUpView() {
     setShowContactInfo(false)
     setContactDetailInfo(null)
     cancelEdit()
+    setReplyingTo(null)
     // Stop any playing audio
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     setPlayingAudioId(null)
@@ -2162,35 +2231,47 @@ export default function FollowUpView() {
           {/* Header */}
           <div className="h-[60px] bg-[#202c33] px-5 flex items-center justify-between">
             <span className="text-[#e9edef] text-[22px] font-bold">WhatsApp</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowNewConversation(true)}
-                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-                title="Nova conversa"
-              >
-                <MessageCirclePlus className="w-[20px] h-[20px] text-[#aebac1]" />
-              </button>
-              <button
-                onClick={async () => {
-                  setIsRefreshing(true)
-                  if (conversations.length === 0) {
-                    triggerManualSync()
-                  }
-                  await loadConversations()
-                  setIsRefreshing(false)
-                }}
-                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-                title={conversations.length === 0 ? 'Sincronizar conversas' : 'Atualizar'}
-              >
-                <RefreshCw className={`w-[20px] h-[20px] text-[#aebac1] ${isRefreshing || isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={disconnectWhatsApp}
-                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-                title="Desconectar"
-              >
-                <LogOut className="w-[20px] h-[20px] text-[#aebac1]" />
-              </button>
+            <div className="flex items-center gap-1">
+              <div className="relative group/tip">
+                <button
+                  onClick={() => setShowNewConversation(true)}
+                  className="p-2.5 hover:bg-[#00a884]/20 rounded-full transition-all duration-200 hover:scale-110"
+                >
+                  <MessageCirclePlus className="w-[20px] h-[20px] text-[#00a884]" />
+                </button>
+                <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 bg-[#111b21] text-[#e9edef] text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg border border-[#2a3942]">
+                  Nova conversa
+                </div>
+              </div>
+              <div className="relative group/tip">
+                <button
+                  onClick={async () => {
+                    setIsRefreshing(true)
+                    if (conversations.length === 0) {
+                      triggerManualSync()
+                    }
+                    await loadConversations()
+                    setIsRefreshing(false)
+                  }}
+                  className="p-2.5 hover:bg-[#2a3942] rounded-full transition-all duration-200 hover:scale-110"
+                >
+                  <RefreshCw className={`w-[20px] h-[20px] text-[#aebac1] ${isRefreshing || isLoadingConversations || isSyncing ? 'animate-spin' : ''}`} />
+                </button>
+                <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 bg-[#111b21] text-[#e9edef] text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg border border-[#2a3942]">
+                  {conversations.length === 0 ? 'Sincronizar conversas' : 'Atualizar conversas'}
+                </div>
+              </div>
+              <div className="relative group/tip">
+                <button
+                  onClick={disconnectWhatsApp}
+                  className="p-2.5 hover:bg-red-500/10 rounded-full transition-all duration-200 hover:scale-110"
+                >
+                  <LogOut className="w-[20px] h-[20px] text-[#aebac1] group-hover/tip:text-red-400 transition-colors" />
+                </button>
+                <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 bg-[#111b21] text-[#e9edef] text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg border border-[#2a3942]">
+                  Desconectar WhatsApp
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2475,18 +2556,18 @@ export default function FollowUpView() {
               </button>
             </div>
             <div className="flex items-center gap-1">
-              {/* Analyze Button - hidden (replaced by Copilot) */}
-              {/* Analysis Score Card - hidden (replaced by Copilot) */}
-
               {/* Search button */}
-              <button
-                onClick={openMessageSearch}
-                className="p-2 hover:bg-[#2a3942] rounded-full transition-colors"
-                title="Pesquisar"
-              >
-                <Search className="w-5 h-5 text-[#aebac1]" />
-              </button>
-
+              <div className="relative group/tip">
+                <button
+                  onClick={openMessageSearch}
+                  className="p-2.5 hover:bg-[#2a3942] rounded-full transition-all duration-200 hover:scale-110"
+                >
+                  <Search className="w-5 h-5 text-[#aebac1]" />
+                </button>
+                <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 bg-[#111b21] text-[#e9edef] text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg border border-[#2a3942]">
+                  Pesquisar mensagens
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2613,6 +2694,31 @@ export default function FollowUpView() {
                           {selectedConversation?.contact_phone.includes('@g.us') && !msg.fromMe && msg.contactName && !/^\d+(@|$)/.test(msg.contactName) && (
                             <p className="text-xs font-medium text-[#00a884] mb-1">{msg.contactName}</p>
                           )}
+                          {/* Quoted message (reply) */}
+                          {msg.quotedMsg && (
+                            <div
+                              className={`mb-1 rounded-md px-3 py-2 cursor-pointer ${
+                                msg.fromMe ? 'bg-[#025144]' : 'bg-[#1a262d]'
+                              } border-l-[3px] ${
+                                msg.quotedMsg.fromMe ? 'border-[#06cf9c]' : 'border-[#7c57e1]'
+                              }`}
+                              style={{ margin: '-2px -4px 4px -4px' }}
+                            >
+                              <p className={`text-[11px] font-medium mb-0.5 ${
+                                msg.quotedMsg.fromMe ? 'text-[#06cf9c]' : 'text-[#7c57e1]'
+                              }`}>
+                                {msg.quotedMsg.fromMe ? 'Você' : (msg.quotedMsg.contactName || selectedConversation?.contact_name || 'Contato')}
+                              </p>
+                              <p className="text-[#8696a0] text-[12px] truncate max-w-[280px]">
+                                {msg.quotedMsg.type === 'image' ? '📷 Foto' :
+                                 msg.quotedMsg.type === 'video' ? '🎥 Vídeo' :
+                                 msg.quotedMsg.type === 'audio' || msg.quotedMsg.type === 'ptt' ? '🎤 Áudio' :
+                                 msg.quotedMsg.type === 'document' ? '📄 Documento' :
+                                 msg.quotedMsg.type === 'sticker' ? '🏷️ Figurinha' :
+                                 msg.quotedMsg.body || '[Mensagem]'}
+                              </p>
+                            </div>
+                          )}
                           {/* Revoked (deleted) message */}
                           {msg.type === 'revoked' ? (
                             <p className="text-[#8696a0] text-[13px] italic flex items-center gap-1.5 py-0.5">
@@ -2680,9 +2786,44 @@ export default function FollowUpView() {
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="8 5 19 12 8 19 8 5"/></svg>
                                   )}
                                 </button>
-                                {/* Waveform with progress */}
+                                {/* Waveform with progress (clickable to seek) */}
                                 <div className="flex-1 flex flex-col gap-1">
-                                  <div className="flex items-center gap-[2px] h-[28px]">
+                                  <div
+                                    className="flex items-center gap-[2px] h-[28px] cursor-pointer"
+                                    onClick={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect()
+                                      const clickX = e.clientX - rect.left
+                                      const seekRatio = Math.max(0, Math.min(1, clickX / rect.width))
+                                      if (audioRef.current && playingAudioId === msg.id) {
+                                        // Audio is playing/paused for this message — seek directly
+                                        const dur = audioRef.current.duration
+                                        if (isFinite(dur) && dur > 0) {
+                                          audioRef.current.currentTime = seekRatio * dur
+                                          setAudioProgress(prev => ({ ...prev, [msg.id]: seekRatio }))
+                                        }
+                                      } else {
+                                        // Start playing from the clicked position
+                                        playAudio(msg.id, msg.mediaId!)
+                                        // Wait for audio to load then seek
+                                        const checkAndSeek = () => {
+                                          if (audioRef.current) {
+                                            const onCanSeek = () => {
+                                              if (audioRef.current && isFinite(audioRef.current.duration)) {
+                                                audioRef.current.currentTime = seekRatio * audioRef.current.duration
+                                                setAudioProgress(prev => ({ ...prev, [msg.id]: seekRatio }))
+                                              }
+                                            }
+                                            if (isFinite(audioRef.current.duration) && audioRef.current.duration > 0) {
+                                              onCanSeek()
+                                            } else {
+                                              audioRef.current.addEventListener('loadedmetadata', onCanSeek, { once: true })
+                                            }
+                                          }
+                                        }
+                                        setTimeout(checkAndSeek, 50)
+                                      }
+                                    }}
+                                  >
                                     {Array.from({ length: 36 }, (_, i) => {
                                       const seed = (msg.id.charCodeAt(i % msg.id.length) * (i + 1)) % 100
                                       const h = Math.max(4, Math.min(26, seed * 0.26))
@@ -2891,6 +3032,28 @@ export default function FollowUpView() {
 
           {/* Message Input Bar */}
           <div className="px-[10px] py-[5px] bg-[#202c33] flex-shrink-0">
+            {/* Reply Preview Banner */}
+            {replyingTo && !editingMessage && (
+              <div className="mb-1 px-3 py-2 bg-[#1d282f] rounded-lg flex items-center gap-3 border-l-4 border-[#06cf9c]">
+                <ArrowLeft className="w-4 h-4 text-[#06cf9c] flex-shrink-0 rotate-[225deg]" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#06cf9c] text-[12px] font-medium">
+                    {replyingTo.fromMe ? 'Você' : (replyingTo.contactName || selectedConversation?.contact_name || 'Contato')}
+                  </p>
+                  <p className="text-[#8696a0] text-[13px] truncate">
+                    {replyingTo.type === 'image' ? '📷 Foto' :
+                     replyingTo.type === 'video' ? '🎥 Vídeo' :
+                     replyingTo.type === 'audio' || replyingTo.type === 'ptt' ? '🎤 Áudio' :
+                     replyingTo.type === 'document' ? '📄 Documento' :
+                     replyingTo.type === 'sticker' ? '🏷️ Figurinha' :
+                     replyingTo.body || '[Mensagem]'}
+                  </p>
+                </div>
+                <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-[#111b21] rounded-full transition-colors flex-shrink-0">
+                  <X className="w-4 h-4 text-[#8696a0]" />
+                </button>
+              </div>
+            )}
             {/* Edit Message Banner */}
             {editingMessage && (
               <div className="mb-1 px-3 py-2 bg-[#1d282f] rounded-lg flex items-center gap-3 border-l-4 border-[#00a884]">
@@ -3066,6 +3229,7 @@ export default function FollowUpView() {
                   {/* Text Input */}
                   <div className="flex-1 py-[9px] pr-3">
                     <textarea
+                      data-message-input
                       value={editingMessage ? editInput : (selectedFile ? mediaCaption : messageInput)}
                       onChange={(e) => editingMessage ? setEditInput(e.target.value) : (selectedFile ? setMediaCaption(e.target.value) : setMessageInput(e.target.value))}
                       onKeyDown={handleKeyDown}
@@ -3084,31 +3248,45 @@ export default function FollowUpView() {
 
                 {/* Mic / Send Button (outside the input bar) */}
                 {(editingMessage || messageInput.trim() || selectedFile) ? (
-                  <button
-                    onClick={editingMessage ? handleEditMessage : (selectedFile ? handleSendMedia : () => handleSendMessage())}
-                    disabled={editingMessage ? !editInput.trim() : (isSending || (!messageInput.trim() && !selectedFile))}
-                    className="w-[42px] h-[42px] flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    {isSending ? <Loader2 className="w-5 h-5 text-[#8696a0] animate-spin" /> : <Send className="w-[20px] h-[20px] text-[#8696a0]" />}
-                  </button>
+                  <div className="relative group/tip">
+                    <button
+                      onClick={editingMessage ? handleEditMessage : (selectedFile ? handleSendMedia : () => handleSendMessage())}
+                      disabled={editingMessage ? !editInput.trim() : (isSending || (!messageInput.trim() && !selectedFile))}
+                      className="w-[42px] h-[42px] flex items-center justify-center rounded-full bg-[#00a884] hover:bg-[#06cf9c] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-transparent flex-shrink-0 hover:scale-105 hover:shadow-[0_0_12px_rgba(0,168,132,0.4)]"
+                    >
+                      {isSending ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-[20px] h-[20px] text-white" />}
+                    </button>
+                    <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 bg-[#111b21] text-[#e9edef] text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg border border-[#2a3942]">
+                      {editingMessage ? 'Salvar edição' : 'Enviar mensagem'}
+                    </div>
+                  </div>
                 ) : (
-                  <button
-                    onClick={startVoiceRecording}
-                    className="w-[42px] h-[42px] flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-colors flex-shrink-0"
-                  >
-                    <Mic className="w-[24px] h-[24px] text-[#8696a0]" />
-                  </button>
+                  <div className="relative group/tip">
+                    <button
+                      onClick={startVoiceRecording}
+                      className="w-[42px] h-[42px] flex items-center justify-center rounded-full hover:bg-[#2a3942] transition-all duration-200 hover:scale-110 flex-shrink-0"
+                    >
+                      <Mic className="w-[24px] h-[24px] text-[#8696a0]" />
+                    </button>
+                    <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 bg-[#111b21] text-[#e9edef] text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg border border-[#2a3942]">
+                      Gravar áudio
+                    </div>
+                  </div>
                 )}
 
                 {/* Copilot toggle button */}
                 {!copilotOpen && (
-                  <button
-                    onClick={() => setCopilotOpen(true)}
-                    className="copilot-foil-btn w-[42px] h-[42px] flex items-center justify-center rounded-full flex-shrink-0 relative overflow-hidden"
-                    title="Abrir Copiloto de Vendas"
-                  >
-                    <Sparkles className="w-5 h-5 text-white relative z-10" />
-                  </button>
+                  <div className="relative group/tip">
+                    <button
+                      onClick={() => setCopilotOpen(true)}
+                      className="copilot-foil-btn w-[42px] h-[42px] flex items-center justify-center rounded-full flex-shrink-0 relative overflow-hidden"
+                    >
+                      <Sparkles className="w-5 h-5 text-white relative z-10" />
+                    </button>
+                    <div className="absolute bottom-[-36px] left-1/2 -translate-x-1/2 bg-[#111b21] text-[#e9edef] text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg border border-[#2a3942]">
+                      Copiloto de Vendas
+                    </div>
+                  </div>
                 )}
               </div>
               )
@@ -3709,6 +3887,22 @@ export default function FollowUpView() {
         >
           {/* Actions */}
           <div className="py-1">
+            {contextMenu.message.type !== 'revoked' && (
+              <button
+                onClick={() => {
+                  setReplyingTo(contextMenu.message)
+                  closeContextMenu()
+                  setTimeout(() => {
+                    const input = document.querySelector<HTMLTextAreaElement>('[data-message-input]')
+                    input?.focus()
+                  }, 100)
+                }}
+                className="w-full text-left px-4 py-2.5 text-[14px] text-[#e9edef] hover:bg-[#2a3942] transition-colors flex items-center gap-3"
+              >
+                <ArrowLeft className="w-4 h-4 text-[#8696a0] rotate-[225deg]" />
+                Responder
+              </button>
+            )}
             {contextMenu.message.fromMe && contextMenu.message.type === 'text' && contextMenu.message.body && (
               <button
                 onClick={startEditMessage}
