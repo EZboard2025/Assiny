@@ -96,7 +96,7 @@ export default function AutopilotActivityIndicator({ authToken }: { authToken: s
     return (
       <button
         onClick={() => setVisible(true)}
-        className="fixed bottom-4 left-4 z-[55] w-10 h-10 rounded-full bg-[#202c33] border border-[#2a3942] flex items-center justify-center hover:bg-[#2a3942] transition-all shadow-lg"
+        className="fixed bottom-4 left-20 z-[55] w-10 h-10 rounded-full bg-[#202c33] border border-[#2a3942] flex items-center justify-center hover:bg-[#2a3942] transition-all shadow-lg"
         title="Mostrar atividade do Autopilot"
       >
         <Radio className={`w-4 h-4 ${events.length > 0 ? 'text-green-400' : 'text-[#8696a0]'}`} />
@@ -112,7 +112,7 @@ export default function AutopilotActivityIndicator({ authToken }: { authToken: s
 
   return (
     <div
-      className={`fixed bottom-4 left-4 z-[55] transition-all duration-300 ${
+      className={`fixed bottom-4 left-20 z-[55] transition-all duration-300 ${
         expanded ? 'w-[340px]' : 'w-[220px]'
       }`}
     >

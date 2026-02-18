@@ -144,7 +144,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
           <button
             type="button"
             onClick={() => openDetails(latest)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium rounded-lg transition-colors border border-green-200"
           >
             <Play className="w-4 h-4" />
             Iniciar Simulação
@@ -252,9 +252,9 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
 
       {/* Detail Modal */}
       {showDetails && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-[fadeIn_200ms_ease-out]" onClick={() => setShowDetails(false)}>
+        <div className="fixed inset-0 xl:right-80 bg-black/50 z-30 flex items-center justify-center p-4 animate-[fadeIn_200ms_ease-out]" onClick={() => setShowDetails(false)}>
           <div
-            className="bg-gray-50 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto animate-[modalSlideUp_300ms_ease-out]"
+            className="bg-gray-50 rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-[modalSlideUp_300ms_ease-out]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -523,7 +523,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
               <button
                 type="button"
                 onClick={() => handleStart(sim)}
-                className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:shadow-lg"
+                className="w-full py-3.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border border-green-200"
               >
                 <Play className="w-5 h-5" />
                 Iniciar Simulação

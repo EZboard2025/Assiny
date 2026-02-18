@@ -1226,11 +1226,21 @@ async function fetchMissingProfilePics(state: ClientState, connectionId: string)
       if (state.destroyed) break
       try {
         // For groups, use contact_phone directly (it's the @g.us ID)
-        // For individuals, construct the JID
-        const jid = conv.contact_phone.includes('@')
-          ? conv.contact_phone
-          : `${conv.contact_phone.replace(/^lid_/, '')}@c.us`
-        const picUrl = await state.client.getProfilePicUrl(jid)
+        // For LID contacts, try both @lid and @c.us JIDs
+        // For regular contacts, construct @c.us JID
+        let picUrl: string | undefined
+        if (conv.contact_phone.includes('@')) {
+          picUrl = await state.client.getProfilePicUrl(conv.contact_phone)
+        } else if (conv.contact_phone.startsWith('lid_')) {
+          const lidNum = conv.contact_phone.replace(/^lid_/, '')
+          // Try @lid first, fallback to @c.us
+          try { picUrl = await state.client.getProfilePicUrl(`${lidNum}@lid`) } catch {}
+          if (!picUrl) {
+            try { picUrl = await state.client.getProfilePicUrl(`${lidNum}@c.us`) } catch {}
+          }
+        } else {
+          picUrl = await state.client.getProfilePicUrl(`${conv.contact_phone}@c.us`)
+        }
         if (picUrl) {
           await supabaseAdmin
             .from('whatsapp_conversations')
@@ -1292,11 +1302,10 @@ async function handleIncomingMessage(state: ClientState, msg: Message, fromMe: b
       contactName = chat.name || contact?.name || contact?.pushname || null
       convContactName = contactName
 
-      if (!fromMe) {
-        try {
-          profilePicUrl = await state.client.getProfilePicUrl(chat.id._serialized) || null
-        } catch {}
-      }
+      // Always try to fetch profile pic (for both inbound and outbound messages)
+      try {
+        profilePicUrl = await state.client.getProfilePicUrl(chat.id._serialized) || null
+      } catch {}
 
       const targetId = fromMe ? (msg.to || '') : (msg.from || '')
       let resolved = contactPhoneCache.get(targetId)

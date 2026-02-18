@@ -611,7 +611,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         userRole={userRole}
         hasChatIA={hasChatIA}
         hasPDI={hasPDI}
-        onOpenConfig={() => setShowConfigHub(true)}
+        onOpenConfig={() => {
+          console.log('[Dashboard] Opening ConfigHub, currentView:', currentView)
+          setShowConfigHub(true)
+        }}
         onLogout={onLogout}
         isExpanded={isSidebarExpanded}
         onExpandChange={setIsSidebarExpanded}

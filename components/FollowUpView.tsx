@@ -100,7 +100,7 @@ export default function FollowUpView() {
   const [copilotOpen, setCopilotOpen] = useState(true)
   const [showAutopilotPanel, setShowAutopilotPanel] = useState(false)
   const [autopilotEnabled, setAutopilotEnabled] = useState(false)
-  const [autopilotPhones, setAutopilotPhones] = useState<Map<string, { objective_reached: boolean, needs_human: boolean }>>(new Map())
+  const [autopilotPhones, setAutopilotPhones] = useState<Map<string, { objective_reached: boolean, needs_human: boolean, enabled: boolean }>>(new Map())
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null)
@@ -427,14 +427,15 @@ export default function FollowUpView() {
       .then(res => res.json())
       .then(data => {
         if (data.contacts) {
-          const phoneMap = new Map<string, { objective_reached: boolean, needs_human: boolean }>()
+          const phoneMap = new Map<string, { objective_reached: boolean, needs_human: boolean, enabled: boolean }>()
           data.contacts.forEach((c: any) => {
             // Include enabled contacts AND disabled contacts that have objective_reached/needs_human (for status indicators)
             if (c.enabled || c.objective_reached || c.needs_human) {
               const suffix = c.contact_phone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)
               phoneMap.set(suffix, {
                 objective_reached: !!c.objective_reached,
-                needs_human: !!c.needs_human
+                needs_human: !!c.needs_human,
+                enabled: !!c.enabled
               })
             }
           })
@@ -2940,7 +2941,23 @@ export default function FollowUpView() {
                   <Send className="w-5 h-5" />
                 </button>
               </div>
-            ) : (
+            ) : (() => {
+              // Check if selected contact is on active autopilot
+              const selPhone = selectedConversation?.contact_phone || ''
+              const selSuffix = selPhone.replace(/@.*$/, '').replace(/[^0-9]/g, '').slice(-9)
+              const apInfo = autopilotEnabled ? autopilotPhones.get(selSuffix) : undefined
+              const isOnAutopilot = apInfo?.enabled
+
+              if (isOnAutopilot) {
+                return (
+                  <div className="flex items-center gap-3 h-[44px] px-4">
+                    <Zap className="w-4 h-4 text-green-400 flex-shrink-0" />
+                    <p className="text-[#8696a0] text-[13px] flex-1">Piloto automático ativo — envio manual bloqueado</p>
+                  </div>
+                )
+              }
+
+              return (
               /* Normal Input Mode */
               <div className="flex items-end gap-[5px]">
                 {/* Input container with emoji + attach + text */}
@@ -3086,7 +3103,8 @@ export default function FollowUpView() {
                   </button>
                 )}
               </div>
-            )}
+              )
+            })()}
           </div>
 
           {/* Hidden file input */}

@@ -69,8 +69,11 @@ export default function Home() {
   // Aguarda o mount e verificação de sessão
   if (!mounted || checking) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Carregando...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-green-500 animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Verificando sessão...</p>
+        </div>
       </div>
     )
   }
@@ -78,14 +81,13 @@ export default function Home() {
   // Tela de carregamento após login
   if (isLoggingIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="relative mb-6">
-            <div className="w-16 h-16 rounded-full border-4 border-green-500/20 border-t-green-500 animate-spin mx-auto" />
-            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-500/10 blur-xl mx-auto" />
+            <div className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-green-500 animate-spin mx-auto" />
           </div>
-          <p className="text-gray-400 text-lg font-medium">Entrando...</p>
-          <p className="text-gray-600 text-sm mt-1">Preparando seu ambiente</p>
+          <p className="text-gray-600 text-lg font-medium">Entrando...</p>
+          <p className="text-gray-400 text-sm mt-1">Preparando seu ambiente</p>
         </div>
       </div>
     )
