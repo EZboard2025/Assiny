@@ -216,6 +216,7 @@ export default function FollowUpView() {
   }
 
   const formatAudioTime = (seconds: number) => {
+    if (!isFinite(seconds) || isNaN(seconds) || seconds < 0) return '0:00'
     const m = Math.floor(seconds / 60)
     const s = Math.floor(seconds % 60)
     return `${m}:${String(s).padStart(2, '0')}`
@@ -2656,48 +2657,55 @@ export default function FollowUpView() {
                           {(msg.type === 'audio' || msg.type === 'ptt') && msg.mediaId && (() => {
                             const isPlaying = playingAudioId === msg.id
                             const progress = audioProgress[msg.id] || 0
-                            const duration = audioDurations[msg.id] || 0
+                            const rawDuration = audioDurations[msg.id] || 0
+                            const duration = isFinite(rawDuration) && !isNaN(rawDuration) ? rawDuration : 0
                             const currentTime = duration * progress
                             const playedBars = Math.floor(progress * 36)
 
                             return (
-                            <div className="min-w-[280px]">
-                              <div className="flex items-center gap-2.5">
+                            <div className="min-w-[260px]">
+                              <div className="flex items-center gap-3">
                                 {/* Play/Pause button */}
                                 <button
                                   onClick={() => playAudio(msg.id, msg.mediaId!)}
-                                  className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-white/5 transition-colors"
+                                  className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-all duration-200 ${
+                                    isPlaying
+                                      ? 'bg-[#00a884] shadow-[0_0_10px_rgba(0,168,132,0.3)]'
+                                      : 'bg-white/10 hover:bg-white/15'
+                                  }`}
                                 >
                                   {isPlaying ? (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="#8696a0" stroke="none"><rect x="7" y="5" width="3" height="14" rx="1"/><rect x="14" y="5" width="3" height="14" rx="1"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="none"><rect x="7" y="5" width="3" height="14" rx="1"/><rect x="14" y="5" width="3" height="14" rx="1"/></svg>
                                   ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#8696a0" stroke="none"><polygon points="8 5 19 12 8 19 8 5"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="8 5 19 12 8 19 8 5"/></svg>
                                   )}
                                 </button>
                                 {/* Waveform with progress */}
-                                <div className="flex-1 flex items-center gap-[2px] h-[28px]">
-                                  {Array.from({ length: 36 }, (_, i) => {
-                                    const seed = (msg.id.charCodeAt(i % msg.id.length) * (i + 1)) % 100
-                                    const h = Math.max(4, Math.min(26, seed * 0.26))
-                                    const played = i < playedBars
-                                    return (
-                                      <div
-                                        key={i}
-                                        className="rounded-full flex-shrink-0 transition-colors duration-100"
-                                        style={{
-                                          width: '2.5px',
-                                          height: `${h}px`,
-                                          backgroundColor: played ? (msg.fromMe ? '#b3d4cc' : '#8696a0') : '#374045'
-                                        }}
-                                      />
-                                    )
-                                  })}
+                                <div className="flex-1 flex flex-col gap-1">
+                                  <div className="flex items-center gap-[2px] h-[28px]">
+                                    {Array.from({ length: 36 }, (_, i) => {
+                                      const seed = (msg.id.charCodeAt(i % msg.id.length) * (i + 1)) % 100
+                                      const h = Math.max(4, Math.min(26, seed * 0.26))
+                                      const played = i < playedBars
+                                      return (
+                                        <div
+                                          key={i}
+                                          className="rounded-full flex-shrink-0 transition-all duration-150"
+                                          style={{
+                                            width: '2.5px',
+                                            height: `${h}px`,
+                                            backgroundColor: played
+                                              ? (isPlaying ? '#00a884' : (msg.fromMe ? '#b3d4cc' : '#8696a0'))
+                                              : (msg.fromMe ? 'rgba(255,255,255,0.15)' : '#374045')
+                                          }}
+                                        />
+                                      )
+                                    })}
+                                  </div>
+                                  <span className="text-[11px] text-[#8696a0]">
+                                    {isPlaying || currentTime > 0 ? formatAudioTime(currentTime) : duration > 0 ? formatAudioTime(duration) : '0:00'}
+                                  </span>
                                 </div>
-                              </div>
-                              <div className="flex items-center justify-between mt-0.5 px-1">
-                                <span className="text-[11px] text-[#8696a0]">
-                                  {isPlaying || currentTime > 0 ? formatAudioTime(currentTime) : duration > 0 ? formatAudioTime(duration) : '0:00'}
-                                </span>
                               </div>
                             </div>
                             )
@@ -3591,7 +3599,7 @@ export default function FollowUpView() {
             onClose={() => setCopilotOpen(false)}
             onSendToChat={(text) => handleSendMessage(text)}
           />
-          <AutopilotActivityIndicator authToken={authToken} />
+          {/* AutopilotActivityIndicator hidden */}
         </>
       ) : connectionStatus === 'checking' ? (
         <div className="flex-1 flex items-center justify-center bg-[#222e35]">
