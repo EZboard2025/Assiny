@@ -416,11 +416,11 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                   </div>
                 </div>
 
-                {/* SPIN Evaluation */}
+                {/* SPIN Scores - Compact overview */}
                 {selectedChallenge.evaluation?.spin_evaluation && (
                   <div className="mb-4">
                     <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Scores SPIN</h4>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-4 gap-2 mb-4">
                       {['S', 'P', 'I', 'N'].map((letter) => {
                         const score = selectedChallenge.evaluation.spin_evaluation[letter]?.final_score
                         const isTarget = extractSpinLetter(selectedChallenge.challenge_config.success_criteria.spin_letter_target) === letter
@@ -440,6 +440,116 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                             <p className={`text-xl font-bold ${getScoreColor(score || 0)}`}>
                               {score?.toFixed(1) || 'N/A'}
                             </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* SPIN Detailed breakdown - 2 columns */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {['S', 'P', 'I', 'N'].map((letter) => {
+                        const spinDetail = selectedChallenge.evaluation.spin_evaluation[letter]
+                        if (!spinDetail) return null
+                        const score = spinDetail.final_score
+                        const isTarget = extractSpinLetter(selectedChallenge.challenge_config.success_criteria.spin_letter_target) === letter
+                        return (
+                          <div key={letter} className={`rounded-xl p-4 ${isTarget ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                            {/* Card header */}
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
+                                score >= 7 ? 'bg-green-500' :
+                                score >= 5 ? 'bg-yellow-500' :
+                                'bg-red-500'
+                              }`}>
+                                {letter}
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {getSpinLetterLabel(letter)}
+                                  {isTarget && <span className="text-green-600 text-xs ml-1">(Meta)</span>}
+                                </div>
+                                <div className={`text-xs font-medium ${
+                                  score >= 7 ? 'text-green-600' :
+                                  score >= 5 ? 'text-yellow-600' :
+                                  'text-red-600'
+                                }`}>
+                                  {score?.toFixed(1) || '--'}/10
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Indicators */}
+                            {spinDetail.indicators && (
+                              <div className="space-y-2 mb-3">
+                                {Object.entries(spinDetail.indicators).map(([key, value]: [string, any]) => {
+                                  const indicatorLabels: Record<string, string> = {
+                                    open_questions_score: 'Perguntas Abertas',
+                                    scenario_mapping_score: 'Mapeamento de Cenário',
+                                    adaptability_score: 'Adaptabilidade',
+                                    problem_identification_score: 'Identificação de Problemas',
+                                    consequences_exploration_score: 'Exploração de Consequências',
+                                    depth_score: 'Profundidade',
+                                    empathy_score: 'Empatia',
+                                    impact_understanding_score: 'Compreensão de Impacto',
+                                    inaction_consequences_score: 'Consequências da Inação',
+                                    urgency_amplification_score: 'Amplificação de Urgência',
+                                    concrete_risks_score: 'Riscos Concretos',
+                                    non_aggressive_urgency_score: 'Urgência Não Agressiva',
+                                    solution_clarity_score: 'Clareza da Solução',
+                                    personalization_score: 'Personalização',
+                                    benefits_clarity_score: 'Clareza dos Benefícios',
+                                    credibility_score: 'Credibilidade',
+                                    cta_effectiveness_score: 'Efetividade do CTA',
+                                  }
+                                  const indicatorLabel = indicatorLabels[key] || key
+                                    .replace(/_score$/, '')
+                                    .replace(/_/g, ' ')
+                                    .replace(/\b\w/g, (c: string) => c.toUpperCase())
+                                  return (
+                                    <div key={key}>
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <span className="text-xs text-gray-600">{indicatorLabel}</span>
+                                        <span className={`text-xs font-semibold ${
+                                          Number(value) >= 7 ? 'text-green-600' :
+                                          Number(value) >= 5 ? 'text-yellow-600' : 'text-red-600'
+                                        }`}>{value}/10</span>
+                                      </div>
+                                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full transition-all ${
+                                            Number(value) >= 7 ? 'bg-green-500' :
+                                            Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                                          }`}
+                                          style={{ width: `${(Number(value) / 10) * 100}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            {/* Technical feedback */}
+                            {spinDetail.technical_feedback && (
+                              <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-3 mb-3">
+                                {spinDetail.technical_feedback}
+                              </p>
+                            )}
+
+                            {/* Missed opportunities */}
+                            {spinDetail.missed_opportunities && spinDetail.missed_opportunities.length > 0 && (
+                              <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                                <p className="text-[11px] font-semibold text-orange-700 mb-1.5">Oportunidades perdidas</p>
+                                <ul className="space-y-1">
+                                  {spinDetail.missed_opportunities.map((opp: string, idx: number) => (
+                                    <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                      <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>
+                                      {opp}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -467,7 +577,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                           <h4 className="text-sm font-semibold text-gray-900">Pontos Fortes</h4>
                         </div>
                         <ul className="space-y-1.5">
-                          {selectedChallenge.evaluation.top_strengths.slice(0, 3).map((strength: string, i: number) => (
+                          {selectedChallenge.evaluation.top_strengths.map((strength: string, i: number) => (
                             <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
                               <span className="text-green-500 mt-1">•</span>
                               {strength}
@@ -484,7 +594,7 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                           <h4 className="text-sm font-semibold text-gray-900">A Melhorar</h4>
                         </div>
                         <ul className="space-y-1.5">
-                          {selectedChallenge.evaluation.critical_gaps.slice(0, 3).map((gap: string, i: number) => (
+                          {selectedChallenge.evaluation.critical_gaps.map((gap: string, i: number) => (
                             <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
                               <span className="text-orange-500 mt-1">•</span>
                               {gap}
@@ -493,6 +603,89 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                         </ul>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Objections Analysis */}
+                {selectedChallenge.evaluation?.objections_analysis && selectedChallenge.evaluation.objections_analysis.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Análise de Objeções</h4>
+                    <div className="space-y-4">
+                      {selectedChallenge.evaluation.objections_analysis.map((obj: any, idx: number) => (
+                        <div key={idx} className="bg-gray-50 rounded-xl p-5">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                                  obj.objection_type === 'preço' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
+                                  obj.objection_type === 'timing' ? 'bg-blue-100 text-blue-700' :
+                                  obj.objection_type === 'autoridade' ? 'bg-purple-100 text-purple-700' :
+                                  obj.objection_type === 'concorrência' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {obj.objection_type}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700 italic leading-relaxed">&ldquo;{obj.objection_text}&rdquo;</p>
+                            </div>
+                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ml-4 ${
+                              obj.score >= 7 ? 'bg-green-100' :
+                              obj.score >= 5 ? 'bg-yellow-100' : 'bg-red-100'
+                            }`}>
+                              <span className={`text-xl font-bold ${
+                                obj.score >= 7 ? 'text-green-600' :
+                                obj.score >= 5 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {obj.score}
+                              </span>
+                            </div>
+                          </div>
+
+                          {obj.detailed_analysis && (
+                            <p className="text-sm text-gray-600 leading-relaxed mb-3">{obj.detailed_analysis}</p>
+                          )}
+
+                          {obj.critical_errors && obj.critical_errors.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs font-semibold text-red-600 mb-1.5">Erros criticos:</p>
+                              <ul className="space-y-1">
+                                {obj.critical_errors.map((err: string, i: number) => (
+                                  <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                    <span className="text-red-400 mt-1">•</span>
+                                    {err}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {obj.ideal_response && (
+                            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                              <p className="text-xs font-semibold text-green-700 mb-1">Resposta ideal:</p>
+                              <p className="text-sm text-gray-700 leading-relaxed">{obj.ideal_response}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Priority Improvements */}
+                {selectedChallenge.evaluation?.priority_improvements && selectedChallenge.evaluation.priority_improvements.length > 0 && (
+                  <div className="bg-purple-50 rounded-xl p-4 mt-4 border border-purple-100">
+                    <h4 className="flex items-center gap-2 text-sm font-semibold text-purple-700 mb-2">
+                      <Lightbulb className="w-4 h-4" />
+                      Melhorias Prioritárias
+                    </h4>
+                    <ul className="space-y-2">
+                      {selectedChallenge.evaluation.priority_improvements.map((improvement: any, idx: number) => (
+                        <li key={idx} className="text-sm text-gray-700">
+                          <span className="font-medium">{improvement.area || improvement}:</span>{' '}
+                          {improvement.action_plan || ''}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
