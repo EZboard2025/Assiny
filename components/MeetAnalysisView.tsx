@@ -29,7 +29,7 @@ import {
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
 
-type BotStatus = 'idle' | 'sending' | 'joining' | 'in_meeting' | 'transcribing' | 'ended' | 'evaluating' | 'error'
+type BotStatus = 'idle' | 'sending' | 'joining' | 'waiting_room' | 'in_meeting' | 'transcribing' | 'ended' | 'evaluating' | 'error'
 
 interface TranscriptSegment {
   speaker: string
@@ -170,7 +170,7 @@ export default function MeetAnalysisView() {
           ...parsed,
           startTime: parsed.startTime ? new Date(parsed.startTime) : undefined
         }
-        const activeStatuses: BotStatus[] = ['sending', 'joining', 'in_meeting', 'transcribing', 'evaluating']
+        const activeStatuses: BotStatus[] = ['sending', 'joining', 'waiting_room', 'in_meeting', 'transcribing', 'evaluating']
         if (activeStatuses.includes(restored.status) && restored.botId) {
           setSession(restored)
           setMeetUrl(restored.meetingUrl)
@@ -456,6 +456,9 @@ export default function MeetAnalysisView() {
               case 'joining':
                 newStatus = 'joining'
                 break
+              case 'waiting_room':
+                newStatus = 'waiting_room'
+                break
               case 'in_meeting':
                 newStatus = 'in_meeting'
                 break
@@ -463,6 +466,13 @@ export default function MeetAnalysisView() {
                 newStatus = 'transcribing'
                 break
               case 'ended':
+                // Check if bot timed out in waiting room
+                if (statusData.subCode === 'timeout_exceeded_waiting_room') {
+                  newStatus = 'error'
+                  setError('O bot não foi aceito na reunião. Verifique se você admitiu o "Ramppy" pela sala de espera do Google Meet.')
+                  stopPolling()
+                  break
+                }
                 // Bot left automatically - trigger auto-evaluation
                 if (!hasTriggeredAutoEvalRef.current && prev.status !== 'ended') {
                   console.log('🤖 Bot saiu automaticamente, iniciando avaliação...')
@@ -846,6 +856,7 @@ export default function MeetAnalysisView() {
       idle: { icon: Clock, text: 'Aguardando', color: 'text-gray-500' },
       sending: { icon: Loader2, text: 'Criando bot...', color: 'text-amber-600' },
       joining: { icon: Loader2, text: 'Entrando na reunião...', color: 'text-amber-600' },
+      waiting_room: { icon: AlertTriangle, text: 'Na sala de espera — aceite o Ramppy!', color: 'text-amber-600' },
       in_meeting: { icon: Video, text: 'Na reunião', color: 'text-green-600' },
       transcribing: { icon: Video, text: 'Transcrevendo...', color: 'text-green-600' },
       evaluating: { icon: Loader2, text: 'Avaliando performance...', color: 'text-purple-600' },
@@ -1034,7 +1045,7 @@ export default function MeetAnalysisView() {
             </div>
 
             {/* Background processing notice */}
-            {session.status !== 'ended' && session.status !== 'error' && session.status !== 'sending' && (
+            {session.status !== 'ended' && session.status !== 'error' && session.status !== 'sending' && session.status !== 'waiting_room' && (
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <div>
@@ -1058,7 +1069,19 @@ export default function MeetAnalysisView() {
                     Isso geralmente leva de 10 a 30 segundos
                   </p>
                   <p className="text-sm text-amber-600 mt-2 font-medium">
-                    Lembre-se de aceitar o "Ramppy" quando ele pedir para entrar!
+                    Lembre-se de aceitar o &quot;Ramppy&quot; quando ele pedir para entrar!
+                  </p>
+                </div>
+              </div>
+            )}
+            {/* Waiting room alert */}
+            {session.status === 'waiting_room' && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-6">
+                <div className="flex flex-col items-center justify-center">
+                  <AlertTriangle className="w-8 h-8 mb-3 text-amber-600" />
+                  <p className="text-amber-800 font-semibold">O Ramppy está na sala de espera</p>
+                  <p className="text-sm text-amber-700 mt-2 text-center">
+                    Abra o Google Meet, vá em <strong>Pessoas</strong> → <strong>Sala de espera</strong> e clique em <strong>Admitir</strong> para o Ramppy entrar na reunião.
                   </p>
                 </div>
               </div>
@@ -1077,6 +1100,19 @@ export default function MeetAnalysisView() {
                   <Video className="w-8 h-8 mb-3 text-green-600" />
                   <p className="text-gray-600">Reunião em andamento...</p>
                   <p className="text-sm text-gray-500 mt-1">{session.transcript.length} falas capturadas</p>
+                </div>
+              </div>
+            )}
+
+            {/* Error state */}
+            {session.status === 'error' && error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                <div className="flex items-start gap-3">
+                  <XCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-red-800 font-semibold">Falha na análise</p>
+                    <p className="text-sm text-red-700 mt-1">{error}</p>
+                  </div>
                 </div>
               </div>
             )}

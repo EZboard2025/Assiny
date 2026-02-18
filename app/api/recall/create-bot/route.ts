@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         },
         // Auto-leave settings
         automatic_leave: {
-          waiting_room_timeout: 300, // 5 minutes in waiting room
+          waiting_room_timeout: 600, // 10 minutes in waiting room
           noone_joined_timeout: 120, // 2 minutes if no one joins
           everyone_left_timeout: {
             timeout: 30 // 30 seconds after everyone leaves

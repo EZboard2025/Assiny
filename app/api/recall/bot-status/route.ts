@@ -47,14 +47,18 @@ export async function GET(request: Request) {
     const statusChanges = data.status_changes || []
     const latestStatus = statusChanges[statusChanges.length - 1]?.code || 'unknown'
 
+    const latestSubCode = statusChanges[statusChanges.length - 1]?.sub_code || null
+
     let mappedStatus = 'unknown'
     switch (latestStatus) {
       case 'ready':
         mappedStatus = 'ready'
         break
       case 'joining_call':
-      case 'in_waiting_room':
         mappedStatus = 'joining'
+        break
+      case 'in_waiting_room':
+        mappedStatus = 'waiting_room'
         break
       case 'in_call_not_recording':
         mappedStatus = 'in_meeting'
@@ -78,6 +82,7 @@ export async function GET(request: Request) {
       botId: data.id,
       status: mappedStatus,
       recallStatus: latestStatus,
+      subCode: latestSubCode,
       statusChanges: statusChanges,
       meetingUrl: data.meeting_url,
       botName: data.bot_name
