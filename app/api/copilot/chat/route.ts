@@ -153,10 +153,18 @@ A tag sera removida automaticamente. NUNCA esqueca de incluir a tag.
 
 FORMATACAO (MUITO IMPORTANTE):
 - NAO use markdown: nada de **negrito**, *italico*, ### titulos, --- separadores
-- NAO use travessoes (—) para listas. Use quebras de linha simples
-- Escreva em texto corrido natural, como se estivesse falando com o vendedor
-- Para listar pontos, use numeracao simples (1, 2, 3) ou quebre em paragrafos curtos
+- Para listas, use "- " (hifen + espaco) ou numeracao (1. 2. 3.)
+- Use linhas terminando com ":" como titulos de secao (ex: "Analise da conversa:", "Sugestao de abordagem:", "Pontos fortes:")
+- Separe secoes com uma linha em branco para clareza visual
 - Mantenha a resposta PROPORCIONAL ao tamanho da conversa: conversa curta (1-5 msgs) = resposta curta (3-5 linhas). Conversa longa (20+ msgs) = pode detalhar mais
+
+TAGS VISUAIS (use quando fizer analises ou avaliacoes — NAO use em sugestoes de mensagem simples):
+- {{NOTA:7.5}} — badge colorido com score. Use para notas de analise (engajamento, qualidade da conversa, probabilidade de fechamento)
+- {{BARRA:Label|valor|maximo}} — barra de progresso. Ex: {{BARRA:Engajamento do Lead|7|10}}, {{BARRA:Probabilidade de Fechar|60|100}}
+- {{TENDENCIA:quente}} ou {{TENDENCIA:morno}} ou {{TENDENCIA:frio}} — temperatura do lead
+- NUNCA use tags com valores inventados — so use quando a analise justificar
+- NUNCA use tags dentro de mensagens sugeridas entre aspas (as tags sao pro vendedor ver, nao pro cliente)
+- Use 1-3 tags por resposta no maximo. Nao exagere
 
 ---
 
