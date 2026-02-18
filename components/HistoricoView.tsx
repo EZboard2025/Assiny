@@ -678,84 +678,85 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
                             </div>
                           </div>
 
-                          {/* Detalhes de cada pilar */}
-                          {['S', 'P', 'I', 'N'].map((letter) => {
-                            const data = spin[letter]
-                            if (!data) return null
+                          {/* SPIN Detailed breakdown - 2 columns, always visible */}
+                          <div className="grid grid-cols-2 gap-4">
+                            {['S', 'P', 'I', 'N'].map((letter) => {
+                              const data = spin[letter]
+                              if (!data) return null
 
-                            const labels: Record<string, string> = {
-                              'S': 'Situação',
-                              'P': 'Problema',
-                              'I': 'Implicação',
-                              'N': 'Necessidade'
-                            }
+                              const labels: Record<string, string> = {
+                                'S': 'Situação',
+                                'P': 'Problema',
+                                'I': 'Implicação',
+                                'N': 'Necessidade'
+                              }
 
-                            const letterColors: Record<string, string> = {
-                              'S': 'bg-cyan-100 text-cyan-700',
-                              'P': 'bg-green-100 text-green-700',
-                              'I': 'bg-yellow-100 text-yellow-700',
-                              'N': 'bg-pink-100 text-pink-700'
-                            }
+                              const score = data.final_score || 0
 
-                            return (
-                              <details key={letter} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
-                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                                  <div className="flex items-center gap-3">
-                                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${letterColors[letter]}`}>
+                              return (
+                                <div key={letter} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                  {/* Card header */}
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
+                                      score >= 7 ? 'bg-green-500' :
+                                      score >= 5 ? 'bg-yellow-500' :
+                                      'bg-red-500'
+                                    }`}>
                                       {letter}
-                                    </span>
-                                    <span className="font-semibold text-gray-900">{labels[letter]}</span>
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-semibold text-gray-900">{labels[letter]}</div>
+                                      <div className={`text-xs font-medium ${
+                                        score >= 7 ? 'text-green-600' :
+                                        score >= 5 ? 'text-yellow-600' :
+                                        'text-red-600'
+                                      }`}>
+                                        {score.toFixed(1)}/10
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className={`text-lg font-bold ${getScoreColor(data.final_score || 0)}`}>
-                                      {data.final_score?.toFixed(1)}
-                                    </span>
-                                    <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
-                                  </div>
-                                </summary>
-                                <div className="p-4 pt-0 space-y-3 border-t border-gray-100">
-                                  {/* Feedback */}
+
+                                  {/* Indicators with progress bars */}
+                                  {data.indicators && Object.keys(data.indicators).length > 0 && (
+                                    <div className="space-y-2 mb-3">
+                                      {Object.entries(data.indicators).map(([key, value]: [string, any]) => (
+                                        <div key={key}>
+                                          <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-xs text-gray-600">{translateIndicator(key)}</span>
+                                            <span className={`text-xs font-semibold ${
+                                              Number(value) >= 7 ? 'text-green-600' :
+                                              Number(value) >= 5 ? 'text-yellow-600' : 'text-red-600'
+                                            }`}>{value}/10</span>
+                                          </div>
+                                          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div
+                                              className={`h-full rounded-full transition-all ${
+                                                Number(value) >= 7 ? 'bg-green-500' :
+                                                Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                                              }`}
+                                              style={{ width: `${(Number(value) / 10) * 100}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Technical feedback */}
                                   {data.technical_feedback && (
-                                    <p className="text-sm text-gray-600 leading-relaxed pt-3">
+                                    <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-3 mb-3">
                                       {data.technical_feedback}
                                     </p>
                                   )}
 
-                                  {/* Indicadores */}
-                                  {data.indicators && Object.keys(data.indicators).length > 0 && (
-                                    <div className="flex flex-wrap gap-2 pt-2">
-                                      {Object.entries(data.indicators).map(([key, value]: [string, any]) => {
-                                        const score = typeof value === 'number' ? value : 0
-                                        const getIndicatorStyle = (s: number) => {
-                                          if (s >= 8) return 'bg-green-50 border-green-200 text-green-700'
-                                          if (s >= 6) return 'bg-yellow-50 border-yellow-200 text-yellow-700'
-                                          return 'bg-red-50 border-red-200 text-red-700'
-                                        }
-                                        const getScoreStyle = (s: number) => {
-                                          if (s >= 8) return 'text-green-600 font-semibold'
-                                          if (s >= 6) return 'text-yellow-600 font-semibold'
-                                          return 'text-red-600 font-semibold'
-                                        }
-                                        return (
-                                          <span
-                                            key={key}
-                                            className={`text-xs px-3 py-1.5 rounded-lg border transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
-                                          >
-                                            {translateIndicator(key)}: <span className={getScoreStyle(score)}>{value}/10</span>
-                                          </span>
-                                        )
-                                      })}
-                                    </div>
-                                  )}
-
-                                  {/* Oportunidades perdidas */}
+                                  {/* Missed opportunities */}
                                   {data.missed_opportunities?.length > 0 && (
-                                    <div className="bg-orange-50 rounded-xl p-4 border border-orange-100 mt-3">
-                                      <p className="text-xs font-semibold text-orange-600 mb-2 uppercase tracking-wider">Oportunidades Perdidas</p>
+                                    <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                                      <p className="text-[11px] font-semibold text-orange-700 mb-1.5">Oportunidades perdidas</p>
                                       <ul className="space-y-1">
                                         {data.missed_opportunities.map((opp: string, i: number) => (
-                                          <li key={i} className="text-sm text-orange-700 flex items-start gap-2">
-                                            <span className="text-orange-400 mt-0.5">•</span>
+                                          <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                            <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>
                                             {opp}
                                           </li>
                                         ))}
@@ -763,48 +764,73 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
                                     </div>
                                   )}
                                 </div>
-                              </details>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
 
-                          {/* Análise de objeções */}
+                          {/* Análise de objeções - always visible */}
                           {evaluation.objections_analysis?.length > 0 && (
-                            <details className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group">
-                              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                  <span className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                                    <Target className="w-4 h-4 text-purple-600" />
-                                  </span>
-                                  <span className="font-semibold text-gray-900">Análise de Objeções</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-sm text-gray-500 font-medium">
-                                    {evaluation.objections_analysis.length} objeções
-                                  </span>
-                                  <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
-                                </div>
-                              </summary>
-                              <div className="p-4 pt-0 space-y-3 border-t border-gray-100">
+                            <div>
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Análise de Objeções</h4>
+                              <div className="space-y-4">
                                 {evaluation.objections_analysis.map((obj: any, idx: number) => (
-                                  <div key={idx} className="bg-gray-50 rounded-xl border border-gray-100 p-4 mt-3 first:mt-0">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className="text-xs px-2.5 py-1 bg-gray-200 rounded-full text-gray-700 font-medium">
-                                        {obj.objection_type}
-                                      </span>
-                                      <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
-                                        {obj.score}/10
-                                      </span>
+                                  <div key={idx} className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                                    <div className="flex items-start justify-between mb-3">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                                            obj.objection_type === 'preço' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
+                                            obj.objection_type === 'timing' ? 'bg-blue-100 text-blue-700' :
+                                            obj.objection_type === 'autoridade' ? 'bg-purple-100 text-purple-700' :
+                                            obj.objection_type === 'concorrência' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
+                                            'bg-gray-100 text-gray-700'
+                                          }`}>
+                                            {obj.objection_type}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-gray-700 italic leading-relaxed">&ldquo;{obj.objection_text}&rdquo;</p>
+                                      </div>
+                                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ml-4 ${
+                                        obj.score >= 7 ? 'bg-green-100' :
+                                        obj.score >= 5 ? 'bg-yellow-100' : 'bg-red-100'
+                                      }`}>
+                                        <span className={`text-xl font-bold ${
+                                          obj.score >= 7 ? 'text-green-600' :
+                                          obj.score >= 5 ? 'text-yellow-600' : 'text-red-600'
+                                        }`}>
+                                          {obj.score}
+                                        </span>
+                                      </div>
                                     </div>
-                                    <p className="text-sm text-gray-600 italic mb-2">
-                                      "{obj.objection_text}"
-                                    </p>
+
                                     {obj.detailed_analysis && (
-                                      <p className="text-sm text-gray-500">{obj.detailed_analysis}</p>
+                                      <p className="text-sm text-gray-600 leading-relaxed mb-3">{obj.detailed_analysis}</p>
+                                    )}
+
+                                    {obj.critical_errors && obj.critical_errors.length > 0 && (
+                                      <div className="mb-3">
+                                        <p className="text-xs font-semibold text-red-600 mb-1.5">Erros criticos:</p>
+                                        <ul className="space-y-1">
+                                          {obj.critical_errors.map((err: string, i: number) => (
+                                            <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                              <span className="text-red-400 mt-1">•</span>
+                                              {err}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+
+                                    {obj.ideal_response && (
+                                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                                        <p className="text-xs font-semibold text-green-700 mb-1">Resposta ideal:</p>
+                                        <p className="text-sm text-gray-700 leading-relaxed">{obj.ideal_response}</p>
+                                      </div>
                                     )}
                                   </div>
                                 ))}
                               </div>
-                            </details>
+                            </div>
                           )}
                         </div>
                       )
