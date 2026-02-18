@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Users, TrendingUp, TrendingDown, Award, Target, Activity, Loader2, MessageSquare, Brain, CheckCircle, AlertTriangle, AlertCircle, Sparkles, Zap, FileText, Video, X, ChevronRight, ChevronDown, Calendar, Mic, Lightbulb, BookOpen, Eye, Filter } from 'lucide-react'
 import type { SellerPerformance } from './SellerGrid'
@@ -177,28 +177,42 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   const [pdiData, setPdiData] = useState<any>(null)
   const [pdiLoading, setPdiLoading] = useState(false)
 
+  // ── Abort controller for cleanup on unmount ─────────────────────────────
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort() }
+  }, [])
+
   // ── Data loading ────────────────────────────────────────────────────────
 
-  useEffect(() => { loadSellerDetails() }, [seller.user_id])
+  useEffect(() => {
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+    loadSellerDetails()
+  }, [seller.user_id])
   useEffect(() => { loadWhatsappEvals() }, [whatsappDays, seller.user_id])
   useEffect(() => {
     if (selectedSellerForPDI) { loadPDI(selectedSellerForPDI.userId) } else { setPdiData(null) }
   }, [selectedSellerForPDI])
 
   const loadSellerDetails = async () => {
+    const signal = abortRef.current?.signal
     try {
       setLoading(true)
 
       const [compData, savedAnalysis, _playbook] = await Promise.all([
-        loadComprehensiveData(),
-        loadSavedAISummary(),
-        loadPlaybook()
+        loadComprehensiveData(signal),
+        loadSavedAISummary(signal),
+        loadPlaybook(signal)
       ])
+
+      if (signal?.aborted) return
 
       // Auto-generate AI summary in background (non-blocking)
       if (!savedAnalysis) {
         console.log(`Auto-gerando analise IA para vendedor ${seller.user_id} (sem analise anterior)`)
-        generateAISummary(false).catch(console.error)
+        generateAISummary(false, signal).catch(() => {})
       } else if (compData) {
         const currentTotal =
           (compData.meets?.total || 0) +
@@ -215,10 +229,11 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
         if (delta >= 10) {
           console.log(`Auto-regenerando analise IA (delta >= 10)`)
-          generateAISummary(true).catch(console.error)
+          generateAISummary(true, signal).catch(() => {})
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return
       console.error('Erro ao carregar detalhes do vendedor:', error)
     } finally {
       setLoading(false)
@@ -226,12 +241,14 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   }
 
   const loadWhatsappEvals = async () => {
+    const signal = abortRef.current?.signal
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) return
 
       const response = await fetch(`/api/manager/evaluations?days=${whatsappDays}&seller=${seller.user_id}`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        signal
       })
 
       if (response.ok) {
@@ -262,7 +279,8 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
         generateWaAiSummary(evals).catch(console.error)
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return
       console.error('Erro ao carregar avaliacoes WhatsApp:', error)
     }
   }
@@ -297,13 +315,14 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
     }
   }
 
-  const loadComprehensiveData = async (): Promise<ComprehensiveData | null> => {
+  const loadComprehensiveData = async (signal?: AbortSignal): Promise<ComprehensiveData | null> => {
     try {
       const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
       const companyId = await getCompanyId()
 
       const response = await fetch(`/api/admin/sellers-comprehensive?sellerId=${seller.user_id}`, {
-        headers: { 'x-company-id': companyId || '' }
+        headers: { 'x-company-id': companyId || '' },
+        signal
       })
 
       if (response.ok) {
@@ -318,7 +337,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
     }
   }
 
-  const loadSavedAISummary = async (): Promise<SavedAnalysis | null> => {
+  const loadSavedAISummary = async (signal?: AbortSignal): Promise<SavedAnalysis | null> => {
     try {
       const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
       const companyId = await getCompanyId()
@@ -326,7 +345,8 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
       if (!companyId) return null
 
       const response = await fetch(`/api/admin/seller-ai-summary?sellerId=${seller.user_id}`, {
-        headers: { 'x-company-id': companyId }
+        headers: { 'x-company-id': companyId },
+        signal
       })
 
       if (response.ok) {
@@ -346,7 +366,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
     }
   }
 
-  const generateAISummary = async (forceRegenerate: boolean = false) => {
+  const generateAISummary = async (forceRegenerate: boolean = false, signal?: AbortSignal) => {
     if (aiSummary && !forceRegenerate) return
 
     try {
@@ -365,7 +385,8 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           'Content-Type': 'application/json',
           'x-company-id': companyId
         },
-        body: JSON.stringify({ sellerId: seller.user_id })
+        body: JSON.stringify({ sellerId: seller.user_id }),
+        signal
       })
 
       if (response.ok) {
@@ -379,21 +400,22 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         const errorData = await response.json()
         console.error('Erro ao gerar resumo IA:', errorData.error)
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return
       console.error('Erro ao gerar resumo IA:', error)
     } finally {
       setAiSummaryLoading(false)
     }
   }
 
-  const loadPlaybook = async () => {
+  const loadPlaybook = async (signal?: AbortSignal) => {
     try {
       const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
       const companyId = await getCompanyId()
 
       if (!companyId) return null
 
-      const response = await fetch(`/api/playbook/save?companyId=${companyId}`)
+      const response = await fetch(`/api/playbook/save?companyId=${companyId}`, { signal })
       const result = await response.json()
 
       if (response.ok && result.success && result.playbook) {
@@ -401,7 +423,8 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         return result.playbook
       }
       return null
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return null
       console.error('Erro ao carregar playbook:', error)
       return null
     }

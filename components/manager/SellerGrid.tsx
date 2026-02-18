@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Users, TrendingUp, TrendingDown, Award, Activity, Target, Search, X, Loader2, MessageSquare } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -84,11 +84,16 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
+  const abortRef = useRef<AbortController | null>(null)
+
   useEffect(() => {
+    abortRef.current = new AbortController()
     loadAllData()
+    return () => { abortRef.current?.abort() }
   }, [])
 
   const loadAllData = async () => {
+    const signal = abortRef.current?.signal
     try {
       setLoading(true)
 
@@ -108,9 +113,9 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
       }
 
       const [roleplayRes, followupRes, whatsappRes] = await Promise.all([
-        fetch('/api/admin/sellers-performance', { headers: { 'x-company-id': companyId } }),
-        fetch('/api/admin/sellers-followup', { headers: { 'x-company-id': companyId } }),
-        fetch('/api/manager/evaluations?days=30', { headers: { 'Authorization': `Bearer ${session.access_token}` } })
+        fetch('/api/admin/sellers-performance', { headers: { 'x-company-id': companyId }, signal }),
+        fetch('/api/admin/sellers-followup', { headers: { 'x-company-id': companyId }, signal }),
+        fetch('/api/manager/evaluations?days=30', { headers: { 'Authorization': `Bearer ${session.access_token}` }, signal })
       ])
 
       const roleplayData = await roleplayRes.json()
@@ -147,7 +152,8 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
       }
 
       setWhatsappEvalsByUser(aggregated)
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return
       console.error('Erro ao carregar dados dos vendedores:', error)
     } finally {
       setLoading(false)

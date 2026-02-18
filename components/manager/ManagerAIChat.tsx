@@ -474,14 +474,16 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
     loadAuth()
 
     let subscription: any
+    let cancelled = false
     ;(async () => {
       const { supabase } = await import('@/lib/supabase')
+      if (cancelled) return
       const { data } = supabase.auth.onAuthStateChange((_event, session) => {
         setAuthToken(session?.access_token || null)
       })
       subscription = data.subscription
     })()
-    return () => subscription?.unsubscribe()
+    return () => { cancelled = true; subscription?.unsubscribe() }
   }, [])
 
   // Focus input when panel opens
