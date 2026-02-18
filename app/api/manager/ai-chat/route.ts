@@ -563,30 +563,44 @@ VOCE TEM ACESSO A:
 
     gptMessages.push({ role: 'user', content: userMessage })
 
-    const completion = await openai.chat.completions.create({
+    // SSE streaming response
+    const stream = await openai.chat.completions.create({
       model: 'gpt-4.1',
       messages: gptMessages,
       temperature: 0.7,
-      max_tokens: 4000
+      max_tokens: 4000,
+      stream: true
     })
 
-    const response = completion.choices[0]?.message?.content
-    if (!response) {
-      return NextResponse.json({ error: 'IA não gerou resposta' }, { status: 500 })
-    }
-
-    // Consume 0.2 credits
+    // Consume 0.2 credits (fire-and-forget)
     if (companyCredits) {
-      await supabaseAdmin
+      supabaseAdmin
         .from('companies')
         .update({ monthly_credits_used: (companyCredits.monthly_credits_used || 0) + 0.2 })
         .eq('id', companyId)
+        .then(() => {})
     }
 
-    return NextResponse.json({
-      response,
-      teamSize: sellersWithData.length,
-      dataTimestamp: new Date().toISOString()
+    const encoder = new TextEncoder()
+    const readable = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content
+          if (content) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: content })}\n\n`))
+          }
+        }
+        controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
+        controller.close()
+      }
+    })
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      }
     })
 
   } catch (error: any) {

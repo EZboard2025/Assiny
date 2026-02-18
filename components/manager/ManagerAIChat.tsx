@@ -342,6 +342,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
   const [userName, setUserName] = useState<string | null>(null)
   const [revealingMsgId, setRevealingMsgId] = useState<string | null>(null)
   const [revealedChunks, setRevealedChunks] = useState(0)
+  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastUserMsgRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -392,11 +393,13 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
     }
   }, [])
 
-  // Phrase-by-phrase reveal
+  // Phrase-by-phrase reveal (skipped for streaming messages)
   useEffect(() => {
     if (messages.length === 0) return
     const lastMsg = messages[messages.length - 1]
     if (lastMsg.role !== 'assistant' || lastMsg.id === revealingMsgId) return
+    // Skip reveal for streaming messages — they render progressively via RichMessage
+    if (streamingMsgId === lastMsg.id) return
 
     const chunks = splitIntoChunks(lastMsg.content)
     setRevealingMsgId(lastMsg.id)
@@ -592,6 +595,8 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
     setMessages(prev => [...prev, userMsg])
     setIsLoading(true)
 
+    const aiMsgId = `ai_${Date.now()}`
+
     try {
       let token = authToken
       if (!token) {
@@ -619,27 +624,70 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
         })
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
         throw new Error(data.error || 'Erro ao processar')
       }
 
+      // Create placeholder AI message for streaming
       const aiMsg: ChatMessage = {
-        id: `ai_${Date.now()}`,
+        id: aiMsgId,
         role: 'assistant',
-        content: data.response,
+        content: '',
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiMsg])
+      setStreamingMsgId(aiMsgId)
+
+      // Read SSE stream
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      if (reader) {
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const payload = line.slice(6)
+              if (payload === '[DONE]') break
+              try {
+                const { text: chunk } = JSON.parse(payload)
+                accumulated += chunk
+                const currentContent = accumulated
+                setMessages(prev =>
+                  prev.map(m => m.id === aiMsgId ? { ...m, content: currentContent } : m)
+                )
+              } catch {}
+            }
+          }
+        }
+      }
+
+      setStreamingMsgId(null)
     } catch (error: any) {
+      setStreamingMsgId(null)
       const errorMsg: ChatMessage = {
         id: `error_${Date.now()}`,
         role: 'assistant',
         content: `Erro: ${error.message || 'Não foi possível processar'}`,
         timestamp: new Date()
       }
-      setMessages(prev => [...prev, errorMsg])
+      // If we already added a placeholder, replace it; otherwise add error
+      setMessages(prev => {
+        const hasPlaceholder = prev.some(m => m.id === aiMsgId)
+        if (hasPlaceholder) {
+          return prev.map(m => m.id === aiMsgId ? errorMsg : m)
+        }
+        return [...prev, errorMsg]
+      })
     } finally {
       setIsLoading(false)
     }
@@ -820,22 +868,23 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
 
                     {/* AI message - Gemini style */}
                     {msg.role === 'assistant' && (() => {
+                      const isStreaming = streamingMsgId === msg.id
                       const isRevealing = revealingMsgId === msg.id
-                      const doneRevealing = !isRevealing
+                      const doneRevealing = !isRevealing && !isStreaming
 
                       return (
                       <div className="flex gap-3 items-start">
-                        <div className={`w-7 h-7 rounded-full bg-gradient-to-br from-[#00a884] to-[#00d4aa] flex items-center justify-center flex-shrink-0 mt-0.5 ${isRevealing ? 'copilot-thinking-ring' : ''}`}>
-                          <Sparkles className={`w-3.5 h-3.5 text-white ${isRevealing ? 'copilot-sparkle-thinking' : ''}`} />
+                        <div className={`w-7 h-7 rounded-full bg-gradient-to-br from-[#00a884] to-[#00d4aa] flex items-center justify-center flex-shrink-0 mt-0.5 ${(isStreaming || isRevealing) ? 'copilot-thinking-ring' : ''}`}>
+                          <Sparkles className={`w-3.5 h-3.5 text-white ${(isStreaming || isRevealing) ? 'copilot-sparkle-thinking' : ''}`} />
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          {/* Rich content (shown after reveal) */}
-                          <div className={isRevealing ? 'opacity-0 h-0 overflow-hidden' : ''}>
+                          {/* Rich content - shown always (streaming renders progressively) */}
+                          {(isStreaming || doneRevealing) && (
                             <RichMessage content={msg.content} />
-                          </div>
-                          {/* Plain text reveal overlay */}
-                          {isRevealing && (() => {
+                          )}
+                          {/* Plain text reveal overlay (legacy non-streaming) */}
+                          {isRevealing && !isStreaming && (() => {
                             const chunks = splitIntoChunks(msg.content)
                             const visibleCount = revealedChunks
                             return (
