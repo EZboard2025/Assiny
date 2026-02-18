@@ -145,6 +145,48 @@ REGRAS GERAIS:
 - Use emojis com moderacao e naturalidade (como vendedores reais usam)
 - NUNCA sugira chamar o cliente para reuniao, call ou fechamento na PRIMEIRA mensagem da conversa. Primeiro construa rapport, entenda a dor, agregue valor. So proponha reuniao ou fechamento apos pelo menos 2-3 trocas de mensagem com engajamento real do lead
 
+RACIOCINIO CRITICO ANTES DE SUGERIR (MUITO IMPORTANTE):
+Quando o vendedor pedir ajuda, ANTES de sugerir uma mensagem voce DEVE analisar criticamente a conversa e compartilhar sua leitura. Isso mostra inteligencia e gera confianca.
+
+PASSO 1 — DIAGNOSTICO RAPIDO (sempre faca, em 2-3 linhas):
+Analise a conversa e compartilhe o que voce observa. Exemplos:
+- "Pelo que vejo, o lead demonstrou interesse em [X] mas parou de responder ha 3 dias. A ultima msg do vendedor foi sobre preco, e o lead nao reagiu — pode ser objecao de preco nao verbalizada."
+- "O lead acabou de responder positivamente — ta quente. Esse e o momento de propor proximo passo."
+- "Conversa ainda no inicio, so teve 2 trocas. O lead mencionou [dor], mas o vendedor ja tentou vender sem qualificar direito."
+- "O lead fez uma pergunta tecnica especifica — isso e sinal de interesse real. Precisa de resposta precisa, nao generica."
+
+PASSO 2 — PERGUNTAS ESTRATEGICAS (so quando necessario):
+Apos o diagnostico, se existem caminhos diferentes possiveis, faca 1-2 perguntas ESPECIFICAS baseadas no que voce observou na conversa:
+- NAO pergunte coisas genericas como "qual seu objetivo?" se a conversa ja deixa claro
+- Pergunte coisas que MUDAM a abordagem. Exemplos baseados no contexto:
+  - Se o lead sumiu: "Voce quer retomar de forma leve ou mais direta? E tem alguma novidade/case pra usar como gancho?"
+  - Se o lead pediu preco: "Voce pode flexibilizar valor ou quer desviar pro valor agregado primeiro?"
+  - Se e primeiro contato: "Qual o canal de origem desse lead? (indicacao, anuncio, inbound...) Isso muda totalmente o tom."
+  - Se a conversa ta travada: "O que voce acha que ta travando? Preco, timing, ou o lead nao entendeu o valor?"
+  - Se o lead respondeu algo ambiguo: "Como voce interpretou essa resposta? Interesse real ou so educacao?"
+  - Se o lead ACEITOU reuniao/call/demo: "Quais horarios voce tem disponiveis? Prefere por video, ligacao ou WhatsApp? Quanto tempo precisa?" — NUNCA invente horarios ou formatos sem perguntar ao vendedor primeiro. O vendedor precisa informar SUA disponibilidade real.
+  - Se o lead pediu algo especifico (contrato, proposta, material): "Voce ja tem isso pronto pra enviar? Quer que eu sugira como apresentar?"
+
+REGRA CRITICA — NUNCA INVENTE DADOS PRATICOS:
+Quando a resposta depende de informacoes que so o VENDEDOR tem (horarios, precos exatos, disponibilidade, prazos, condicoes especiais), voce DEVE perguntar antes de sugerir. Exemplos:
+- Horarios de reuniao: pergunte ao vendedor quais dias/horarios tem livres
+- Precos ou descontos: pergunte se pode dar valor ou se precisa de aprovacao
+- Prazos de entrega: pergunte qual o prazo real
+- Condicoes especiais: pergunte o que pode oferecer
+NUNCA coloque dados inventados numa sugestao de mensagem — isso cria compromissos que o vendedor pode nao cumprir.
+
+QUANDO PULAR PRO PASSO 3 DIRETO (sem perguntar):
+- O vendedor ja especificou o que quer ("sugira um follow-up de valor", "como tratar essa objecao")
+- O vendedor JA informou os dados praticos necessarios (horarios, precos, etc.) em mensagens anteriores no copilot
+- O vendedor esta respondendo suas perguntas anteriores (ai gere a sugestao direto)
+- A conversa e longa (15+ msgs) e o estagio e evidente
+
+PASSO 3 — SUGESTAO (apos entender o contexto):
+Gere a mensagem sugerida usando tudo que voce aprendeu: o diagnostico, as respostas do vendedor, e o historico da conversa.
+
+Ao fazer diagnostico + perguntas, use a tag [OUTRO].
+Ao gerar a sugestao final, use [SUGESTAO].
+
 CLASSIFICACAO DA RESPOSTA (OBRIGATORIO - SEMPRE):
 Comece TODA resposta com exatamente uma destas tags na primeira linha sozinha:
 [SUGESTAO] - quando voce sugere uma mensagem para o vendedor copiar e enviar ao cliente (inclui follow-ups, respostas, mensagens de fechamento, qualquer texto para enviar)
@@ -358,33 +400,32 @@ CONTEXTO B2B:
     const isSuggestion = rawResponse.trimStart().startsWith('[SUGESTAO]')
     const suggestion = rawResponse.replace(/^\s*\[(SUGESTAO|ANALISE|OUTRO)\]\s*/, '')
 
-    // 9. Save copilot_feedback record ONLY for suggestion messages
+    // 9. Save copilot_feedback record for ALL responses (enables thumbs up/down on every message)
     let feedbackRecord: { id: string } | null = null
 
-    if (isSuggestion) {
-      const { data } = await supabaseAdmin
-        .from('copilot_feedback')
-        .insert({
-          user_id: user.id,
-          company_id: companyId,
-          contact_phone: contactPhone,
-          contact_name: contactName || null,
-          user_question: userMessage,
-          ai_suggestion: suggestion,
-          conversation_context: conversationContext.slice(0, 5000),
-          was_helpful: null,
-          metadata: {
-            model: 'gpt-4.1',
-            success_examples: successExamples.length,
-            failure_examples: failureExamples.length,
-            company_knowledge: companyKnowledge.length,
-            tokens: completion.usage?.total_tokens || 0
-          }
-        })
-        .select('id')
-        .single()
-      feedbackRecord = data
-    }
+    const { data: feedbackData } = await supabaseAdmin
+      .from('copilot_feedback')
+      .insert({
+        user_id: user.id,
+        company_id: companyId,
+        contact_phone: contactPhone,
+        contact_name: contactName || null,
+        user_question: userMessage,
+        ai_suggestion: suggestion,
+        conversation_context: conversationContext.slice(0, 5000),
+        was_helpful: null,
+        metadata: {
+          model: 'gpt-4.1',
+          response_type: isSuggestion ? 'suggestion' : 'other',
+          success_examples: successExamples.length,
+          failure_examples: failureExamples.length,
+          company_knowledge: companyKnowledge.length,
+          tokens: completion.usage?.total_tokens || 0
+        }
+      })
+      .select('id')
+      .single()
+    feedbackRecord = feedbackData
 
     // 10. Consume 0.2 credits
     if (companyCredits) {

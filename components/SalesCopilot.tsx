@@ -384,12 +384,22 @@ export default function SalesCopilot({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [sentMsgIds, setSentMsgIds] = useState<Set<string>>(new Set())
   const [sentBubblesByMsg, setSentBubblesByMsg] = useState<Record<string, Set<number>>>({})
+  const [showActionHints, setShowActionHints] = useState(true)
   const [revealingMsgId, setRevealingMsgId] = useState<string | null>(null)
   const [revealedChunks, setRevealedChunks] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastUserMsgRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const prevConvRef = useRef<string | null>(null)
+
+  // Cache copilot conversations per contact (persists across contact switches, cleared on panel close)
+  const conversationCacheRef = useRef<Record<string, {
+    messages: CopilotMessage[]
+    feedbackStates: Record<string, 'up' | 'down' | null>
+    sentMsgIds: Set<string>
+    sentBubblesByMsg: Record<string, Set<number>>
+    showActionHints: boolean
+  }>>({})
 
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false)
@@ -437,11 +447,40 @@ export default function SalesCopilot({
     }
   }, [])
 
-  // Reset copilot when conversation changes
+  // Clear all cached conversations when panel is closed
+  const prevOpenRef = useRef(isOpen)
+  useEffect(() => {
+    if (prevOpenRef.current && !isOpen) {
+      // Panel just closed — clear everything
+      conversationCacheRef.current = {}
+      setCopilotMessages([])
+      setFeedbackStates({})
+      setSentMsgIds(new Set())
+      setSentBubblesByMsg({})
+      setShowActionHints(true)
+      setInput('')
+      prevConvRef.current = null
+    }
+    prevOpenRef.current = isOpen
+  }, [isOpen])
+
+  // Save/restore copilot conversations when switching contacts
   useEffect(() => {
     const currentPhone = selectedConversation?.contact_phone || null
     if (currentPhone !== prevConvRef.current) {
+      // Save current contact's state to cache before switching
+      if (prevConvRef.current && copilotMessages.length > 0) {
+        conversationCacheRef.current[prevConvRef.current] = {
+          messages: copilotMessages,
+          feedbackStates,
+          sentMsgIds,
+          sentBubblesByMsg,
+          showActionHints
+        }
+      }
+
       prevConvRef.current = currentPhone
+
       // Cancel any in-progress recording
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop()
@@ -455,14 +494,27 @@ export default function SalesCopilot({
       mediaRecorderRef.current = null
       setIsRecording(false)
       setRecordingDuration(0)
-      setCopilotMessages([])
-      setFeedbackStates({})
-      setSentMsgIds(new Set())
-      setSentBubblesByMsg({})
       setInput('')
       setRevealingMsgId(null)
       setRevealedChunks(0)
+
+      // Restore cached state for the new contact, or start fresh
+      const cached = currentPhone ? conversationCacheRef.current[currentPhone] : null
+      if (cached) {
+        setCopilotMessages(cached.messages)
+        setFeedbackStates(cached.feedbackStates)
+        setSentMsgIds(cached.sentMsgIds)
+        setSentBubblesByMsg(cached.sentBubblesByMsg)
+        setShowActionHints(cached.showActionHints)
+      } else {
+        setCopilotMessages([])
+        setFeedbackStates({})
+        setSentMsgIds(new Set())
+        setSentBubblesByMsg({})
+        setShowActionHints(true)
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversation?.contact_phone])
 
   // Progressive reveal: rich formatting from the start, content grows word by word
@@ -862,10 +914,14 @@ export default function SalesCopilot({
             {hasMessages && (
               <button
                 onClick={() => {
+                  // Clear current contact's conversation and remove from cache
+                  const phone = selectedConversation?.contact_phone
+                  if (phone) delete conversationCacheRef.current[phone]
                   setCopilotMessages([])
                   setFeedbackStates({})
                   setSentMsgIds(new Set())
                   setSentBubblesByMsg({})
+                  setShowActionHints(true)
                   setInput('')
                 }}
                 className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors"
@@ -973,17 +1029,6 @@ export default function SalesCopilot({
               </div>
             </div>
 
-            {/* Context indicator at bottom */}
-            {selectedConversation && (
-              <div className="px-4 py-2 border-t border-[#222d34] shrink-0">
-                <p className="text-[#8696a0] text-[11px] text-center">
-                  Analisando conversa com{' '}
-                  <span className="text-[#e9edef]">
-                    {selectedConversation.contact_name || selectedConversation.contact_phone}
-                  </span>
-                </p>
-              </div>
-            )}
           </div>
         )}
 
@@ -1037,86 +1082,102 @@ export default function SalesCopilot({
                           sentBubbles={sentBubblesByMsg[msg.id]}
                         />
 
-                        {/* Action bar - Gemini style icons row (only after reveal completes) */}
+                        {/* Action bar - icons with hint labels that disappear after first interaction */}
                         {doneRevealing && !msg.content.startsWith('Erro:') && (
-                          <div className="flex items-center gap-0.5 mt-3">
+                          <div className="flex items-start gap-1 mt-3">
                             {/* Send to chat */}
                             {onSendToChat && (
-                              <button
-                                onClick={async () => {
-                                  const allQuotes = extractAllQuotedMessages(msg.content)
-                                  if (allQuotes.length > 1) {
-                                    for (let i = 0; i < allQuotes.length; i++) {
-                                      onSendToChat(allQuotes[i])
-                                      setSentBubblesByMsg(prev => ({
-                                        ...prev,
-                                        [msg.id]: new Set([...(prev[msg.id] || []), i])
-                                      }))
-                                      if (i < allQuotes.length - 1) {
-                                        await new Promise(r => setTimeout(r, 1500))
+                              <div className="flex flex-col items-center">
+                                <button
+                                  onClick={async () => {
+                                    setShowActionHints(false)
+                                    const allQuotes = extractAllQuotedMessages(msg.content)
+                                    if (allQuotes.length > 1) {
+                                      for (let i = 0; i < allQuotes.length; i++) {
+                                        onSendToChat(allQuotes[i])
+                                        setSentBubblesByMsg(prev => ({
+                                          ...prev,
+                                          [msg.id]: new Set([...(prev[msg.id] || []), i])
+                                        }))
+                                        if (i < allQuotes.length - 1) {
+                                          await new Promise(r => setTimeout(r, 1500))
+                                        }
                                       }
+                                    } else {
+                                      onSendToChat(extractCleanMessage(msg.content))
                                     }
-                                  } else {
-                                    onSendToChat(extractCleanMessage(msg.content))
-                                  }
-                                  setSentMsgIds(prev => new Set(prev).add(msg.id))
-                                }}
-                                disabled={sentMsgIds.has(msg.id)}
-                                className={`p-1.5 rounded-full transition-colors ${
-                                  sentMsgIds.has(msg.id)
-                                    ? 'text-[#00a884]'
-                                    : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
-                                }`}
-                                title={sentMsgIds.has(msg.id) ? 'Enviado!' : 'Enviar para o chat'}
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
+                                    setSentMsgIds(prev => new Set(prev).add(msg.id))
+                                  }}
+                                  disabled={sentMsgIds.has(msg.id)}
+                                  className={`p-1.5 rounded-full transition-colors ${
+                                    sentMsgIds.has(msg.id)
+                                      ? 'text-[#00a884]'
+                                      : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
+                                  }`}
+                                  title={sentMsgIds.has(msg.id) ? 'Enviado!' : 'Enviar para o chat'}
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                                {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5 transition-opacity">Enviar</span>}
+                              </div>
                             )}
                             {/* Thumbs up */}
                             {msg.feedbackId && (
-                              <button
-                                onClick={() => handleFeedback(msg.feedbackId!, true)}
-                                className={`p-1.5 rounded-full transition-colors ${
-                                  feedbackStates[msg.feedbackId!] === 'up' ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
-                                }`}
-                                title="Útil"
-                                disabled={!!feedbackStates[msg.feedbackId!]}
-                              >
-                                <ThumbsUp className="w-4 h-4" />
-                              </button>
+                              <div className="flex flex-col items-center">
+                                <button
+                                  onClick={() => { setShowActionHints(false); handleFeedback(msg.feedbackId!, true) }}
+                                  className={`p-1.5 rounded-full transition-colors ${
+                                    feedbackStates[msg.feedbackId!] === 'up' ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
+                                  }`}
+                                  title="Útil"
+                                  disabled={!!feedbackStates[msg.feedbackId!]}
+                                >
+                                  <ThumbsUp className="w-4 h-4" />
+                                </button>
+                                {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Útil</span>}
+                              </div>
                             )}
                             {/* Thumbs down */}
                             {msg.feedbackId && (
-                              <button
-                                onClick={() => handleFeedback(msg.feedbackId!, false)}
-                                className={`p-1.5 rounded-full transition-colors ${
-                                  feedbackStates[msg.feedbackId!] === 'down' ? 'text-red-400' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
-                                }`}
-                                title="Não útil"
-                                disabled={!!feedbackStates[msg.feedbackId!]}
-                              >
-                                <ThumbsDown className="w-4 h-4" />
-                              </button>
+                              <div className="flex flex-col items-center">
+                                <button
+                                  onClick={() => { setShowActionHints(false); handleFeedback(msg.feedbackId!, false) }}
+                                  className={`p-1.5 rounded-full transition-colors ${
+                                    feedbackStates[msg.feedbackId!] === 'down' ? 'text-red-400' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
+                                  }`}
+                                  title="Não útil"
+                                  disabled={!!feedbackStates[msg.feedbackId!]}
+                                >
+                                  <ThumbsDown className="w-4 h-4" />
+                                </button>
+                                {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Ruim</span>}
+                              </div>
                             )}
                             {/* Regenerate */}
-                            <button
-                              onClick={() => handleRegenerate(msg.id)}
-                              className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors"
-                              title="Gerar outra sugestão"
-                              disabled={isLoading}
-                            >
-                              <RefreshCw className="w-4 h-4" />
-                            </button>
+                            <div className="flex flex-col items-center">
+                              <button
+                                onClick={() => { setShowActionHints(false); handleRegenerate(msg.id) }}
+                                className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors"
+                                title="Gerar outra sugestão"
+                                disabled={isLoading}
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </button>
+                              {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Refazer</span>}
+                            </div>
                             {/* Copy */}
-                            <button
-                              onClick={() => handleCopy(msg.content, msg.id)}
-                              className={`p-1.5 rounded-full transition-colors ${
-                                copiedId === msg.id ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
-                              }`}
-                              title="Copiar"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </button>
+                            <div className="flex flex-col items-center">
+                              <button
+                                onClick={() => { setShowActionHints(false); handleCopy(msg.content, msg.id) }}
+                                className={`p-1.5 rounded-full transition-colors ${
+                                  copiedId === msg.id ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
+                                }`}
+                                title="Copiar"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                              {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Copiar</span>}
+                            </div>
                           </div>
                         )}
                       </div>
