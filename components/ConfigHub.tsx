@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -3507,7 +3507,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     >
                       <Sparkles className="w-4 h-4 animate-pulse" />
                       Gerar com IA
-                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
                     </button>
                     {/* Filtro por Tipo B2B/B2C */}
                     <select
@@ -4375,7 +4375,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   >
                     <Sparkles className="w-4 h-4 animate-pulse" />
                     Gerar com IA
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
                   </button>
                 </div>
                 <p className="text-gray-500 mt-2 text-xs">
@@ -4686,7 +4686,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 >
                   <Sparkles className="w-4 h-4 animate-pulse" />
                   Gerar com IA
-                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
                 </button>
               </div>
 
@@ -4940,15 +4940,15 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <Upload className="w-4 h-4 text-white flex-shrink-0" />
                     <span className="text-sm font-semibold text-white">Extrair de Arquivos</span>
                     {aiFillMode === 'pdf' && <ChevronUp className="w-3.5 h-3.5 text-white/70 ml-auto" />}
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
                   </button>
                   <button
                     onClick={() => { setAiFillMode('none'); setShowAIModal(true) }}
                     className="group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-[length:200%_100%] animate-gradient-x shadow-md shadow-blue-500/15 hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.02] text-left transition-all duration-300 overflow-hidden"
                   >
                     <Globe className="w-4 h-4 text-white flex-shrink-0" />
-                    <span className="text-sm font-semibold text-white">Extrair de URL</span>
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+                    <span className="text-sm font-semibold text-white">Extrair do Site da Empresa</span>
+                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
                   </button>
                 </div>
 
