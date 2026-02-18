@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
 async function handleTextMessage(request: NextRequest, body: any) {
   try {
-    const { to, message } = body
+    const { to, message, quotedMessageId } = body
 
     if (!to || !message) {
       return NextResponse.json(
@@ -44,7 +44,7 @@ async function handleTextMessage(request: NextRequest, body: any) {
     const { user, error: authErr } = await authenticateRequest(request)
     if (authErr) return authErr
 
-    console.log(`[WA Send] Attempting to send text to: ${to}`)
+    console.log(`[WA Send] Attempting to send text to: ${to}${quotedMessageId ? ` (reply to ${quotedMessageId})` : ''}`)
 
     const client = getConnectedClient(user!.id)
     if (!client) {
@@ -67,12 +67,65 @@ async function handleTextMessage(request: NextRequest, body: any) {
     const typingDelay = 2000 + Math.random() * 2000
     await new Promise(resolve => setTimeout(resolve, typingDelay))
 
+    const sendOptions: any = {}
+    if (quotedMessageId) {
+      sendOptions.quotedMessageId = quotedMessageId
+    }
+
+    // Look up quoted message from DB if replying
+    let quotedMsgInfo: { body: string; fromMe: boolean; type: string; contactName?: string | null } | null = null
+    if (quotedMessageId) {
+      try {
+        const { data: quotedRow } = await supabaseAdmin
+          .from('whatsapp_messages')
+          .select('content, direction, message_type, contact_name')
+          .eq('wa_message_id', quotedMessageId)
+          .eq('user_id', user!.id)
+          .limit(1)
+          .single()
+        if (quotedRow) {
+          quotedMsgInfo = {
+            body: quotedRow.content || '',
+            fromMe: quotedRow.direction === 'outbound',
+            type: quotedRow.message_type || 'text',
+            contactName: quotedRow.contact_name
+          }
+        }
+      } catch (e) {
+        console.error('[WA Send] Failed to look up quoted message:', e)
+      }
+    }
+
     console.log(`[WA Send] Sending message to ${chatId}...`)
     const sentMsg = await Promise.race([
-      client.sendMessage(chatId, message),
+      client.sendMessage(chatId, message, sendOptions),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sendMessage timeout (15s)')), 15000))
     ])
     console.log(`[WA Send] Message sent! ID: ${sentMsg.id._serialized}`)
+
+    // Fire-and-forget: persist quotedMsg in the sent message's raw_payload
+    if (quotedMsgInfo) {
+      setTimeout(async () => {
+        try {
+          const { data: sentRow } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .select('id, raw_payload')
+            .eq('wa_message_id', sentMsg.id._serialized)
+            .eq('user_id', user!.id)
+            .limit(1)
+            .single()
+          if (sentRow) {
+            await supabaseAdmin
+              .from('whatsapp_messages')
+              .update({ raw_payload: { ...(sentRow.raw_payload || {}), quotedMsg: quotedMsgInfo } })
+              .eq('id', sentRow.id)
+            console.log(`[WA Send] Persisted quotedMsg in raw_payload for ${sentMsg.id._serialized}`)
+          }
+        } catch (e) {
+          console.error('[WA Send] Failed to persist quotedMsg:', e)
+        }
+      }, 3000)
+    }
 
     return NextResponse.json({
       success: true,
@@ -84,7 +137,8 @@ async function handleTextMessage(request: NextRequest, body: any) {
         timestamp: new Date().toISOString(),
         type: 'text',
         hasMedia: false,
-        status: 'sent'
+        status: 'sent',
+        quotedMsg: quotedMsgInfo
       }
     })
 
@@ -108,6 +162,7 @@ async function handleMediaMessage(request: NextRequest) {
     const file = formData.get('file') as File
     const messageType = (formData.get('type') as string) || 'document'
     const caption = formData.get('caption') as string | null
+    const quotedMessageId = formData.get('quotedMessageId') as string | null
 
     if (!to || !file) {
       return NextResponse.json(
@@ -173,6 +228,33 @@ async function handleMediaMessage(request: NextRequest) {
     if (messageType === 'audio') {
       options.sendAudioAsVoice = true
     }
+    if (quotedMessageId) {
+      options.quotedMessageId = quotedMessageId
+    }
+
+    // Look up quoted message from DB if replying
+    let quotedMsgInfo: { body: string; fromMe: boolean; type: string; contactName?: string | null } | null = null
+    if (quotedMessageId) {
+      try {
+        const { data: quotedRow } = await supabaseAdmin
+          .from('whatsapp_messages')
+          .select('content, direction, message_type, contact_name')
+          .eq('wa_message_id', quotedMessageId)
+          .eq('user_id', user!.id)
+          .limit(1)
+          .single()
+        if (quotedRow) {
+          quotedMsgInfo = {
+            body: quotedRow.content || '',
+            fromMe: quotedRow.direction === 'outbound',
+            type: quotedRow.message_type || 'text',
+            contactName: quotedRow.contact_name
+          }
+        }
+      } catch (e) {
+        console.error('[WA Send Media] Failed to look up quoted message:', e)
+      }
+    }
 
     const sentMsg = await client.sendMessage(chatId, media, options)
 
@@ -187,6 +269,29 @@ async function handleMediaMessage(request: NextRequest) {
         upsert: true
       })
 
+    // Fire-and-forget: persist quotedMsg in sent message's raw_payload
+    if (quotedMsgInfo) {
+      setTimeout(async () => {
+        try {
+          const { data: sentRow } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .select('id, raw_payload')
+            .eq('wa_message_id', sentMsg.id._serialized)
+            .eq('user_id', user!.id)
+            .limit(1)
+            .single()
+          if (sentRow) {
+            await supabaseAdmin
+              .from('whatsapp_messages')
+              .update({ raw_payload: { ...(sentRow.raw_payload || {}), quotedMsg: quotedMsgInfo } })
+              .eq('id', sentRow.id)
+          }
+        } catch (e) {
+          console.error('[WA Send Media] Failed to persist quotedMsg:', e)
+        }
+      }, 3000)
+    }
+
     return NextResponse.json({
       success: true,
       message: {
@@ -199,7 +304,8 @@ async function handleMediaMessage(request: NextRequest) {
         hasMedia: true,
         mediaId: mediaId,
         mimetype: file.type,
-        status: 'sent'
+        status: 'sent',
+        quotedMsg: quotedMsgInfo
       }
     })
 
