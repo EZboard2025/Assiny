@@ -559,7 +559,7 @@ export default function MeetHistoryContent() {
               </div>
             )}
 
-            {/* Simulação de Correção */}
+            {/* Prática Direcionada */}
             {simulations[selectedEvaluation.id] && (
               <div className="p-6 border-t border-gray-100">
                 {(() => {
@@ -584,10 +584,10 @@ export default function MeetHistoryContent() {
                           </div>
                           <div>
                             <h3 className="text-sm font-semibold text-gray-900">
-                              {isCompleted ? 'Correção Concluída' : 'Simulação de Correção'}
+                              {isCompleted ? 'Prática Concluída' : 'Prática Direcionada'}
                             </h3>
                             <p className="text-xs text-gray-500">
-                              {isCompleted ? 'Simulação de correção realizada' : 'Pratique com o mesmo cliente para corrigir os erros'}
+                              {isCompleted ? 'Prática direcionada realizada' : 'Pratique com o mesmo cliente para corrigir os erros'}
                             </p>
                           </div>
                         </div>

@@ -32,7 +32,7 @@ export default function DashboardSidebar({
     { icon: Clock, href: '/history', label: 'Histórico', show: true },
     { icon: Target, href: '/pdi-page', label: 'PDI', show: hasPDI },
     { icon: TrendingUp, href: '/manager', label: 'Gestão', show: isAdmin || isGestor },
-    { icon: MessageSquare, href: '/followup', label: 'WhatsApp IA+', show: true },
+    { icon: MessageSquare, href: '/followup', label: 'WhatsApp IA', show: true },
     { icon: Video, href: '/meet-analysis', label: 'Análise Meet', show: true },
     { icon: Link2, href: '/roleplay-links', label: 'Links Públicos', show: isAdmin || isGestor },
   ]

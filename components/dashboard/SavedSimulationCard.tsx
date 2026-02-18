@@ -19,6 +19,17 @@ function cleanGptText(text: string): string {
     .trim()
 }
 
+// Normaliza nomes de áreas SPIN que podem vir sem acento do banco
+function fixAreaAccent(area: string): string {
+  const map: Record<string, string> = {
+    'Implicacao': 'Implicação',
+    'Situacao': 'Situação',
+    'Necessidade': 'Necessidade',
+    'Problema': 'Problema',
+  }
+  return map[area] || area
+}
+
 export default function SavedSimulationCard({ userId }: SavedSimulationCardProps) {
   const router = useRouter()
   const [simulations, setSimulations] = useState<any[]>([])
@@ -100,7 +111,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-sm font-semibold text-gray-900">Simulacao de Correçao</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Prática Direcionada</h3>
               <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-medium rounded border border-amber-100">
                 Pendente
               </span>
@@ -108,12 +119,12 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
             <div className="flex items-center gap-2 flex-wrap">
               {latestMainArea && (
                 <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
-                  {latestMainArea}
+                  {fixAreaAccent(latestMainArea)}
                 </span>
               )}
               {latestCoaching.length > 1 && latestCoaching.slice(1).map((c: any, i: number) => (
                 <span key={i} className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
-                  {c.area}
+                  {fixAreaAccent(c.area)}
                 </span>
               ))}
             </div>
@@ -136,7 +147,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Play className="w-4 h-4" />
-            Iniciar Simulacao
+            Iniciar Simulação
           </button>
         </div>
 
@@ -201,7 +212,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                             const sevColor = c.severity === 'critical' ? 'bg-red-100 text-red-700' : c.severity === 'high' ? 'bg-amber-100 text-amber-700' : 'bg-yellow-100 text-yellow-700'
                             return (
                               <span key={i} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${sevColor}`}>
-                                {c.area} {c.spin_score !== undefined ? `${c.spin_score.toFixed(1)}` : ''}
+                                {fixAreaAccent(c.area)} {c.spin_score !== undefined ? `${c.spin_score.toFixed(1)}` : ''}
                               </span>
                             )
                           })}
@@ -253,8 +264,8 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                   <Target className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Simulacao de Correçao</h3>
-                  <p className="text-sm text-gray-500">Baseada nos erros identificados na reuniao</p>
+                  <h3 className="text-lg font-bold text-gray-900">Prática Direcionada</h3>
+                  <p className="text-sm text-gray-500">Baseada nos erros identificados na reunião</p>
                 </div>
               </div>
               <button
@@ -278,7 +289,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                 <div className="bg-green-50 rounded-xl p-4 border-l-4 border-green-500 border-t border-r border-b border-t-green-200 border-r-green-200 border-b-green-200">
                   <div className="flex items-center gap-2 mb-2">
                     <Target className="w-4 h-4 text-green-600" />
-                    <h4 className="text-sm font-bold text-gray-900">Por que esta simulacao?</h4>
+                    <h4 className="text-sm font-bold text-gray-900">Por que esta prática?</h4>
                   </div>
                   <p className="text-sm text-gray-700 leading-relaxed">{justification}</p>
                 </div>
@@ -450,7 +461,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                                 {sev.label}
                               </span>
                             )}
-                            <span className="text-sm font-bold text-gray-900">{focus.area}</span>
+                            <span className="text-sm font-bold text-gray-900">{fixAreaAccent(focus.area)}</span>
                           </div>
                           {focus.spin_score !== undefined && (
                             <span className={`text-sm font-bold ${focus.spin_score < 4 ? 'text-red-600' : focus.spin_score < 6 ? 'text-amber-600' : 'text-yellow-600'}`}>
@@ -515,7 +526,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                 className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:shadow-lg"
               >
                 <Play className="w-5 h-5" />
-                Iniciar Simulacao
+                Iniciar Simulação
               </button>
             </div>
           </div>

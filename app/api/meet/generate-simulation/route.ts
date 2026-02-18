@@ -348,7 +348,7 @@ Retorne JSON com esta estrutura exata:
   "simulation_justification": "Paragrafo de 3-5 frases explicando por que esta simulacao foi criada para este vendedor. Referencie o cliente, o score critico com numero, o momento da falha, e o que sera praticado.",
   "coaching_focus": [
     {
-      "area": "Implicacao",
+      "area": "Implicação",
       "spin_score": 3.5,
       "severity": "critical",
       "diagnosis": "Diagnostico especifico do que o vendedor fez errado, referenciando momento real da transcricao. 2-3 frases.",

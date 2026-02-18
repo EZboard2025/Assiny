@@ -357,8 +357,8 @@ export default function CorrectionHistoryContent() {
         <div className="w-20 h-20 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
           <Video className="w-10 h-10 text-gray-400" />
         </div>
-        <p className="text-gray-900 font-semibold text-lg mb-2">Nenhuma sessao de correcao encontrada</p>
-        <p className="text-gray-500 text-sm">Analise uma reuniao Meet e gere uma simulacao de correcao.</p>
+        <p className="text-gray-900 font-semibold text-lg mb-2">Nenhuma sessão de prática direcionada encontrada</p>
+        <p className="text-gray-500 text-sm">Analise uma reunião Meet e gere uma prática direcionada.</p>
       </div>
     )
   }

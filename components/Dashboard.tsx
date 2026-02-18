@@ -432,7 +432,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               {/* Content */}
               <div className="relative z-10 h-full flex flex-col justify-end">
                 <h2 className="text-lg font-bold text-white leading-tight">
-                  Treinar vendas agora
+                  Acelere sua rampagem
                 </h2>
               </div>
             </button>
@@ -441,7 +441,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <div className="flex-1 flex items-center">
               <div>
                 <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">
-                  Plataforma de Treinamento
+                  Plataforma de Rampagem
                 </p>
                 <div className="flex items-center gap-4">
                   <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
