@@ -1910,20 +1910,20 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           <div className="flex-1 flex overflow-hidden">
             {/* Painel de Dicas do Desafio - Flutuante na esquerda */}
             {challengeConfig && showChallengeTips && (
-              <div className={`${isChallengeTipsMinimized ? 'w-16' : 'w-72'} bg-white/95 border-r border-gray-200 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
+              <div className={`${isChallengeTipsMinimized ? 'w-16' : 'w-72'} bg-gray-900/95 border-r border-gray-700 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
                 {/* Header */}
                 <button
                   onClick={() => setIsChallengeTipsMinimized(!isChallengeTipsMinimized)}
-                  className="w-full p-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors text-left border-b border-gray-100"
+                  className="w-full p-3 flex items-center gap-3 hover:bg-gray-700/50 transition-colors text-left border-b border-gray-700"
                 >
                   {!isChallengeTipsMinimized ? (
                     <>
-                      <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Target size={18} className="text-green-600" />
+                      <div className="w-9 h-9 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Target size={18} className="text-green-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-gray-900">Desafio Ativo</h3>
-                        <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100 inline-block mt-1">
+                        <h3 className="text-sm font-semibold text-gray-100">Desafio Ativo</h3>
+                        <span className="text-xs font-medium text-green-400 bg-green-500/20 px-2 py-0.5 rounded border border-green-500/30 inline-block mt-1">
                           {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)} ≥ {challengeConfig.success_criteria.spin_min_score}
                         </span>
                       </div>
@@ -1931,8 +1931,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     </>
                   ) : (
                     <div className="w-full flex flex-col items-center gap-2">
-                      <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
-                        <Target size={18} className="text-green-600" />
+                      <div className="w-9 h-9 bg-green-500/20 rounded-lg flex items-center justify-center">
+                        <Target size={18} className="text-green-400" />
                       </div>
                       <ChevronUp size={14} className="text-gray-400" />
                     </div>
@@ -1941,36 +1941,36 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Conteúdo expandido */}
                 {!isChallengeTipsMinimized && (
-                  <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                  <div className="flex-1 overflow-y-auto p-3 space-y-3 whatsapp-scrollbar">
                     {/* Título e Descrição */}
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-1">{cleanSpinText(challengeConfig.title)}</h4>
-                      <p className="text-xs text-gray-600 leading-relaxed">{cleanSpinText(challengeConfig.description)}</p>
+                      <h4 className="text-sm font-semibold text-gray-100 mb-1">{cleanSpinText(challengeConfig.title)}</h4>
+                      <p className="text-xs text-gray-400 leading-relaxed">{cleanSpinText(challengeConfig.description)}</p>
                     </div>
 
                     {/* Meta */}
-                    <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                    <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
                       <div className="flex items-center gap-2 mb-1">
-                        <Target size={14} className="text-green-600" />
-                        <span className="text-xs font-semibold text-green-700">Meta</span>
+                        <Target size={14} className="text-green-400" />
+                        <span className="text-xs font-semibold text-green-400">Meta</span>
                       </div>
-                      <p className="text-sm text-gray-700">
-                        Alcançar <span className="font-bold text-green-700">{challengeConfig.success_criteria.spin_min_score}+</span> em {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
+                      <p className="text-sm text-gray-300">
+                        Alcançar <span className="font-bold text-green-400">{challengeConfig.success_criteria.spin_min_score}+</span> em {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
                       </p>
                     </div>
 
                     {/* Dicas de Coaching */}
                     {challengeConfig.coaching_tips && challengeConfig.coaching_tips.length > 0 && (
                       <details className="group" open>
-                        <summary className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-700 mb-2">
-                          <Lightbulb size={14} className="text-green-600" />
+                        <summary className="flex items-center gap-2 cursor-pointer text-xs text-gray-400 hover:text-gray-200 mb-2">
+                          <Lightbulb size={14} className="text-green-400" />
                           <span className="font-medium">Dicas de coaching</span>
-                          <ChevronDown size={12} className="group-open:rotate-180 transition-transform ml-auto text-gray-400" />
+                          <ChevronDown size={12} className="group-open:rotate-180 transition-transform ml-auto text-gray-500" />
                         </summary>
                         <ul className="space-y-1.5">
                           {challengeConfig.coaching_tips.map((tip, index) => (
-                            <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
-                              <span className="w-4 h-4 bg-green-100 text-green-700 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
+                            <li key={index} className="text-xs text-gray-400 flex items-start gap-2">
+                              <span className="w-4 h-4 bg-green-500/20 text-green-400 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
                                 {index + 1}
                               </span>
                               <span className="leading-relaxed">{cleanSpinText(tip)}</span>
@@ -1981,13 +1981,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     )}
 
                     {/* Foco SPIN */}
-                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-xs text-gray-500 mb-2">Foque em perguntas de:</p>
+                    <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                      <p className="text-xs text-gray-400 mb-2">Foque em perguntas de:</p>
                       <div className="flex items-center gap-2">
                         <span className="w-8 h-8 bg-green-600 text-white text-sm font-bold rounded-lg flex items-center justify-center">
                           {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
                         </span>
-                        <span className="text-gray-900 text-sm font-medium">
+                        <span className="text-gray-100 text-sm font-medium">
                           {formatSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
                         </span>
                       </div>
@@ -2001,7 +2001,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     <span className="w-8 h-8 bg-green-600 text-white text-sm font-bold rounded-lg flex items-center justify-center">
                       {extractSpinLetter(challengeConfig.success_criteria.spin_letter_target)}
                     </span>
-                    <span className="text-xs text-gray-500 font-semibold">
+                    <span className="text-xs text-gray-400 font-semibold">
                       ≥{challengeConfig.success_criteria.spin_min_score}
                     </span>
                   </div>
@@ -2011,21 +2011,21 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
             {/* Meet Simulation Coaching Panel */}
             {isMeetSimulation && meetSimulationConfig && (
-              <div className={`${isMeetTipsMinimized ? 'w-14' : 'w-80'} bg-white/95 border-r border-gray-200 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
+              <div className={`${isMeetTipsMinimized ? 'w-14' : 'w-80'} bg-gray-900/95 border-r border-gray-700 flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300`}>
                 {/* Header - clickable to toggle */}
                 <button
                   onClick={() => setIsMeetTipsMinimized(!isMeetTipsMinimized)}
-                  className="w-full px-3 py-2.5 flex items-center gap-2.5 hover:bg-gray-50/50 transition-colors text-left border-b border-gray-100"
+                  className="w-full px-3 py-2.5 flex items-center gap-2.5 hover:bg-gray-700/50 transition-colors text-left border-b border-gray-700"
                 >
                   {!isMeetTipsMinimized ? (
                     <>
-                      <Target size={16} className="text-purple-600 flex-shrink-0" />
-                      <span className="text-xs font-semibold text-gray-900 flex-1">Coaching</span>
+                      <Target size={16} className="text-purple-400 flex-shrink-0" />
+                      <span className="text-xs font-semibold text-gray-100 flex-1">Coaching</span>
                       <ChevronDown size={14} className="text-gray-400" />
                     </>
                   ) : (
                     <div className="w-full flex flex-col items-center gap-1.5">
-                      <Target size={16} className="text-purple-600" />
+                      <Target size={16} className="text-purple-400" />
                       <ChevronUp size={12} className="text-gray-400" />
                     </div>
                   )}
@@ -2033,19 +2033,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
                 {/* Expanded content */}
                 {!isMeetTipsMinimized && (
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
                     {/* Coaching Focus Areas */}
                     {meetSimulationConfig.coaching_focus.map((focus, idx) => {
                       const cleanText = (text: string) => text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/—/g, '-').replace(/\s{2,}/g, ' ').trim()
                       const borderColor = focus.severity === 'critical' ? 'border-l-red-400' : focus.severity === 'high' ? 'border-l-amber-400' : 'border-l-yellow-400'
-                      const scoreColor = (focus.spin_score ?? 10) < 4 ? 'text-red-600' : (focus.spin_score ?? 10) < 6 ? 'text-amber-600' : 'text-yellow-600'
+                      const scoreColor = (focus.spin_score ?? 10) < 4 ? 'text-red-400' : (focus.spin_score ?? 10) < 6 ? 'text-amber-400' : 'text-yellow-400'
                       const phrases = (focus.example_phrases || focus.tips || []).map((p: string) => cleanText(p))
 
                       return (
-                        <div key={idx} className={`border-b border-gray-100 border-l-[3px] ${borderColor}`}>
+                        <div key={idx} className={`border-b border-gray-700 border-l-[3px] ${borderColor}`}>
                           {/* Area + Score */}
                           <div className="px-3 py-2 flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-900">{focus.area}</span>
+                            <span className="text-xs font-bold text-gray-100">{focus.area}</span>
                             {focus.spin_score !== undefined && (
                               <span className={`text-xs font-bold ${scoreColor}`}>{focus.spin_score.toFixed(1)}</span>
                             )}
@@ -2054,14 +2054,14 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           {/* Practice Goal */}
                           {focus.practice_goal && (
                             <div className="px-3 pb-1.5">
-                              <p className="text-xs text-gray-700 leading-relaxed">{cleanText(focus.practice_goal)}</p>
+                              <p className="text-xs text-gray-400 leading-relaxed">{cleanText(focus.practice_goal)}</p>
                             </div>
                           )}
 
                           {/* One example phrase */}
                           {phrases.length > 0 && (
                             <div className="px-3 pb-2.5">
-                              <p className="text-xs text-blue-600 leading-relaxed italic">&ldquo;{phrases[0]}&rdquo;</p>
+                              <p className="text-xs text-emerald-400 leading-relaxed italic">&ldquo;{phrases[0]}&rdquo;</p>
                             </div>
                           )}
                         </div>
@@ -2069,9 +2069,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     })}
 
                     {/* Objections - just names */}
-                    <div className="border-b border-gray-100">
+                    <div className="border-b border-gray-700">
                       <div className="px-3 py-2">
-                        <span className="text-xs font-bold text-gray-900">Objecoes esperadas</span>
+                        <span className="text-xs font-bold text-gray-100">Objecoes esperadas</span>
                       </div>
                       <div className="px-3 pb-2.5 space-y-1.5">
                         {meetSimulationConfig.objections.map((obj, idx) => {
@@ -2079,11 +2079,11 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                           return (
                             <div key={idx} className="flex items-start gap-1.5">
                               <span className={`text-[10px] px-1 py-0.5 rounded font-medium mt-px flex-shrink-0 ${
-                                obj.source === 'meeting' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
+                                obj.source === 'meeting' ? 'bg-blue-500/20 text-blue-400' : 'bg-orange-500/20 text-orange-400'
                               }`}>
                                 {obj.source === 'meeting' ? 'Meet' : 'Coach'}
                               </span>
-                              <span className="text-xs text-gray-700 leading-relaxed">{cleanText(obj.name)}</span>
+                              <span className="text-xs text-gray-300 leading-relaxed">{cleanText(obj.name)}</span>
                             </div>
                           )
                         })}

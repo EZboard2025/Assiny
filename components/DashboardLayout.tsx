@@ -109,7 +109,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const isAdmin = user.role?.toLowerCase() === 'admin'
 
   return (
-    <div className="h-screen overflow-hidden bg-[#F8F9FA]">
+    <div className="fixed inset-0 overflow-hidden">
       {/* Sidebar */}
       <DashboardSidebar
         userRole={user.role}
@@ -122,8 +122,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <main
-        className={`transition-all duration-300 h-screen overflow-y-auto ${
-          isSidebarExpanded ? 'ml-56' : 'ml-16'
+        className={`absolute top-0 bottom-0 right-0 overflow-clip transition-all duration-300 ${
+          isSidebarExpanded ? 'left-56' : 'left-16'
         }`}
       >
         {children}
