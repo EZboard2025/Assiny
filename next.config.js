@@ -4,6 +4,8 @@ const nextConfig = {
   images: {
     domains: [],
   },
+  // Pacotes que NÃO devem ser bundlados pelo webpack (usam require dinâmico)
+  serverExternalPackages: ['pdf-parse', 'mammoth'],
   // Aumentar limite de tamanho de body para uploads (100MB)
   experimental: {
     serverActions: {

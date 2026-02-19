@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 
-// Função para extrair texto de PDF usando pdf-parse
+// Função para extrair texto de PDF usando pdf-parse v1
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  // Usar require para compatibilidade com pdf-parse
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pdfParse = require('pdf-parse')
-  const data = await pdfParse(buffer)
-  return data.text || ''
+  const result = await pdfParse(buffer)
+  return result.text || ''
 }
 
 // Aumentar limite de timeout para Next.js App Router
