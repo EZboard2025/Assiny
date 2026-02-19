@@ -177,6 +177,21 @@ export async function processCompletedBot(botId: string): Promise<void> {
 
     console.log(`[MeetBG] Notification created for user ${user_id}`)
 
+    // 10b. Update calendar_scheduled_bots if this bot was auto-scheduled
+    try {
+      await supabaseAdmin
+        .from('calendar_scheduled_bots')
+        .update({
+          bot_status: 'completed',
+          evaluation_id: savedEval.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('bot_id', botId)
+    } catch (calErr) {
+      // Non-fatal — calendar bot may not exist (manual URL submissions)
+      console.warn(`[MeetBG] Calendar bot update skipped for ${botId}`)
+    }
+
     // 11. Generate correction simulation (fire-and-forget, don't fail evaluation)
     try {
       console.log(`[MeetBG] Generating correction simulation for bot ${botId}`)

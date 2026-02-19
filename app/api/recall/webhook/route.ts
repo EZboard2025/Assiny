@@ -129,6 +129,21 @@ export async function POST(request: Request) {
           .from('meet_bot_sessions')
           .update({ recall_status: statusCode, status: mappedStatus, updated_at: new Date().toISOString() })
           .eq('bot_id', botId)
+
+        // Also sync status to calendar_scheduled_bots (if auto-scheduled)
+        const calendarStatusMap: Record<string, string> = {
+          'joining': 'joining',
+          'recording': 'recording',
+          'processing': 'recording', // Keep showing "recording" until evaluation completes
+        }
+        const calBotStatus = calendarStatusMap[mappedStatus]
+        if (calBotStatus) {
+          await supabaseAdmin
+            .from('calendar_scheduled_bots')
+            .update({ bot_status: calBotStatus, updated_at: new Date().toISOString() })
+            .eq('bot_id', botId)
+            .catch(() => {}) // Non-fatal
+        }
       }
 
       // When bot finishes (bot.done), trigger background evaluation (fire-and-forget)
@@ -156,6 +171,13 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString()
           })
           .eq('bot_id', botId)
+
+        // Also update calendar_scheduled_bots
+        await supabaseAdmin
+          .from('calendar_scheduled_bots')
+          .update({ bot_status: 'error', error_message: 'Bot fatal error', updated_at: new Date().toISOString() })
+          .eq('bot_id', botId)
+          .catch(() => {})
       }
     }
 
