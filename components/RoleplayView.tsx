@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Settings, Play, Clock, MessageCircle, Send, Calendar, User, Zap, Mic, MicOff, Volume2, UserCircle2, CheckCircle, Loader2, X, AlertCircle, ChevronDown, ChevronUp, Lock, Target, TrendingUp, AlertTriangle, Lightbulb, Video, VideoOff, PhoneOff, Phone, Shuffle, EyeOff, Eye, Trophy } from 'lucide-react'
 import { getPersonas, getObjections, getCompanyType, getTags, getPersonaTags, getRoleplayObjectives, type Persona, type PersonaB2B, type PersonaB2C, type Objection, type Tag, type RoleplayObjective } from '@/lib/config'
 import { createRoleplaySession, addMessageToSession, endRoleplaySession, getRoleplaySession, type RoleplayMessage } from '@/lib/roleplay'
@@ -80,6 +81,8 @@ interface RoleplayViewProps {
 }
 
 export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete, meetSimulationConfig, meetSimulationId }: RoleplayViewProps = {}) {
+  const router = useRouter()
+
   // Hook para verificar limites do plano
   const {
     checkRoleplayLimit,
@@ -1292,6 +1295,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
     // NÃO inicia avaliação - sessão encerrada manualmente
     console.log('⚠️ Avaliação pulada - encerramento manual pelo usuário');
+
+    // Meet simulation: redirect back to dashboard so user sees the simulation still pending
+    if (meetSimulationId) {
+      console.log('🔄 Redirecionando de volta — simulação de correção continua pendente')
+      router.push('/')
+    }
   }
 
   const handleSendMessage = async (messageToSend?: string) => {
