@@ -68,6 +68,7 @@ import {
 import { PlanType } from '@/lib/types/plans'
 import { useToast } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import CompanyDataChat from '@/components/CompanyDataChat'
 
 interface ConfigHubProps {
   onClose: () => void
@@ -4876,24 +4877,22 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setAiFillMode(aiFillMode === 'pdf' ? 'none' : 'pdf')}
-                    className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all duration-300 overflow-hidden ${
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left transition-all duration-200 border ${
                       aiFillMode === 'pdf'
-                        ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x shadow-lg shadow-purple-500/25'
-                        : 'bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x shadow-md shadow-purple-500/15 hover:shadow-lg hover:shadow-purple-500/25 hover:scale-[1.02]'
+                        ? 'bg-gray-100 border-gray-300 text-gray-800'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
                     }`}
                   >
-                    <Upload className="w-4 h-4 text-white flex-shrink-0" />
-                    <span className="text-sm font-semibold text-white">Extrair de Arquivos</span>
-                    {aiFillMode === 'pdf' && <ChevronUp className="w-3.5 h-3.5 text-white/70 ml-auto" />}
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
+                    <Upload className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                    <span className="text-sm font-medium">Extrair de Arquivos</span>
+                    {aiFillMode === 'pdf' && <ChevronUp className="w-3.5 h-3.5 text-gray-400 ml-auto" />}
                   </button>
                   <button
                     onClick={() => { setAiFillMode('none'); setShowAIModal(true) }}
-                    className="group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-[length:200%_100%] animate-gradient-x shadow-md shadow-blue-500/15 hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.02] text-left transition-all duration-300 overflow-hidden"
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 text-left transition-all duration-200"
                   >
-                    <Globe className="w-4 h-4 text-white flex-shrink-0" />
-                    <span className="text-sm font-semibold text-white">Extrair do Site da Empresa</span>
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
+                    <Globe className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                    <span className="text-sm font-medium">Extrair do Site</span>
                   </button>
                 </div>
 
@@ -4973,8 +4972,20 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 )}
               </div>
 
-              {/* Formulário de Dados da Empresa */}
+              {/* Chat IA para preencher dados */}
               <div className="p-4">
+                <CompanyDataChat
+                  companyData={companyData}
+                  businessType={businessType}
+                  onFieldUpdate={(field, value) => {
+                    setCompanyData(prev => ({ ...prev, [field]: value }))
+                    setCompanyDataEdited(true)
+                  }}
+                />
+              </div>
+
+              {/* Formulário de Dados da Empresa */}
+              <div className="p-4 pt-0">
                 <div className="space-y-4">
                   {/* Nome da Empresa */}
                   <div>
