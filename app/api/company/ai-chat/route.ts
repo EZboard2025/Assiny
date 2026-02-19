@@ -121,7 +121,7 @@ REGRAS DE PROPOSALS:
 
 - Proponha apenas campos que voce tem informacao suficiente para preencher
 - Nao proponha campos que ja foram aceitos pelo usuario (veja currentFields)
-- Proponha 1 a 3 campos por vez (nao sobrecarregue)
+- Proponha EXATAMENTE 1 campo por vez. NUNCA proponha 2 ou mais campos na mesma resposta. O sistema vai automaticamente pedir o proximo campo apos o usuario aceitar/rejeitar.
 - Se ja coletou informacao suficiente para todos os campos vazios, faca as ultimas propostas
 - Quando todos os campos estiverem preenchidos, parabenize e sugira salvar
 - Use formatacao com lista separada por | quando o campo pede multiplos itens
@@ -172,19 +172,44 @@ ${emptyFields.length > 0 ? emptyFields.join('\n') : '  Todos preenchidos!'}
 
 NÃO proponha campos que já estão preenchidos. Foque nos vazios.${extractedContent ? `
 
-CONTEUDO EXTRAIDO (de arquivo ou site compartilhado pelo usuario):
+===== CONTEUDO EXTRAIDO DO SITE/ARQUIVO =====
 ${extractedContent.substring(0, 15000)}
+===== FIM DO CONTEUDO =====
 
-INSTRUCAO CRITICA - MODO EXTRACAO AUTOMATICA:
-Voce recebeu conteudo extraido de um arquivo ou site. Voce DEVE:
-1. Analisar TODO o conteudo extraido acima ANTES de fazer qualquer pergunta
-2. Propor valores para TODOS os campos vazios que voce conseguir preencher com base no conteudo (ate 3 proposals por resposta)
-3. Escrever valores no nivel EXCELENTE usando as informacoes do conteudo
-4. NAO peca mais detalhes sobre informacoes que ja estao no conteudo extraido
-5. So faca perguntas sobre campos que REALMENTE nao tem informacao suficiente no conteudo
-6. Se o conteudo tem informacao parcial sobre um campo, proponha o que tem e depois pergunte se quer complementar
-7. Na mensagem, diga que encontrou informacoes no conteudo e esta propondo os campos baseado nelas
-8. Se conseguir identificar o tipo de negocio (B2B, B2C ou Ambos), proponha o campo business_type tambem` : ''}`
+🚨 MODO EXTRACAO AUTOMATICA ATIVADO 🚨
+
+Voce recebeu conteudo REAL extraido de um site ou arquivo da empresa. Suas instrucoes agora mudam:
+
+OBRIGATORIO:
+1. Analise TODO o conteudo extraido ANTES de fazer qualquer pergunta
+2. Proponha EXATAMENTE 1 campo por resposta (o sistema vai pedir o proximo automaticamente apos aceitar/rejeitar)
+3. Escreva o valor no nivel EXCELENTE usando APENAS informacoes do conteudo extraido
+4. NAO faca perguntas sobre informacoes que estao no conteudo - va direto para a proposal
+5. Na primeira resposta, comece pelo campo mais importante que encontrou (nome ou business_type)
+6. Na mensagem, diga brevemente que analisou o site/arquivo e encontrou dados para preencher
+
+ORDEM RECOMENDADA DE PREENCHIMENTO (siga esta ordem, pulando campos ja preenchidos):
+1. business_type (B2B, B2C ou Ambos - identifique pelo publico-alvo no conteudo)
+2. nome (nome exato da empresa)
+3. descricao (o que a empresa faz - nivel EXCELENTE)
+4. produtos_servicos (lista com formato "• Produto - descricao")
+5. funcao_produtos (o que cada produto faz na pratica para o cliente)
+6. diferenciais (diferenciais ESPECIFICOS: certificacoes, numeros, tecnologias)
+7. dados_metricas (provas sociais: clientes, premios, certificacoes, cases)
+8. concorrentes (se mencionados, formato "vs X: diferencial")
+9. percepcao_desejada (posicionamento baseado no tom do conteudo)
+10. dores_resolvidas (problemas que a empresa diz resolver)
+11. erros_comuns (raramente esta em sites, so proponha se achar)
+
+🚫 REGRA ANTI-ALUCINACAO (CRITICA):
+- NUNCA invente dados que NAO estao no conteudo extraido
+- Se um campo NAO tem informacao suficiente no conteudo, NAO proponha esse campo
+- Em vez disso, PULE para o proximo campo que tem informacao no conteudo
+- Quando acabarem os campos com informacao, avise o usuario: "Consegui preencher X campos com base no site/arquivo. Para os campos restantes (liste os nomes), vou precisar que voce me conte mais detalhes."
+- Entao pergunte sobre o proximo campo vazio de forma conversacional
+- E MELHOR pular um campo do que propor dados inventados
+
+LEMBRE-SE: Proponha apenas 1 campo. O usuario aceita/rejeita e o sistema pede automaticamente o proximo.` : ''}`
 
     // Construir array de mensagens para OpenAI
     const openaiMessages = [
@@ -205,7 +230,7 @@ Voce recebeu conteudo extraido de um arquivo ou site. Voce DEVE:
         model: 'gpt-4.1',
         messages: openaiMessages,
         temperature: 0.3,
-        max_tokens: extractedContent ? 4000 : 2500,
+        max_tokens: 2500,
         response_format: { type: 'json_object' }
       })
     })

@@ -18,7 +18,8 @@ const FIELD_CONFIG: { key: string; label: string; placeholder: string; type: 'in
 
 const ALL_FIELD_KEYS = FIELD_CONFIG.map(f => f.key)
 
-const URL_REGEX = /(?:https?:\/\/|www\.)[^\s,]+/i
+// Matches full URLs (https://..., www...) AND bare domains (ramppy.com, empresa.com.br)
+const URL_REGEX = /(?:https?:\/\/|www\.)[^\s,]+|(?:^|\s)([a-zA-Z0-9][\w-]*\.(?:com|net|org|io|dev|app|site|co|me|ai|tech|cloud|online|store|shop|edu|gov|info|biz)(?:\.[a-z]{2,4})?(?:\/[^\s,]*)?)/i
 
 interface FieldProposal {
   field: string
@@ -53,14 +54,16 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isExtracting, setIsExtracting] = useState(false)
+  const [isExtracting, setIsExtracting] = useState<false | 'url' | 'file'>(false)
   const [editingProposal, setEditingProposal] = useState<{ msgId: string; field: string } | null>(null)
   const [editValue, setEditValue] = useState('')
   const [showFields, setShowFields] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const extractedContentRef = useRef<string | undefined>(undefined)
 
   const totalFields = ALL_FIELD_KEYS.length + 1 // +1 for business_type
   const filledCount = ALL_FIELD_KEYS.filter(f => companyData[f]?.trim()).length + (businessType ? 1 : 0)
@@ -136,38 +139,84 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
 
   const handleSend = async () => {
     const text = input.trim()
-    if (!text || isLoading) return
+    const hasFiles = pendingFiles.length > 0
+    if ((!text && !hasFiles) || isLoading) return
+
+    // Build user message content
+    const filesToProcess = [...pendingFiles]
+    const fileNames = filesToProcess.map(f => f.name)
+    let msgContent = text
+    let attachment: ChatMessage['attachment'] = undefined
+
+    if (hasFiles) {
+      const fileLabel = filesToProcess.length === 1 ? fileNames[0] : `${filesToProcess.length} arquivos`
+      msgContent = text ? `${text}\n${fileLabel}` : fileLabel
+      attachment = { name: fileNames.join(', '), type: 'file' }
+    }
 
     const userMsg: ChatMessage = {
       id: `user_${Date.now()}`,
       role: 'user',
-      content: text
+      content: msgContent,
+      attachment
     }
 
     const updatedMessages = [...messages, userMsg]
     setMessages(updatedMessages)
     setInput('')
+    setPendingFiles([])
     setIsLoading(true)
 
-    // Check for URL in message
     let extractedContent: string | undefined
-    const urlMatch = text.match(URL_REGEX)
-    if (urlMatch) {
-      setIsExtracting(true)
-      try {
-        const res = await fetch('/api/company/extract-text', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: urlMatch[0] })
-        })
-        if (res.ok) {
-          const data = await res.json()
-          extractedContent = data.text
+
+    // Extract from pending files
+    if (filesToProcess.length > 0) {
+      setIsExtracting('file')
+      const { text: fileText, failed } = await extractFilesContent(filesToProcess)
+      if (fileText) {
+        extractedContent = fileText
+        extractedContentRef.current = fileText
+      }
+      if (failed.length > 0) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `warn_${Date.now()}`,
+            role: 'assistant',
+            content: `Nao consegui extrair texto de: ${failed.join(', ')}.${fileText ? ' Continuando com os demais.' : ' Verifique se os PDFs contem texto.'}`
+          }
+        ])
+        if (!fileText) {
+          setIsLoading(false)
+          setIsExtracting(false)
+          return
         }
-      } catch {
-        // URL extraction failed, continue without it
       }
       setIsExtracting(false)
+    }
+
+    // Check for URL in text (supports bare domains like ramppy.com)
+    if (!extractedContent && text) {
+      const urlMatch = text.match(URL_REGEX)
+      if (urlMatch) {
+        const detectedUrl = (urlMatch[1] || urlMatch[0]).trim()
+        setIsExtracting('url')
+        try {
+          const res = await fetch('/api/company/extract-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: detectedUrl })
+          })
+          if (res.ok) {
+            const data = await res.json()
+            extractedContent = data.text
+            extractedContentRef.current = data.text
+          }
+        } catch {
+          // URL extraction failed, continue without it
+        }
+        setIsExtracting(false)
+      }
     }
 
     await sendToAiChat(updatedMessages, extractedContent)
@@ -175,70 +224,48 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || isLoading) return
-
-    // Reset file input
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0 || isLoading) return
+    const fileArray = Array.from(files)
     e.target.value = ''
-
-    // Add user message about file
-    const userMsg: ChatMessage = {
-      id: `user_${Date.now()}`,
-      role: 'user',
-      content: file.name,
-      attachment: { name: file.name, type: 'file' }
-    }
-
-    const updatedMessages = [...messages, userMsg]
-    setMessages(updatedMessages)
-    setIsLoading(true)
-    setIsExtracting(true)
-
-    // Extract text from file
-    let extractedContent: string | undefined
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/company/extract-text', {
-        method: 'POST',
-        body: formData
-      })
-      if (res.ok) {
-        const data = await res.json()
-        extractedContent = data.text
-      } else {
-        const errData = await res.json().catch(() => null)
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `err_${Date.now()}`,
-            role: 'assistant',
-            content: errData?.error || 'Nao consegui extrair texto deste arquivo. Tente um PDF com texto (nao imagem).'
-          }
-        ])
-        setIsLoading(false)
-        setIsExtracting(false)
-        return
-      }
-    } catch {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
-          role: 'assistant',
-          content: 'Erro ao processar o arquivo. Tente novamente.'
-        }
-      ])
-      setIsLoading(false)
-      setIsExtracting(false)
-      return
-    }
-
-    setIsExtracting(false)
-    await sendToAiChat(updatedMessages, extractedContent)
-    setIsLoading(false)
+    setPendingFiles(prev => [...prev, ...fileArray])
     setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Extract text from multiple files
+  const extractFilesContent = async (files: File[]): Promise<{ text: string; failed: string[] }> => {
+    const allTexts: string[] = []
+    const failedFiles: string[] = []
+
+    for (const file of files) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch('/api/company/extract-text', {
+          method: 'POST',
+          body: formData
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.text) {
+            allTexts.push(`===== ARQUIVO: ${file.name} =====\n${data.text}`)
+          } else {
+            failedFiles.push(file.name)
+          }
+        } else {
+          failedFiles.push(file.name)
+        }
+      } catch {
+        failedFiles.push(file.name)
+      }
+    }
+
+    return { text: allTexts.join('\n\n'), failed: failedFiles }
   }
 
   // Collect all accepted field values from a message's proposals
@@ -263,7 +290,7 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     const allResolved = msg.proposals.every(p => p.status === 'accepted' || p.status === 'rejected')
     if (allResolved && !isLoading) {
       setIsLoading(true)
-      await sendToAiChat(newMessages, undefined, overrides)
+      await sendToAiChat(newMessages, extractedContentRef.current, overrides)
       setIsLoading(false)
       setTimeout(() => inputRef.current?.focus(), 100)
     }
@@ -532,7 +559,7 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                 <div className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-green-500" />
                   <span className="text-xs text-gray-400">
-                    {isExtracting ? 'Extraindo conteudo...' : 'Pensando...'}
+                    {isExtracting === 'url' ? 'Analisando site e extraindo dados...' : isExtracting === 'file' ? 'Lendo arquivo e extraindo dados...' : 'Analisando e preenchendo campos...'}
                   </span>
                 </div>
               </div>
@@ -542,19 +569,40 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
 
           {/* Input Bar */}
           <div className="px-5 py-3 border-t border-gray-100 bg-white">
+            {/* Pending file chips */}
+            {pendingFiles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {pendingFiles.map((file, idx) => (
+                  <div
+                    key={`${file.name}-${idx}`}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 max-w-[200px]"
+                  >
+                    <FileText className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{file.name}</span>
+                    <button
+                      onClick={() => removePendingFile(idx)}
+                      className="flex-shrink-0 text-green-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2 items-end">
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
                 className="p-2.5 rounded-xl text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                title="Enviar arquivo PDF"
+                title="Enviar arquivo"
               >
                 <Paperclip className="w-4 h-4" />
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.txt,.csv,.md,.doc,.docx,.pptx,.xlsx"
+                multiple
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -563,7 +611,7 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Descreva sua empresa ou cole um link..."
+                placeholder={pendingFiles.length > 0 ? 'Adicione uma mensagem ou envie os arquivos...' : 'Descreva sua empresa ou cole um link...'}
                 rows={1}
                 className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none transition-all"
                 style={{ minHeight: '40px', maxHeight: '100px' }}
@@ -571,7 +619,7 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
               />
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+                disabled={(!input.trim() && pendingFiles.length === 0) || isLoading}
                 className="p-2.5 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 shadow-sm"
               >
                 <Send className="w-4 h-4" />

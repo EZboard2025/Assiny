@@ -23,10 +23,10 @@ export default function ConfigurationRequired({
 }: ConfigurationRequiredProps) {
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center">
+      <div className="fixed inset-0 z-[80] bg-white/95 backdrop-blur-sm flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-green-400 animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Verificando configuração...</p>
+          <Loader2 className="w-12 h-12 text-green-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-500">Verificando configuração...</p>
         </div>
       </div>
     )
@@ -60,23 +60,22 @@ export default function ConfigurationRequired({
   const progress = (completedCount / configItems.length) * 100
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-      {/* Starfield background */}
-      <div className="fixed inset-0 z-0">
-        <div className="stars"></div>
-        <div className="stars2"></div>
-        <div className="stars3"></div>
+    <div className="fixed inset-0 z-[80] bg-white/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      {/* Background decoration */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-100 rounded-full opacity-50 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green-50 rounded-full opacity-50 blur-3xl" />
       </div>
 
       <div className="relative z-10 max-w-lg w-full">
         {/* Card principal */}
-        <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-3xl border border-green-500/30 shadow-2xl shadow-green-500/10 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
           {/* Botão de logout */}
           {onLogout && (
             <div className="absolute top-4 right-4 z-20">
               <button
                 onClick={onLogout}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-red-400 bg-gray-800/80 hover:bg-gray-800 rounded-lg transition-colors border border-gray-700/50 hover:border-red-500/30"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-red-500 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors border border-gray-200 hover:border-red-200"
               >
                 <LogOut className="w-4 h-4" />
                 Sair
@@ -85,33 +84,28 @@ export default function ConfigurationRequired({
           )}
 
           {/* Header com ícone */}
-          <div className="relative p-8 pb-6 text-center">
-            {/* Glow effect */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-green-500/20 blur-3xl" />
-
-            <div className="relative">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-green-500/30 to-emerald-500/20 border border-green-500/40 flex items-center justify-center">
-                <Settings className="w-10 h-10 text-green-400" />
-              </div>
-
-              <h1 className="text-2xl font-bold text-white mb-2">
-                Configure sua Empresa
-              </h1>
-              <p className="text-gray-400 text-sm">
-                Complete a configuração para liberar todas as funcionalidades
-              </p>
+          <div className="p-8 pb-6 text-center">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center">
+              <Settings className="w-10 h-10 text-green-600" />
             </div>
+
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Configure sua Empresa
+            </h1>
+            <p className="text-gray-500 text-sm">
+              Complete a configuração para liberar todas as funcionalidades
+            </p>
           </div>
 
           {/* Barra de progresso */}
           <div className="px-8 pb-6">
             <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-400">Progresso</span>
-              <span className="text-green-400 font-medium">{completedCount}/{configItems.length}</span>
+              <span className="text-gray-500">Progresso</span>
+              <span className="text-green-600 font-medium">{completedCount}/{configItems.length}</span>
             </div>
-            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all duration-500"
+                className="h-full bg-green-500 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -126,24 +120,24 @@ export default function ConfigurationRequired({
                   key={item.key}
                   className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
                     item.completed
-                      ? 'bg-green-500/10 border-green-500/30'
-                      : 'bg-gray-800/50 border-gray-700/50'
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-gray-50 border-gray-200'
                   }`}
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     item.completed
-                      ? 'bg-green-500/20'
-                      : 'bg-gray-700/50'
+                      ? 'bg-green-100'
+                      : 'bg-gray-100'
                   }`}>
                     {item.completed ? (
-                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      <CheckCircle className="w-5 h-5 text-green-600" />
                     ) : (
-                      <Icon className="w-5 h-5 text-gray-500" />
+                      <Icon className="w-5 h-5 text-gray-400" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`font-medium ${
-                      item.completed ? 'text-green-400' : 'text-white'
+                      item.completed ? 'text-green-700' : 'text-gray-900'
                     }`}>
                       {item.label}
                     </p>
@@ -152,7 +146,7 @@ export default function ConfigurationRequired({
                     </p>
                   </div>
                   {item.completed && (
-                    <span className="text-xs text-green-400 font-medium px-2 py-1 bg-green-500/10 rounded-lg">
+                    <span className="text-xs text-green-600 font-medium px-2 py-1 bg-green-100 rounded-lg">
                       OK
                     </span>
                   )}
@@ -162,14 +156,14 @@ export default function ConfigurationRequired({
           </div>
 
           {/* Aviso */}
-          <div className="mx-8 mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+          <div className="mx-8 mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm text-yellow-400 font-medium">
+                <p className="text-sm text-yellow-700 font-medium">
                   Configuração necessária
                 </p>
-                <p className="text-xs text-yellow-400/70 mt-1">
+                <p className="text-xs text-yellow-600 mt-1">
                   O treinamento de roleplay, chat IA e outras funcionalidades ficam disponíveis após completar a configuração.
                 </p>
               </div>
@@ -180,7 +174,7 @@ export default function ConfigurationRequired({
           <div className="p-8 pt-0">
             <button
               onClick={onOpenConfig}
-              className="w-full py-4 bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 hover:from-green-500 hover:via-emerald-500 hover:to-green-500 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center gap-3 shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02]"
+              className="w-full py-4 bg-green-600 hover:bg-green-500 rounded-xl font-semibold text-white transition-all duration-200 flex items-center justify-center gap-3 shadow-lg shadow-green-500/20 hover:shadow-green-500/30"
             >
               <Settings className="w-5 h-5" />
               Abrir Hub de Configuração
@@ -190,7 +184,7 @@ export default function ConfigurationRequired({
         </div>
 
         {/* Texto de ajuda */}
-        <p className="text-center text-gray-500 text-xs mt-6">
+        <p className="text-center text-gray-400 text-xs mt-6">
           Precisa de ajuda? Entre em contato com o suporte.
         </p>
       </div>
