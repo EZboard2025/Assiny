@@ -4973,248 +4973,70 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
 
               {/* Chat IA para preencher dados */}
-              <div className="p-4">
-                <CompanyDataChat
-                  companyData={companyData}
-                  businessType={businessType}
-                  onFieldUpdate={(field, value) => {
-                    setCompanyData(prev => ({ ...prev, [field]: value }))
-                    setCompanyDataEdited(true)
-                  }}
-                />
-              </div>
-
-              {/* Formulário de Dados da Empresa */}
-              <div className="p-4 pt-0">
-                <div className="space-y-4">
-                  {/* Nome da Empresa */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Nome da empresa
-                    </label>
-                    <input
-                      type="text"
-                      value={companyData.nome}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, nome: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Ex: Tech Solutions LTDA"
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50"
-                    />
-                  </div>
-
-                  {/* Descrição */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Descrição
-                    </label>
-                    <textarea
-                      value={companyData.descricao}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, descricao: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="O que a empresa faz em uma frase"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Produtos/Serviços */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Produtos/Serviços
-                    </label>
-                    <textarea
-                      value={companyData.produtos_servicos}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, produtos_servicos: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Ex: Sistema ERP, CRM para vendas"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Função dos Produtos */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Função dos produtos
-                    </label>
-                    <textarea
-                      value={companyData.funcao_produtos}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, funcao_produtos: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="O que cada produto faz na prática"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Diferenciais */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Diferenciais
-                    </label>
-                    <textarea
-                      value={companyData.diferenciais}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, diferenciais: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Diferenciais em relação aos concorrentes"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Concorrentes */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Concorrentes
-                    </label>
-                    <textarea
-                      value={companyData.concorrentes}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, concorrentes: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Ex: TOTVS, Omie, Bling"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Dados e Métricas */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Provas Sociais
-                    </label>
-                    <textarea
-                      value={companyData.dados_metricas}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, dados_metricas: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Depoimentos, cases, prêmios, certificações, clientes conhecidos, métricas..."
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Erros Comuns */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Erros comuns
-                    </label>
-                    <textarea
-                      value={companyData.erros_comuns}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, erros_comuns: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Informações que vendedores costumam confundir"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Percepção Desejada */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Percepção desejada
-                    </label>
-                    <textarea
-                      value={companyData.percepcao_desejada}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, percepcao_desejada: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Como a empresa deseja ser percebida pelos clientes"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Dores que Resolve */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Dores que resolve
-                    </label>
-                    <textarea
-                      value={companyData.dores_resolvidas}
-                      onChange={(e) => {
-                        setCompanyData({ ...companyData, dores_resolvidas: e.target.value })
-                        setCompanyDataEdited(true)
-                      }}
-                      placeholder="Quais dores a empresa resolve para seus clientes"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
-                    />
-                  </div>
-
-                  {/* Botões Salvar/Avaliar/Ver */}
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {/* Botão Salvar/Atualizar - só aparece se não há ID (primeira vez) OU se houve edição */}
-                    {(!companyDataId || companyDataEdited) && (
-                      <button
-                        onClick={handleSaveCompanyData}
-                        disabled={savingCompanyData}
-                        className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                      >
-                        {savingCompanyData ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            {companyDataId ? 'Atualizando...' : 'Salvando...'}
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            {companyDataId ? 'Atualizar' : 'Salvar'}
-                          </>
-                        )}
-                      </button>
-                    )}
-
+              <CompanyDataChat
+                companyData={companyData}
+                businessType={businessType}
+                onFieldUpdate={(field, value) => {
+                  setCompanyData(prev => ({ ...prev, [field]: value }))
+                  setCompanyDataEdited(true)
+                }}
+              >
+                {/* Botões Salvar/Avaliar/Ver */}
+                <div className="flex flex-wrap gap-2">
+                  {(!companyDataId || companyDataEdited) && (
                     <button
-                      onClick={handleEvaluateQuality}
-                      disabled={evaluatingQuality || (qualityEvaluation && !companyDataEdited)}
-                      className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                      title={
-                        qualityEvaluation && !companyDataEdited
-                          ? 'Edite os dados para poder reavaliar'
-                          : ''
-                      }
+                      onClick={handleSaveCompanyData}
+                      disabled={savingCompanyData}
+                      className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg text-sm font-medium hover:from-green-500 hover:to-green-400 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      {evaluatingQuality ? (
+                      {savingCompanyData ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Avaliando...
+                          {companyDataId ? 'Atualizando...' : 'Salvando...'}
                         </>
                       ) : (
                         <>
-                          <AlertCircle className="w-4 h-4" />
-                          {qualityEvaluation ? 'Reavaliar' : 'Avaliar'}
+                          <CheckCircle className="w-4 h-4" />
+                          {companyDataId ? 'Atualizar' : 'Salvar'}
                         </>
                       )}
                     </button>
+                  )}
 
-                    {qualityEvaluation && (
-                      <button
-                        onClick={() => setShowCompanyEvaluationModal(true)}
-                        className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-500/30 transition-colors flex items-center gap-2"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Ver Avaliação
-                      </button>
+                  <button
+                    onClick={handleEvaluateQuality}
+                    disabled={evaluatingQuality || (qualityEvaluation && !companyDataEdited)}
+                    className="px-4 py-2 bg-gray-700/60 text-gray-300 border border-gray-600/50 rounded-lg text-sm font-medium hover:bg-gray-700/80 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    title={
+                      qualityEvaluation && !companyDataEdited
+                        ? 'Edite os dados para poder reavaliar'
+                        : ''
+                    }
+                  >
+                    {evaluatingQuality ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Avaliando...
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-4 h-4" />
+                        {qualityEvaluation ? 'Reavaliar' : 'Avaliar'}
+                      </>
                     )}
-                  </div>
+                  </button>
+
+                  {qualityEvaluation && (
+                    <button
+                      onClick={() => setShowCompanyEvaluationModal(true)}
+                      className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-500/30 transition-colors flex items-center gap-2"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Ver Avaliação
+                    </button>
+                  )}
                 </div>
-              </div>
+              </CompanyDataChat>
             </div>
           </div>
         )}
