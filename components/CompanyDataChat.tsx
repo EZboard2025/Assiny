@@ -1,7 +1,34 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Send, Loader2, Check, X, Pencil, Bot, CheckCircle, ChevronDown, ChevronUp, Paperclip, FileText, Globe } from 'lucide-react'
+import { Sparkles, Send, Loader2, Check, X, Pencil, Bot, CheckCircle, ChevronDown, ChevronUp, Paperclip, FileText, Globe, Mic, MicOff } from 'lucide-react'
+
+// Web Speech API types (not in default TS lib)
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean
+  readonly length: number
+  [index: number]: { transcript: string; confidence: number }
+}
+interface SpeechRecognitionResultList {
+  readonly length: number
+  [index: number]: SpeechRecognitionResult
+}
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number
+  readonly results: SpeechRecognitionResultList
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start(): void
+  stop(): void
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const window: Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any }
 
 const FIELD_CONFIG: { key: string; label: string; placeholder: string; type: 'input' | 'textarea' }[] = [
   { key: 'nome', label: 'Nome da Empresa', placeholder: 'Ex: Tech Solutions LTDA', type: 'input' },
@@ -41,10 +68,11 @@ interface CompanyDataChatProps {
   businessType: string
   onFieldUpdate: (field: string, value: string) => void
   onBusinessTypeChange?: (type: 'B2B' | 'B2C' | 'Ambos') => void
+  onAutoSave?: () => void
   children?: React.ReactNode
 }
 
-export default function CompanyDataChat({ companyData, businessType, onFieldUpdate, onBusinessTypeChange, children }: CompanyDataChatProps) {
+export default function CompanyDataChat({ companyData, businessType, onFieldUpdate, onBusinessTypeChange, onAutoSave, children }: CompanyDataChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -59,11 +87,13 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
   const [editValue, setEditValue] = useState('')
   const [showFields, setShowFields] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [isListening, setIsListening] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const extractedContentRef = useRef<string | undefined>(undefined)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   const totalFields = ALL_FIELD_KEYS.length + 1 // +1 for business_type
   const filledCount = ALL_FIELD_KEYS.filter(f => companyData[f]?.trim()).length + (businessType ? 1 : 0)
@@ -72,6 +102,18 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
   const hasStartedChat = messages.length > 1
   // Show CTA button initially if no fields are filled yet
   const [chatOpened, setChatOpened] = useState(filledCount > 0)
+
+  const prevFilledRef = useRef(filledCount)
+  const autoSavedRef = useRef(false)
+
+  useEffect(() => {
+    // Auto-save when all fields become filled during chat (not on initial load)
+    if (allFilled && prevFilledRef.current < totalFields && !autoSavedRef.current && hasStartedChat && onAutoSave) {
+      autoSavedRef.current = true
+      onAutoSave()
+    }
+    prevFilledRef.current = filledCount
+  }, [filledCount, allFilled, totalFields, hasStartedChat, onAutoSave])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -389,6 +431,62 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     }
   }
 
+  const toggleDictation = () => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      return
+    }
+
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognitionCtor) return
+
+    const recognition: SpeechRecognitionInstance = new SpeechRecognitionCtor()
+    recognition.lang = 'pt-BR'
+    recognition.continuous = true
+    recognition.interimResults = true
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = ''
+      let interimTranscript = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript
+        } else {
+          interimTranscript = transcript
+        }
+      }
+      if (finalTranscript) {
+        setInput(prev => prev + (prev && !prev.endsWith(' ') ? ' ' : '') + finalTranscript)
+      }
+      if (interimTranscript && inputRef.current) {
+        inputRef.current.placeholder = interimTranscript + '...'
+      }
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      recognitionRef.current = null
+      if (inputRef.current) {
+        inputRef.current.placeholder = pendingFiles.length > 0 ? 'Adicione uma mensagem ou envie os arquivos...' : 'Descreva sua empresa ou cole um link...'
+      }
+    }
+
+    recognition.onerror = () => {
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+  }
+
+  // Cleanup recognition on unmount
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop() }
+  }, [])
+
   const showChat = chatOpened && (!allFilled || hasStartedChat || forceOpen)
 
   // Progress bar percentage
@@ -606,15 +704,32 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                 onChange={handleFileUpload}
                 className="hidden"
               />
+              <button
+                onClick={toggleDictation}
+                disabled={isLoading}
+                className={`p-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 ${
+                  isListening
+                    ? 'text-white bg-red-500 hover:bg-red-600 animate-pulse shadow-md shadow-red-500/30'
+                    : 'text-white bg-green-500 hover:bg-green-600 shadow-sm shadow-green-500/20'
+                }`}
+                title={isListening ? 'Parar ditado' : 'Ditar mensagem'}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  // Auto-resize
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={pendingFiles.length > 0 ? 'Adicione uma mensagem ou envie os arquivos...' : 'Descreva sua empresa ou cole um link...'}
                 rows={1}
-                className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none transition-all"
-                style={{ minHeight: '40px', maxHeight: '100px' }}
+                className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none transition-all overflow-y-auto"
+                style={{ minHeight: '40px', maxHeight: '160px' }}
                 disabled={isLoading}
               />
               <button

@@ -4864,6 +4864,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   setCompanyDataEdited(true)
                 }}
                 onBusinessTypeChange={handleSetBusinessType}
+                onAutoSave={handleSaveCompanyData}
               >
                 {/* Botões Salvar/Avaliar/Ver */}
                 <div className="flex flex-wrap gap-2">
