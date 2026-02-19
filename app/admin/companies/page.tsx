@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, BarChart3, PlayCircle, Settings, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap, Search, Target } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, PlayCircle, Settings, CheckCircle, AlertCircle, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap, Search, Target } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -130,9 +130,6 @@ export default function CompaniesAdmin() {
   const [metrics, setMetrics] = useState<CompanyMetrics[]>([])
   const [metricsTotals, setMetricsTotals] = useState<MetricsTotals | null>(null)
   const [loadingMetrics, setLoadingMetrics] = useState(false)
-  const [showMetrics, setShowMetrics] = useState(false)
-  const [expandedMetricId, setExpandedMetricId] = useState<string | null>(null)
-  const [showUsersForCompany, setShowUsersForCompany] = useState<string | null>(null)
 
   // Timer state for weekly reset
   const [timeUntilReset, setTimeUntilReset] = useState(getTimeUntilReset())
@@ -207,12 +204,6 @@ export default function CompaniesAdmin() {
     }
   }
 
-  const handleToggleMetrics = () => {
-    if (!showMetrics && metrics.length === 0) {
-      loadMetrics()
-    }
-    setShowMetrics(!showMetrics)
-  }
 
   // Form fields
   const [companyName, setCompanyName] = useState('')
@@ -265,6 +256,7 @@ export default function CompaniesAdmin() {
     if (savedAuth === 'admin123') {
       setIsAuthenticated(true)
       loadCompanies()
+      loadMetrics()
     }
   }, [])
 
@@ -306,6 +298,7 @@ export default function CompaniesAdmin() {
       setIsAuthenticated(true)
       sessionStorage.setItem('admin-companies-auth', 'admin123')
       loadCompanies()
+      loadMetrics()
       showToast('success', 'Autenticado com sucesso!')
     } else {
       showToast('error', 'Senha incorreta', 'A senha informada está incorreta. Tente novamente.')
@@ -815,22 +808,13 @@ export default function CompaniesAdmin() {
                 <p className="text-gray-500 text-sm">Administre as empresas do sistema multi-tenant</p>
               </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleToggleMetrics}
-                className={`px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showMetrics ? 'bg-green-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
-              >
-                <BarChart3 className="w-5 h-5" />
-                {showMetrics ? 'Ocultar Métricas' : 'Ver Métricas'}
-              </button>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm hover:shadow-md"
-              >
-                <Plus className="w-5 h-5" />
-                Nova Empresa
-              </button>
-            </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm hover:shadow-md"
+            >
+              <Plus className="w-5 h-5" />
+              Nova Empresa
+            </button>
           </div>
         </div>
 
@@ -942,193 +926,47 @@ export default function CompaniesAdmin() {
           </div>
         </div>
 
-        {/* Metrics Section */}
-        {showMetrics && (
-          <div className="mb-8 space-y-6">
-            {/* Totals Cards */}
-            {loadingMetrics ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
+        {/* Metrics Summary Bar */}
+        {metricsTotals && (
+          <div className="bg-white rounded-xl border border-gray-200 mb-6 shadow-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100">
+              <div className="px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <PlayCircle className="w-4 h-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Total Roleplays</p>
+                  <p className="text-lg font-bold text-gray-900">{metricsTotals.totalRoleplays}</p>
+                </div>
               </div>
-            ) : metricsTotals && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl p-5 border border-gray-200">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-                        <PlayCircle className="w-5 h-5 text-green-600" />
-                      </div>
-                      <span className="text-xs text-gray-500 font-medium">Total de Roleplays</span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{metricsTotals.totalRoleplays}</p>
-                  </div>
-
-                  <div className="bg-white rounded-xl p-5 border border-gray-200">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                        <Users className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <span className="text-xs text-gray-500 font-medium">Treinamento</span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{metricsTotals.trainingRoleplays}</p>
-                  </div>
-
-                  <div className="bg-white rounded-xl p-5 border border-gray-200">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                        <Globe className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <span className="text-xs text-gray-500 font-medium">Públicos</span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{metricsTotals.publicRoleplays}</p>
-                  </div>
-
-                  <div className="bg-white rounded-xl p-5 border border-gray-200">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
-                        <Settings className="w-5 h-5 text-yellow-600" />
-                      </div>
-                      <span className="text-xs text-gray-500 font-medium">Empresas Configuradas</span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {metricsTotals.fullyConfiguredCompanies}/{metricsTotals.totalCompanies}
-                    </p>
-                  </div>
+              <div className="px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Users className="w-4 h-4 text-blue-600" />
                 </div>
-
-                {/* Per Company Metrics */}
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-green-600" />
-                      Métricas por Empresa
-                    </h3>
-                  </div>
-
-                  <div className="divide-y divide-gray-100">
-                    {metrics.map((metric) => (
-                      <div key={metric.companyId} className="p-4">
-                        <div
-                          className="flex items-center justify-between cursor-pointer"
-                          onClick={() => setExpandedMetricId(expandedMetricId === metric.companyId ? null : metric.companyId)}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className={`w-3 h-3 rounded-full ${metric.isFullyConfigured ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                            <div>
-                              <p className="font-medium text-gray-900">{metric.companyName}</p>
-                              <p className="text-sm text-gray-500">{metric.subdomain}.ramppy.site</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-6">
-                            <div className="text-right">
-                              <p className="text-sm text-gray-500">Roleplays</p>
-                              <p className="font-semibold text-gray-900">{metric.roleplays.total}</p>
-                            </div>
-                            <div className="text-right hidden sm:block">
-                              <p className="text-sm text-gray-500">Treinamento / Público</p>
-                              <p className="font-semibold text-gray-900">{metric.roleplays.training} / {metric.roleplays.public}</p>
-                            </div>
-                            {expandedMetricId === metric.companyId ? (
-                              <ChevronUp className="w-5 h-5 text-gray-400" />
-                            ) : (
-                              <ChevronDown className="w-5 h-5 text-gray-400" />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Expanded Details */}
-                        {expandedMetricId === metric.companyId && (
-                          <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div className="flex items-center gap-2">
-                                {metric.configStatus.hasPersonas ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
-                                )}
-                                <span className="text-sm text-gray-600">
-                                  Personas: {metric.configStatus.personasCount}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {metric.configStatus.hasObjections ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
-                                )}
-                                <span className="text-sm text-gray-600">
-                                  Objeções: {metric.configStatus.objectionsCount}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {metric.configStatus.hasCompanyData ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
-                                )}
-                                <span className="text-sm text-gray-600">
-                                  Dados da Empresa
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {metric.configStatus.hasBusinessType ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
-                                )}
-                                <span className="text-sm text-gray-600">
-                                  Tipo de Negócio
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Botão Ver Usuários */}
-                            {metric.usersWithRoleplays.length > 0 && (
-                              <div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setShowUsersForCompany(showUsersForCompany === metric.companyId ? null : metric.companyId)
-                                  }}
-                                  className="flex items-center gap-2 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                  <Users className="w-4 h-4" />
-                                  {showUsersForCompany === metric.companyId ? 'Ocultar' : 'Ver'} Usuários ({metric.usersWithRoleplays.length})
-                                </button>
-
-                                {/* Lista de Usuários */}
-                                {showUsersForCompany === metric.companyId && (
-                                  <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-2">
-                                    {metric.usersWithRoleplays.map((user) => (
-                                      <div key={user.id} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-gray-100">
-                                        <div>
-                                          <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                                          <p className="text-xs text-gray-500">{user.email}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <PlayCircle className="w-4 h-4 text-green-600" />
-                                          <span className="text-sm font-semibold text-green-600">{user.roleplayCount}</span>
-                                          <span className="text-xs text-gray-500">roleplays</span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {metric.usersWithRoleplays.length === 0 && metric.roleplays.training > 0 && (
-                              <p className="text-sm text-gray-500 italic">Nenhum usuário identificado nos roleplays</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                <div>
+                  <p className="text-xs text-gray-500">Treinamento</p>
+                  <p className="text-lg font-bold text-gray-900">{metricsTotals.trainingRoleplays}</p>
                 </div>
-              </>
-            )}
+              </div>
+              <div className="px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Globe className="w-4 h-4 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Públicos</p>
+                  <p className="text-lg font-bold text-gray-900">{metricsTotals.publicRoleplays}</p>
+                </div>
+              </div>
+              <div className="px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 bg-yellow-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Settings className="w-4 h-4 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Configuradas</p>
+                  <p className="text-lg font-bold text-gray-900">{metricsTotals.fullyConfiguredCompanies}/{metricsTotals.totalCompanies}</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1222,6 +1060,61 @@ export default function CompaniesAdmin() {
                     </span>
                   </div>
                 </div>
+
+                {/* Metrics (inline) */}
+                {(() => {
+                  const metric = metrics.find(m => m.companyId === company.id)
+                  if (!metric) return null
+                  return (
+                    <div className="mb-3 space-y-2">
+                      {/* Roleplays */}
+                      <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg">
+                        <PlayCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                        <span className="text-xs font-medium text-gray-700">Roleplays</span>
+                        <div className="flex items-center gap-2 ml-auto">
+                          <span className="text-sm font-bold text-gray-900">{metric.roleplays.total}</span>
+                          <span className="text-xs text-gray-400">({metric.roleplays.training} treino / {metric.roleplays.public} público)</span>
+                        </div>
+                      </div>
+
+                      {/* Config Status */}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded">
+                          {metric.configStatus.hasPersonas ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                          )}
+                          <span className="text-xs text-gray-600">Personas ({metric.configStatus.personasCount})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded">
+                          {metric.configStatus.hasObjections ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                          )}
+                          <span className="text-xs text-gray-600">Objeções ({metric.configStatus.objectionsCount})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded">
+                          {metric.configStatus.hasCompanyData ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                          )}
+                          <span className="text-xs text-gray-600">Dados Empresa</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded">
+                          {metric.configStatus.hasBusinessType ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                          )}
+                          <span className="text-xs text-gray-600">Tipo Negócio</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Access Links */}
                 <div className="mb-3">
