@@ -674,18 +674,18 @@ export default function CompaniesAdmin() {
   // Helper para formatar score
   const getScoreColor = (score: number | undefined) => {
     if (score === undefined) return 'text-gray-400'
-    if (score >= 8) return 'text-green-400'
-    if (score >= 6) return 'text-yellow-400'
-    if (score >= 4) return 'text-orange-400'
-    return 'text-red-400'
+    if (score >= 8) return 'text-green-600'
+    if (score >= 6) return 'text-yellow-600'
+    if (score >= 4) return 'text-orange-500'
+    return 'text-red-600'
   }
 
   const getScoreBgColor = (score: number | undefined) => {
-    if (score === undefined) return 'bg-gray-700/50'
-    if (score >= 8) return 'bg-green-600/20'
-    if (score >= 6) return 'bg-yellow-600/20'
-    if (score >= 4) return 'bg-orange-600/20'
-    return 'bg-red-600/20'
+    if (score === undefined) return 'bg-gray-100'
+    if (score >= 8) return 'bg-green-50'
+    if (score >= 6) return 'bg-yellow-50'
+    if (score >= 4) return 'bg-orange-50'
+    return 'bg-red-50'
   }
 
   const confirmDelete = async () => {
@@ -756,13 +756,15 @@ export default function CompaniesAdmin() {
   // Tela de senha
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center px-6">
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center px-6">
         <div className="max-w-md w-full">
-          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 border border-emerald-500/30">
+          <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-xl">
             <div className="text-center mb-6">
-              <Building2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-              <h1 className="text-3xl font-bold text-white mb-2">Gerenciar Empresas</h1>
-              <p className="text-gray-400">Digite a senha para acessar</p>
+              <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-green-200">
+                <Building2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Gerenciar Empresas</h1>
+              <p className="text-gray-500">Digite a senha para acessar</p>
             </div>
 
             <form onSubmit={handlePasswordSubmit}>
@@ -771,18 +773,18 @@ export default function CompaniesAdmin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Senha de acesso"
-                className="w-full px-4 py-3 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none mb-4"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all mb-4"
                 autoFocus
               />
               <button
                 type="submit"
-                className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 text-white rounded-xl font-medium hover:scale-105 transition-all shadow-lg shadow-emerald-500/30"
+                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all shadow-sm hover:shadow-md"
               >
                 Acessar
               </button>
             </form>
 
-            <p className="text-xs text-gray-500 text-center mt-4">
+            <p className="text-xs text-gray-400 text-center mt-4">
               Senha padrão: admin123
             </p>
           </div>
@@ -799,117 +801,122 @@ export default function CompaniesAdmin() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black py-20 px-6">
+    <div className="min-h-screen bg-[#F8F9FA] py-8 px-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-              <Building2 className="w-10 h-10 text-emerald-400" />
-              <span className="bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500 bg-clip-text text-transparent">
-                Gerenciar Empresas
-              </span>
-            </h1>
-            <p className="text-gray-400 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-              Administre as empresas do sistema multi-tenant
-            </p>
-
-            {/* Timer para reset mensal */}
-            <div className="mt-4 bg-gradient-to-r from-emerald-900/20 to-green-900/20 border border-emerald-500/30 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
-              <Clock className="w-5 h-5 text-emerald-400" />
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">Reset mensal em:</span>
-                <div className="flex items-center gap-4 text-white font-mono">
-                  {timeUntilReset.days > 0 && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xl font-bold text-emerald-400">{timeUntilReset.days}</span>
-                      <span className="text-xs text-gray-400">dias</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-green-400">{String(timeUntilReset.hours).padStart(2, '0')}</span>
-                    <span className="text-xs text-gray-400">h</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-emerald-300">{String(timeUntilReset.minutes).padStart(2, '0')}</span>
-                    <span className="text-xs text-gray-400">m</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-green-300">{String(timeUntilReset.seconds).padStart(2, '0')}</span>
-                    <span className="text-xs text-gray-400">s</span>
-                  </div>
-                </div>
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-green-600" />
               </div>
-              <div className="ml-auto text-xs text-gray-500">
-                Dia 1 do próximo mês às 00:00
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Gerenciar Empresas</h1>
+                <p className="text-gray-500 text-sm">Administre as empresas do sistema multi-tenant</p>
               </div>
             </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleToggleMetrics}
+                className={`px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showMetrics ? 'bg-green-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+              >
+                <BarChart3 className="w-5 h-5" />
+                {showMetrics ? 'Ocultar Métricas' : 'Ver Métricas'}
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-sm hover:shadow-md"
+              >
+                <Plus className="w-5 h-5" />
+                Nova Empresa
+              </button>
+            </div>
+          </div>
+        </div>
 
-            {/* Timer para geração de desafios diários */}
-            <div className="mt-3 bg-gradient-to-r from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl px-4 py-3 flex items-center gap-3 backdrop-blur-sm">
-              <Target className="w-5 h-5 text-purple-400" />
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">Próxima geração de desafios:</span>
-                <div className="flex items-center gap-4 text-white font-mono">
+        {/* Timers */}
+        <div className="bg-white rounded-xl border border-gray-200 mb-6 shadow-sm overflow-hidden">
+          {/* Monthly Reset Timer */}
+          <div className="px-5 py-3 flex items-center gap-3 border-b border-gray-100">
+            <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 text-green-600" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Reset mensal em:</span>
+              <div className="flex items-center gap-3 font-mono">
+                {timeUntilReset.days > 0 && (
                   <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-purple-400">{String(timeUntilChallengeGen.hours).padStart(2, '0')}</span>
-                    <span className="text-xs text-gray-400">h</span>
+                    <span className="text-lg font-bold text-gray-900">{timeUntilReset.days}</span>
+                    <span className="text-xs text-gray-400">dias</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-pink-400">{String(timeUntilChallengeGen.minutes).padStart(2, '0')}</span>
-                    <span className="text-xs text-gray-400">m</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xl font-bold text-purple-300">{String(timeUntilChallengeGen.seconds).padStart(2, '0')}</span>
-                    <span className="text-xs text-gray-400">s</span>
-                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-bold text-gray-900">{String(timeUntilReset.hours).padStart(2, '0')}</span>
+                  <span className="text-xs text-gray-400">h</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-bold text-gray-900">{String(timeUntilReset.minutes).padStart(2, '0')}</span>
+                  <span className="text-xs text-gray-400">m</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-bold text-gray-900">{String(timeUntilReset.seconds).padStart(2, '0')}</span>
+                  <span className="text-xs text-gray-400">s</span>
                 </div>
               </div>
-              <div className="ml-auto flex items-center gap-4">
-                <div className="text-xs text-gray-400">
-                  <span className="text-purple-400 font-medium">{challengeGenInfo?.enabledCompanies || 0}</span> empresas |{' '}
-                  <span className="text-pink-400 font-medium">{challengeGenInfo?.totalEmployees || 0}</span> vendedores
-                </div>
-                <div className="text-xs text-gray-500">
-                  Todos os dias à meia-noite
-                </div>
-                <button
-                  onClick={generateChallengesNow}
-                  disabled={generatingChallenges}
-                  className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                >
-                  {generatingChallenges ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Gerando...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-3 h-3" />
-                      Gerar Agora
-                    </>
-                  )}
-                </button>
-              </div>
+            </div>
+            <div className="ml-auto text-xs text-gray-400">
+              Dia 1 do próximo mês às 00:00
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleToggleMetrics}
-              className={`px-6 py-3 ${showMetrics ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-gray-700 hover:bg-gray-600'} text-white rounded-xl font-medium transition-all flex items-center gap-2`}
-            >
-              <BarChart3 className="w-5 h-5" />
-              {showMetrics ? 'Ocultar Métricas' : 'Ver Métricas'}
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 text-white rounded-xl font-medium hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/30"
-            >
-              <Plus className="w-5 h-5" />
-              Nova Empresa
-            </button>
+          {/* Challenge Generation Timer */}
+          <div className="px-5 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Target className="w-4 h-4 text-purple-600" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Próxima geração de desafios:</span>
+              <div className="flex items-center gap-3 font-mono">
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-bold text-gray-900">{String(timeUntilChallengeGen.hours).padStart(2, '0')}</span>
+                  <span className="text-xs text-gray-400">h</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-bold text-gray-900">{String(timeUntilChallengeGen.minutes).padStart(2, '0')}</span>
+                  <span className="text-xs text-gray-400">m</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-bold text-gray-900">{String(timeUntilChallengeGen.seconds).padStart(2, '0')}</span>
+                  <span className="text-xs text-gray-400">s</span>
+                </div>
+              </div>
+            </div>
+            <div className="ml-auto flex items-center gap-4">
+              <div className="text-xs text-gray-500">
+                <span className="text-purple-600 font-medium">{challengeGenInfo?.enabledCompanies || 0}</span> empresas |{' '}
+                <span className="text-purple-600 font-medium">{challengeGenInfo?.totalEmployees || 0}</span> vendedores
+              </div>
+              <div className="text-xs text-gray-400">
+                Todos os dias à meia-noite
+              </div>
+              <button
+                onClick={generateChallengesNow}
+                disabled={generatingChallenges}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {generatingChallenges ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3 h-3" />
+                    Gerar Agora
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -922,12 +929,12 @@ export default function CompaniesAdmin() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Pesquisar empresa por nome ou subdomínio..."
-              className="w-full pl-12 pr-4 py-3 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none transition-all"
+              className="w-full pl-12 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-200 focus:border-green-300 transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -941,56 +948,64 @@ export default function CompaniesAdmin() {
             {/* Totals Cards */}
             {loadingMetrics ? (
               <div className="flex items-center justify-center py-10">
-                <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
               </div>
             ) : metricsTotals && (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-emerald-500/30">
+                  <div className="bg-white rounded-xl p-5 border border-gray-200">
                     <div className="flex items-center gap-3 mb-2">
-                      <PlayCircle className="w-6 h-6 text-emerald-400" />
-                      <span className="text-sm text-gray-400">Total de Roleplays</span>
+                      <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                        <PlayCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                      <span className="text-xs text-gray-500 font-medium">Total de Roleplays</span>
                     </div>
-                    <p className="text-3xl font-bold bg-gradient-to-br from-emerald-400 to-green-500 bg-clip-text text-transparent">{metricsTotals.totalRoleplays}</p>
+                    <p className="text-2xl font-bold text-gray-900">{metricsTotals.totalRoleplays}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-green-500/30">
+                  <div className="bg-white rounded-xl p-5 border border-gray-200">
                     <div className="flex items-center gap-3 mb-2">
-                      <Users className="w-6 h-6 text-green-400" />
-                      <span className="text-sm text-gray-400">Treinamento</span>
+                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                        <Users className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <span className="text-xs text-gray-500 font-medium">Treinamento</span>
                     </div>
-                    <p className="text-3xl font-bold bg-gradient-to-br from-green-400 to-emerald-500 bg-clip-text text-transparent">{metricsTotals.trainingRoleplays}</p>
+                    <p className="text-2xl font-bold text-gray-900">{metricsTotals.trainingRoleplays}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-cyan-500/30">
+                  <div className="bg-white rounded-xl p-5 border border-gray-200">
                     <div className="flex items-center gap-3 mb-2">
-                      <Globe className="w-6 h-6 text-cyan-400" />
-                      <span className="text-sm text-gray-400">Públicos</span>
+                      <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
+                        <Globe className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <span className="text-xs text-gray-500 font-medium">Públicos</span>
                     </div>
-                    <p className="text-3xl font-bold bg-gradient-to-br from-cyan-400 to-blue-500 bg-clip-text text-transparent">{metricsTotals.publicRoleplays}</p>
+                    <p className="text-2xl font-bold text-gray-900">{metricsTotals.publicRoleplays}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-5 border border-yellow-500/30">
+                  <div className="bg-white rounded-xl p-5 border border-gray-200">
                     <div className="flex items-center gap-3 mb-2">
-                      <Settings className="w-6 h-6 text-yellow-400" />
-                      <span className="text-sm text-gray-400">Empresas Configuradas</span>
+                      <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
+                        <Settings className="w-5 h-5 text-yellow-600" />
+                      </div>
+                      <span className="text-xs text-gray-500 font-medium">Empresas Configuradas</span>
                     </div>
-                    <p className="text-3xl font-bold bg-gradient-to-br from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                    <p className="text-2xl font-bold text-gray-900">
                       {metricsTotals.fullyConfiguredCompanies}/{metricsTotals.totalCompanies}
                     </p>
                   </div>
                 </div>
 
                 {/* Per Company Metrics */}
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl border border-emerald-500/30 overflow-hidden shadow-2xl">
-                  <div className="px-6 py-4 border-b border-gray-700/50 bg-gray-800/50">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-blue-400" />
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-green-600" />
                       Métricas por Empresa
                     </h3>
                   </div>
 
-                  <div className="divide-y divide-gray-700">
+                  <div className="divide-y divide-gray-100">
                     {metrics.map((metric) => (
                       <div key={metric.companyId} className="p-4">
                         <div
@@ -1000,19 +1015,19 @@ export default function CompaniesAdmin() {
                           <div className="flex items-center gap-4">
                             <div className={`w-3 h-3 rounded-full ${metric.isFullyConfigured ? 'bg-green-500' : 'bg-yellow-500'}`} />
                             <div>
-                              <p className="font-medium text-white">{metric.companyName}</p>
-                              <p className="text-sm text-gray-400">{metric.subdomain}.ramppy.site</p>
+                              <p className="font-medium text-gray-900">{metric.companyName}</p>
+                              <p className="text-sm text-gray-500">{metric.subdomain}.ramppy.site</p>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-6">
                             <div className="text-right">
-                              <p className="text-sm text-gray-400">Roleplays</p>
-                              <p className="font-semibold text-white">{metric.roleplays.total}</p>
+                              <p className="text-sm text-gray-500">Roleplays</p>
+                              <p className="font-semibold text-gray-900">{metric.roleplays.total}</p>
                             </div>
                             <div className="text-right hidden sm:block">
-                              <p className="text-sm text-gray-400">Treinamento / Público</p>
-                              <p className="font-semibold text-white">{metric.roleplays.training} / {metric.roleplays.public}</p>
+                              <p className="text-sm text-gray-500">Treinamento / Público</p>
+                              <p className="font-semibold text-gray-900">{metric.roleplays.training} / {metric.roleplays.public}</p>
                             </div>
                             {expandedMetricId === metric.companyId ? (
                               <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -1024,45 +1039,45 @@ export default function CompaniesAdmin() {
 
                         {/* Expanded Details */}
                         {expandedMetricId === metric.companyId && (
-                          <div className="mt-4 pt-4 border-t border-gray-700/50 space-y-4">
+                          <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               <div className="flex items-center gap-2">
                                 {metric.configStatus.hasPersonas ? (
-                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                  <CheckCircle className="w-4 h-4 text-green-500" />
                                 ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
                                 )}
-                                <span className="text-sm text-gray-300">
+                                <span className="text-sm text-gray-600">
                                   Personas: {metric.configStatus.personasCount}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
                                 {metric.configStatus.hasObjections ? (
-                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                  <CheckCircle className="w-4 h-4 text-green-500" />
                                 ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
                                 )}
-                                <span className="text-sm text-gray-300">
+                                <span className="text-sm text-gray-600">
                                   Objeções: {metric.configStatus.objectionsCount}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
                                 {metric.configStatus.hasCompanyData ? (
-                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                  <CheckCircle className="w-4 h-4 text-green-500" />
                                 ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
                                 )}
-                                <span className="text-sm text-gray-300">
+                                <span className="text-sm text-gray-600">
                                   Dados da Empresa
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
                                 {metric.configStatus.hasBusinessType ? (
-                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                  <CheckCircle className="w-4 h-4 text-green-500" />
                                 ) : (
-                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                  <AlertCircle className="w-4 h-4 text-yellow-500" />
                                 )}
-                                <span className="text-sm text-gray-300">
+                                <span className="text-sm text-gray-600">
                                   Tipo de Negócio
                                 </span>
                               </div>
@@ -1076,7 +1091,7 @@ export default function CompaniesAdmin() {
                                     e.stopPropagation()
                                     setShowUsersForCompany(showUsersForCompany === metric.companyId ? null : metric.companyId)
                                   }}
-                                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-lg text-sm font-medium transition-colors"
+                                  className="flex items-center gap-2 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-sm font-medium transition-colors"
                                 >
                                   <Users className="w-4 h-4" />
                                   {showUsersForCompany === metric.companyId ? 'Ocultar' : 'Ver'} Usuários ({metric.usersWithRoleplays.length})
@@ -1084,16 +1099,16 @@ export default function CompaniesAdmin() {
 
                                 {/* Lista de Usuários */}
                                 {showUsersForCompany === metric.companyId && (
-                                  <div className="mt-3 bg-gray-800/50 rounded-xl p-3 space-y-2">
+                                  <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-2">
                                     {metric.usersWithRoleplays.map((user) => (
-                                      <div key={user.id} className="flex items-center justify-between py-2 px-3 bg-gray-900/50 rounded-lg">
+                                      <div key={user.id} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-gray-100">
                                         <div>
-                                          <p className="text-sm font-medium text-white">{user.name}</p>
-                                          <p className="text-xs text-gray-400">{user.email}</p>
+                                          <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                                          <p className="text-xs text-gray-500">{user.email}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          <PlayCircle className="w-4 h-4 text-emerald-400" />
-                                          <span className="text-sm font-semibold text-emerald-300">{user.roleplayCount}</span>
+                                          <PlayCircle className="w-4 h-4 text-green-600" />
+                                          <span className="text-sm font-semibold text-green-600">{user.roleplayCount}</span>
                                           <span className="text-xs text-gray-500">roleplays</span>
                                         </div>
                                       </div>
@@ -1120,20 +1135,20 @@ export default function CompaniesAdmin() {
         {/* Companies Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+            <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
           </div>
         ) : companies.length === 0 ? (
-          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-20 text-center border border-emerald-500/30">
-            <Building2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">Nenhuma empresa cadastrada</p>
+          <div className="bg-white rounded-2xl p-20 text-center border border-gray-200 shadow-sm">
+            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">Nenhuma empresa cadastrada</p>
           </div>
         ) : filteredCompanies.length === 0 ? (
-          <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-20 text-center border border-emerald-500/30">
-            <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">Nenhuma empresa encontrada para "{searchQuery}"</p>
+          <div className="bg-white rounded-2xl p-20 text-center border border-gray-200 shadow-sm">
+            <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">Nenhuma empresa encontrada para &ldquo;{searchQuery}&rdquo;</p>
             <button
               onClick={() => setSearchQuery('')}
-              className="mt-4 text-emerald-400 hover:text-emerald-300 transition-colors text-sm"
+              className="mt-4 text-green-600 hover:text-green-700 transition-colors text-sm font-medium"
             >
               Limpar busca
             </button>
@@ -1143,173 +1158,171 @@ export default function CompaniesAdmin() {
             {filteredCompanies.map((company) => (
               <div
                 key={company.id}
-                className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-2xl p-6 border border-emerald-500/30 hover:border-emerald-500/40 transition-all"
+                className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-green-200 transition-all"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-xl font-bold text-white">{company.name}</h3>
+                {/* Company Info */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate">{company.name}</h3>
                       {company.locked && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-500/20 border border-orange-500/30 rounded-full text-xs font-semibold text-orange-400">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 rounded-full text-xs font-semibold text-orange-700 flex-shrink-0">
                           <Lock className="w-3 h-3" />
                           BLOQUEADA
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <Globe className="w-4 h-4" />
-                      <span>Sistema Unificado</span>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {company.training_plan && (
-                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-emerald-600/20 to-green-600/20 rounded-full">
-                          <Package className="w-3 h-3 text-emerald-400" />
-                          <span className="text-xs font-medium text-emerald-300">
-                            {PLAN_NAMES[company.training_plan]}
-                          </span>
-                        </div>
-                      )}
-                      {/* Créditos usados / total */}
-                      <div className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-yellow-600/20 to-amber-600/20 rounded-full">
-                        <Zap className="w-3 h-3 text-yellow-400" />
-                        <span className="text-xs font-medium text-yellow-300">
-                          {company.monthly_credits_used || 0}/{(PLAN_CONFIGS[company.training_plan!]?.monthlyCredits || 0) + (company.extra_monthly_credits || 0)} créditos
-                          {(company.extra_monthly_credits || 0) > 0 && (
-                            <span className="text-green-400"> (+{company.extra_monthly_credits})</span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleEditPlanClick(company)}
-                      className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
-                      title="Editar plano"
-                    >
-                      <Package className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={() => handleAddCreditsClick(company)}
-                      className="p-2 text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
-                      title="Adicionar créditos"
-                    >
-                      <Zap className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={() => handleOpenCreateUser(company)}
-                      className="p-2 text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
-                      title="Criar novo usuário"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={() => handleManageUsersClick(company)}
-                      className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-                      title="Gerenciar usuários"
-                    >
-                      <Users className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={() => handleViewRoleplays(company)}
-                      className="p-2 text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
-                      title="Ver roleplays"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={() => toggleLock(company)}
-                      disabled={togglingLock === company.id}
-                      className={`p-2 rounded-lg transition-colors ${
-                        company.locked
-                          ? 'text-orange-400 hover:bg-orange-500/10'
-                          : 'text-gray-400 hover:bg-gray-500/10'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      title={company.locked ? 'Desbloquear empresa' : 'Bloquear empresa'}
-                    >
-                      {togglingLock === company.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : company.locked ? (
-                        <Lock className="w-4 h-4" />
-                      ) : (
-                        <LockOpen className="w-4 h-4" />
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteClick(company)}
-                      className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                      title="Excluir empresa"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5" />
+                      {company.subdomain}.ramppy.site
+                    </p>
                   </div>
                 </div>
 
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-gray-300">
-                    <Users className="w-4 h-4 text-emerald-400" />
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {company.training_plan && (
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 rounded-full">
+                      <Package className="w-3 h-3 text-green-700" />
+                      <span className="text-xs font-medium text-green-700">
+                        {PLAN_NAMES[company.training_plan]}
+                      </span>
+                    </div>
+                  )}
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 rounded-full">
+                    <Zap className="w-3 h-3 text-yellow-700" />
+                    <span className="text-xs font-medium text-yellow-700">
+                      {company.monthly_credits_used || 0}/{(PLAN_CONFIGS[company.training_plan!]?.monthlyCredits || 0) + (company.extra_monthly_credits || 0)} créditos
+                      {(company.extra_monthly_credits || 0) > 0 && (
+                        <span className="text-green-600"> (+{company.extra_monthly_credits})</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-1.5 text-sm mb-3">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Users className="w-4 h-4 text-green-600" />
                     <span>
                       {company._count?.employees || 0}
                       {company.employee_limit ? ` / ${company.employee_limit}` : ''} funcionários
                     </span>
                     {company.employee_limit && company._count && company._count.employees >= company.employee_limit && (
-                      <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full">Limite atingido</span>
+                      <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Limite atingido</span>
                     )}
                   </div>
-
-                  <div className="flex items-center gap-2 text-gray-300">
-                    <Calendar className="w-4 h-4 text-emerald-400" />
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Calendar className="w-4 h-4 text-gray-400" />
                     <span>
                       Criada em {new Date(company.created_at).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-700 space-y-2">
-                  <div className="flex gap-2">
-                    {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true' ? (
-                      <p className="text-xs text-gray-500 text-center w-full">
-                        Acesso unificado em ramppy.site
-                      </p>
-                    ) : (
-                      <>
-                        <a
-                          href={`http://${company.subdomain}.ramppy.local:3000`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-lg text-sm font-medium text-center transition-colors"
-                        >
-                          Acessar Local
-                        </a>
-                        <a
-                          href={`https://${company.subdomain}.ramppy.site`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded-lg text-sm font-medium text-center transition-colors"
-                        >
-                          Acessar Produção
-                        </a>
-                      </>
-                    )}
-                  </div>
-                  {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM !== 'true' && (
-                    <a
-                      href={`https://${company.subdomain}.ramppy.site?openConfigHub=true`}
-                      target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-sm font-medium text-center transition-colors flex items-center justify-center gap-2"
-                  >
-                      <Settings className="w-4 h-4" />
-                      Ver Configurações
-                    </a>
+                {/* Access Links */}
+                <div className="mb-3">
+                  {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true' ? (
+                    <p className="text-xs text-gray-400 text-center">
+                      Acesso unificado em ramppy.site
+                    </p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <a
+                        href={`http://${company.subdomain}.ramppy.local:3000`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-medium text-center transition-colors border border-gray-200"
+                      >
+                        Local
+                      </a>
+                      <a
+                        href={`https://${company.subdomain}.ramppy.site`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-xs font-medium text-center transition-colors border border-green-200"
+                      >
+                        Produção
+                      </a>
+                      <a
+                        href={`https://${company.subdomain}.ramppy.site?openConfigHub=true`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-medium text-center transition-colors border border-gray-200 flex items-center justify-center gap-1"
+                      >
+                        <Settings className="w-3 h-3" />
+                        Config
+                      </a>
+                    </div>
                   )}
+                </div>
+
+                {/* Action Bar */}
+                <div className="pt-3 border-t border-gray-100 flex items-center gap-1">
+                  <button
+                    onClick={() => handleEditPlanClick(company)}
+                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Editar plano"
+                  >
+                    <Package className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleAddCreditsClick(company)}
+                    className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+                    title="Adicionar créditos"
+                  >
+                    <Zap className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleOpenCreateUser(company)}
+                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Criar novo usuário"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleManageUsersClick(company)}
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Gerenciar usuários"
+                  >
+                    <Users className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleViewRoleplays(company)}
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Ver roleplays"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => toggleLock(company)}
+                    disabled={togglingLock === company.id}
+                    className={`p-2 rounded-lg transition-colors ${
+                      company.locked
+                        ? 'text-orange-500 hover:bg-orange-50'
+                        : 'text-gray-400 hover:bg-gray-100'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    title={company.locked ? 'Desbloquear empresa' : 'Bloquear empresa'}
+                  >
+                    {togglingLock === company.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : company.locked ? (
+                      <Lock className="w-4 h-4" />
+                    ) : (
+                      <LockOpen className="w-4 h-4" />
+                    )}
+                  </button>
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => handleDeleteClick(company)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Excluir empresa"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -1318,30 +1331,28 @@ export default function CompaniesAdmin() {
 
         {/* Create Company Modal */}
         {showCreateModal && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 max-w-2xl w-full border border-emerald-500/30 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-2xl w-full border border-gray-200 shadow-xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">
-                  <span className="bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500 bg-clip-text text-transparent">
-                    Criar Nova Empresa
-                  </span>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Criar Nova Empresa
                 </h2>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {error && (
-                <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400">
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
                   {error}
                 </div>
               )}
 
               {success && (
-                <div className="mb-4 p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400">
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700">
                   {success}
                 </div>
               )}
@@ -1349,11 +1360,11 @@ export default function CompaniesAdmin() {
               <div className="space-y-4">
                 {/* Dados da Empresa */}
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-3">Dados da Empresa</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Dados da Empresa</h3>
 
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Nome da Empresa
                       </label>
                       <input
@@ -1361,19 +1372,19 @@ export default function CompaniesAdmin() {
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
                         placeholder="Ex: Tech Solutions"
-                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                       />
                     </div>
 
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Tipo de Negócio
                       </label>
                       <select
                         value={businessType}
                         onChange={(e) => setBusinessType(e.target.value as 'B2B' | 'B2C')}
-                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white focus:border-emerald-400/60 focus:outline-none"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                       >
                         <option value="B2B">B2B (Empresa para Empresa)</option>
                         <option value="B2C">B2C (Empresa para Consumidor)</option>
@@ -1384,12 +1395,12 @@ export default function CompaniesAdmin() {
                 </div>
 
                 {/* Dados do Administrador */}
-                <div className="pt-4 border-t border-gray-700">
-                  <h3 className="text-lg font-semibold text-white mb-3">Administrador da Empresa</h3>
+                <div className="pt-4 border-t border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Administrador da Empresa</h3>
 
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Nome do Administrador
                       </label>
                       <input
@@ -1397,12 +1408,12 @@ export default function CompaniesAdmin() {
                         value={adminName}
                         onChange={(e) => setAdminName(e.target.value)}
                         placeholder="João Silva"
-                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Email do Administrador
                       </label>
                       <input
@@ -1410,12 +1421,12 @@ export default function CompaniesAdmin() {
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
                         placeholder="admin@techsolutions.com"
-                        className="w-full px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Senha Inicial
                       </label>
                       <div className="flex items-center gap-2">
@@ -1424,12 +1435,12 @@ export default function CompaniesAdmin() {
                           value={adminPassword}
                           onChange={(e) => setAdminPassword(e.target.value)}
                           placeholder="Mínimo 6 caracteres"
-                          className="flex-1 px-4 py-2 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:border-emerald-400/60 focus:outline-none"
+                          className="flex-1 px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                         />
                         <button
                           type="button"
                           onClick={generatePassword}
-                          className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-xl text-sm font-medium transition-colors"
+                          className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors"
                         >
                           Gerar Senha
                         </button>
@@ -1440,18 +1451,18 @@ export default function CompaniesAdmin() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-700">
+              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   onClick={() => setShowCreateModal(false)}
                   disabled={creating}
-                  className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleCreateCompany}
                   disabled={creating}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {creating ? (
                     <>
@@ -1483,11 +1494,11 @@ export default function CompaniesAdmin() {
           message={
             <div className="space-y-3">
               <p>
-                Tem certeza que deseja excluir a empresa <strong className="text-white">{companyToDelete?.name}</strong>?
+                Tem certeza que deseja excluir a empresa <strong className="text-gray-900">{companyToDelete?.name}</strong>?
               </p>
-              <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3 space-y-1">
-                <p className="text-sm font-semibold text-red-400">⚠️ Esta ação irá deletar PERMANENTEMENTE:</p>
-                <ul className="text-sm text-gray-300 space-y-1 ml-4">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+                <p className="text-sm font-semibold text-red-700">⚠️ Esta ação irá deletar PERMANENTEMENTE:</p>
+                <ul className="text-sm text-gray-600 space-y-1 ml-4">
                   <li>• A empresa e todas as configurações</li>
                   <li>• Todos os funcionários e usuários</li>
                   <li>• Todas as personas e objeções</li>
@@ -1496,7 +1507,7 @@ export default function CompaniesAdmin() {
                   <li>• Todas as sessões de chat</li>
                 </ul>
               </div>
-              <p className="text-sm text-yellow-400 font-semibold">
+              <p className="text-sm text-red-600 font-semibold">
                 Esta ação NÃO pode ser desfeita!
               </p>
             </div>
@@ -1511,12 +1522,12 @@ export default function CompaniesAdmin() {
 
         {/* Manage Users Modal */}
         {showManageUsersModal && companyToManageUsers && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-4xl w-full border border-emerald-500/30 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-4xl w-full border border-gray-200 shadow-xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Gerenciar Usuários</h2>
-                  <p className="text-sm text-gray-400 mt-1">Empresa: {companyToManageUsers.name}</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Gerenciar Usuários</h2>
+                  <p className="text-sm text-gray-500 mt-1">Empresa: {companyToManageUsers.name}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -1524,7 +1535,7 @@ export default function CompaniesAdmin() {
                     setCompanyToManageUsers(null)
                     setCompanyUsers([])
                   }}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1532,35 +1543,35 @@ export default function CompaniesAdmin() {
 
               {loadingUsers ? (
                 <div className="py-12 text-center">
-                  <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto mb-4" />
-                  <p className="text-gray-400">Carregando usuários...</p>
+                  <Loader2 className="w-8 h-8 text-green-500 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-500">Carregando usuários...</p>
                 </div>
               ) : companyUsers.length === 0 ? (
                 <div className="py-12 text-center">
-                  <Users className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">Nenhum usuário encontrado</p>
+                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">Nenhum usuário encontrado</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {companyUsers.map(user => (
                     <div
                       key={user.user_id}
-                      className="bg-gray-800/60 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between"
+                      className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center justify-between"
                     >
                       <div className="flex-1">
-                        <h4 className="text-white font-medium">{user.name}</h4>
-                        <p className="text-sm text-gray-400">{user.email}</p>
+                        <h4 className="text-gray-900 font-medium">{user.name}</h4>
+                        <p className="text-sm text-gray-500">{user.email}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <select
                           value={user.role}
                           onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
-                          className="px-4 py-2 bg-gray-700/50 border border-emerald-500/30 rounded-lg text-white focus:border-emerald-400/60 focus:outline-none appearance-none cursor-pointer"
-                          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5rem', paddingRight: '2.5rem' }}
+                          className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none appearance-none cursor-pointer"
+                          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5rem', paddingRight: '2.5rem' }}
                         >
-                          <option value="Admin" className="bg-gray-800 text-white">Admin</option>
-                          <option value="Vendedor" className="bg-gray-800 text-white">Vendedor</option>
-                          <option value="Representante" className="bg-gray-800 text-white">Representante</option>
+                          <option value="Admin">Admin</option>
+                          <option value="Vendedor">Vendedor</option>
+                          <option value="Representante">Representante</option>
                         </select>
                       </div>
                     </div>
@@ -1568,13 +1579,13 @@ export default function CompaniesAdmin() {
                 </div>
               )}
 
-              <div className="mt-6 pt-6 border-t border-gray-700">
-                <div className="text-sm text-gray-400">
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="text-sm text-gray-600">
                   <p className="mb-2">📌 Notas:</p>
                   <ul className="space-y-1 ml-4">
-                    <li>• <strong className="text-emerald-400">Admin:</strong> Acesso total, incluindo ConfigHub</li>
-                    <li>• <strong className="text-emerald-400">Vendedor:</strong> Acesso apenas aos treinamentos</li>
-                    <li>• <strong className="text-emerald-400">Representante:</strong> Portal de parceiros (sem acesso a treinamentos)</li>
+                    <li>• <strong className="text-green-600">Admin:</strong> Acesso total, incluindo ConfigHub</li>
+                    <li>• <strong className="text-green-600">Vendedor:</strong> Acesso apenas aos treinamentos</li>
+                    <li>• <strong className="text-green-600">Representante:</strong> Portal de parceiros (sem acesso a treinamentos)</li>
                     <li>• As alterações são aplicadas imediatamente</li>
                   </ul>
                 </div>
@@ -1585,13 +1596,13 @@ export default function CompaniesAdmin() {
 
         {/* Modal de Criar Novo Usuário */}
         {showCreateUserModal && selectedCompanyForNewUser && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-lg w-full border border-green-500/30">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-lg w-full border border-gray-200 shadow-xl">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Criar Novo Usuário</h2>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Empresa: <span className="text-green-400 font-medium">{selectedCompanyForNewUser.name}</span>
+                  <h2 className="text-2xl font-bold text-gray-900">Criar Novo Usuário</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Empresa: <span className="text-green-600 font-medium">{selectedCompanyForNewUser.name}</span>
                   </p>
                 </div>
                 <button
@@ -1599,7 +1610,7 @@ export default function CompaniesAdmin() {
                     setShowCreateUserModal(false)
                     setSelectedCompanyForNewUser(null)
                   }}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1607,7 +1618,7 @@ export default function CompaniesAdmin() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Nome do Usuário
                   </label>
                   <input
@@ -1615,12 +1626,12 @@ export default function CompaniesAdmin() {
                     value={newUserName}
                     onChange={(e) => setNewUserName(e.target.value)}
                     placeholder="João Silva"
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Email
                   </label>
                   <input
@@ -1628,12 +1639,12 @@ export default function CompaniesAdmin() {
                     value={newUserEmail}
                     onChange={(e) => setNewUserEmail(e.target.value)}
                     placeholder="joao@empresa.com"
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Senha
                   </label>
                   <div className="flex gap-2">
@@ -1642,11 +1653,11 @@ export default function CompaniesAdmin() {
                       value={newUserPassword}
                       onChange={(e) => setNewUserPassword(e.target.value)}
                       placeholder="Mínimo 6 caracteres"
-                      className="flex-1 px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
+                      className="flex-1 px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                     />
                     <button
                       onClick={generateUserPassword}
-                      className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-xl font-medium transition-colors"
+                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
                     >
                       Gerar
                     </button>
@@ -1654,18 +1665,18 @@ export default function CompaniesAdmin() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Cargo
                   </label>
                   <select
                     value={newUserRole}
                     onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'vendedor' | 'representante')}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-green-500/20 rounded-xl text-white focus:border-green-500/50 focus:outline-none appearance-none cursor-pointer"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1.25rem', paddingRight: '2.5rem' }}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all appearance-none cursor-pointer"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1.25rem', paddingRight: '2.5rem' }}
                   >
-                    <option value="vendedor" className="bg-gray-800 text-white">Vendedor</option>
-                    <option value="admin" className="bg-gray-800 text-white">Administrador</option>
-                    <option value="representante" className="bg-gray-800 text-white">Representante</option>
+                    <option value="vendedor">Vendedor</option>
+                    <option value="admin">Administrador</option>
+                    <option value="representante">Representante</option>
                   </select>
                 </div>
 
@@ -1675,14 +1686,14 @@ export default function CompaniesAdmin() {
                       setShowCreateUserModal(false)
                       setSelectedCompanyForNewUser(null)
                     }}
-                    className="flex-1 px-6 py-3 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 rounded-xl font-medium transition-colors"
+                    className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleCreateUser}
                     disabled={creatingUser}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
                   >
                     {creatingUser ? (
                       <>
@@ -1704,13 +1715,13 @@ export default function CompaniesAdmin() {
 
         {/* Plan Selection Modal */}
         {showPlanModal && companyToEditPlan && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-2xl w-full border border-emerald-500/30 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-2xl w-full border border-gray-200 shadow-xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Selecionar Plano</h2>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Empresa: <span className="text-emerald-400 font-medium">{companyToEditPlan.name}</span>
+                  <h2 className="text-2xl font-bold text-gray-900">Selecionar Plano</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Empresa: <span className="text-green-600 font-medium">{companyToEditPlan.name}</span>
                   </p>
                 </div>
                 <button
@@ -1718,7 +1729,7 @@ export default function CompaniesAdmin() {
                     setShowPlanModal(false)
                     setCompanyToEditPlan(null)
                   }}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1727,16 +1738,16 @@ export default function CompaniesAdmin() {
               <div className="space-y-3">
                 {/* Planos de Treinamento */}
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-green-600" />
                     Planos de Treinamento
                   </h3>
                   <div className="space-y-2">
                     {/* Individual Plan */}
                     <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
                       selectedTrainingPlan === PlanType.INDIVIDUAL
-                        ? 'bg-gradient-to-r from-green-600/30 to-emerald-600/30 border-2 border-green-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                        ? 'bg-green-50 border-2 border-green-500'
+                        : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                     }`}>
                       <input
                         type="radio"
@@ -1747,16 +1758,16 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.INDIVIDUAL]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-green-600/50 text-green-200 rounded-full">
+                          <span className="font-bold text-gray-900">{PLAN_NAMES[PlanType.INDIVIDUAL]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
                             R$ 129/mês
                           </span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-2">Para vendedores individuais</p>
+                        <p className="text-sm text-gray-500 mb-2">Para vendedores individuais</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">20 créditos/mês</span>
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">1 vendedor</span>
-                          <span className="text-xs px-2 py-1 bg-green-600/20 text-green-300 rounded">✓ Todos os recursos</span>
+                          <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded">20 créditos/mês</span>
+                          <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded">1 vendedor</span>
+                          <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded">✓ Todos os recursos</span>
                         </div>
                       </div>
                     </label>
@@ -1764,8 +1775,8 @@ export default function CompaniesAdmin() {
                     {/* Team Plan */}
                     <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
                       selectedTrainingPlan === PlanType.TEAM
-                        ? 'bg-gradient-to-r from-blue-600/30 to-cyan-600/30 border-2 border-blue-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                        ? 'bg-blue-50 border-2 border-blue-500'
+                        : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                     }`}>
                       <input
                         type="radio"
@@ -1776,16 +1787,16 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.TEAM]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-blue-600/50 text-blue-200 rounded-full">
+                          <span className="font-bold text-gray-900">{PLAN_NAMES[PlanType.TEAM]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
                             R$ 1.999/mês
                           </span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-2">Para equipes pequenas e médias</p>
+                        <p className="text-sm text-gray-500 mb-2">Para equipes pequenas e médias</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">400 créditos/mês</span>
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">Até 20 vendedores</span>
-                          <span className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 rounded">+50 créd = R$250</span>
+                          <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded">400 créditos/mês</span>
+                          <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded">Até 20 vendedores</span>
+                          <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded">+50 créd = R$250</span>
                         </div>
                       </div>
                     </label>
@@ -1793,8 +1804,8 @@ export default function CompaniesAdmin() {
                     {/* Business Plan */}
                     <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
                       selectedTrainingPlan === PlanType.BUSINESS
-                        ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 border-2 border-purple-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                        ? 'bg-purple-50 border-2 border-purple-500'
+                        : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                     }`}>
                       <input
                         type="radio"
@@ -1805,17 +1816,17 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.BUSINESS]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-purple-600/50 text-purple-200 rounded-full">
+                          <span className="font-bold text-gray-900">{PLAN_NAMES[PlanType.BUSINESS]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
                             R$ 4.999/mês
                           </span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-2">Para equipes grandes</p>
+                        <p className="text-sm text-gray-500 mb-2">Para equipes grandes</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">1.000 créditos/mês</span>
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">20-50 vendedores</span>
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+50 créd = R$250</span>
-                          <span className="text-xs px-2 py-1 bg-purple-600/20 text-purple-300 rounded">+100 créd = R$450</span>
+                          <span className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded">1.000 créditos/mês</span>
+                          <span className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded">20-50 vendedores</span>
+                          <span className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded">+50 créd = R$250</span>
+                          <span className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded">+100 créd = R$450</span>
                         </div>
                       </div>
                     </label>
@@ -1823,8 +1834,8 @@ export default function CompaniesAdmin() {
                     {/* Enterprise Plan */}
                     <label className={`relative flex items-start p-4 rounded-xl cursor-pointer transition-all ${
                       selectedTrainingPlan === PlanType.ENTERPRISE
-                        ? 'bg-gradient-to-r from-amber-600/30 to-orange-600/30 border-2 border-amber-500'
-                        : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-800/70'
+                        ? 'bg-amber-50 border-2 border-amber-500'
+                        : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                     }`}>
                       <input
                         type="radio"
@@ -1835,16 +1846,16 @@ export default function CompaniesAdmin() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">{PLAN_NAMES[PlanType.ENTERPRISE]}</span>
-                          <span className="text-xs px-2 py-0.5 bg-amber-600/50 text-amber-200 rounded-full">
+                          <span className="font-bold text-gray-900">{PLAN_NAMES[PlanType.ENTERPRISE]}</span>
+                          <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
                             Personalizado
                           </span>
                         </div>
-                        <p className="text-sm text-gray-400 mb-2">Para grandes operações - preço negociável</p>
+                        <p className="text-sm text-gray-500 mb-2">Para grandes operações - preço negociável</p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">Créditos ilimitados</span>
-                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">+50 vendedores</span>
-                          <span className="text-xs px-2 py-1 bg-amber-600/20 text-amber-300 rounded">Suporte dedicado</span>
+                          <span className="text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded">Créditos ilimitados</span>
+                          <span className="text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded">+50 vendedores</span>
+                          <span className="text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded">Suporte dedicado</span>
                         </div>
                       </div>
                     </label>
@@ -1853,21 +1864,21 @@ export default function CompaniesAdmin() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-700">
+              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   onClick={() => {
                     setShowPlanModal(false)
                     setCompanyToEditPlan(null)
                   }}
                   disabled={updatingPlan}
-                  className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleUpdatePlan}
                   disabled={updatingPlan}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {updatingPlan ? (
                     <>
@@ -1888,16 +1899,16 @@ export default function CompaniesAdmin() {
 
         {/* Modal de Roleplays */}
         {showRoleplaysModal && companyToViewRoleplays && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-cyan-500/30 shadow-2xl shadow-cyan-500/20">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-gray-200 shadow-xl">
               {/* Header */}
-              <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <MessageSquare className="w-6 h-6 text-cyan-400" />
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <MessageSquare className="w-6 h-6 text-green-600" />
                     Roleplays - {companyToViewRoleplays.name}
                   </h2>
-                  <p className="text-gray-400 text-sm mt-1">
+                  <p className="text-gray-500 text-sm mt-1">
                     {roleplays.length} sessão(ões) encontrada(s)
                   </p>
                 </div>
@@ -1907,7 +1918,7 @@ export default function CompaniesAdmin() {
                     setCompanyToViewRoleplays(null)
                     setSelectedRoleplay(null)
                   }}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -1916,10 +1927,10 @@ export default function CompaniesAdmin() {
               {/* Content */}
               <div className="flex h-[calc(90vh-120px)]">
                 {/* Lista de Roleplays */}
-                <div className="w-1/3 border-r border-gray-700 overflow-y-auto">
+                <div className="w-1/3 border-r border-gray-200 overflow-y-auto">
                   {loadingRoleplays ? (
                     <div className="flex items-center justify-center h-full">
-                      <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                      <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
                     </div>
                   ) : roleplays.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6">
@@ -1927,19 +1938,19 @@ export default function CompaniesAdmin() {
                       <p className="text-center">Nenhum roleplay encontrado para esta empresa</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-700">
+                    <div className="divide-y divide-gray-100">
                       {roleplays.map((roleplay) => (
                         <button
                           key={roleplay.id}
                           onClick={() => setSelectedRoleplay(roleplay)}
                           className={`w-full p-4 text-left transition-colors ${
                             selectedRoleplay?.id === roleplay.id
-                              ? 'bg-cyan-600/20 border-l-4 border-cyan-500'
-                              : 'hover:bg-gray-800/50'
+                              ? 'bg-green-50 border-l-4 border-green-500'
+                              : 'hover:bg-gray-50'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-white font-medium truncate">
+                            <span className="text-gray-900 font-medium truncate">
                               {roleplay.employee_name || 'Usuário'}
                             </span>
                             {roleplay.evaluation?.overall_score !== undefined && (
@@ -1948,7 +1959,7 @@ export default function CompaniesAdmin() {
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-gray-400 space-y-1">
+                          <div className="text-xs text-gray-500 space-y-1">
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
                               {new Date(roleplay.created_at).toLocaleDateString('pt-BR')} às{' '}
@@ -1959,7 +1970,7 @@ export default function CompaniesAdmin() {
                               {roleplay.messages?.length || 0} mensagens
                             </div>
                             {roleplay.config?.persona && (
-                              <div className="truncate text-cyan-400/70">
+                              <div className="truncate text-green-600/70">
                                 {roleplay.config.persona}
                               </div>
                             )}
@@ -1974,40 +1985,40 @@ export default function CompaniesAdmin() {
                 <div className="flex-1 overflow-y-auto">
                   {!selectedRoleplay ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                      <ChevronRight className="w-12 h-12 mb-4 opacity-50" />
-                      <p>Selecione um roleplay para ver os detalhes</p>
+                      <ChevronRight className="w-12 h-12 mb-4 opacity-30" />
+                      <p className="text-gray-500">Selecione um roleplay para ver os detalhes</p>
                     </div>
                   ) : (
                     <div className="p-6 space-y-6">
                       {/* Info do Funcionário e Scores */}
                       <div className="grid grid-cols-2 gap-4">
                         {/* Info */}
-                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                          <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                            <Users className="w-4 h-4 text-cyan-400" />
+                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                          <h3 className="text-gray-900 font-semibold mb-3 flex items-center gap-2">
+                            <Users className="w-4 h-4 text-green-600" />
                             Informações
                           </h3>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Funcionário:</span>
-                              <span className="text-white">{selectedRoleplay.employee_name}</span>
+                              <span className="text-gray-500">Funcionário:</span>
+                              <span className="text-gray-900">{selectedRoleplay.employee_name}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Email:</span>
-                              <span className="text-gray-300 text-xs">{selectedRoleplay.employee_email}</span>
+                              <span className="text-gray-500">Email:</span>
+                              <span className="text-gray-600 text-xs">{selectedRoleplay.employee_email}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Data:</span>
-                              <span className="text-white">
+                              <span className="text-gray-500">Data:</span>
+                              <span className="text-gray-900">
                                 {new Date(selectedRoleplay.created_at).toLocaleDateString('pt-BR')}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Status:</span>
+                              <span className="text-gray-500">Status:</span>
                               <span className={`px-2 py-0.5 rounded text-xs ${
-                                selectedRoleplay.status === 'completed' ? 'bg-green-600/20 text-green-400' :
-                                selectedRoleplay.status === 'active' ? 'bg-blue-600/20 text-blue-400' :
-                                'bg-gray-600/20 text-gray-400'
+                                selectedRoleplay.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                selectedRoleplay.status === 'active' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-600'
                               }`}>
                                 {selectedRoleplay.status}
                               </span>
@@ -2016,9 +2027,9 @@ export default function CompaniesAdmin() {
                         </div>
 
                         {/* Score Geral */}
-                        <div className={`rounded-xl p-4 border ${getScoreBgColor(selectedRoleplay.evaluation?.overall_score)} border-gray-700`}>
-                          <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                            <Star className="w-4 h-4 text-yellow-400" />
+                        <div className={`rounded-xl p-4 border ${getScoreBgColor(selectedRoleplay.evaluation?.overall_score)} border-gray-200`}>
+                          <h3 className="text-gray-900 font-semibold mb-3 flex items-center gap-2">
+                            <Star className="w-4 h-4 text-yellow-500" />
                             Avaliação
                           </h3>
                           {selectedRoleplay.evaluation ? (
@@ -2027,31 +2038,31 @@ export default function CompaniesAdmin() {
                                 <div className={`text-4xl font-bold ${getScoreColor(selectedRoleplay.evaluation.overall_score)}`}>
                                   {selectedRoleplay.evaluation.overall_score?.toFixed(1) || 'N/A'}
                                 </div>
-                                <div className="text-sm text-gray-400 capitalize">
+                                <div className="text-sm text-gray-500 capitalize">
                                   {selectedRoleplay.evaluation.performance_level?.replace(/_/g, ' ') || ''}
                                 </div>
                               </div>
                             </div>
                           ) : (
-                            <p className="text-gray-400 text-sm text-center">Sem avaliação</p>
+                            <p className="text-gray-500 text-sm text-center">Sem avaliação</p>
                           )}
                         </div>
                       </div>
 
                       {/* Scores SPIN */}
                       {selectedRoleplay.evaluation?.spin_evaluation && (
-                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                          <h3 className="text-white font-semibold mb-3">Scores SPIN</h3>
+                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                          <h3 className="text-gray-900 font-semibold mb-3">Scores SPIN</h3>
                           <div className="grid grid-cols-4 gap-3">
                             {(['S', 'P', 'I', 'N'] as const).map((letter) => {
                               const score = selectedRoleplay.evaluation?.spin_evaluation?.[letter]?.final_score
                               return (
                                 <div key={letter} className={`rounded-lg p-3 text-center ${getScoreBgColor(score)}`}>
-                                  <div className="text-lg font-bold text-white">{letter}</div>
+                                  <div className="text-lg font-bold text-gray-900">{letter}</div>
                                   <div className={`text-2xl font-bold ${getScoreColor(score)}`}>
                                     {score?.toFixed(1) || 'N/A'}
                                   </div>
-                                  <div className="text-xs text-gray-400">
+                                  <div className="text-xs text-gray-500">
                                     {letter === 'S' && 'Situação'}
                                     {letter === 'P' && 'Problema'}
                                     {letter === 'I' && 'Implicação'}
@@ -2066,9 +2077,9 @@ export default function CompaniesAdmin() {
 
                       {/* Resumo Executivo */}
                       {selectedRoleplay.evaluation?.executive_summary && (
-                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                          <h3 className="text-white font-semibold mb-3">Resumo Executivo</h3>
-                          <p className="text-gray-300 text-sm leading-relaxed">
+                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                          <h3 className="text-gray-900 font-semibold mb-3">Resumo Executivo</h3>
+                          <p className="text-gray-600 text-sm leading-relaxed">
                             {selectedRoleplay.evaluation.executive_summary}
                           </p>
                         </div>
@@ -2077,12 +2088,12 @@ export default function CompaniesAdmin() {
                       {/* Pontos Fortes e Gaps */}
                       <div className="grid grid-cols-2 gap-4">
                         {selectedRoleplay.evaluation?.top_strengths && selectedRoleplay.evaluation.top_strengths.length > 0 && (
-                          <div className="bg-green-600/10 rounded-xl p-4 border border-green-500/30">
-                            <h3 className="text-green-400 font-semibold mb-3">Pontos Fortes</h3>
+                          <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                            <h3 className="text-green-700 font-semibold mb-3">Pontos Fortes</h3>
                             <ul className="space-y-1">
                               {selectedRoleplay.evaluation.top_strengths.map((strength, idx) => (
-                                <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                                  <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                                <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                                   {strength}
                                 </li>
                               ))}
@@ -2091,12 +2102,12 @@ export default function CompaniesAdmin() {
                         )}
 
                         {selectedRoleplay.evaluation?.critical_gaps && selectedRoleplay.evaluation.critical_gaps.length > 0 && (
-                          <div className="bg-red-600/10 rounded-xl p-4 border border-red-500/30">
-                            <h3 className="text-red-400 font-semibold mb-3">Gaps Críticos</h3>
+                          <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                            <h3 className="text-red-700 font-semibold mb-3">Gaps Críticos</h3>
                             <ul className="space-y-1">
                               {selectedRoleplay.evaluation.critical_gaps.map((gap, idx) => (
-                                <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                                <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                                   {gap}
                                 </li>
                               ))}
@@ -2107,33 +2118,33 @@ export default function CompaniesAdmin() {
 
                       {/* Configuração */}
                       {selectedRoleplay.config && (
-                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                          <h3 className="text-white font-semibold mb-3">Configuração da Sessão</h3>
+                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                          <h3 className="text-gray-900 font-semibold mb-3">Configuração da Sessão</h3>
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             {selectedRoleplay.config.persona && (
                               <div>
-                                <span className="text-gray-400">Persona:</span>
-                                <p className="text-white mt-1">{selectedRoleplay.config.persona}</p>
+                                <span className="text-gray-500">Persona:</span>
+                                <p className="text-gray-900 mt-1">{selectedRoleplay.config.persona}</p>
                               </div>
                             )}
                             {selectedRoleplay.config.age && (
                               <div>
-                                <span className="text-gray-400">Faixa Etária:</span>
-                                <p className="text-white mt-1">{selectedRoleplay.config.age}</p>
+                                <span className="text-gray-500">Faixa Etária:</span>
+                                <p className="text-gray-900 mt-1">{selectedRoleplay.config.age}</p>
                               </div>
                             )}
                             {selectedRoleplay.config.temperament && (
                               <div>
-                                <span className="text-gray-400">Temperamento:</span>
-                                <p className="text-white mt-1">{selectedRoleplay.config.temperament}</p>
+                                <span className="text-gray-500">Temperamento:</span>
+                                <p className="text-gray-900 mt-1">{selectedRoleplay.config.temperament}</p>
                               </div>
                             )}
                             {selectedRoleplay.config.objections && selectedRoleplay.config.objections.length > 0 && (
                               <div className="col-span-2">
-                                <span className="text-gray-400">Objeções:</span>
+                                <span className="text-gray-500">Objeções:</span>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {selectedRoleplay.config.objections.map((obj, idx) => (
-                                    <span key={idx} className="px-2 py-0.5 bg-orange-600/20 text-orange-300 rounded text-xs">
+                                    <span key={idx} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
                                       {obj}
                                     </span>
                                   ))}
@@ -2145,9 +2156,9 @@ export default function CompaniesAdmin() {
                       )}
 
                       {/* Transcrição */}
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-cyan-400" />
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <h3 className="text-gray-900 font-semibold mb-3 flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-green-600" />
                           Transcrição ({selectedRoleplay.messages?.length || 0} mensagens)
                         </h3>
                         <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -2156,13 +2167,13 @@ export default function CompaniesAdmin() {
                               key={idx}
                               className={`p-3 rounded-lg ${
                                 msg.role === 'seller' || msg.role === 'user'
-                                  ? 'bg-cyan-600/20 border border-cyan-500/30 ml-8'
-                                  : 'bg-gray-700/50 border border-gray-600/30 mr-8'
+                                  ? 'bg-green-50 border border-green-200 ml-8'
+                                  : 'bg-gray-100 border border-gray-200 mr-8'
                               }`}
                             >
                               <div className="flex items-center gap-2 mb-1">
                                 <span className={`text-xs font-medium ${
-                                  msg.role === 'seller' || msg.role === 'user' ? 'text-cyan-400' : 'text-emerald-400'
+                                  msg.role === 'seller' || msg.role === 'user' ? 'text-green-600' : 'text-gray-700'
                                 }`}>
                                   {msg.role === 'seller' || msg.role === 'user' ? 'Vendedor' : 'Cliente'}
                                 </span>
@@ -2172,11 +2183,11 @@ export default function CompaniesAdmin() {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-gray-300 text-sm">{msg.text}</p>
+                              <p className="text-gray-600 text-sm">{msg.text}</p>
                             </div>
                           ))}
                           {(!selectedRoleplay.messages || selectedRoleplay.messages.length === 0) && (
-                            <p className="text-gray-400 text-sm text-center py-4">
+                            <p className="text-gray-500 text-sm text-center py-4">
                               Nenhuma mensagem registrada
                             </p>
                           )}
@@ -2192,16 +2203,16 @@ export default function CompaniesAdmin() {
 
         {/* Modal Adicionar Créditos */}
         {showCreditsModal && companyToAddCredits && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-md w-full border border-yellow-500/30">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full border border-gray-200 shadow-xl">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <Zap className="w-6 h-6 text-yellow-400" />
+                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <Zap className="w-6 h-6 text-yellow-500" />
                     Adicionar Créditos
                   </h2>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Empresa: <span className="text-yellow-400 font-medium">{companyToAddCredits.name}</span>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Empresa: <span className="text-green-600 font-medium">{companyToAddCredits.name}</span>
                   </p>
                 </div>
                 <button
@@ -2210,46 +2221,46 @@ export default function CompaniesAdmin() {
                     setCompanyToAddCredits(null)
                     setCreditsToAdd('')
                   }}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Créditos atuais */}
-              <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700 space-y-3">
+              <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Limite do plano:</span>
-                  <span className="text-lg font-bold text-emerald-400">
+                  <span className="text-gray-500">Limite do plano:</span>
+                  <span className="text-lg font-bold text-green-600">
                     {PLAN_CONFIGS[companyToAddCredits.training_plan!]?.monthlyCredits ?? 'Ilimitado'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Créditos extras:</span>
-                  <span className="text-lg font-bold text-green-400">
+                  <span className="text-gray-500">Créditos extras:</span>
+                  <span className="text-lg font-bold text-green-600">
                     +{companyToAddCredits.extra_monthly_credits || 0}
                   </span>
                 </div>
-                <div className="flex items-center justify-between border-t border-gray-700 pt-3">
-                  <span className="text-gray-400">Limite total:</span>
-                  <span className="text-xl font-bold text-yellow-400">
+                <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+                  <span className="text-gray-500">Limite total:</span>
+                  <span className="text-xl font-bold text-gray-900">
                     {(PLAN_CONFIGS[companyToAddCredits.training_plan!]?.monthlyCredits || 0) + (companyToAddCredits.extra_monthly_credits || 0)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Créditos usados:</span>
-                  <span className="text-lg text-gray-300">
+                  <span className="text-gray-500">Créditos usados:</span>
+                  <span className="text-lg text-gray-700">
                     {companyToAddCredits.monthly_credits_used || 0}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
+                <p className="text-xs text-gray-400 pt-2 border-t border-gray-200">
                   Os créditos adicionados aumentam o limite mensal total da empresa.
                 </p>
               </div>
 
               {/* Input de créditos */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Quantidade de créditos a adicionar
                 </label>
                 <input
@@ -2258,13 +2269,13 @@ export default function CompaniesAdmin() {
                   value={creditsToAdd}
                   onChange={(e) => setCreditsToAdd(e.target.value)}
                   placeholder="Ex: 50, 100, 200..."
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500/50"
+                  className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                 />
               </div>
 
               {/* Pacotes sugeridos */}
               <div className="mb-6">
-                <p className="text-sm text-gray-400 mb-3">Pacotes rápidos:</p>
+                <p className="text-sm text-gray-500 mb-3">Pacotes rápidos:</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[10, 50, 100, 200, 500, 1000].map((amount) => (
                     <button
@@ -2272,8 +2283,8 @@ export default function CompaniesAdmin() {
                       onClick={() => setCreditsToAdd(amount.toString())}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         creditsToAdd === amount.toString()
-                          ? 'bg-yellow-600 text-white'
-                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
                       +{amount}
@@ -2290,14 +2301,14 @@ export default function CompaniesAdmin() {
                     setCompanyToAddCredits(null)
                     setCreditsToAdd('')
                   }}
-                  className="flex-1 px-4 py-3 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors"
+                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleAddCredits}
                   disabled={addingCredits || !creditsToAdd}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-yellow-600 to-amber-600 text-white rounded-xl hover:from-yellow-500 hover:to-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {addingCredits ? (
                     <>
