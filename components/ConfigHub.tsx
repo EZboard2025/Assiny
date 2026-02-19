@@ -4848,28 +4848,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Dados da Empresa</h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Preencha as informações para melhorar o treinamento da IA.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {['B2C', 'B2B', 'Ambos'].map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => handleSetBusinessType(type as 'B2C' | 'B2B' | 'Ambos')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        businessType === type
-                          ? 'bg-green-100 text-green-700 border border-green-500/30'
-                          : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Dados da Empresa</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Preencha as informações para melhorar o treinamento da IA.
+                </p>
               </div>
 
               {/* Preencher com IA */}
@@ -4980,6 +4963,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   setCompanyData(prev => ({ ...prev, [field]: value }))
                   setCompanyDataEdited(true)
                 }}
+                onBusinessTypeChange={handleSetBusinessType}
               >
                 {/* Botões Salvar/Avaliar/Ver */}
                 <div className="flex flex-wrap gap-2">
@@ -4987,7 +4971,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <button
                       onClick={handleSaveCompanyData}
                       disabled={savingCompanyData}
-                      className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg text-sm font-medium hover:from-green-500 hover:to-green-400 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {savingCompanyData ? (
                         <>
@@ -5006,7 +4990,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   <button
                     onClick={handleEvaluateQuality}
                     disabled={evaluatingQuality || (qualityEvaluation && !companyDataEdited)}
-                    className="px-4 py-2 bg-gray-700/60 text-gray-300 border border-gray-600/50 rounded-lg text-sm font-medium hover:bg-gray-700/80 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     title={
                       qualityEvaluation && !companyDataEdited
                         ? 'Edite os dados para poder reavaliar'
@@ -5029,7 +5013,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   {qualityEvaluation && (
                     <button
                       onClick={() => setShowCompanyEvaluationModal(true)}
-                      className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-500/30 transition-colors flex items-center gap-2"
+                      className="px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
                     >
                       <CheckCircle className="w-4 h-4" />
                       Ver Avaliação

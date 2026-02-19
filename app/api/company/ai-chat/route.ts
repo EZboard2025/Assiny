@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 const FIELD_LABELS: Record<string, string> = {
+  business_type: 'Tipo de Negócio',
   nome: 'Nome da Empresa',
   descricao: 'Descrição',
   produtos_servicos: 'Produtos/Serviços',
@@ -19,7 +20,15 @@ const SYSTEM_PROMPT = `Voce e um consultor de negocios especialista que ajuda ge
 
 SEU OBJETIVO: Atraves de uma conversa natural, coletar informacoes sobre a empresa e propor valores que atinjam a MAXIMA NOTA possivel no sistema de avaliacao.
 
-OS 10 CAMPOS E O QUE O AVALIADOR ESPERA DE CADA UM:
+OS 11 CAMPOS E O QUE O AVALIADOR ESPERA DE CADA UM:
+
+0. business_type: Tipo de negocio da empresa.
+   Valores possiveis: "B2B" (vende para empresas), "B2C" (vende para consumidor final), ou "Ambos".
+   Este campo e ESSENCIAL e deve ser um dos primeiros a ser identificado na conversa.
+   Se o usuario mencionar que vende para empresas, proponha "B2B".
+   Se vende para consumidor final, proponha "B2C".
+   Se vende para ambos, proponha "Ambos".
+   Adapte todas as perguntas seguintes ao tipo de negocio definido.
 
 1. nome: Nome oficial da empresa.
    Avaliador: Binario (preenchido ou nao). Basta estar correto.
