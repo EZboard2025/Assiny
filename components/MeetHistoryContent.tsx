@@ -876,31 +876,222 @@ export default function MeetHistoryContent() {
                         </div>
                       )}
 
-                      {/* PENDING STATE: Show config preview */}
+                      {/* PENDING STATE: Show full config details */}
                       {!isCompleted && (
-                        <>
+                        <div className="space-y-4">
+                          {/* Justification */}
                           {justification && (
-                            <div className="bg-purple-50 rounded-lg p-3 border-l-4 border-purple-400">
-                              <p className="text-xs text-gray-700 leading-relaxed">{justification}</p>
+                            <div className="bg-purple-50 rounded-xl p-4 border-l-4 border-purple-400 border border-purple-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Target className="w-4 h-4 text-purple-600" />
+                                <h4 className="text-sm font-bold text-gray-900">Por que esta prática?</h4>
+                              </div>
+                              <p className="text-sm text-gray-700 leading-relaxed">{justification}</p>
                             </div>
                           )}
-                          {config?.objections && config.objections.length > 0 && (
-                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                              <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-2">Objeções para treinar</p>
-                              <div className="space-y-1.5">
-                                {config.objections.slice(0, 3).map((obj: any, i: number) => (
-                                  <p key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
-                                    <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
-                                    {cleanGptText(obj.name)}
-                                  </p>
-                                ))}
-                                {config.objections.length > 3 && (
-                                  <p className="text-[10px] text-gray-400 ml-4.5">+{config.objections.length - 3} mais</p>
+
+                          {/* Meeting Context */}
+                          {config?.meeting_context && (
+                            <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                              <p className="text-sm text-gray-700 italic">{config.meeting_context}</p>
+                            </div>
+                          )}
+
+                          {/* Persona */}
+                          {config?.persona && (
+                            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <User className="w-4 h-4 text-green-600" />
+                                <h4 className="text-sm font-bold text-gray-900">Persona do Cliente</h4>
+                                {config?.age && (
+                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{config.age} anos</span>
+                                )}
+                                {config?.temperament && (
+                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{config.temperament}</span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {config.persona.cargo && (
+                                  <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Cargo</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{config.persona.cargo}</p>
+                                  </div>
+                                )}
+                                {config.persona.profissao && (
+                                  <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Perfil</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{config.persona.profissao}</p>
+                                  </div>
+                                )}
+                                {config.persona.tipo_empresa_faturamento && (
+                                  <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Empresa</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{config.persona.tipo_empresa_faturamento}</p>
+                                  </div>
+                                )}
+                                {config.persona.perfil_socioeconomico && (
+                                  <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Perfil Socioeconômico</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{config.persona.perfil_socioeconomico}</p>
+                                  </div>
+                                )}
+                                {config.persona.contexto && (
+                                  <div className="bg-white rounded-lg p-3 border border-gray-100 col-span-2">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Contexto</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{config.persona.contexto}</p>
+                                  </div>
+                                )}
+                                {config.persona.busca && (
+                                  <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                    <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">O que busca</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{config.persona.busca}</p>
+                                  </div>
+                                )}
+                                {config.persona.dores && (
+                                  <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                    <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide mb-1">Dores</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{config.persona.dores}</p>
+                                  </div>
                                 )}
                               </div>
                             </div>
                           )}
-                        </>
+
+                          {/* Objective */}
+                          {config?.objective && (
+                            <div className="bg-white rounded-xl p-4 border border-gray-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Target className="w-4 h-4 text-green-600" />
+                                <h4 className="text-sm font-bold text-gray-900">Objetivo</h4>
+                              </div>
+                              <p className="text-sm font-medium text-gray-900 mb-1">{config.objective.name}</p>
+                              {config.objective.description && (
+                                <p className="text-sm text-gray-600">{config.objective.description}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Objections with rebuttals */}
+                          {config?.objections && config.objections.length > 0 && (
+                            <div className="bg-white rounded-xl p-4 border border-gray-200">
+                              <div className="flex items-center gap-2 mb-3">
+                                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                                <h4 className="text-sm font-bold text-gray-900">Objeções para Treinar</h4>
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{config.objections.length}</span>
+                              </div>
+                              <div className="space-y-2">
+                                {config.objections.map((obj: any, idx: number) => (
+                                  <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                                    <div className="flex items-start gap-2 mb-1.5">
+                                      <p className="text-xs font-medium text-gray-900 flex-1">{cleanGptText(obj.name)}</p>
+                                      {obj.source && (
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                                          obj.source === 'meeting' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                                        }`}>
+                                          {obj.source === 'meeting' ? 'Da reunião' : 'Coaching'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {obj.rebuttals && obj.rebuttals.length > 0 && (
+                                      <div className="space-y-1 mt-2">
+                                        <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-wide">Como quebrar:</p>
+                                        {obj.rebuttals.map((r: string, ri: number) => (
+                                          <p key={ri} className="text-[11px] text-green-700 flex items-start gap-1.5 bg-green-50 rounded px-2 py-1">
+                                            <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                            {cleanGptText(r)}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Coaching Focus - Full details */}
+                          {coaching.length > 0 && (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <Lightbulb className="w-4 h-4 text-amber-500" />
+                                <h4 className="text-sm font-bold text-gray-900">Foco de Coaching</h4>
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                  {coaching.length} {coaching.length === 1 ? 'área' : 'áreas'}
+                                </span>
+                              </div>
+
+                              {coaching.map((focus: any, idx: number) => {
+                                const severityColors: Record<string, { border: string, badge: string, label: string, impact: string }> = {
+                                  critical: { border: 'border-l-red-500', badge: 'bg-red-100 text-red-700', label: 'Crítico', impact: 'bg-red-50 border-red-100' },
+                                  high: { border: 'border-l-amber-500', badge: 'bg-amber-100 text-amber-700', label: 'Alto', impact: 'bg-amber-50 border-amber-100' },
+                                  medium: { border: 'border-l-yellow-500', badge: 'bg-yellow-100 text-yellow-700', label: 'Médio', impact: 'bg-yellow-50 border-yellow-100' }
+                                }
+                                const sev = severityColors[focus.severity as string] || severityColors.high
+                                const phrases = focus.example_phrases || focus.tips || []
+                                const diagnosisText = focus.diagnosis || focus.what_to_improve || ''
+
+                                return (
+                                  <div key={idx} className={`bg-white rounded-xl border border-gray-200 border-l-4 ${sev.border} overflow-hidden`}>
+                                    <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                                      <div className="flex items-center gap-2">
+                                        {focus.severity && (
+                                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${sev.badge}`}>
+                                            {sev.label}
+                                          </span>
+                                        )}
+                                        <span className="text-sm font-bold text-gray-900">{focus.area}</span>
+                                      </div>
+                                      {focus.spin_score !== undefined && (
+                                        <span className={`text-sm font-bold ${focus.spin_score < 4 ? 'text-red-600' : focus.spin_score < 6 ? 'text-amber-600' : 'text-yellow-600'}`}>
+                                          {focus.spin_score.toFixed(1)}/10
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                      {diagnosisText && (
+                                        <div>
+                                          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Diagnóstico</p>
+                                          <p className="text-sm text-gray-700 leading-relaxed">{cleanGptText(diagnosisText)}</p>
+                                        </div>
+                                      )}
+                                      {focus.transcript_evidence && (
+                                        <div className="bg-gray-50 rounded-lg p-3 border-l-[3px] border-l-gray-300 border border-gray-100">
+                                          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Evidência da Reunião</p>
+                                          <p className="text-xs text-gray-600 italic leading-relaxed">{cleanGptText(focus.transcript_evidence)}</p>
+                                        </div>
+                                      )}
+                                      {focus.business_impact && (
+                                        <div className={`rounded-lg p-3 border ${sev.impact}`}>
+                                          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Por que importa</p>
+                                          <p className="text-xs text-gray-700 leading-relaxed">{cleanGptText(focus.business_impact)}</p>
+                                        </div>
+                                      )}
+                                      {focus.practice_goal && (
+                                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                                          <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">O que praticar</p>
+                                          <p className="text-xs text-green-800 leading-relaxed font-medium">{cleanGptText(focus.practice_goal)}</p>
+                                        </div>
+                                      )}
+                                      {phrases.length > 0 && (
+                                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                          <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide mb-1.5">Frases para usar</p>
+                                          <div className="space-y-1.5">
+                                            {phrases.map((phrase: string, pi: number) => (
+                                              <p key={pi} className="text-xs text-blue-800 flex items-start gap-1.5">
+                                                <span className="text-blue-400 mt-0.5 flex-shrink-0">&ldquo;</span>
+                                                <span className="leading-relaxed">{cleanGptText(phrase)}</span>
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* COMPLETED STATE: Full expanded details */}
