@@ -144,7 +144,7 @@ Use os labels amigaveis ao se referir aos campos na conversa.`
 
 export async function POST(req: Request) {
   try {
-    const { messages, currentFields, businessType } = await req.json()
+    const { messages, currentFields, businessType, extractedContent } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -170,7 +170,21 @@ ${filledFields.length > 0 ? filledFields.join('\n') : '  Nenhum'}
 - Campos ainda vazios (${emptyFields.length}):
 ${emptyFields.length > 0 ? emptyFields.join('\n') : '  Todos preenchidos!'}
 
-NÃO proponha campos que já estão preenchidos. Foque nos vazios.`
+NÃO proponha campos que já estão preenchidos. Foque nos vazios.${extractedContent ? `
+
+CONTEUDO EXTRAIDO (de arquivo ou site compartilhado pelo usuario):
+${extractedContent.substring(0, 15000)}
+
+INSTRUCAO CRITICA - MODO EXTRACAO AUTOMATICA:
+Voce recebeu conteudo extraido de um arquivo ou site. Voce DEVE:
+1. Analisar TODO o conteudo extraido acima ANTES de fazer qualquer pergunta
+2. Propor valores para TODOS os campos vazios que voce conseguir preencher com base no conteudo (ate 3 proposals por resposta)
+3. Escrever valores no nivel EXCELENTE usando as informacoes do conteudo
+4. NAO peca mais detalhes sobre informacoes que ja estao no conteudo extraido
+5. So faca perguntas sobre campos que REALMENTE nao tem informacao suficiente no conteudo
+6. Se o conteudo tem informacao parcial sobre um campo, proponha o que tem e depois pergunte se quer complementar
+7. Na mensagem, diga que encontrou informacoes no conteudo e esta propondo os campos baseado nelas
+8. Se conseguir identificar o tipo de negocio (B2B, B2C ou Ambos), proponha o campo business_type tambem` : ''}`
 
     // Construir array de mensagens para OpenAI
     const openaiMessages = [
@@ -191,7 +205,7 @@ NÃO proponha campos que já estão preenchidos. Foque nos vazios.`
         model: 'gpt-4.1',
         messages: openaiMessages,
         temperature: 0.3,
-        max_tokens: 2500,
+        max_tokens: extractedContent ? 4000 : 2500,
         response_format: { type: 'json_object' }
       })
     })

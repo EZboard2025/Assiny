@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Send, Loader2, Check, X, Pencil, Bot, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Sparkles, Send, Loader2, Check, X, Pencil, Bot, CheckCircle, ChevronDown, ChevronUp, Paperclip, FileText, Globe } from 'lucide-react'
 
 const FIELD_CONFIG: { key: string; label: string; placeholder: string; type: 'input' | 'textarea' }[] = [
   { key: 'nome', label: 'Nome da Empresa', placeholder: 'Ex: Tech Solutions LTDA', type: 'input' },
@@ -18,6 +18,8 @@ const FIELD_CONFIG: { key: string; label: string; placeholder: string; type: 'in
 
 const ALL_FIELD_KEYS = FIELD_CONFIG.map(f => f.key)
 
+const URL_REGEX = /(?:https?:\/\/|www\.)[^\s,]+/i
+
 interface FieldProposal {
   field: string
   label: string
@@ -30,6 +32,7 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   proposals?: FieldProposal[]
+  attachment?: { name: string; type: 'file' | 'url' }
 }
 
 interface CompanyDataChatProps {
@@ -45,23 +48,27 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Olá! Sou o assistente de dados da empresa. Me conte sobre a sua empresa, o que ela faz, quais produtos ou serviços oferece, e eu vou te ajudar a preencher todos os campos automaticamente.'
+      content: 'Olá! Sou o assistente de dados da empresa. Me conte sobre a sua empresa, o que ela faz, quais produtos ou serviços oferece, e eu vou te ajudar a preencher todos os campos automaticamente.\n\nVocê também pode enviar o link do site da empresa ou um arquivo PDF com informações (apresentações, playbooks, materiais de vendas) para que eu extraia os dados automaticamente.'
     }
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isExtracting, setIsExtracting] = useState(false)
   const [editingProposal, setEditingProposal] = useState<{ msgId: string; field: string } | null>(null)
   const [editValue, setEditValue] = useState('')
   const [showFields, setShowFields] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const totalFields = ALL_FIELD_KEYS.length + 1 // +1 for business_type
   const filledCount = ALL_FIELD_KEYS.filter(f => companyData[f]?.trim()).length + (businessType ? 1 : 0)
   const allFilled = filledCount === totalFields
   const [forceOpen, setForceOpen] = useState(false)
   const hasStartedChat = messages.length > 1
+  // Show CTA button initially if no fields are filled yet
+  const [chatOpened, setChatOpened] = useState(filledCount > 0)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -85,29 +92,17 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
       })
   }
 
-  const handleSend = async () => {
-    const text = input.trim()
-    if (!text || isLoading) return
-
-    const userMsg: ChatMessage = {
-      id: `user_${Date.now()}`,
-      role: 'user',
-      content: text
-    }
-
-    const updatedMessages = [...messages, userMsg]
-    setMessages(updatedMessages)
-    setInput('')
-    setIsLoading(true)
-
+  const sendToAiChat = async (updatedMessages: ChatMessage[], extractedContent?: string, fieldOverrides?: Record<string, string>) => {
     try {
+      const mergedFields = { ...companyData, ...fieldOverrides, business_type: fieldOverrides?.business_type || businessType || '' }
       const res = await fetch('/api/company/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: buildApiMessages(updatedMessages),
-          currentFields: { ...companyData, business_type: businessType || '' },
-          businessType
+          currentFields: mergedFields,
+          businessType: fieldOverrides?.business_type || businessType,
+          extractedContent
         })
       })
 
@@ -136,7 +131,139 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
           content: 'Desculpe, houve um erro. Tente novamente.'
         }
       ])
-    } finally {
+    }
+  }
+
+  const handleSend = async () => {
+    const text = input.trim()
+    if (!text || isLoading) return
+
+    const userMsg: ChatMessage = {
+      id: `user_${Date.now()}`,
+      role: 'user',
+      content: text
+    }
+
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
+    setInput('')
+    setIsLoading(true)
+
+    // Check for URL in message
+    let extractedContent: string | undefined
+    const urlMatch = text.match(URL_REGEX)
+    if (urlMatch) {
+      setIsExtracting(true)
+      try {
+        const res = await fetch('/api/company/extract-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: urlMatch[0] })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          extractedContent = data.text
+        }
+      } catch {
+        // URL extraction failed, continue without it
+      }
+      setIsExtracting(false)
+    }
+
+    await sendToAiChat(updatedMessages, extractedContent)
+    setIsLoading(false)
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || isLoading) return
+
+    // Reset file input
+    e.target.value = ''
+
+    // Add user message about file
+    const userMsg: ChatMessage = {
+      id: `user_${Date.now()}`,
+      role: 'user',
+      content: file.name,
+      attachment: { name: file.name, type: 'file' }
+    }
+
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
+    setIsLoading(true)
+    setIsExtracting(true)
+
+    // Extract text from file
+    let extractedContent: string | undefined
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/company/extract-text', {
+        method: 'POST',
+        body: formData
+      })
+      if (res.ok) {
+        const data = await res.json()
+        extractedContent = data.text
+      } else {
+        const errData = await res.json().catch(() => null)
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `err_${Date.now()}`,
+            role: 'assistant',
+            content: errData?.error || 'Nao consegui extrair texto deste arquivo. Tente um PDF com texto (nao imagem).'
+          }
+        ])
+        setIsLoading(false)
+        setIsExtracting(false)
+        return
+      }
+    } catch {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `err_${Date.now()}`,
+          role: 'assistant',
+          content: 'Erro ao processar o arquivo. Tente novamente.'
+        }
+      ])
+      setIsLoading(false)
+      setIsExtracting(false)
+      return
+    }
+
+    setIsExtracting(false)
+    await sendToAiChat(updatedMessages, extractedContent)
+    setIsLoading(false)
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
+  // Collect all accepted field values from a message's proposals
+  const getAcceptedOverrides = (newMessages: ChatMessage[], msgId: string, extraField?: string, extraValue?: string) => {
+    const msg = newMessages.find(m => m.id === msgId)
+    const overrides: Record<string, string> = {}
+    msg?.proposals?.forEach(p => {
+      if (p.status === 'accepted') {
+        overrides[p.field] = p.value
+      }
+    })
+    if (extraField && extraValue) {
+      overrides[extraField] = extraValue
+    }
+    return overrides
+  }
+
+  // Auto-continue conversation when all proposals in a message are resolved
+  const autoContinueIfResolved = async (newMessages: ChatMessage[], msgId: string, overrides: Record<string, string>) => {
+    const msg = newMessages.find(m => m.id === msgId)
+    if (!msg?.proposals?.length) return
+    const allResolved = msg.proposals.every(p => p.status === 'accepted' || p.status === 'rejected')
+    if (allResolved && !isLoading) {
+      setIsLoading(true)
+      await sendToAiChat(newMessages, undefined, overrides)
       setIsLoading(false)
       setTimeout(() => inputRef.current?.focus(), 100)
     }
@@ -156,21 +283,24 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
           onFieldUpdate(field, proposal.value)
         }
       }
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === msgId
-            ? { ...m, proposals: m.proposals?.map(p => p.field === field ? { ...p, status: 'accepted' as const } : p) }
-            : m
-        )
+      // Compute new messages with updated status
+      const newMessages = messages.map(m =>
+        m.id === msgId
+          ? { ...m, proposals: m.proposals?.map(p => p.field === field ? { ...p, status: 'accepted' as const } : p) }
+          : m
       )
+      setMessages(newMessages)
+      const overrides = getAcceptedOverrides(newMessages, msgId, field, proposal?.value)
+      autoContinueIfResolved(newMessages, msgId, overrides)
     } else if (action === 'reject') {
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === msgId
-            ? { ...m, proposals: m.proposals?.map(p => p.field === field ? { ...p, status: 'rejected' as const } : p) }
-            : m
-        )
+      const newMessages = messages.map(m =>
+        m.id === msgId
+          ? { ...m, proposals: m.proposals?.map(p => p.field === field ? { ...p, status: 'rejected' as const } : p) }
+          : m
       )
+      setMessages(newMessages)
+      const overrides = getAcceptedOverrides(newMessages, msgId)
+      autoContinueIfResolved(newMessages, msgId, overrides)
     } else if (action === 'edit') {
       const msg = messages.find(m => m.id === msgId)
       const proposal = msg?.proposals?.find(p => p.field === field)
@@ -199,15 +329,16 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     } else {
       onFieldUpdate(field, editValue.trim())
     }
-    setMessages(prev =>
-      prev.map(m =>
-        m.id === msgId
-          ? { ...m, proposals: m.proposals?.map(p => p.field === field ? { ...p, value: editValue.trim(), status: 'accepted' as const } : p) }
-          : m
-      )
+    const newMessages = messages.map(m =>
+      m.id === msgId
+        ? { ...m, proposals: m.proposals?.map(p => p.field === field ? { ...p, value: editValue.trim(), status: 'accepted' as const } : p) }
+        : m
     )
+    setMessages(newMessages)
     setEditingProposal(null)
     setEditValue('')
+    const overrides = getAcceptedOverrides(newMessages, msgId, field, editValue.trim())
+    autoContinueIfResolved(newMessages, msgId, overrides)
   }
 
   const handleEditCancel = () => {
@@ -231,15 +362,32 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     }
   }
 
-  const showChat = !allFilled || hasStartedChat || forceOpen
+  const showChat = chatOpened && (!allFilled || hasStartedChat || forceOpen)
 
   // Progress bar percentage
   const progressPercent = (filledCount / totalFields) * 100
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Chat Section */}
-      {showChat ? (
+      {/* CTA - initial state before chat is opened */}
+      {!chatOpened && !allFilled ? (
+        <div className="px-6 py-8 flex flex-col items-center text-center">
+          <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center mb-4">
+            <Sparkles className="w-6 h-6 text-green-600" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900 mb-1.5">Configurar Empresa</h3>
+          <p className="text-sm text-gray-500 mb-5 max-w-sm">
+            Configure os dados da empresa com ajuda da IA. Você pode descrever a empresa, colar o link do site ou enviar um PDF.
+          </p>
+          <button
+            onClick={() => setChatOpened(true)}
+            className="px-5 py-2.5 bg-green-600 text-white text-sm font-medium rounded-xl hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            Iniciar Configuração
+          </button>
+        </div>
+      ) : showChat ? (
         <>
           {/* Header */}
           <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100 bg-gray-50/50">
@@ -279,7 +427,7 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                     </div>
                     <div className="flex-1 space-y-2">
                       <div className="px-3.5 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm">
-                        <p className="text-sm text-gray-700 leading-relaxed">{msg.content}</p>
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{msg.content}</p>
                       </div>
                       {/* Proposals */}
                       {msg.proposals?.map((p) => (
@@ -358,7 +506,18 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                   /* User Message */
                   <div className="flex justify-end">
                     <div className="max-w-[80%] px-3.5 py-2.5 rounded-2xl rounded-br-md bg-green-600 text-white text-sm leading-relaxed shadow-sm">
-                      {msg.content}
+                      {msg.attachment ? (
+                        <div className="flex items-center gap-2">
+                          {msg.attachment.type === 'file' ? (
+                            <FileText className="w-4 h-4 flex-shrink-0" />
+                          ) : (
+                            <Globe className="w-4 h-4 flex-shrink-0" />
+                          )}
+                          <span>{msg.content}</span>
+                        </div>
+                      ) : (
+                        msg.content
+                      )}
                     </div>
                   </div>
                 )}
@@ -372,7 +531,9 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                 </div>
                 <div className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-green-500" />
-                  <span className="text-xs text-gray-400">Pensando...</span>
+                  <span className="text-xs text-gray-400">
+                    {isExtracting ? 'Extraindo conteudo...' : 'Pensando...'}
+                  </span>
                 </div>
               </div>
             )}
@@ -382,12 +543,27 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
           {/* Input Bar */}
           <div className="px-5 py-3 border-t border-gray-100 bg-white">
             <div className="flex gap-2 items-end">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className="p-2.5 rounded-xl text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                title="Enviar arquivo PDF"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Descreva sua empresa..."
+                placeholder="Descreva sua empresa ou cole um link..."
                 rows={1}
                 className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none transition-all"
                 style={{ minHeight: '40px', maxHeight: '100px' }}
