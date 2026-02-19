@@ -76,9 +76,10 @@ interface RoleplayViewProps {
   challengeId?: string
   onChallengeComplete?: () => void
   meetSimulationConfig?: MeetSimulationConfig
+  meetSimulationId?: string
 }
 
-export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete, meetSimulationConfig }: RoleplayViewProps = {}) {
+export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete, meetSimulationConfig, meetSimulationId }: RoleplayViewProps = {}) {
   // Hook para verificar limites do plano
   const {
     checkRoleplayLimit,
@@ -1186,6 +1187,19 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 }
               } catch (error) {
                 console.error('Erro ao completar desafio:', error)
+              }
+            }
+
+            // Mark meet simulation as completed
+            if (meetSimulationId && sessionId) {
+              try {
+                await supabase
+                  .from('saved_simulations')
+                  .update({ status: 'completed', roleplay_session_id: sessionId })
+                  .eq('id', meetSimulationId)
+                console.log('✅ Simulação de correção marcada como concluída')
+              } catch (error) {
+                console.error('Erro ao marcar simulação como concluída:', error)
               }
             }
           }

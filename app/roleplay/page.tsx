@@ -37,6 +37,7 @@ export default function RoleplayPage() {
         challengeId={activeChallenge?.id}
         onChallengeComplete={() => setActiveChallenge(null)}
         meetSimulationConfig={meetSimulation?.simulation_config}
+        meetSimulationId={meetSimulation?.simulation_id}
       />
     </DashboardLayout>
   )

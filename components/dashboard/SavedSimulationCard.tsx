@@ -38,6 +38,8 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
   const [showDetails, setShowDetails] = useState(false)
   const [showList, setShowList] = useState(false)
 
+  const [meetEvaluations, setMeetEvaluations] = useState<Record<string, any>>({})
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -50,6 +52,22 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
 
         if (!error && data && data.length > 0) {
           setSimulations(data)
+
+          // Load linked meet evaluations for context
+          const evalIds = data
+            .map((s: any) => s.meet_evaluation_id)
+            .filter(Boolean)
+          if (evalIds.length > 0) {
+            const { data: evals } = await supabase
+              .from('meet_evaluations')
+              .select('id, seller_name, overall_score, created_at')
+              .in('id', evalIds)
+            if (evals) {
+              const evalMap: Record<string, any> = {}
+              evals.forEach((e: any) => { evalMap[e.id] = e })
+              setMeetEvaluations(evalMap)
+            }
+          }
         }
       } catch (e) {
         console.error('Error loading saved simulations:', e)
@@ -64,16 +82,8 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
     if (!sim) return
     sessionStorage.setItem('meetSimulation', JSON.stringify({
       simulation_config: sim.simulation_config,
+      simulation_id: sim.id,
     }))
-
-    try {
-      await supabase
-        .from('saved_simulations')
-        .delete()
-        .eq('id', sim.id)
-    } catch (e) {
-      console.error('Error deleting saved simulation:', e)
-    }
 
     setSimulations(prev => prev.filter(s => s.id !== sim.id))
     setShowDetails(false)
@@ -94,12 +104,14 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
   const latestCoaching = latestConfig?.coaching_focus || []
   const latestMainArea = latestCoaching[0]?.area || null
   const totalPending = simulations.length
+  const latestMeetEval = latest.meet_evaluation_id ? meetEvaluations[latest.meet_evaluation_id] : null
 
   // For detail modal
   const sim = selectedSim || latest
   const config = sim.simulation_config
   const coaching = config?.coaching_focus || []
   const justification = sim.simulation_justification || config?.simulation_justification || null
+  const simMeetEval = sim.meet_evaluation_id ? meetEvaluations[sim.meet_evaluation_id] : null
 
   return (
     <>
@@ -116,6 +128,30 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                 Pendente
               </span>
             </div>
+            {/* Google Meet origin info */}
+            {latestMeetEval && (
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Video className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                <span className="text-[11px] text-blue-600 font-medium">Google Meet</span>
+                <span className="text-[10px] text-gray-400">•</span>
+                <span className="text-[11px] text-gray-600">{latestMeetEval.seller_name}</span>
+                {latestMeetEval.overall_score !== null && (
+                  <>
+                    <span className="text-[10px] text-gray-400">•</span>
+                    <span className={`text-[11px] font-semibold ${
+                      latestMeetEval.overall_score >= 70 ? 'text-green-600' :
+                      latestMeetEval.overall_score >= 40 ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      {Math.round(latestMeetEval.overall_score / 10)}/10
+                    </span>
+                  </>
+                )}
+                <span className="text-[10px] text-gray-400">•</span>
+                <span className="text-[10px] text-gray-400">
+                  {new Date(latestMeetEval.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {latestMainArea && (
                 <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
@@ -198,11 +234,32 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                 const sPersona = sConfig?.persona?.cargo || sConfig?.persona?.profissao || 'Cliente'
                 const sJustification = s.simulation_justification || sConfig?.simulation_justification || ''
                 const sDate = new Date(s.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                const sMeetEval = s.meet_evaluation_id ? meetEvaluations[s.meet_evaluation_id] : null
 
                 return (
                   <div key={s.id} className="bg-gray-50 rounded-xl border border-gray-200 p-4">
                     <div className="flex items-start gap-3 mb-3">
                       <div className="flex-1 min-w-0">
+                        {/* Meet evaluation origin */}
+                        {sMeetEval && (
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <Video className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                            <span className="text-[10px] text-blue-600 font-medium">Google Meet</span>
+                            <span className="text-[10px] text-gray-400">•</span>
+                            <span className="text-[10px] text-gray-600">{sMeetEval.seller_name}</span>
+                            {sMeetEval.overall_score !== null && (
+                              <>
+                                <span className="text-[10px] text-gray-400">•</span>
+                                <span className={`text-[10px] font-semibold ${
+                                  sMeetEval.overall_score >= 70 ? 'text-green-600' :
+                                  sMeetEval.overall_score >= 40 ? 'text-amber-600' : 'text-red-600'
+                                }`}>
+                                  Nota: {Math.round(sMeetEval.overall_score / 10)}/10
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mb-1">
                           <p className="text-sm font-semibold text-gray-900 line-clamp-1">{sPersona}</p>
                           <span className="text-[10px] text-gray-400">{sDate}</span>
@@ -265,7 +322,31 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Prática Direcionada</h3>
-                  <p className="text-sm text-gray-500">Baseada nos erros identificados na reunião</p>
+                  {simMeetEval ? (
+                    <div className="flex items-center gap-1.5">
+                      <Video className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-sm text-blue-600 font-medium">Google Meet</span>
+                      <span className="text-sm text-gray-400">•</span>
+                      <span className="text-sm text-gray-500">{simMeetEval.seller_name}</span>
+                      {simMeetEval.overall_score !== null && (
+                        <>
+                          <span className="text-sm text-gray-400">•</span>
+                          <span className={`text-sm font-semibold ${
+                            simMeetEval.overall_score >= 70 ? 'text-green-600' :
+                            simMeetEval.overall_score >= 40 ? 'text-amber-600' : 'text-red-600'
+                          }`}>
+                            Nota: {Math.round(simMeetEval.overall_score / 10)}/10
+                          </span>
+                        </>
+                      )}
+                      <span className="text-sm text-gray-400">•</span>
+                      <span className="text-sm text-gray-400">
+                        {new Date(simMeetEval.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">Baseada nos erros identificados na reunião</p>
+                  )}
                 </div>
               </div>
               <button

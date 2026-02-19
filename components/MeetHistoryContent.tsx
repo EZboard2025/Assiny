@@ -32,6 +32,43 @@ function cleanGptText(text: string): string {
     .trim()
 }
 
+function mapAreaToSpinLetter(area: string): string | null {
+  const n = area.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  if (n.includes('situac')) return 'S'
+  if (n.includes('problema')) return 'P'
+  if (n.includes('implicac')) return 'I'
+  if (n.includes('necessidade') || n.includes('need')) return 'N'
+  return null
+}
+
+const indicatorLabels: Record<string, string> = {
+  open_questions_score: 'Perguntas Abertas',
+  scenario_mapping_score: 'Mapeamento de Cenário',
+  adaptability_score: 'Adaptabilidade',
+  problem_identification_score: 'Identificação de Problemas',
+  consequences_exploration_score: 'Exploração de Consequências',
+  depth_score: 'Profundidade',
+  empathy_score: 'Empatia',
+  impact_understanding_score: 'Compreensão de Impacto',
+  inaction_consequences_score: 'Consequências da Inação',
+  urgency_amplification_score: 'Amplificação de Urgência',
+  concrete_risks_score: 'Riscos Concretos',
+  non_aggressive_urgency_score: 'Urgência Não Agressiva',
+  solution_clarity_score: 'Clareza da Solução',
+  personalization_score: 'Personalização',
+  benefits_clarity_score: 'Clareza dos Benefícios',
+  credibility_score: 'Credibilidade',
+  cta_effectiveness_score: 'Efetividade do CTA',
+}
+
+function translateIndicator(key: string): string {
+  if (indicatorLabels[key]) return indicatorLabels[key]
+  return key
+    .replace(/_score$/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c: string) => c.toUpperCase())
+}
+
 export default function MeetHistoryContent() {
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
@@ -40,6 +77,8 @@ export default function MeetHistoryContent() {
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set())
   const [simulations, setSimulations] = useState<Record<string, any>>({})
   const [correctionScores, setCorrectionScores] = useState<Record<string, number | null>>({})
+  const [correctionSessions, setCorrectionSessions] = useState<Record<string, any>>({})
+  const [expandedCorrectionSection, setExpandedCorrectionSection] = useState<string | null>(null)
 
   useEffect(() => {
     loadHistory()
@@ -89,29 +128,32 @@ export default function MeetHistoryContent() {
           })
           setSimulations(simMap)
 
-          // Load roleplay scores for completed simulations
+          // Load full roleplay session data for completed simulations
           const completedSims = sims.filter((s: any) => s.status === 'completed' && s.roleplay_session_id)
           if (completedSims.length > 0) {
             const sessionIds = completedSims.map((s: any) => s.roleplay_session_id)
             const { data: sessions } = await supabase
               .from('roleplay_sessions')
-              .select('id, evaluation')
+              .select('*')
               .in('id', sessionIds)
 
             if (sessions) {
               const scores: Record<string, number | null> = {}
+              const sessionMap: Record<string, any> = {}
               completedSims.forEach((sim: any) => {
                 const session = sessions.find((s: any) => s.id === sim.roleplay_session_id)
-                if (session?.evaluation) {
+                if (session) {
                   let evalData = session.evaluation
-                  if (typeof evalData === 'object' && 'output' in evalData) {
+                  if (evalData && typeof evalData === 'object' && 'output' in evalData) {
                     try { evalData = JSON.parse(evalData.output) } catch {}
                   }
                   const score = evalData?.overall_score
                   scores[sim.meet_evaluation_id] = score !== undefined ? (score > 10 ? score / 10 : score) : null
+                  sessionMap[sim.meet_evaluation_id] = { ...session, evaluation: evalData }
                 }
               })
               setCorrectionScores(scores)
+              setCorrectionSessions(sessionMap)
             }
           }
         }
@@ -127,16 +169,8 @@ export default function MeetHistoryContent() {
     if (!sim) return
     sessionStorage.setItem('meetSimulation', JSON.stringify({
       simulation_config: sim.simulation_config,
+      simulation_id: sim.id,
     }))
-
-    try {
-      await supabase
-        .from('saved_simulations')
-        .delete()
-        .eq('id', sim.id)
-    } catch (e) {
-      console.error('Error deleting saved simulation:', e)
-    }
 
     router.push('/roleplay')
   }
@@ -282,7 +316,10 @@ export default function MeetHistoryContent() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {evaluation.seller_name}
+                      </div>
+                      <div className="text-[11px] text-gray-400">
                         {formatDate(evaluation.created_at)}
                       </div>
                       {hasSim && (
@@ -751,9 +788,13 @@ export default function MeetHistoryContent() {
                   const isCompleted = sim.status === 'completed'
                   const cScore = correctionScores[selectedEvaluation.id]
                   const meetScore = selectedEvaluation.overall_score !== null ? normalizeScore(selectedEvaluation.overall_score) : null
+                  const corrSession = correctionSessions[selectedEvaluation.id]
+                  const corrEval = corrSession?.evaluation
+                  const isExpanded = expandedCorrectionSection === selectedEvaluation.id
 
                   return (
                     <div className="space-y-4">
+                      {/* Header */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isCompleted ? 'bg-green-100' : 'bg-purple-100'}`}>
@@ -779,6 +820,15 @@ export default function MeetHistoryContent() {
                           >
                             <Play className="w-4 h-4" />
                             Iniciar Simulação
+                          </button>
+                        )}
+                        {isCompleted && (
+                          <button
+                            onClick={() => setExpandedCorrectionSection(isExpanded ? null : selectedEvaluation.id)}
+                            className="flex items-center gap-1.5 text-xs text-green-600 hover:text-green-700 font-medium transition-colors"
+                          >
+                            {isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           </button>
                         )}
                       </div>
@@ -812,13 +862,7 @@ export default function MeetHistoryContent() {
                         </div>
                       )}
 
-                      {justification && (
-                        <div className="bg-purple-50 rounded-lg p-3 border-l-4 border-purple-400">
-                          <p className="text-xs text-gray-700 leading-relaxed">{justification}</p>
-                        </div>
-                      )}
-
-                      {/* Coaching focus areas */}
+                      {/* Coaching focus area badges */}
                       {coaching.length > 0 && (
                         <div className="flex flex-wrap gap-2">
                           {coaching.map((c: any, i: number) => {
@@ -832,21 +876,430 @@ export default function MeetHistoryContent() {
                         </div>
                       )}
 
-                      {/* Objections preview */}
-                      {!isCompleted && config?.objections && config.objections.length > 0 && (
-                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-2">Objeções para treinar</p>
-                          <div className="space-y-1.5">
-                            {config.objections.slice(0, 3).map((obj: any, i: number) => (
-                              <p key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
-                                <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
-                                {cleanGptText(obj.name)}
-                              </p>
-                            ))}
-                            {config.objections.length > 3 && (
-                              <p className="text-[10px] text-gray-400 ml-4.5">+{config.objections.length - 3} mais</p>
+                      {/* PENDING STATE: Show config preview */}
+                      {!isCompleted && (
+                        <>
+                          {justification && (
+                            <div className="bg-purple-50 rounded-lg p-3 border-l-4 border-purple-400">
+                              <p className="text-xs text-gray-700 leading-relaxed">{justification}</p>
+                            </div>
+                          )}
+                          {config?.objections && config.objections.length > 0 && (
+                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                              <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-2">Objeções para treinar</p>
+                              <div className="space-y-1.5">
+                                {config.objections.slice(0, 3).map((obj: any, i: number) => (
+                                  <p key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                    <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
+                                    {cleanGptText(obj.name)}
+                                  </p>
+                                ))}
+                                {config.objections.length > 3 && (
+                                  <p className="text-[10px] text-gray-400 ml-4.5">+{config.objections.length - 3} mais</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* COMPLETED STATE: Full expanded details */}
+                      {isCompleted && isExpanded && (
+                        <div className="space-y-4 pt-2">
+                          {/* Simulation Config */}
+                          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Configuração da Simulação</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                              {config?.temperament && (
+                                <div className="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+                                  <span className="text-[10px] text-purple-600 font-medium uppercase tracking-wider">Temperamento</span>
+                                  <span className="text-gray-900 font-semibold block">{config.temperament}</span>
+                                </div>
+                              )}
+                              {config?.age && (
+                                <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                                  <span className="text-[10px] text-blue-600 font-medium uppercase tracking-wider">Idade</span>
+                                  <span className="text-gray-900 font-semibold block">{config.age} anos</span>
+                                </div>
+                              )}
+                              {config?.objective && (
+                                <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                  <span className="text-[10px] text-amber-600 font-medium uppercase tracking-wider">Objetivo</span>
+                                  <span className="text-gray-900 font-medium text-sm leading-snug block">{config.objective.name}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Persona */}
+                            {config?.persona && (
+                              <div className="space-y-2">
+                                <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Persona</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {config.persona.cargo && (
+                                    <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                      <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Cargo</p>
+                                      <p className="text-xs text-gray-700 leading-relaxed">{config.persona.cargo}</p>
+                                    </div>
+                                  )}
+                                  {config.persona.profissao && (
+                                    <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                      <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Perfil</p>
+                                      <p className="text-xs text-gray-700 leading-relaxed">{config.persona.profissao}</p>
+                                    </div>
+                                  )}
+                                  {config.persona.tipo_empresa_faturamento && (
+                                    <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                      <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Empresa</p>
+                                      <p className="text-xs text-gray-700 leading-relaxed">{config.persona.tipo_empresa_faturamento}</p>
+                                    </div>
+                                  )}
+                                  {config.persona.contexto && (
+                                    <div className="bg-white rounded-lg p-3 border border-gray-100 col-span-2">
+                                      <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">Contexto</p>
+                                      <p className="text-xs text-gray-700 leading-relaxed">{config.persona.contexto}</p>
+                                    </div>
+                                  )}
+                                  {config.persona.busca && (
+                                    <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                      <p className="text-[10px] text-green-600 font-semibold uppercase tracking-wide mb-1">O que busca</p>
+                                      <p className="text-xs text-gray-700 leading-relaxed">{config.persona.busca}</p>
+                                    </div>
+                                  )}
+                                  {config.persona.dores && (
+                                    <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                      <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide mb-1">Dores</p>
+                                      <p className="text-xs text-gray-700 leading-relaxed">{config.persona.dores}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Objections */}
+                            {config?.objections && config.objections.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-2">Objeções ({config.objections.length})</p>
+                                <div className="space-y-2">
+                                  {config.objections.map((obj: any, idx: number) => (
+                                    <div key={idx} className="bg-white rounded-lg p-3 border border-gray-100">
+                                      <p className="text-xs font-medium text-gray-900">{cleanGptText(obj.name)}</p>
+                                      {obj.rebuttals && obj.rebuttals.length > 0 && (
+                                        <div className="mt-1.5 space-y-1">
+                                          {obj.rebuttals.map((r: string, ri: number) => (
+                                            <p key={ri} className="text-[11px] text-green-700 flex items-start gap-1.5">
+                                              <CheckCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                              {cleanGptText(r)}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             )}
                           </div>
+
+                          {/* Before/After SPIN comparison */}
+                          {coaching.length > 0 && corrEval?.spin_evaluation && (
+                            <div className="bg-white rounded-xl border border-gray-200 p-4">
+                              <div className="flex items-center gap-2 mb-4">
+                                <TrendingUp className="w-5 h-5 text-green-600" />
+                                <h4 className="text-sm font-semibold text-gray-900">Comparação Antes / Depois</h4>
+                              </div>
+                              <div className="space-y-3">
+                                {coaching.map((c: any, idx: number) => {
+                                  if (c.spin_score === undefined || c.spin_score === null) return null
+                                  const letter = mapAreaToSpinLetter(c.area)
+                                  const newScore = letter && corrEval.spin_evaluation[letter]?.final_score !== undefined
+                                    ? corrEval.spin_evaluation[letter].final_score
+                                    : null
+                                  const delta = newScore !== null ? newScore - c.spin_score : null
+                                  const deltaBg = delta !== null
+                                    ? delta > 0 ? 'bg-green-100 text-green-700' : delta < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                                    : 'bg-gray-100 text-gray-500'
+
+                                  return (
+                                    <div key={idx} className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-semibold text-gray-900">{c.area}</span>
+                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${deltaBg}`}>
+                                          {delta !== null ? (delta > 0 ? `+${delta.toFixed(1)}` : delta < 0 ? delta.toFixed(1) : '=') : '--'}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-gray-500">Reunião:</span>
+                                        <span className={`font-semibold ${getScoreColor(c.spin_score)}`}>{c.spin_score.toFixed(1)}</span>
+                                        <span className="text-gray-400">→</span>
+                                        <span className="text-gray-500">Roleplay:</span>
+                                        {newScore !== null ? (
+                                          <span className={`font-semibold ${getScoreColor(newScore)}`}>{newScore.toFixed(1)}</span>
+                                        ) : (
+                                          <span className="text-gray-400 text-xs">sem avaliação</span>
+                                        )}
+                                      </div>
+                                      {c.practice_goal && (
+                                        <p className="text-xs text-gray-500 leading-relaxed mt-2">{cleanGptText(c.practice_goal)}</p>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Meet correction AI observations */}
+                          {corrEval?.meet_correction && (
+                            <div className="bg-white rounded-xl border border-gray-200 p-4">
+                              <div className="flex items-center gap-2 mb-4">
+                                <AlertCircle className="w-5 h-5 text-blue-600" />
+                                <h4 className="text-sm font-semibold text-gray-900">Observações da IA</h4>
+                              </div>
+                              {corrEval.meet_correction.overall_feedback && (
+                                <p className="text-sm text-gray-700 leading-relaxed mb-4">{cleanGptText(corrEval.meet_correction.overall_feedback)}</p>
+                              )}
+                              {corrEval.meet_correction.areas?.length > 0 && (
+                                <div className="space-y-3">
+                                  {corrEval.meet_correction.areas.map((area: any, idx: number) => {
+                                    const borderColor = area.corrected ? 'border-green-200' : area.partially_corrected ? 'border-amber-200' : 'border-red-200'
+                                    const bgColor = area.corrected ? 'bg-green-50' : area.partially_corrected ? 'bg-amber-50' : 'bg-red-50'
+                                    const statusLabel = area.corrected ? 'Corrigido' : area.partially_corrected ? 'Parcialmente' : 'Não Corrigido'
+                                    const statusBadge = area.corrected ? 'bg-green-100 text-green-700' : area.partially_corrected ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+
+                                    return (
+                                      <div key={idx} className={`rounded-xl border ${borderColor} ${bgColor} p-4`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className="text-sm font-semibold text-gray-900">{area.area}</span>
+                                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusBadge}`}>{statusLabel}</span>
+                                        </div>
+                                        {area.what_seller_did && (
+                                          <p className="text-sm text-gray-700 leading-relaxed">{cleanGptText(area.what_seller_did)}</p>
+                                        )}
+                                        {area.what_still_needs_work && (
+                                          <p className="text-xs text-gray-500 leading-relaxed mt-2">
+                                            <span className="font-medium text-gray-600">Ainda precisa melhorar: </span>
+                                            {cleanGptText(area.what_still_needs_work)}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Executive Summary */}
+                          {corrEval?.executive_summary && (
+                            <div className="bg-white rounded-xl border border-gray-200 p-4">
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Resumo Executivo</h4>
+                              <p className="text-gray-700 text-sm leading-relaxed">{cleanGptText(corrEval.executive_summary)}</p>
+                            </div>
+                          )}
+
+                          {/* SPIN Scores */}
+                          {corrEval?.spin_evaluation && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Scores SPIN da Correção</h4>
+                              <div className="grid grid-cols-4 gap-3 mb-4">
+                                {[
+                                  { letter: 'S', label: 'Situação' },
+                                  { letter: 'P', label: 'Problema' },
+                                  { letter: 'I', label: 'Implicação' },
+                                  { letter: 'N', label: 'Necessidade' },
+                                ].map(({ letter, label }) => {
+                                  const spinScore = corrEval.spin_evaluation[letter]?.final_score
+                                  return (
+                                    <div key={letter} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+                                      <div className={`text-3xl font-bold mb-1 ${
+                                        spinScore !== null && spinScore !== undefined && spinScore >= 7 ? 'text-green-600' :
+                                        spinScore !== null && spinScore !== undefined && spinScore >= 5 ? 'text-yellow-600' :
+                                        spinScore !== null && spinScore !== undefined ? 'text-red-600' : 'text-gray-400'
+                                      }`}>
+                                        {spinScore !== null && spinScore !== undefined ? spinScore.toFixed(1) : '--'}
+                                      </div>
+                                      <div className="text-xs font-medium text-gray-500">{label}</div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+
+                              {/* SPIN Detailed breakdown */}
+                              <div className="grid grid-cols-2 gap-4">
+                                {['S', 'P', 'I', 'N'].map((letter) => {
+                                  const spinDetail = corrEval.spin_evaluation[letter]
+                                  if (!spinDetail) return null
+                                  const spinScore = spinDetail.final_score || 0
+                                  const labels: Record<string, string> = { 'S': 'Situação', 'P': 'Problema', 'I': 'Implicação', 'N': 'Necessidade' }
+
+                                  return (
+                                    <div key={letter} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                      <div className="flex items-center gap-3 mb-3">
+                                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
+                                          spinScore >= 7 ? 'bg-green-500' : spinScore >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`}>
+                                          {letter}
+                                        </div>
+                                        <div>
+                                          <div className="text-sm font-semibold text-gray-900">{labels[letter]}</div>
+                                          <div className={`text-xs font-medium ${spinScore >= 7 ? 'text-green-600' : spinScore >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                            {spinScore.toFixed(1)}/10
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {spinDetail.indicators && Object.keys(spinDetail.indicators).length > 0 && (
+                                        <div className="space-y-2 mb-3">
+                                          {Object.entries(spinDetail.indicators).map(([key, value]: [string, any]) => (
+                                            <div key={key}>
+                                              <div className="flex items-center justify-between mb-0.5">
+                                                <span className="text-xs text-gray-600">{translateIndicator(key)}</span>
+                                                <span className={`text-xs font-semibold ${
+                                                  Number(value) >= 7 ? 'text-green-600' : Number(value) >= 5 ? 'text-yellow-600' : 'text-red-600'
+                                                }`}>{value}/10</span>
+                                              </div>
+                                              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                <div
+                                                  className={`h-full rounded-full transition-all ${
+                                                    Number(value) >= 7 ? 'bg-green-500' : Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                                                  }`}
+                                                  style={{ width: `${(Number(value) / 10) * 100}%` }}
+                                                />
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {spinDetail.technical_feedback && (
+                                        <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-3 mb-3">
+                                          {cleanGptText(spinDetail.technical_feedback)}
+                                        </p>
+                                      )}
+
+                                      {spinDetail.missed_opportunities?.length > 0 && (
+                                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                                          <p className="text-[11px] font-semibold text-orange-700 mb-1.5">Oportunidades perdidas</p>
+                                          <ul className="space-y-1">
+                                            {spinDetail.missed_opportunities.map((opp: string, idx: number) => (
+                                              <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                                <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>
+                                                {cleanGptText(opp)}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Strengths & Gaps */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {corrEval?.top_strengths?.length > 0 && (
+                              <div className="bg-green-50 rounded-xl border border-green-100 p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <CheckCircle className="w-4 h-4 text-green-600" />
+                                  <h4 className="text-sm font-semibold text-green-700">Pontos Fortes</h4>
+                                </div>
+                                <ul className="space-y-1.5">
+                                  {corrEval.top_strengths.map((s: string, i: number) => (
+                                    <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                      <span className="text-green-500 mt-0.5 flex-shrink-0">•</span>
+                                      {cleanGptText(s)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {corrEval?.critical_gaps?.length > 0 && (
+                              <div className="bg-red-50 rounded-xl border border-red-100 p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <AlertCircle className="w-4 h-4 text-red-600" />
+                                  <h4 className="text-sm font-semibold text-red-700">Pontos a Melhorar</h4>
+                                </div>
+                                <ul className="space-y-1.5">
+                                  {corrEval.critical_gaps.map((g: string, i: number) => (
+                                    <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                      <span className="text-red-500 mt-0.5 flex-shrink-0">•</span>
+                                      {cleanGptText(g)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Priority Improvements */}
+                          {corrEval?.priority_improvements?.length > 0 && (
+                            <div className="bg-purple-50 rounded-xl border border-purple-100 p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Lightbulb className="w-4 h-4 text-purple-600" />
+                                <h4 className="text-sm font-semibold text-purple-700">Melhorias Prioritárias</h4>
+                              </div>
+                              <div className="space-y-2">
+                                {corrEval.priority_improvements.map((imp: any, i: number) => (
+                                  <div key={i} className="bg-white/50 rounded-lg border border-purple-100 p-3">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      {imp.priority && (
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                          imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                                          imp.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                          'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                          {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
+                                        </span>
+                                      )}
+                                      <span className="text-sm font-semibold text-gray-900">{imp.area || imp}</span>
+                                    </div>
+                                    {imp.action_plan && (
+                                      <p className="text-xs text-gray-600 leading-relaxed">{cleanGptText(imp.action_plan)}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Transcription */}
+                          {corrSession?.messages?.length > 0 && (
+                            <div className="bg-white rounded-xl border border-gray-200 p-4">
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                                Transcrição ({corrSession.messages.length} mensagens)
+                              </h4>
+                              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                                {corrSession.messages.map((msg: any, index: number) => (
+                                  <div
+                                    key={index}
+                                    className={`flex gap-3 ${msg.role === 'seller' ? 'flex-row-reverse' : ''}`}
+                                  >
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                      msg.role === 'client' ? 'bg-gray-200' : 'bg-green-100'
+                                    }`}>
+                                      <User className={`w-3.5 h-3.5 ${msg.role === 'client' ? 'text-gray-600' : 'text-green-600'}`} />
+                                    </div>
+                                    <div className={`flex-1 max-w-[80%] ${msg.role === 'seller' ? 'text-right' : ''}`}>
+                                      <div className="text-[10px] text-gray-500 mb-1 flex items-center gap-1.5">
+                                        <span className={`font-medium ${msg.role === 'client' ? 'text-gray-600' : 'text-green-600'}`}>
+                                          {msg.role === 'client' ? 'Cliente' : 'Você'}
+                                        </span>
+                                      </div>
+                                      <div className={`inline-block p-3 rounded-2xl text-xs leading-relaxed ${
+                                        msg.role === 'client'
+                                          ? 'bg-gray-100 text-gray-700 rounded-tl-sm'
+                                          : 'bg-green-50 text-gray-700 border border-green-100 rounded-tr-sm'
+                                      }`}>
+                                        {msg.text}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
