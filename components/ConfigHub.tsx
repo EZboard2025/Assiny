@@ -69,6 +69,7 @@ import { PlanType } from '@/lib/types/plans'
 import { useToast } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import CompanyDataChat from '@/components/CompanyDataChat'
+import PersonaChat from '@/components/PersonaChat'
 
 interface ConfigHubProps {
   onClose: () => void
@@ -4091,6 +4092,30 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </div>
                   )}
 
+                  {/* Criação: sempre IA / Edição: formulário manual */}
+                  {!editingPersonaId ? (
+                    <PersonaChat
+                      key={selectedPersonaType}
+                      personaType={selectedPersonaType}
+                      personaData={newPersona as Record<string, string>}
+                      companyData={companyData}
+                      businessType={businessType}
+                      onFieldUpdate={(field, value) => setNewPersona(prev => ({ ...prev, [field]: value }))}
+                      onPersonaSaved={(persona) => {
+                        setPersonas(prev => [...prev, persona])
+                        setNewPersona({})
+                        setShowPersonaForm(false)
+                        setSelectedPersonaTags([])
+                        showToast('success', 'Persona criada', 'Persona criada com sucesso via IA!')
+                      }}
+                      onCancel={() => {
+                        setShowPersonaForm(false)
+                        setNewPersona({})
+                        setSelectedPersonaTags([])
+                      }}
+                    />
+                  ) : (
+                  <>
                   {/* Formulário muda baseado no selectedPersonaType */}
                   {selectedPersonaType === 'B2B' ? (
                     <>
@@ -4295,6 +4320,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       {editingPersonaId ? 'Atualizar' : 'Salvar'} Persona
                     </button>
                   </div>
+                  </>
+                  )}
                 </div>
               </div>
               )}
