@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, History, CheckCircle, Video, Users, AlertCircle } from 'lucide-react'
+import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, History, CheckCircle, Video, Users, AlertCircle, ArrowLeft } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 
 const FollowUpHistoryView = lazy(() => import('./FollowUpHistoryView'))
@@ -27,7 +27,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<'resumo' | 'spin' | 'playbook' | 'transcricao'>('resumo')
-  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios'>('simulacoes')
+  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -35,7 +35,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
 
     // Listen for history type change event (from Dashboard)
     const handleSetHistoryType = (e: CustomEvent) => {
-      if (e.detail === 'desafios' || e.detail === 'meet') {
+      if (e.detail === 'desafios' || e.detail === 'meet' || e.detail === 'simulacoes' || e.detail === 'correcoes') {
         setHistoryType(e.detail)
       }
     }
@@ -286,74 +286,114 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
     return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
   }
 
+  const historyOptions = [
+    {
+      key: 'simulacoes' as const,
+      label: 'Simulações',
+      description: 'Revise seus roleplays de vendas e avaliações SPIN',
+      icon: Users,
+      color: 'green',
+      bgColor: 'bg-green-50',
+      iconColor: 'text-green-600',
+      borderColor: 'border-green-200',
+      hoverBg: 'hover:bg-green-50',
+      hoverBorder: 'hover:border-green-300',
+    },
+    {
+      key: 'meet' as const,
+      label: 'Google Meet',
+      description: 'Avaliações de reuniões reais gravadas pelo bot',
+      icon: Video,
+      color: 'blue',
+      bgColor: 'bg-blue-50',
+      iconColor: 'text-blue-600',
+      borderColor: 'border-blue-200',
+      hoverBg: 'hover:bg-blue-50',
+      hoverBorder: 'hover:border-blue-300',
+    },
+    {
+      key: 'correcoes' as const,
+      label: 'Correções',
+      description: 'Simulações de correção baseadas nos seus erros',
+      icon: Lightbulb,
+      color: 'amber',
+      bgColor: 'bg-amber-50',
+      iconColor: 'text-amber-600',
+      borderColor: 'border-amber-200',
+      hoverBg: 'hover:bg-amber-50',
+      hoverBorder: 'hover:border-amber-300',
+    },
+    {
+      key: 'desafios' as const,
+      label: 'Desafios',
+      description: 'Desafios diários personalizados para suas fraquezas',
+      icon: Target,
+      color: 'purple',
+      bgColor: 'bg-purple-50',
+      iconColor: 'text-purple-600',
+      borderColor: 'border-purple-200',
+      hoverBg: 'hover:bg-purple-50',
+      hoverBorder: 'hover:border-purple-300',
+    },
+  ]
+
+  const currentOption = historyOptions.find(o => o.key === historyType)
+
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header Card - Design Profissional */}
+        {/* Header */}
         <div className={`bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+          <div className="flex items-center gap-4">
+            {historyType !== null && (
+              <button
+                onClick={() => setHistoryType(null)}
+                className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+            )}
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${currentOption ? currentOption.bgColor : 'bg-green-50'}`}>
+              {currentOption ? (
+                <currentOption.icon className={`w-6 h-6 ${currentOption.iconColor}`} />
+              ) : (
                 <History className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Histórico</h1>
-                <p className="text-gray-500 text-sm">Analise suas sessões e acompanhe sua evolução</p>
-              </div>
+              )}
             </div>
-
-            {/* Tabs for history type */}
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-              <button
-                onClick={() => setHistoryType('simulacoes')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  historyType === 'simulacoes'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                Simulações
-              </button>
-              <button
-                onClick={() => setHistoryType('meet')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  historyType === 'meet'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Video className="w-4 h-4" />
-                Google Meet
-              </button>
-              <button
-                onClick={() => setHistoryType('correcoes')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  historyType === 'correcoes'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Lightbulb className="w-4 h-4" />
-                Correcoes
-              </button>
-              <button
-                onClick={() => setHistoryType('desafios')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  historyType === 'desafios'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Target className="w-4 h-4" />
-                Desafios
-              </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {currentOption ? currentOption.label : 'Histórico'}
+              </h1>
+              <p className="text-gray-500 text-sm">
+                {currentOption ? currentOption.description : 'Escolha qual histórico deseja acessar'}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Render content based on selected history type */}
-        {historyType === 'meet' ? (
+        {/* Selector Screen */}
+        {historyType === null ? (
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+            {historyOptions.map((option) => (
+              <button
+                key={option.key}
+                onClick={() => setHistoryType(option.key)}
+                className={`group bg-white rounded-2xl p-6 border-2 border-gray-200 ${option.hoverBg} ${option.hoverBorder} transition-all text-left shadow-sm hover:shadow-md`}
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${option.bgColor} group-hover:scale-110 transition-transform`}>
+                    <option.icon className={`w-7 h-7 ${option.iconColor}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">{option.label}</h3>
+                    <p className="text-sm text-gray-500 leading-relaxed">{option.description}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+        ) : historyType === 'meet' ? (
           <Suspense fallback={<LazySpinner />}>
             <MeetHistoryContent />
           </Suspense>
