@@ -184,7 +184,7 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const [isCameraOn, setIsCameraOn] = useState(true)
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
   const [showChallengeTips, setShowChallengeTips] = useState(true) // Mostrar dicas do desafio por padrão
-  const [isChallengeTipsMinimized, setIsChallengeTipsMinimized] = useState(false) // Painel de dicas minimizado
+  const [isChallengeTipsMinimized, setIsChallengeTipsMinimized] = useState(false) // Painel de dicas expandido por padrão
   const [isMeetTipsMinimized, setIsMeetTipsMinimized] = useState(false) // Painel de coaching Meet minimizado
 
   // Configurações do roleplay
@@ -237,7 +237,6 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const audioContextRef = useRef<AudioContext | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const [showFinalizingMessage, setShowFinalizingMessage] = useState(false) // Mostrar mensagem de finalização
-  const [activeEvaluationTab, setActiveEvaluationTab] = useState<'conversation' | 'evaluation' | 'feedback' | 'playbook'>('evaluation') // Aba ativa no modal de avaliação
   const [clientName, setClientName] = useState<string>('Cliente') // Nome do cliente virtual
   const [roleplayConfig, setRoleplayConfig] = useState<any>(null) // Armazena toda a configuração do roleplay
   const [dataLoading, setDataLoading] = useState(true) // Loading state para dados iniciais
@@ -309,6 +308,16 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
       handleStartSimulation()
     }
   }, [isMeetSimulation, mounted, planLoading])
+
+  // Auto-start challenge (skip config screen — config is already locked by the challenge)
+  // Must wait for dataLoading to finish so persona/objections/objective are set from challenge config
+  const challengeAutoStarted = useRef(false)
+  useEffect(() => {
+    if (challengeConfig && mounted && !planLoading && !dataLoading && !isSimulating && !challengeAutoStarted.current) {
+      challengeAutoStarted.current = true
+      handleStartSimulation()
+    }
+  }, [challengeConfig, mounted, planLoading, dataLoading])
 
   // Verificar limite de créditos mensais
   useEffect(() => {
@@ -521,124 +530,6 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
     }
   }, [isSimulating])
 
-  // Helper functions for evaluation modal (matching HistoricoView design)
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-400'
-    if (score >= 6) return 'text-yellow-400'
-    return 'text-red-400'
-  }
-
-  const getScoreBg = (score: number) => {
-    if (score >= 8) return 'bg-green-500/20 border-green-500/30'
-    if (score >= 6) return 'bg-yellow-500/20 border-yellow-500/30'
-    return 'bg-red-500/20 border-red-500/30'
-  }
-
-  const getPerformanceLabel = (level: string) => {
-    const labels: Record<string, string> = {
-      'legendary': 'Lendário',
-      'excellent': 'Excelente',
-      'very_good': 'Muito Bom',
-      'good': 'Bom',
-      'needs_improvement': 'Precisa Melhorar',
-      'poor': 'Em Desenvolvimento'
-    }
-    return labels[level] || level
-  }
-
-  const translateIndicator = (key: string) => {
-    const translations: Record<string, string> = {
-      // Indicadores SPIN - Situação (S)
-      'adaptability_score': 'Adaptabilidade',
-      'open_questions_score': 'Perguntas Abertas',
-      'scenario_mapping_score': 'Mapeamento de Cenário',
-      'depth_score': 'Profundidade',
-      'relevance_score': 'Relevância',
-      'context_score': 'Contexto',
-      'discovery_score': 'Descoberta',
-      'exploration_score': 'Exploração',
-      'investigation_score': 'Investigação',
-      // Indicadores SPIN - Problema (P)
-      'problem_identification_score': 'Identificação de Problemas',
-      'empathy_score': 'Empatia',
-      'consequences_exploration_score': 'Exploração de Consequências',
-      'impact_understanding_score': 'Compreensão de Impacto',
-      'pain_identification_score': 'Identificação de Dores',
-      'challenge_discovery_score': 'Descoberta de Desafios',
-      // Indicadores SPIN - Implicação (I)
-      'emotional_impact_score': 'Impacto Emocional',
-      'logical_flow_score': 'Fluxo Lógico',
-      'quantification_score': 'Quantificação',
-      'future_projection_score': 'Projeção Futura',
-      'business_impact_score': 'Impacto no Negócio',
-      'consequence_development_score': 'Desenvolvimento de Consequências',
-      'amplification_score': 'Amplificação',
-      'concrete_risks': 'Riscos Concretos',
-      'inaction_consequences': 'Consequências da Inação',
-      'urgency_amplification': 'Amplificação de Urgência',
-      'non_aggressive_urgency': 'Urgência Não Agressiva',
-      // Indicadores SPIN - Necessidade (N)
-      'value_articulation_score': 'Articulação de Valor',
-      'solution_fit_score': 'Adequação da Solução',
-      'commitment_score': 'Comprometimento',
-      'benefit_clarity_score': 'Clareza de Benefícios',
-      'roi_demonstration_score': 'Demonstração de ROI',
-      'outcome_score': 'Resultado',
-      'value_proposition_score': 'Proposta de Valor',
-      'credibility': 'Credibilidade',
-      'personalization': 'Personalização',
-      'benefits_clarity': 'Clareza de Benefícios',
-      'solution_clarity': 'Clareza da Solução',
-      'cta_effectiveness': 'Eficácia do CTA',
-      // Indicadores gerais de vendas
-      'timing_score': 'Timing',
-      'impact_score': 'Impacto',
-      'clarity_score': 'Clareza',
-      'connection_score': 'Conexão',
-      'rapport_score': 'Rapport',
-      'listening_score': 'Escuta Ativa',
-      'active_listening_score': 'Escuta Ativa',
-      'questioning_score': 'Questionamento',
-      'probing_score': 'Investigação',
-      'urgency_score': 'Urgência',
-      'engagement_score': 'Engajamento',
-      'trust_score': 'Confiança',
-      'persuasion_score': 'Persuasão',
-      'negotiation_score': 'Negociação',
-      'presentation_score': 'Apresentação',
-      'communication_score': 'Comunicação',
-      'flexibility_score': 'Flexibilidade',
-      'confidence_score': 'Confiança',
-      // Indicadores sem sufixo _score
-      'timing': 'Timing',
-      'impact': 'Impacto',
-      'clarity': 'Clareza',
-      'connection': 'Conexão',
-      'rapport': 'Rapport',
-      'listening': 'Escuta Ativa',
-      'engagement': 'Engajamento',
-      'trust': 'Confiança',
-      'depth': 'Profundidade',
-      'relevance': 'Relevância',
-      'context': 'Contexto',
-      'discovery': 'Descoberta',
-      'exploration': 'Exploração',
-      'empathy': 'Empatia',
-      'adaptability': 'Adaptabilidade',
-      'outcome': 'Resultado',
-      'commitment': 'Comprometimento',
-      'quantification': 'Quantificação',
-      'amplification': 'Amplificação',
-    }
-    const normalized = key.toLowerCase().replace(/\s+/g, '_')
-    if (translations[normalized]) return translations[normalized]
-    if (translations[key]) return translations[key]
-    const withoutScore = normalized.replace(/_score$/, '')
-    if (translations[withoutScore]) return translations[withoutScore]
-    const cleaned = key.replace(/_score$/i, '').replace(/\s+score$/i, '').replace(/_/g, ' ').trim()
-    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
-  }
-
   const temperaments = ['Analítico', 'Empático', 'Determinado', 'Indeciso', 'Sociável']
 
   // Função para converter idade numérica em faixa etária para TTS
@@ -726,8 +617,8 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   }
 
   const handleStartSimulation = async () => {
-    // Skip validation when using meet simulation (data is inline, not from DB)
-    if (!isMeetSimulation) {
+    // Skip validation when using meet simulation or challenge (data is pre-configured)
+    if (!isMeetSimulation && !challengeConfig) {
       // Validar persona selecionada
       if (!selectedPersona) {
         const messageElement = document.createElement('div')
@@ -1894,7 +1785,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       {/* Interface de Videochamada - Exibida durante a sessão ativa */}
       {isSimulating && (
-        <div className="fixed inset-0 bg-[#1a1a1a] z-50 flex flex-col">
+        <div className="fixed inset-0 bg-[#1a1a1a] z-[70] flex flex-col">
           {/* Header minimalista */}
           <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800">
             <div className="flex items-center gap-3">
@@ -2284,8 +2175,37 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         </div>
       )}
 
+      {/* Tela de carregamento do desafio - enquanto auto-start está pendente */}
+      {challengeConfig && !isSimulating && (
+        <div className="fixed inset-0 bg-[#1a1a1a] z-[70] flex flex-col items-center justify-center">
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes challengePulse {
+              0%, 100% { opacity: 0.4; transform: scale(0.8); }
+              50% { opacity: 1; transform: scale(1); }
+            }
+            .challenge-dot-1 { animation: challengePulse 1.4s ease-in-out infinite; }
+            .challenge-dot-2 { animation: challengePulse 1.4s ease-in-out infinite; animation-delay: 0.2s; }
+            .challenge-dot-3 { animation: challengePulse 1.4s ease-in-out infinite; animation-delay: 0.4s; }
+          `}} />
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center">
+              <Target className="w-8 h-8 text-green-400" />
+            </div>
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-white mb-2">Iniciando Desafio...</h2>
+              <p className="text-white/50 text-sm">Preparando sua simulação</p>
+            </div>
+            <div className="flex gap-2 mt-2">
+              <div className="w-2.5 h-2.5 bg-green-400 rounded-full challenge-dot-1" />
+              <div className="w-2.5 h-2.5 bg-green-400 rounded-full challenge-dot-2" />
+              <div className="w-2.5 h-2.5 bg-green-400 rounded-full challenge-dot-3" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tela de Configuração - Layout integrado com fundo branco */}
-      <div className={`min-h-screen relative z-10 py-8 px-6 ${isSimulating ? 'hidden' : ''}`}>
+      <div className={`min-h-screen relative z-10 py-8 px-6 ${isSimulating || challengeConfig ? 'hidden' : ''}`}>
         <div className="max-w-6xl mx-auto">
           {/* Header com título e contador */}
           <div className={`mb-6 flex items-start justify-between ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
@@ -3042,7 +2962,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       {/* Modal de Loading - Avaliação */}
         {isEvaluating && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
             <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
               <Loader2 className="w-16 h-16 text-green-400 animate-spin mx-auto" />
               <div>
@@ -3053,786 +2973,40 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           </div>
         )}
 
-        {/* Modal de Avaliação - Design Tema Claro */}
+        {/* Modal de Conclusão - Redireciona para Histórico */}
         {showEvaluationSummary && evaluation && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] overflow-y-auto">
-            <div className="min-h-screen py-8 px-4 sm:px-6">
-              <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl">
-                {/* Header */}
-                <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-1">Resultado da Sessão</h1>
-                    <p className="text-gray-500 text-sm">Análise detalhada do seu desempenho</p>
-                  </div>
-                  <button
-                    onClick={() => setShowEvaluationSummary(false)}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-
-                {/* Conteúdo do Modal */}
-                <div className="p-6">
-                  {/* Score Principal */}
-                  {(() => {
-                    const overallScore = evaluation.overall_score !== undefined
-                      ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
-                      : null
-                    return (
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6 text-center mb-6">
-                        <div className={`text-5xl font-bold mb-2 ${getScoreColor(overallScore || 0)}`}>
-                          {overallScore?.toFixed(1) || 'N/A'}
-                        </div>
-                        <div className="text-gray-600 text-sm font-medium">
-                          {evaluation.performance_level && getPerformanceLabel(evaluation.performance_level)}
-                        </div>
-                      </div>
-                    )
-                  })()}
-
-                  {/* Seção de Correção Meet - observações da IA */}
-                  {evaluation.meet_correction && (
-                    <div className="mb-6 space-y-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Target className="w-5 h-5 text-purple-600" />
-                        <h3 className="text-sm font-semibold text-gray-800">Correção da Reunião</h3>
-                      </div>
-
-                      {/* Feedback geral */}
-                      {evaluation.meet_correction.overall_feedback && (
-                        <div className={`rounded-xl border p-4 ${
-                          evaluation.meet_correction.overall_corrected
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-amber-50 border-amber-200'
-                        }`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            {evaluation.meet_correction.overall_corrected ? (
-                              <CheckCircle className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <AlertTriangle className="w-4 h-4 text-amber-600" />
-                            )}
-                            <span className={`text-sm font-semibold ${
-                              evaluation.meet_correction.overall_corrected ? 'text-green-700' : 'text-amber-700'
-                            }`}>
-                              {evaluation.meet_correction.overall_corrected ? 'Erros Corrigidos!' : 'Continue Praticando'}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-700 leading-relaxed">
-                            {safeRender(evaluation.meet_correction.overall_feedback)}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Cards por área */}
-                      {evaluation.meet_correction.areas?.map((area: any, i: number) => (
-                        <div
-                          key={i}
-                          className={`rounded-xl border overflow-hidden ${
-                            area.corrected
-                              ? 'border-green-200'
-                              : area.partially_corrected
-                              ? 'border-amber-200'
-                              : 'border-red-200'
-                          }`}
-                        >
-                          {/* Header */}
-                          <div className={`px-4 py-3 flex items-center justify-between ${
-                            area.corrected
-                              ? 'bg-green-50'
-                              : area.partially_corrected
-                              ? 'bg-amber-50'
-                              : 'bg-red-50'
-                          }`}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-gray-800">{area.area}</span>
-                            </div>
-                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                              area.corrected
-                                ? 'bg-green-100 text-green-700'
-                                : area.partially_corrected
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}>
-                              {area.corrected ? 'Corrigido' : area.partially_corrected ? 'Parcial' : 'Não corrigido'}
-                            </span>
-                          </div>
-
-                          <div className="p-4 space-y-3 bg-white">
-                            {/* O que o vendedor fez */}
-                            {area.what_seller_did && (
-                              <div>
-                                <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">O que você fez</p>
-                                <p className="text-sm text-gray-700 leading-relaxed">{safeRender(area.what_seller_did)}</p>
-                              </div>
-                            )}
-
-                            {/* O que ainda falta */}
-                            {area.what_still_needs_work && (
-                              <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-                                <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-1">O que ainda falta</p>
-                                <p className="text-xs text-gray-700 leading-relaxed">{safeRender(area.what_still_needs_work)}</p>
-                              </div>
-                            )}
-
-                            {/* Momento-chave */}
-                            {area.key_moment && (
-                              <div className="bg-gray-50 rounded-lg p-3 border-l-2 border-l-purple-400 border border-gray-100">
-                                <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1">Momento-Chave</p>
-                                <p className="text-xs text-gray-600 italic leading-relaxed">{safeRender(area.key_moment)}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Seção de Feedback do Desafio - só aparece quando challenge_performance existe */}
-                  {evaluation.challenge_performance && (
-                    <div className="mb-6 space-y-4">
-                      {/* Card de Resultado do Desafio */}
-                      <div className={`rounded-xl border p-5 ${
-                        evaluation.challenge_performance.goal_achieved
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-amber-50 border-amber-200'
-                      }`}>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              evaluation.challenge_performance.goal_achieved
-                                ? 'bg-green-100'
-                                : 'bg-amber-100'
-                            }`}>
-                              {evaluation.challenge_performance.goal_achieved ? (
-                                <Trophy className="w-5 h-5 text-green-600" />
-                              ) : (
-                                <Target className="w-5 h-5 text-amber-600" />
-                              )}
-                            </div>
-                            <div>
-                              <h3 className={`font-semibold ${
-                                evaluation.challenge_performance.goal_achieved ? 'text-green-700' : 'text-amber-700'
-                              }`}>
-                                {evaluation.challenge_performance.goal_achieved ? 'Meta Alcançada!' : 'Continue Praticando'}
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                Foco: {evaluation.challenge_performance.target_letter?.toUpperCase()} - {
-                                  evaluation.challenge_performance.target_letter === 'S' ? 'Situação' :
-                                  evaluation.challenge_performance.target_letter === 'P' ? 'Problema' :
-                                  evaluation.challenge_performance.target_letter === 'I' ? 'Implicação' :
-                                  'Necessidade'
-                                }
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-2xl font-bold ${
-                              evaluation.challenge_performance.goal_achieved ? 'text-green-600' : 'text-amber-600'
-                            }`}>
-                              {evaluation.challenge_performance.achieved_score?.toFixed(1) || 'N/A'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Meta: {evaluation.challenge_performance.target_score?.toFixed(1) || 'N/A'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Feedback do desafio */}
-                        {evaluation.challenge_performance.challenge_feedback && (
-                          <p className="text-sm text-gray-700 border-t border-gray-200 pt-3 mt-3">
-                            {safeRender(evaluation.challenge_performance.challenge_feedback)}
-                          </p>
-                        )}
-                      </div>
-
-                    {/* Grid de Dicas de Coaching */}
-                    {(evaluation.challenge_performance.coaching_tips_applied?.length > 0 ||
-                      evaluation.challenge_performance.coaching_tips_missed?.length > 0) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Dicas Aplicadas */}
-                        {evaluation.challenge_performance.coaching_tips_applied?.length > 0 && (
-                          <div className="bg-green-50 rounded-xl border border-green-200 p-4">
-                            <h4 className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
-                              <CheckCircle className="w-4 h-4" />
-                              Dicas Aplicadas
-                            </h4>
-                            <ul className="space-y-2">
-                              {evaluation.challenge_performance.coaching_tips_applied.map((tip: any, i: number) => (
-                                <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                  <span className="text-green-600 mt-0.5">✓</span>
-                                  {cleanSpinText(safeRender(tip))}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* Dicas Não Aplicadas */}
-                        {evaluation.challenge_performance.coaching_tips_missed?.length > 0 && (
-                          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
-                            <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
-                              <AlertTriangle className="w-4 h-4" />
-                              Dicas a Praticar
-                            </h4>
-                            <ul className="space-y-2">
-                              {evaluation.challenge_performance.coaching_tips_missed.map((tip: any, i: number) => (
-                                <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                  <span className="text-amber-600 mt-0.5">○</span>
-                                  {cleanSpinText(safeRender(tip))}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Momentos-Chave */}
-                    {evaluation.challenge_performance.key_moments?.length > 0 && (
-                      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
-                          <Lightbulb className="w-4 h-4" />
-                          Momentos-Chave para Melhoria
-                        </h4>
-                        <div className="space-y-3">
-                          {evaluation.challenge_performance.key_moments.map((moment: any, i: number) => (
-                            <div key={i} className="bg-gray-50 rounded-lg p-3 border-l-2 border-green-500">
-                              <p className="text-sm text-gray-800 mb-2">{safeRender(moment.moment)}</p>
-                              {(moment.what_happened || moment.analysis) && (
-                                <p className="text-xs text-gray-600 mb-1">
-                                  <span className="text-gray-700 font-medium">O que aconteceu:</span> {safeRender(moment.what_happened || moment.analysis)}
-                                </p>
-                              )}
-                              {moment.what_should_have_done && (
-                                <p className="text-xs text-gray-600 mb-1">
-                                  <span className="text-gray-700 font-medium">O que fazer:</span> {safeRender(moment.what_should_have_done)}
-                                </p>
-                              )}
-                              {(moment.suggested_phrase || moment.suggestion) && (
-                                <p className="text-xs italic text-green-700 bg-green-100 rounded px-2 py-1 mt-2">
-                                  &ldquo;{safeRender(moment.suggested_phrase || moment.suggestion)}&rdquo;
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Análise Profunda da Letra Alvo */}
-                    {evaluation.challenge_performance.target_letter_deep_analysis && (
-                      <details className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                          <span className="text-sm font-medium text-gray-700">
-                            Análise Detalhada: {evaluation.challenge_performance.target_letter?.toUpperCase()}
-                          </span>
-                          <ChevronDown className="w-4 h-4 text-gray-500" />
-                        </summary>
-                        <div className="px-4 pb-4">
-                          <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
-                            {safeRender(evaluation.challenge_performance.target_letter_deep_analysis)}
-                          </p>
-                        </div>
-                      </details>
-                    )}
-                  </div>
-                )}
-
-                {/* Tabs de navegação */}
-                <div className="flex gap-1 bg-gray-100 rounded-xl border border-gray-200 p-1 mb-6">
-                  {['resumo', 'spin', ...(evaluation.playbook_adherence ? ['playbook'] : []), 'transcricao'].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveEvaluationTab(
-                        tab === 'resumo' ? 'evaluation' :
-                        tab === 'spin' ? 'feedback' :
-                        tab === 'playbook' ? 'playbook' : 'conversation'
-                      )}
-                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
-                        (tab === 'resumo' && activeEvaluationTab === 'evaluation') ||
-                        (tab === 'spin' && activeEvaluationTab === 'feedback') ||
-                        (tab === 'playbook' && activeEvaluationTab === 'playbook') ||
-                        (tab === 'transcricao' && activeEvaluationTab === 'conversation')
-                          ? 'bg-white text-green-700 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                      }`}
-                    >
-                      {tab === 'resumo' && 'Resumo'}
-                      {tab === 'spin' && 'Análise SPIN'}
-                      {tab === 'playbook' && 'Playbook'}
-                      {tab === 'transcricao' && 'Transcrição'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Conteúdo das tabs */}
-                {/* Tab Resumo (evaluation) */}
-                {activeEvaluationTab === 'evaluation' && (
-                  <div className="space-y-4">
-                    {/* Resumo executivo */}
-                    {evaluation.executive_summary && (
-                      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
-                          Resumo Executivo
-                        </h4>
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                          {safeRender(evaluation.executive_summary)}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Grid de insights */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Pontos fortes */}
-                      {evaluation.top_strengths?.length > 0 && (
-                        <div className="bg-green-50 rounded-xl border border-green-200 p-4">
-                          <h4 className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
-                            <TrendingUp className="w-4 h-4" />
-                            Pontos Fortes
-                          </h4>
-                          <ul className="space-y-2">
-                            {evaluation.top_strengths.map((strength: any, i: number) => (
-                              <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                <span className="text-green-600 mt-0.5">•</span>
-                                {safeRender(strength)}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Gaps críticos */}
-                      {evaluation.critical_gaps?.length > 0 && (
-                        <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
-                          <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
-                            <AlertTriangle className="w-4 h-4" />
-                            Pontos a Melhorar
-                          </h4>
-                          <ul className="space-y-2">
-                            {evaluation.critical_gaps.map((gap: any, i: number) => (
-                              <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                <span className="text-amber-600 mt-0.5">•</span>
-                                {safeRender(gap)}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Prioridades de melhoria */}
-                    {evaluation.priority_improvements?.length > 0 && (
-                      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
-                          <Lightbulb className="w-4 h-4" />
-                          Prioridades de Melhoria
-                        </h4>
-                        <div className="space-y-3">
-                          {evaluation.priority_improvements.map((imp: any, i: number) => (
-                            <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                                  imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
-                                  imp.priority === 'high' ? 'bg-amber-100 text-amber-700' :
-                                  'bg-gray-200 text-gray-700'
-                                }`}>
-                                  {imp.priority === 'critical' ? 'Crítico' :
-                                   imp.priority === 'high' ? 'Alta' : 'Média'}
-                                </span>
-                                <span className="text-sm font-medium text-gray-800">{safeRender(imp.area)}</span>
-                              </div>
-                              <p className="text-xs text-gray-600">{safeRender(imp.action_plan)}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Tab Análise SPIN (feedback) */}
-                {activeEvaluationTab === 'feedback' && evaluation.spin_evaluation && (
-                  <div className="space-y-4">
-                    {/* Grid de scores SPIN */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {[
-                        { key: 'S', label: 'Situação', color: 'text-blue-600' },
-                        { key: 'P', label: 'Problema', color: 'text-purple-600' },
-                        { key: 'I', label: 'Implicação', color: 'text-orange-600' },
-                        { key: 'N', label: 'Necessidade', color: 'text-green-600' }
-                      ].map(({ key, label, color }) => {
-                        const score = evaluation.spin_evaluation[key]?.final_score || 0
-                        return (
-                          <div key={key} className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
-                            <div className={`text-3xl font-bold mb-1 ${color}`}>
-                              {score.toFixed(1)}
-                            </div>
-                            <div className="text-xs text-gray-500 uppercase tracking-wider">
-                              {label}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Média SPIN */}
-                    <div className="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
-                      <div className="text-2xl font-bold text-green-600 mb-1">
-                        {(
-                          ((evaluation.spin_evaluation.S?.final_score || 0) +
-                          (evaluation.spin_evaluation.P?.final_score || 0) +
-                          (evaluation.spin_evaluation.I?.final_score || 0) +
-                          (evaluation.spin_evaluation.N?.final_score || 0)) / 4
-                        ).toFixed(1)}
-                      </div>
-                      <div className="text-xs text-gray-600 uppercase tracking-wider">
-                        Média Geral SPIN
-                      </div>
-                    </div>
-
-                    {/* Detalhes de cada pilar */}
-                    {['S', 'P', 'I', 'N'].map((letter) => {
-                      const data = evaluation.spin_evaluation[letter]
-                      if (!data) return null
-
-                      const labels: Record<string, string> = {
-                        'S': 'Situação',
-                        'P': 'Problema',
-                        'I': 'Implicação',
-                        'N': 'Necessidade'
-                      }
-
-                      return (
-                        <details key={letter} className="bg-white rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
-                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center gap-3">
-                              <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-sm font-bold text-green-700">
-                                {letter}
-                              </span>
-                              <span className="font-medium text-gray-800">{labels[letter]}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-gray-800">
-                                {data.final_score?.toFixed(1)}
-                              </span>
-                              <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
-                            </div>
-                          </summary>
-                          <div className="p-4 pt-0 space-y-3">
-                            {/* Feedback */}
-                            {data.technical_feedback && (
-                              <p className="text-sm text-gray-700 leading-relaxed">
-                                {safeRender(data.technical_feedback)}
-                              </p>
-                            )}
-
-                            {/* Indicadores */}
-                            {data.indicators && Object.keys(data.indicators).length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {Object.entries(data.indicators).map(([key, value]: [string, any]) => {
-                                  const score = typeof value === 'number' ? value : 0
-                                  const getIndicatorStyle = (s: number) => {
-                                    if (s >= 8) return 'bg-green-100 border-green-300 text-green-700'
-                                    if (s >= 6) return 'bg-yellow-100 border-yellow-300 text-yellow-700'
-                                    return 'bg-red-100 border-red-300 text-red-700'
-                                  }
-                                  const getIndicatorScoreStyle = (s: number) => {
-                                    if (s >= 8) return 'text-green-700 font-semibold'
-                                    if (s >= 6) return 'text-yellow-700 font-semibold'
-                                    return 'text-red-700 font-semibold'
-                                  }
-                                  return (
-                                    <span
-                                      key={key}
-                                      className={`text-xs px-3 py-1.5 rounded-lg border transition-all hover:scale-105 ${getIndicatorStyle(score)}`}
-                                    >
-                                      {translateIndicator(key)}: <span className={getIndicatorScoreStyle(score)}>{value}/10</span>
-                                    </span>
-                                  )
-                                })}
-                              </div>
-                            )}
-
-                            {/* Oportunidades perdidas */}
-                            {data.missed_opportunities?.length > 0 && (
-                              <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
-                                <p className="text-xs font-medium text-amber-700 mb-2">Oportunidades Perdidas</p>
-                                <ul className="space-y-1">
-                                  {data.missed_opportunities.map((opp: any, i: number) => (
-                                    <li key={i} className="text-xs text-amber-700">• {safeRender(opp)}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        </details>
-                      )
-                    })}
-
-                    {/* Análise de objeções */}
-                    {evaluation.objections_analysis?.length > 0 && (
-                      <details className="bg-white rounded-xl border border-gray-200 overflow-hidden group shadow-sm">
-                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                              <Target className="w-4 h-4 text-green-700" />
-                            </span>
-                            <span className="font-medium text-gray-800">Análise de Objeções</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-500">
-                              {evaluation.objections_analysis.length} objeções
-                            </span>
-                            <ChevronDown className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform" />
-                          </div>
-                        </summary>
-                        <div className="p-4 pt-0 space-y-3">
-                          {evaluation.objections_analysis.map((obj: any, idx: number) => (
-                            <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs px-2 py-0.5 bg-gray-200 rounded text-gray-700">
-                                  {safeRender(obj.objection_type)}
-                                </span>
-                                <span className={`text-sm font-bold ${getScoreColor(obj.score)}`}>
-                                  {obj.score}/10
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-700 italic mb-2">
-                                "{safeRender(obj.objection_text)}"
-                              </p>
-                              {obj.detailed_analysis && (
-                                <p className="text-xs text-gray-600">{safeRender(obj.detailed_analysis)}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    )}
-                  </div>
-                )}
-
-                {/* Tab Transcrição (conversation) */}
-                {activeEvaluationTab === 'conversation' && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                    <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
-                      {messages.length} mensagens
-                    </h4>
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                      {messages.map((msg, index) => (
-                        <div
-                          key={index}
-                          className={`flex gap-3 ${msg.role === 'seller' ? 'flex-row-reverse' : ''}`}
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            msg.role === 'client'
-                              ? 'bg-gray-200'
-                              : 'bg-green-100'
-                          }`}>
-                            <User className={`w-4 h-4 ${
-                              msg.role === 'client' ? 'text-gray-600' : 'text-green-600'
-                            }`} />
-                          </div>
-                          <div className={`flex-1 max-w-[80%] ${msg.role === 'seller' ? 'text-right' : ''}`}>
-                            <div className="text-xs text-gray-500 mb-1">
-                              {msg.role === 'client' ? 'Cliente' : 'Você'}
-                            </div>
-                            <div className={`inline-block p-3 rounded-xl text-sm ${
-                              msg.role === 'client'
-                                ? 'bg-gray-100 text-gray-700 rounded-tl-none border border-gray-200'
-                                : 'bg-green-100 text-green-800 rounded-tr-none border border-green-200'
-                            }`}>
-                              {msg.text}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Tab Playbook Adherence */}
-                {activeEvaluationTab === 'playbook' && evaluation.playbook_adherence && (
-                  <div className="space-y-4">
-                    {/* Score Geral do Playbook */}
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium text-purple-700 uppercase tracking-wider">
-                          Aderência ao Playbook
-                        </h4>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
-                          evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
-                          evaluation.playbook_adherence.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'Exemplar' :
-                           evaluation.playbook_adherence.adherence_level === 'compliant' ? 'Conforme' :
-                           evaluation.playbook_adherence.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
-                        </span>
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <span className="text-4xl font-bold text-purple-600">
-                          {evaluation.playbook_adherence.overall_adherence_score}%
-                        </span>
-                        <span className="text-sm text-gray-500 mb-1">de aderência</span>
-                      </div>
-                    </div>
-
-                    {/* Dimensões do Playbook */}
-                    {evaluation.playbook_adherence.dimensions && (
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        {[
-                          { key: 'opening', label: 'Abertura', icon: '🎯' },
-                          { key: 'closing', label: 'Fechamento', icon: '🤝' },
-                          { key: 'conduct', label: 'Conduta', icon: '👔' },
-                          { key: 'required_scripts', label: 'Scripts', icon: '📝' },
-                          { key: 'process', label: 'Processo', icon: '⚙️' }
-                        ].map(({ key, label, icon }) => {
-                          const dim = evaluation.playbook_adherence?.dimensions?.[key as keyof typeof evaluation.playbook_adherence.dimensions]
-                          if (!dim || dim.status === 'not_evaluated') return null
-                          return (
-                            <div key={key} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-                              <div className="text-xl mb-1">{icon}</div>
-                              <div className={`text-2xl font-bold ${
-                                (dim.score || 0) >= 70 ? 'text-green-600' :
-                                (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
-                              }`}>
-                                {dim.score || 0}%
-                              </div>
-                              <div className="text-xs text-gray-500">{label}</div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {/* Violações */}
-                    <div className="bg-red-50 rounded-xl border border-red-200 p-4">
-                      <h4 className="flex items-center gap-2 text-sm font-medium text-red-700 mb-3">
-                        <AlertTriangle className="w-4 h-4" />
-                        Violações Detectadas
-                      </h4>
-                      {evaluation.playbook_adherence.violations && evaluation.playbook_adherence.violations.length > 0 ? (
-                        <ul className="space-y-2">
-                          {evaluation.playbook_adherence.violations.map((v: any, i: number) => (
-                            <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-2 border border-red-100">
-                              <div className="font-medium text-red-700">{safeRender(v.criterion)}</div>
-                              {v.evidence && <p className="text-xs text-gray-500 mt-1 italic">"{safeRender(v.evidence)}"</p>}
-                              {v.recommendation && <p className="text-xs text-red-600 mt-1">{safeRender(v.recommendation)}</p>}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-green-600 flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4" />
-                          Nenhuma violação detectada
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Requisitos Perdidos */}
-                    <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
-                      <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
-                        <AlertCircle className="w-4 h-4" />
-                        Requisitos Não Cumpridos
-                      </h4>
-                      {evaluation.playbook_adherence.missed_requirements && evaluation.playbook_adherence.missed_requirements.length > 0 ? (
-                        <ul className="space-y-2">
-                          {evaluation.playbook_adherence.missed_requirements.map((m: any, i: number) => (
-                            <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-2 border border-amber-100">
-                              <div className="font-medium text-amber-700">{safeRender(m.criterion)}</div>
-                              {m.expected && <p className="text-xs text-gray-500 mt-1">Esperado: {safeRender(m.expected)}</p>}
-                              {m.recommendation && <p className="text-xs text-amber-600 mt-1">{safeRender(m.recommendation)}</p>}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-green-600 flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4" />
-                          Todos os requisitos foram cumpridos
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Momentos Exemplares - dados salvos na avaliação para feature futura, mas não exibidos na UI */}
-
-                    {/* Notas de Coaching */}
-                    {evaluation.playbook_adherence.coaching_notes && (
-                      <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-3">
-                          <Lightbulb className="w-4 h-4" />
-                          Orientações para Melhorar
-                        </h4>
-                        <p className="text-sm text-gray-700 leading-relaxed">
-                          {safeRender(evaluation.playbook_adherence.coaching_notes)}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Resumo de Critérios */}
-                    {evaluation.playbook_adherence.playbook_summary && (
-                      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
-                          Resumo dos Critérios
-                        </h4>
-                        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-center text-xs">
-                          <div className="bg-white rounded-lg p-2 border border-gray-200">
-                            <div className="font-bold text-gray-700">{evaluation.playbook_adherence.playbook_summary.total_criteria_extracted}</div>
-                            <div className="text-gray-500">Total</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 border border-green-200">
-                            <div className="font-bold text-green-600">{evaluation.playbook_adherence.playbook_summary.criteria_compliant}</div>
-                            <div className="text-gray-500">Conforme</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 border border-yellow-200">
-                            <div className="font-bold text-yellow-600">{evaluation.playbook_adherence.playbook_summary.criteria_partial}</div>
-                            <div className="text-gray-500">Parcial</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 border border-orange-200">
-                            <div className="font-bold text-orange-600">{evaluation.playbook_adherence.playbook_summary.criteria_missed}</div>
-                            <div className="text-gray-500">Perdido</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 border border-red-200">
-                            <div className="font-bold text-red-600">{evaluation.playbook_adherence.playbook_summary.criteria_violated}</div>
-                            <div className="text-gray-500">Violado</div>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 border border-purple-200">
-                            <div className="font-bold text-purple-600">{evaluation.playbook_adherence.playbook_summary.compliance_rate}</div>
-                            <div className="text-gray-500">Taxa</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => setShowEvaluationSummary(false)}
-                    className="flex-1 px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl font-medium hover:bg-gray-200 transition-colors text-gray-700 text-sm"
-                  >
-                    Fechar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowEvaluationSummary(false);
-                      if (onNavigateToHistory) {
-                        onNavigateToHistory();
-                      } else {
-                        window.location.href = '/?view=historico';
-                      }
-                    }}
-                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-medium transition-colors text-white text-sm"
-                  >
-                    Ver Análise Completa no Histórico
-                  </button>
-                </div>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center animate-fade-in">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Simulação Finalizada!</h2>
+              <p className="text-gray-500 text-sm mb-8">
+                Sua avaliação está pronta. Confira os detalhes no histórico.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setShowEvaluationSummary(false);
+                    if (onNavigateToHistory) {
+                      onNavigateToHistory();
+                    } else {
+                      window.location.href = '/?view=historico';
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-medium transition-colors text-white text-sm"
+                >
+                  Ver Avaliação
+                </button>
+                <button
+                  onClick={() => setShowEvaluationSummary(false)}
+                  className="w-full px-4 py-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl font-medium transition-colors text-sm"
+                >
+                  Fechar
+                </button>
               </div>
             </div>
           </div>
-        </div>
         )}
 
     </>

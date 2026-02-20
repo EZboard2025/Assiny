@@ -112,6 +112,8 @@ export default function FollowUpView() {
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null)
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isInitializing, setIsInitializing] = useState(false)
@@ -656,8 +658,9 @@ export default function FollowUpView() {
         if (!currentConv) return
 
         try {
+          // Fetch only recent messages for polling (50 is enough to detect new ones + status updates)
           const response = await fetch(
-            `/api/whatsapp/messages?contactPhone=${encodeURIComponent(currentConv.contact_phone)}`,
+            `/api/whatsapp/messages?contactPhone=${encodeURIComponent(currentConv.contact_phone)}&limit=50`,
             { headers: { 'Authorization': `Bearer ${authToken}` } }
           )
           const data = await response.json()
@@ -667,10 +670,24 @@ export default function FollowUpView() {
               const tempMessages = prev.filter(m => m.id.startsWith('temp_'))
               const realPrev = prev.filter(m => !m.id.startsWith('temp_'))
 
-              // Don't wipe messages if DB has fewer (race: event handler hasn't saved yet)
-              if (data.messages.length < realPrev.length) {
-                return prev
-              }
+              const existingIds = new Set(realPrev.map(m => m.id))
+
+              // Find truly new messages not in our current state
+              const newMsgs = (data.messages as WhatsAppMessage[]).filter(m => !existingIds.has(m.id))
+
+              // Update statuses of existing messages from fresh data
+              const freshMap = new Map((data.messages as WhatsAppMessage[]).map((m: WhatsAppMessage) => [m.id, m]))
+              let hasStatusChanges = false
+              const updatedPrev = realPrev.map(m => {
+                const fresh = freshMap.get(m.id)
+                if (fresh && fresh.status !== m.status) {
+                  hasStatusChanges = true
+                  return { ...m, status: fresh.status }
+                }
+                return m
+              })
+
+              if (newMsgs.length === 0 && !hasStatusChanges) return prev
 
               // Build lookup of existing quotedMsg data to preserve across reloads
               const existingQuotedMsgs = new Map<string, WhatsAppMessage['quotedMsg']>()
@@ -680,8 +697,8 @@ export default function FollowUpView() {
                 }
               })
 
-              // Merge: preserve quotedMsg from existing state if DB version doesn't have it yet
-              const mergedMessages = data.messages.map((m: WhatsAppMessage) => {
+              // Merge new messages with quotedMsg preservation
+              const mergedNew = newMsgs.map((m: WhatsAppMessage) => {
                 if (!m.quotedMsg) {
                   const existing = existingQuotedMsgs.get(m.waMessageId || m.id)
                   if (existing) return { ...m, quotedMsg: existing }
@@ -689,15 +706,12 @@ export default function FollowUpView() {
                 return m
               })
 
-              if (data.messages.length !== realPrev.length) {
-                return [...mergedMessages, ...tempMessages]
-              }
-              const lastNew = data.messages[data.messages.length - 1]
-              const lastOld = realPrev[realPrev.length - 1]
-              if (lastNew && lastOld && lastNew.id !== lastOld.id) {
-                return [...mergedMessages, ...tempMessages]
-              }
-              return prev
+              // Remove temp messages that now have a real DB version
+              const remainingTemps = tempMessages.filter(t =>
+                !newMsgs.some(n => n.body === t.body && n.fromMe === t.fromMe)
+              )
+
+              return [...updatedPrev, ...mergedNew, ...remainingTemps]
             })
           }
         } catch (e) {
@@ -1025,6 +1039,7 @@ export default function FollowUpView() {
 
     setIsLoadingMessages(true)
     setMessages([])
+    setHasMoreMessages(false)
     try {
       const response = await fetch(
         `/api/whatsapp/messages?contactPhone=${encodeURIComponent(contactPhone)}`,
@@ -1034,6 +1049,7 @@ export default function FollowUpView() {
 
       if (data.messages) {
         setMessages(data.messages)
+        setHasMoreMessages(data.hasMore === true)
       }
 
       // Try to sync more history from WhatsApp in background
@@ -1094,11 +1110,51 @@ export default function FollowUpView() {
               return m
             })
           })
+          setHasMoreMessages(reloadData.hasMore === true)
         }
       }
     } catch (error) {
       // Silently fail - sync is optional enhancement
       console.error('[Sync] Error syncing history:', error)
+    }
+  }
+
+  // Load older messages (pagination)
+  const loadOlderMessages = async () => {
+    if (!authToken || !selectedConversation || isLoadingMore || messages.length === 0) return
+
+    setIsLoadingMore(true)
+    try {
+      const oldestTimestamp = messages[0]?.timestamp
+      if (!oldestTimestamp) return
+
+      const container = messagesContainerRef.current
+      const prevScrollHeight = container?.scrollHeight || 0
+
+      const response = await fetch(
+        `/api/whatsapp/messages?contactPhone=${encodeURIComponent(selectedConversation.contact_phone)}&before=${encodeURIComponent(oldestTimestamp)}`,
+        { headers: { 'Authorization': `Bearer ${authToken}` } }
+      )
+      const data = await response.json()
+
+      if (data.messages && data.messages.length > 0) {
+        setMessages(prev => [...data.messages, ...prev])
+        setHasMoreMessages(data.hasMore === true)
+
+        // Preserve scroll position after prepending
+        requestAnimationFrame(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight
+            container.scrollTop = newScrollHeight - prevScrollHeight
+          }
+        })
+      } else {
+        setHasMoreMessages(false)
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error)
+    } finally {
+      setIsLoadingMore(false)
     }
   }
 
@@ -2643,6 +2699,23 @@ export default function FollowUpView() {
               </div>
             ) : (
               <div className="space-y-1">
+                {/* Load older messages button */}
+                {hasMoreMessages && (
+                  <div className="flex justify-center py-3">
+                    <button
+                      onClick={loadOlderMessages}
+                      disabled={isLoadingMore}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#202c33] hover:bg-[#2a3942] text-[#8696a0] text-xs transition-colors disabled:opacity-50"
+                    >
+                      {isLoadingMore ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      )}
+                      {isLoadingMore ? 'Carregando...' : 'Carregar mensagens anteriores'}
+                    </button>
+                  </div>
+                )}
                 {messages
                   .filter(msg => {
                     const hiddenTypes = ['reaction', 'e2e_notification', 'notification', 'notification_template', 'gp2', 'call_log', 'protocol', 'ciphertext']
