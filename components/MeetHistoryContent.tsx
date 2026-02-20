@@ -79,7 +79,7 @@ export default function MeetHistoryContent() {
   const [correctionScores, setCorrectionScores] = useState<Record<string, number | null>>({})
   const [correctionSessions, setCorrectionSessions] = useState<Record<string, any>>({})
   const [expandedCorrectionSection, setExpandedCorrectionSection] = useState<string | null>(null)
-  const [showTranscript, setShowTranscript] = useState(false)
+  const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
   useEffect(() => {
     loadHistory()
@@ -300,7 +300,7 @@ export default function MeetHistoryContent() {
               return (
                 <button
                   key={evaluation.id}
-                  onClick={() => { setSelectedEvaluation(evaluation); setShowTranscript(false) }}
+                  onClick={() => { setSelectedEvaluation(evaluation); setExpandedSection(null) }}
                   className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
                     selectedEvaluation?.id === evaluation.id
                       ? 'bg-green-50 border-l-4 border-l-green-500'
@@ -395,492 +395,406 @@ export default function MeetHistoryContent() {
               </div>
             )}
 
-            {/* SPIN Scores - Compact overview */}
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Scores SPIN</h3>
-              <div className="grid grid-cols-4 gap-3 mb-6">
-                {[
-                  { letter: 'S', label: 'Situação', score: selectedEvaluation.spin_s_score },
-                  { letter: 'P', label: 'Problema', score: selectedEvaluation.spin_p_score },
-                  { letter: 'I', label: 'Implicação', score: selectedEvaluation.spin_i_score },
-                  { letter: 'N', label: 'Necessidade', score: selectedEvaluation.spin_n_score },
-                ].map(({ letter, label, score }) => (
-                  <div key={letter} className="bg-gray-50 rounded-xl p-4 text-center">
-                    <div className={`text-3xl font-bold mb-1 ${
-                      score !== null && score >= 7 ? 'text-green-600' :
-                      score !== null && score >= 5 ? 'text-yellow-600' :
-                      score !== null ? 'text-red-600' : 'text-gray-400'
-                    }`}>
-                      {score !== null ? score.toFixed(1) : '--'}
-                    </div>
-                    <div className="text-xs font-medium text-gray-500">{label}</div>
-                  </div>
-                ))}
-              </div>
+            {/* Collapsible Section Cards */}
+            <div className="p-4 space-y-2">
 
-              {/* SPIN Detailed breakdown - 2 columns */}
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { letter: 'S', label: 'Situação', score: selectedEvaluation.spin_s_score },
-                  { letter: 'P', label: 'Problema', score: selectedEvaluation.spin_p_score },
-                  { letter: 'I', label: 'Implicação', score: selectedEvaluation.spin_i_score },
-                  { letter: 'N', label: 'Necessidade', score: selectedEvaluation.spin_n_score },
-                ].map(({ letter, label, score }) => {
-                  const spinDetail = selectedEvaluation.evaluation?.spin_evaluation?.[letter]
-                  if (!spinDetail) return null
-                  return (
-                    <div key={letter} className="bg-gray-50 rounded-xl p-4">
-                      {/* Card header */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
-                          score !== null && score >= 7 ? 'bg-green-500' :
-                          score !== null && score >= 5 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`}>
-                          {letter}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-gray-900">{label}</div>
-                          <div className={`text-xs font-medium ${
-                            score !== null && score >= 7 ? 'text-green-600' :
-                            score !== null && score >= 5 ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`}>
-                            {score !== null ? `${score.toFixed(1)}/10` : '--'}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Indicators */}
-                      {spinDetail.indicators && (
-                        <div className="space-y-2 mb-3">
-                          {Object.entries(spinDetail.indicators).map(([key, value]: [string, any]) => {
-                            const indicatorLabels: Record<string, string> = {
-                              open_questions_score: 'Perguntas Abertas',
-                              scenario_mapping_score: 'Mapeamento de Cenário',
-                              adaptability_score: 'Adaptabilidade',
-                              problem_identification_score: 'Identificação de Problemas',
-                              consequences_exploration_score: 'Exploração de Consequências',
-                              depth_score: 'Profundidade',
-                              empathy_score: 'Empatia',
-                              impact_understanding_score: 'Compreensão de Impacto',
-                              inaction_consequences_score: 'Consequências da Inação',
-                              urgency_amplification_score: 'Amplificação de Urgência',
-                              concrete_risks_score: 'Riscos Concretos',
-                              non_aggressive_urgency_score: 'Urgência Não Agressiva',
-                              solution_clarity_score: 'Clareza da Solução',
-                              personalization_score: 'Personalização',
-                              benefits_clarity_score: 'Clareza dos Benefícios',
-                              credibility_score: 'Credibilidade',
-                              cta_effectiveness_score: 'Efetividade do CTA',
-                            }
-                            const indicatorLabel = indicatorLabels[key] || key
-                              .replace(/_score$/, '')
-                              .replace(/_/g, ' ')
-                              .replace(/\b\w/g, (c: string) => c.toUpperCase())
-                            return (
-                              <div key={key}>
-                                <div className="flex items-center justify-between mb-0.5">
-                                  <span className="text-xs text-gray-600">{indicatorLabel}</span>
-                                  <span className={`text-xs font-semibold ${
-                                    Number(value) >= 7 ? 'text-green-600' :
-                                    Number(value) >= 5 ? 'text-yellow-600' : 'text-red-600'
-                                  }`}>{value}/10</span>
-                                </div>
-                                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full transition-all ${
-                                      Number(value) >= 7 ? 'bg-green-500' :
-                                      Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'
-                                    }`}
-                                    style={{ width: `${(Number(value) / 10) * 100}%` }}
-                                  />
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {/* Technical feedback */}
-                      {spinDetail.technical_feedback && (
-                        <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-3 mb-3">
-                          {spinDetail.technical_feedback}
-                        </p>
-                      )}
-
-                      {/* Missed opportunities */}
-                      {spinDetail.missed_opportunities && spinDetail.missed_opportunities.length > 0 && (
-                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
-                          <p className="text-[11px] font-semibold text-orange-700 mb-1.5">Oportunidades perdidas</p>
-                          <ul className="space-y-1">
-                            {spinDetail.missed_opportunities.map((opp: string, idx: number) => (
-                              <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
-                                <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>
-                                {opp}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Objections Analysis */}
-            {selectedEvaluation.evaluation?.objections_analysis && selectedEvaluation.evaluation.objections_analysis.length > 0 && (
-              <div className="p-6 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Análise de Objeções</h3>
-                <div className="space-y-4">
-                  {selectedEvaluation.evaluation.objections_analysis.map((obj: any, idx: number) => (
-                    <div key={idx} className="bg-gray-50 rounded-xl p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                              obj.objection_type === 'preço' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
-                              obj.objection_type === 'timing' ? 'bg-blue-100 text-blue-700' :
-                              obj.objection_type === 'autoridade' ? 'bg-purple-100 text-purple-700' :
-                              obj.objection_type === 'concorrência' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {obj.objection_type}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-700 italic leading-relaxed">&ldquo;{obj.objection_text}&rdquo;</p>
-                        </div>
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ml-4 ${
-                          obj.score >= 7 ? 'bg-green-100' :
-                          obj.score >= 5 ? 'bg-yellow-100' : 'bg-red-100'
-                        }`}>
-                          <span className={`text-xl font-bold ${
-                            obj.score >= 7 ? 'text-green-600' :
-                            obj.score >= 5 ? 'text-yellow-600' : 'text-red-600'
-                          }`}>
-                            {obj.score}
-                          </span>
-                        </div>
-                      </div>
-
-                      {obj.detailed_analysis && (
-                        <p className="text-sm text-gray-600 leading-relaxed mb-3">{obj.detailed_analysis}</p>
-                      )}
-
-                      {obj.critical_errors && obj.critical_errors.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-xs font-semibold text-red-600 mb-1.5">Erros criticos:</p>
-                          <ul className="space-y-1">
-                            {obj.critical_errors.map((err: string, i: number) => (
-                              <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                <span className="text-red-400 mt-1">•</span>
-                                {err}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {obj.ideal_response && (
-                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                          <p className="text-xs font-semibold text-green-700 mb-1">Resposta ideal:</p>
-                          <p className="text-sm text-gray-700 leading-relaxed">{obj.ideal_response}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Avaliação detalhada - always visible */}
-            {selectedEvaluation.evaluation && (
-              <div className="p-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Avaliação Detalhada</h3>
-                  <div className="space-y-4">
-                    {/* Resumo executivo */}
-                    {selectedEvaluation.evaluation.executive_summary && (
-                      <div className="bg-blue-50 rounded-xl p-4">
-                        <h4 className="text-sm font-semibold text-blue-700 mb-2">Resumo Executivo</h4>
-                        <p className="text-sm text-gray-700">{selectedEvaluation.evaluation.executive_summary}</p>
-                      </div>
-                    )}
-
-                    {/* Pontos fortes */}
-                    {selectedEvaluation.evaluation.top_strengths && selectedEvaluation.evaluation.top_strengths.length > 0 && (
-                      <div className="bg-green-50 rounded-xl p-4">
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-green-700 mb-2">
-                          <CheckCircle className="w-4 h-4" />
-                          Pontos Fortes
-                        </h4>
-                        <ul className="space-y-1">
-                          {selectedEvaluation.evaluation.top_strengths.map((strength: string, idx: number) => (
-                            <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
-                              <span className="text-green-500 mt-1">•</span>
-                              {strength}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Gaps críticos */}
-                    {selectedEvaluation.evaluation.critical_gaps && selectedEvaluation.evaluation.critical_gaps.length > 0 && (
-                      <div className="bg-orange-50 rounded-xl p-4">
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-orange-700 mb-2">
-                          <AlertTriangle className="w-4 h-4" />
-                          Gaps Críticos
-                        </h4>
-                        <ul className="space-y-1">
-                          {selectedEvaluation.evaluation.critical_gaps.map((gap: string, idx: number) => (
-                            <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
-                              <span className="text-orange-500 mt-1">•</span>
-                              {gap}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Melhorias prioritárias */}
-                    {selectedEvaluation.evaluation.priority_improvements && selectedEvaluation.evaluation.priority_improvements.length > 0 && (
-                      <div className="bg-purple-50 rounded-xl p-4">
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-purple-700 mb-2">
-                          <Lightbulb className="w-4 h-4" />
-                          Melhorias Prioritárias
-                        </h4>
-                        <ul className="space-y-2">
-                          {selectedEvaluation.evaluation.priority_improvements.map((improvement: any, idx: number) => (
-                            <li key={idx} className="text-sm text-gray-700">
-                              <span className="font-medium">{improvement.area || improvement}:</span>{' '}
-                              {improvement.action_plan || ''}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Playbook Adherence */}
-                    {selectedEvaluation.evaluation.playbook_adherence && (
-                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-purple-600" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-purple-700">Aderência ao Playbook</h4>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-2xl font-bold text-purple-600">
-                                  {selectedEvaluation.evaluation.playbook_adherence.overall_adherence_score}%
-                                </span>
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                  selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
-                                  selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
-                                  selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-red-100 text-red-700'
-                                }`}>
-                                  {selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'Exemplar' :
-                                   selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'Conforme' :
-                                   selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Dimensões */}
-                        {selectedEvaluation.evaluation.playbook_adherence.dimensions && (
-                          <div className="grid grid-cols-5 gap-2 mb-4">
-                            {[
-                              { key: 'opening', label: 'Abertura', Icon: MessageCircle, color: 'text-blue-500' },
-                              { key: 'closing', label: 'Fechamento', Icon: CheckCheck, color: 'text-emerald-500' },
-                              { key: 'conduct', label: 'Conduta', Icon: Shield, color: 'text-purple-500' },
-                              { key: 'required_scripts', label: 'Scripts', Icon: ScrollText, color: 'text-amber-500' },
-                              { key: 'process', label: 'Processo', Icon: Settings, color: 'text-gray-500' }
-                            ].map(({ key, label, Icon, color }) => {
-                              const dim = selectedEvaluation.evaluation.playbook_adherence?.dimensions?.[key]
-                              if (!dim || dim.status === 'not_evaluated') return null
-                              return (
-                                <div key={key} className="bg-white/70 rounded-lg p-2 text-center border border-purple-100">
-                                  <div className="flex justify-center mb-1">
-                                    <Icon className={`w-4 h-4 ${color}`} />
-                                  </div>
-                                  <div className={`text-lg font-bold ${
-                                    (dim.score || 0) >= 70 ? 'text-green-600' :
-                                    (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
-                                  }`}>
-                                    {dim.score || 0}%
-                                  </div>
-                                  <div className="text-[10px] text-gray-500">{label}</div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-3">
-                          {/* Violações */}
-                          <div className="bg-red-50/80 rounded-lg p-3 border border-red-100">
-                            <h5 className="flex items-center gap-2 text-xs font-semibold text-red-700 mb-2">
-                              <AlertTriangle className="w-3 h-3" />
-                              Violações
-                            </h5>
-                            {selectedEvaluation.evaluation.playbook_adherence.violations?.length > 0 ? (
-                              <ul className="space-y-1">
-                                {selectedEvaluation.evaluation.playbook_adherence.violations.slice(0, 3).map((v: any, i: number) => (
-                                  <li key={i} className="text-xs text-gray-700">{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="text-xs text-green-600 flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" />
-                                Nenhuma violação
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Requisitos não cumpridos */}
-                          <div className="bg-amber-50/80 rounded-lg p-3 border border-amber-100">
-                            <h5 className="flex items-center gap-2 text-xs font-semibold text-amber-700 mb-2">
-                              <AlertCircle className="w-3 h-3" />
-                              Não Cumpridos
-                            </h5>
-                            {selectedEvaluation.evaluation.playbook_adherence.missed_requirements?.length > 0 ? (
-                              <ul className="space-y-1">
-                                {selectedEvaluation.evaluation.playbook_adherence.missed_requirements.slice(0, 3).map((m: any, i: number) => (
-                                  <li key={i} className="text-xs text-gray-700">{typeof m === 'string' ? m : m?.criterion || m?.description || JSON.stringify(m)}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="text-xs text-green-600 flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" />
-                                Todos cumpridos
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Orientações */}
-                        {selectedEvaluation.evaluation.playbook_adherence.coaching_notes && (
-                          <div className="bg-blue-50/80 rounded-lg p-3 border border-blue-100 mt-3">
-                            <h5 className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-2">
-                              <Lightbulb className="w-3 h-3" />
-                              Orientações para Melhorar
-                            </h5>
-                            <p className="text-xs text-gray-700 leading-relaxed">{selectedEvaluation.evaluation.playbook_adherence.coaching_notes}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-              </div>
-            )}
-
-            {/* Transcrição da Reunião */}
-            {selectedEvaluation.transcript && selectedEvaluation.transcript.length > 0 && (
-              <div className="p-6 border-t border-gray-100">
+              {/* 1. Análise SPIN */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <button
-                  onClick={() => setShowTranscript(!showTranscript)}
-                  className="w-full flex items-center justify-between group"
+                  onClick={() => setExpandedSection(expandedSection === 'spin' ? null : 'spin')}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                      <MessageCircle className="w-4 h-4 text-blue-600" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-green-600" />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-sm font-semibold text-gray-900">Transcrição da Reunião</h3>
-                      <p className="text-xs text-gray-500">{selectedEvaluation.transcript.length} segmentos</p>
+                      <h3 className="text-sm font-semibold text-gray-900">Análise SPIN</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {[
+                          { letter: 'S', score: selectedEvaluation.spin_s_score },
+                          { letter: 'P', score: selectedEvaluation.spin_p_score },
+                          { letter: 'I', score: selectedEvaluation.spin_i_score },
+                          { letter: 'N', score: selectedEvaluation.spin_n_score },
+                        ].map(({ letter, score }) => (
+                          <span key={letter} className={`text-xs font-bold ${
+                            score !== null && score >= 7 ? 'text-green-600' :
+                            score !== null && score >= 5 ? 'text-yellow-600' :
+                            score !== null ? 'text-red-600' : 'text-gray-400'
+                          }`}>
+                            {letter}:{score !== null ? score.toFixed(1) : '--'}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {showTranscript ? (
-                      <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
-                    )}
-                  </div>
+                  {expandedSection === 'spin' ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
                 </button>
 
-                {showTranscript && (
-                  <div className="mt-4 space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                    {selectedEvaluation.transcript.map((segment: any, idx: number) => {
-                      const speaker = segment.speaker || 'Desconhecido'
-                      const text = segment.text || segment.words?.map((w: any) => w.text).join(' ') || ''
-                      if (!text.trim()) return null
-
-                      // Try to detect if it's the seller (often "Speaker 1" or matches seller name)
-                      const sellerName = selectedEvaluation.evaluation?.seller_identification?.name
-                      const isSeller = sellerName
-                        ? speaker.toLowerCase().includes(sellerName.toLowerCase()) || speaker === 'Speaker 1'
-                        : speaker === 'Speaker 1' || speaker.includes('Speaker 0')
-
-                      return (
-                        <div key={idx} className={`flex gap-2.5 ${isSeller ? 'flex-row-reverse' : ''}`}>
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
-                            isSeller ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                {expandedSection === 'spin' && (
+                  <div className="px-4 pb-4 border-t border-gray-100">
+                    {/* Score overview */}
+                    <div className="grid grid-cols-4 gap-3 my-4">
+                      {[
+                        { letter: 'S', label: 'Situação', score: selectedEvaluation.spin_s_score },
+                        { letter: 'P', label: 'Problema', score: selectedEvaluation.spin_p_score },
+                        { letter: 'I', label: 'Implicação', score: selectedEvaluation.spin_i_score },
+                        { letter: 'N', label: 'Necessidade', score: selectedEvaluation.spin_n_score },
+                      ].map(({ letter, label, score }) => (
+                        <div key={letter} className="bg-gray-50 rounded-xl p-4 text-center">
+                          <div className={`text-3xl font-bold mb-1 ${
+                            score !== null && score >= 7 ? 'text-green-600' :
+                            score !== null && score >= 5 ? 'text-yellow-600' :
+                            score !== null ? 'text-red-600' : 'text-gray-400'
                           }`}>
-                            {speaker.charAt(0).toUpperCase()}
+                            {score !== null ? score.toFixed(1) : '--'}
                           </div>
-                          <div className={`flex-1 max-w-[85%] ${isSeller ? 'text-right' : ''}`}>
-                            <div className="text-[10px] text-gray-400 mb-0.5">
-                              <span className={`font-medium ${isSeller ? 'text-green-600' : 'text-gray-500'}`}>
-                                {speaker}
-                              </span>
-                            </div>
-                            <div className={`inline-block px-3 py-2 rounded-2xl text-xs leading-relaxed ${
-                              isSeller
-                                ? 'bg-green-50 text-gray-700 border border-green-100 rounded-tr-sm'
-                                : 'bg-gray-100 text-gray-700 rounded-tl-sm'
-                            }`}>
-                              {text}
-                            </div>
-                          </div>
+                          <div className="text-xs font-medium text-gray-500">{label}</div>
                         </div>
-                      )
-                    })}
+                      ))}
+                    </div>
+
+                    {/* SPIN Detailed breakdown */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {[
+                        { letter: 'S', label: 'Situação', score: selectedEvaluation.spin_s_score },
+                        { letter: 'P', label: 'Problema', score: selectedEvaluation.spin_p_score },
+                        { letter: 'I', label: 'Implicação', score: selectedEvaluation.spin_i_score },
+                        { letter: 'N', label: 'Necessidade', score: selectedEvaluation.spin_n_score },
+                      ].map(({ letter, label, score }) => {
+                        const spinDetail = selectedEvaluation.evaluation?.spin_evaluation?.[letter]
+                        if (!spinDetail) return null
+                        return (
+                          <div key={letter} className="bg-gray-50 rounded-xl p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
+                                score !== null && score >= 7 ? 'bg-green-500' :
+                                score !== null && score >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}>{letter}</div>
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">{label}</div>
+                                <div className={`text-xs font-medium ${
+                                  score !== null && score >= 7 ? 'text-green-600' :
+                                  score !== null && score >= 5 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>{score !== null ? `${score.toFixed(1)}/10` : '--'}</div>
+                              </div>
+                            </div>
+                            {spinDetail.indicators && (
+                              <div className="space-y-2 mb-3">
+                                {Object.entries(spinDetail.indicators).map(([key, value]: [string, any]) => {
+                                  const label2 = indicatorLabels[key] || key.replace(/_score$/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                                  return (
+                                    <div key={key}>
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <span className="text-xs text-gray-600">{label2}</span>
+                                        <span className={`text-xs font-semibold ${Number(value) >= 7 ? 'text-green-600' : Number(value) >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{value}/10</span>
+                                      </div>
+                                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all ${Number(value) >= 7 ? 'bg-green-500' : Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${(Number(value) / 10) * 100}%` }} />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            {spinDetail.technical_feedback && (
+                              <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-3 mb-3">{spinDetail.technical_feedback}</p>
+                            )}
+                            {spinDetail.missed_opportunities && spinDetail.missed_opportunities.length > 0 && (
+                              <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                                <p className="text-[11px] font-semibold text-orange-700 mb-1.5">Oportunidades perdidas</p>
+                                <ul className="space-y-1">
+                                  {spinDetail.missed_opportunities.map((opp: string, i: number) => (
+                                    <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5"><span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>{opp}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
-            )}
 
-            {/* Prática Direcionada */}
-            {simulations[selectedEvaluation.id] && (
-              <div className="p-6 border-t border-gray-100">
-                {(() => {
-                  const sim = simulations[selectedEvaluation.id]
-                  const config = sim.simulation_config
-                  const coaching = config?.coaching_focus || []
-                  const justification = sim.simulation_justification || config?.simulation_justification || null
-                  const isCompleted = sim.status === 'completed'
-                  const cScore = correctionScores[selectedEvaluation.id]
-                  const meetScore = selectedEvaluation.overall_score !== null ? normalizeScore(selectedEvaluation.overall_score) : null
-                  const corrSession = correctionSessions[selectedEvaluation.id]
-                  const corrEval = corrSession?.evaluation
-                  const isExpanded = expandedCorrectionSection === selectedEvaluation.id
+              {/* 2. Análise de Objeções */}
+              {selectedEvaluation.evaluation?.objections_analysis && selectedEvaluation.evaluation.objections_analysis.length > 0 && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setExpandedSection(expandedSection === 'objections' ? null : 'objections')}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+                        <Shield className="w-5 h-5 text-red-600" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-sm font-semibold text-gray-900">Análise de Objeções</h3>
+                        <p className="text-xs text-gray-500">{selectedEvaluation.evaluation.objections_analysis.length} objeções identificadas</p>
+                      </div>
+                    </div>
+                    {expandedSection === 'objections' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
 
-                  return (
-                    <div className="space-y-4">
-                      {/* Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isCompleted ? 'bg-green-100' : 'bg-purple-100'}`}>
-                            {isCompleted ? (
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                            ) : (
-                              <Target className="w-5 h-5 text-purple-600" />
-                            )}
+                  {expandedSection === 'objections' && (
+                    <div className="px-4 pb-4 border-t border-gray-100 space-y-4 pt-4">
+                      {selectedEvaluation.evaluation.objections_analysis.map((obj: any, idx: number) => (
+                        <div key={idx} className="bg-gray-50 rounded-xl p-5">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                                  obj.objection_type === 'preço' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
+                                  obj.objection_type === 'timing' ? 'bg-blue-100 text-blue-700' :
+                                  obj.objection_type === 'autoridade' ? 'bg-purple-100 text-purple-700' :
+                                  obj.objection_type === 'concorrência' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>{obj.objection_type}</span>
+                              </div>
+                              <p className="text-sm text-gray-700 italic leading-relaxed">&ldquo;{obj.objection_text}&rdquo;</p>
+                            </div>
+                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ml-4 ${obj.score >= 7 ? 'bg-green-100' : obj.score >= 5 ? 'bg-yellow-100' : 'bg-red-100'}`}>
+                              <span className={`text-xl font-bold ${obj.score >= 7 ? 'text-green-600' : obj.score >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{obj.score}</span>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="text-sm font-semibold text-gray-900">
-                              {isCompleted ? 'Prática Concluída' : 'Prática Direcionada'}
-                            </h3>
-                            <p className="text-xs text-gray-500">
-                              {isCompleted ? 'Prática direcionada realizada' : 'Pratique com o mesmo cliente para corrigir os erros'}
-                            </p>
-                          </div>
+                          {obj.detailed_analysis && <p className="text-sm text-gray-600 leading-relaxed mb-3">{obj.detailed_analysis}</p>}
+                          {obj.critical_errors && obj.critical_errors.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs font-semibold text-red-600 mb-1.5">Erros criticos:</p>
+                              <ul className="space-y-1">{obj.critical_errors.map((err: string, i: number) => (<li key={i} className="text-sm text-gray-700 flex items-start gap-2"><span className="text-red-400 mt-1">•</span>{err}</li>))}</ul>
+                            </div>
+                          )}
+                          {obj.ideal_response && (
+                            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                              <p className="text-xs font-semibold text-green-700 mb-1">Resposta ideal:</p>
+                              <p className="text-sm text-gray-700 leading-relaxed">{obj.ideal_response}</p>
+                            </div>
+                          )}
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Avaliação Detalhada */}
+              {selectedEvaluation.evaluation && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setExpandedSection(expandedSection === 'evaluation' ? null : 'evaluation')}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-sm font-semibold text-gray-900">Avaliação Detalhada</h3>
+                        <p className="text-xs text-gray-500">Resumo, pontos fortes, gaps e melhorias</p>
+                      </div>
+                    </div>
+                    {expandedSection === 'evaluation' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+
+                  {expandedSection === 'evaluation' && (
+                    <div className="px-4 pb-4 border-t border-gray-100 space-y-4 pt-4">
+                      {selectedEvaluation.evaluation.executive_summary && (
+                        <div className="bg-blue-50 rounded-xl p-4">
+                          <h4 className="text-sm font-semibold text-blue-700 mb-2">Resumo Executivo</h4>
+                          <p className="text-sm text-gray-700">{selectedEvaluation.evaluation.executive_summary}</p>
+                        </div>
+                      )}
+                      {selectedEvaluation.evaluation.top_strengths && selectedEvaluation.evaluation.top_strengths.length > 0 && (
+                        <div className="bg-green-50 rounded-xl p-4">
+                          <h4 className="flex items-center gap-2 text-sm font-semibold text-green-700 mb-2"><CheckCircle className="w-4 h-4" />Pontos Fortes</h4>
+                          <ul className="space-y-1">{selectedEvaluation.evaluation.top_strengths.map((s: string, i: number) => (<li key={i} className="text-sm text-gray-700 flex items-start gap-2"><span className="text-green-500 mt-1">•</span>{s}</li>))}</ul>
+                        </div>
+                      )}
+                      {selectedEvaluation.evaluation.critical_gaps && selectedEvaluation.evaluation.critical_gaps.length > 0 && (
+                        <div className="bg-orange-50 rounded-xl p-4">
+                          <h4 className="flex items-center gap-2 text-sm font-semibold text-orange-700 mb-2"><AlertTriangle className="w-4 h-4" />Gaps Críticos</h4>
+                          <ul className="space-y-1">{selectedEvaluation.evaluation.critical_gaps.map((g: string, i: number) => (<li key={i} className="text-sm text-gray-700 flex items-start gap-2"><span className="text-orange-500 mt-1">•</span>{g}</li>))}</ul>
+                        </div>
+                      )}
+                      {selectedEvaluation.evaluation.priority_improvements && selectedEvaluation.evaluation.priority_improvements.length > 0 && (
+                        <div className="bg-purple-50 rounded-xl p-4">
+                          <h4 className="flex items-center gap-2 text-sm font-semibold text-purple-700 mb-2"><Lightbulb className="w-4 h-4" />Melhorias Prioritárias</h4>
+                          <ul className="space-y-2">{selectedEvaluation.evaluation.priority_improvements.map((imp: any, i: number) => (<li key={i} className="text-sm text-gray-700"><span className="font-medium">{imp.area || imp}:</span> {imp.action_plan || ''}</li>))}</ul>
+                        </div>
+                      )}
+                      {selectedEvaluation.evaluation.playbook_adherence && (
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5 text-purple-600" /></div>
+                              <div>
+                                <h4 className="text-sm font-semibold text-purple-700">Aderência ao Playbook</h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-2xl font-bold text-purple-600">{selectedEvaluation.evaluation.playbook_adherence.overall_adherence_score}%</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                    selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
+                                    selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
+                                    selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-red-100 text-red-700'
+                                  }`}>
+                                    {selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'Exemplar' :
+                                     selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'Conforme' :
+                                     selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {selectedEvaluation.evaluation.playbook_adherence.dimensions && (
+                            <div className="grid grid-cols-5 gap-2 mb-4">
+                              {[
+                                { key: 'opening', label: 'Abertura', Icon: MessageCircle, color: 'text-blue-500' },
+                                { key: 'closing', label: 'Fechamento', Icon: CheckCheck, color: 'text-emerald-500' },
+                                { key: 'conduct', label: 'Conduta', Icon: Shield, color: 'text-purple-500' },
+                                { key: 'required_scripts', label: 'Scripts', Icon: ScrollText, color: 'text-amber-500' },
+                                { key: 'process', label: 'Processo', Icon: Settings, color: 'text-gray-500' }
+                              ].map(({ key, label, Icon, color }) => {
+                                const dim = selectedEvaluation.evaluation.playbook_adherence?.dimensions?.[key]
+                                if (!dim || dim.status === 'not_evaluated') return null
+                                return (
+                                  <div key={key} className="bg-white/70 rounded-lg p-2 text-center border border-purple-100">
+                                    <div className="flex justify-center mb-1"><Icon className={`w-4 h-4 ${color}`} /></div>
+                                    <div className={`text-lg font-bold ${(dim.score || 0) >= 70 ? 'text-green-600' : (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{dim.score || 0}%</div>
+                                    <div className="text-[10px] text-gray-500">{label}</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-red-50/80 rounded-lg p-3 border border-red-100">
+                              <h5 className="flex items-center gap-2 text-xs font-semibold text-red-700 mb-2"><AlertTriangle className="w-3 h-3" />Violações</h5>
+                              {selectedEvaluation.evaluation.playbook_adherence.violations?.length > 0 ? (
+                                <ul className="space-y-1">{selectedEvaluation.evaluation.playbook_adherence.violations.slice(0, 3).map((v: any, i: number) => (<li key={i} className="text-xs text-gray-700">{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</li>))}</ul>
+                              ) : (<p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Nenhuma violação</p>)}
+                            </div>
+                            <div className="bg-amber-50/80 rounded-lg p-3 border border-amber-100">
+                              <h5 className="flex items-center gap-2 text-xs font-semibold text-amber-700 mb-2"><AlertCircle className="w-3 h-3" />Não Cumpridos</h5>
+                              {selectedEvaluation.evaluation.playbook_adherence.missed_requirements?.length > 0 ? (
+                                <ul className="space-y-1">{selectedEvaluation.evaluation.playbook_adherence.missed_requirements.slice(0, 3).map((m: any, i: number) => (<li key={i} className="text-xs text-gray-700">{typeof m === 'string' ? m : m?.criterion || m?.description || JSON.stringify(m)}</li>))}</ul>
+                              ) : (<p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Todos cumpridos</p>)}
+                            </div>
+                          </div>
+                          {selectedEvaluation.evaluation.playbook_adherence.coaching_notes && (
+                            <div className="bg-blue-50/80 rounded-lg p-3 border border-blue-100 mt-3">
+                              <h5 className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-2"><Lightbulb className="w-3 h-3" />Orientações para Melhorar</h5>
+                              <p className="text-xs text-gray-700 leading-relaxed">{selectedEvaluation.evaluation.playbook_adherence.coaching_notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 4. Transcrição da Reunião */}
+              {selectedEvaluation.transcript && selectedEvaluation.transcript.length > 0 && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setExpandedSection(expandedSection === 'transcript' ? null : 'transcript')}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center">
+                        <MessageCircle className="w-5 h-5 text-cyan-600" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-sm font-semibold text-gray-900">Transcrição da Reunião</h3>
+                        <p className="text-xs text-gray-500">{selectedEvaluation.transcript.length} segmentos</p>
+                      </div>
+                    </div>
+                    {expandedSection === 'transcript' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+
+                  {expandedSection === 'transcript' && (
+                    <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                      <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                        {selectedEvaluation.transcript.map((segment: any, idx: number) => {
+                          const speaker = segment.speaker || 'Desconhecido'
+                          const text = segment.text || segment.words?.map((w: any) => w.text).join(' ') || ''
+                          if (!text.trim()) return null
+                          const sellerName = selectedEvaluation.evaluation?.seller_identification?.name
+                          const isSeller = sellerName
+                            ? speaker.toLowerCase().includes(sellerName.toLowerCase()) || speaker === 'Speaker 1'
+                            : speaker === 'Speaker 1' || speaker.includes('Speaker 0')
+                          return (
+                            <div key={idx} className={`flex gap-2.5 ${isSeller ? 'flex-row-reverse' : ''}`}>
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${isSeller ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                                {speaker.charAt(0).toUpperCase()}
+                              </div>
+                              <div className={`flex-1 max-w-[85%] ${isSeller ? 'text-right' : ''}`}>
+                                <div className="text-[10px] text-gray-400 mb-0.5">
+                                  <span className={`font-medium ${isSeller ? 'text-green-600' : 'text-gray-500'}`}>{speaker}</span>
+                                </div>
+                                <div className={`inline-block px-3 py-2 rounded-2xl text-xs leading-relaxed ${
+                                  isSeller ? 'bg-green-50 text-gray-700 border border-green-100 rounded-tr-sm' : 'bg-gray-100 text-gray-700 rounded-tl-sm'
+                                }`}>{text}</div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 5. Prática Direcionada */}
+              {simulations[selectedEvaluation.id] && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  {(() => {
+                    const sim = simulations[selectedEvaluation.id]
+                    const config = sim.simulation_config
+                    const coaching = config?.coaching_focus || []
+                    const justification = sim.simulation_justification || config?.simulation_justification || null
+                    const isCompleted = sim.status === 'completed'
+                    const cScore = correctionScores[selectedEvaluation.id]
+                    const meetScore = selectedEvaluation.overall_score !== null ? normalizeScore(selectedEvaluation.overall_score) : null
+                    const corrSession = correctionSessions[selectedEvaluation.id]
+                    const corrEval = corrSession?.evaluation
+                    const isExpanded = expandedCorrectionSection === selectedEvaluation.id
+
+                    return (
+                      <>
+                        <button
+                          onClick={() => setExpandedSection(expandedSection === 'practice' ? null : 'practice')}
+                          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isCompleted ? 'bg-green-50' : 'bg-purple-50'}`}>
+                              {isCompleted ? (
+                                <CheckCircle className="w-5 h-5 text-green-600" />
+                              ) : (
+                                <Target className="w-5 h-5 text-purple-600" />
+                              )}
+                            </div>
+                            <div className="text-left">
+                              <h3 className="text-sm font-semibold text-gray-900">
+                                {isCompleted ? 'Prática Concluída' : 'Prática Direcionada'}
+                              </h3>
+                              <p className="text-xs text-gray-500">
+                                {isCompleted ? 'Veja os resultados da correção' : 'Pratique com o mesmo cliente para corrigir os erros'}
+                              </p>
+                            </div>
+                          </div>
+                          {expandedSection === 'practice' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                        </button>
+
+                        {expandedSection === 'practice' && (
+                          <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-end">
                         {!isCompleted && (
                           <button
                             onClick={() => handleStartSimulation(sim)}
@@ -1561,11 +1475,16 @@ export default function MeetHistoryContent() {
                           )}
                         </div>
                       )}
-                    </div>
-                  )
-                })()}
-              </div>
-            )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
+
+            </div>{/* end of p-4 space-y-2 collapsible cards container */}
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
