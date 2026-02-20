@@ -79,6 +79,7 @@ export default function MeetHistoryContent() {
   const [correctionScores, setCorrectionScores] = useState<Record<string, number | null>>({})
   const [correctionSessions, setCorrectionSessions] = useState<Record<string, any>>({})
   const [expandedCorrectionSection, setExpandedCorrectionSection] = useState<string | null>(null)
+  const [showTranscript, setShowTranscript] = useState(false)
 
   useEffect(() => {
     loadHistory()
@@ -299,7 +300,7 @@ export default function MeetHistoryContent() {
               return (
                 <button
                   key={evaluation.id}
-                  onClick={() => setSelectedEvaluation(evaluation)}
+                  onClick={() => { setSelectedEvaluation(evaluation); setShowTranscript(false) }}
                   className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
                     selectedEvaluation?.id === evaluation.id
                       ? 'bg-green-50 border-l-4 border-l-green-500'
@@ -774,6 +775,73 @@ export default function MeetHistoryContent() {
                       </div>
                     )}
                   </div>
+              </div>
+            )}
+
+            {/* Transcrição da Reunião */}
+            {selectedEvaluation.transcript && selectedEvaluation.transcript.length > 0 && (
+              <div className="p-6 border-t border-gray-100">
+                <button
+                  onClick={() => setShowTranscript(!showTranscript)}
+                  className="w-full flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                      <MessageCircle className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="text-sm font-semibold text-gray-900">Transcrição da Reunião</h3>
+                      <p className="text-xs text-gray-500">{selectedEvaluation.transcript.length} segmentos</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {showTranscript ? (
+                      <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    )}
+                  </div>
+                </button>
+
+                {showTranscript && (
+                  <div className="mt-4 space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                    {selectedEvaluation.transcript.map((segment: any, idx: number) => {
+                      const speaker = segment.speaker || 'Desconhecido'
+                      const text = segment.text || segment.words?.map((w: any) => w.text).join(' ') || ''
+                      if (!text.trim()) return null
+
+                      // Try to detect if it's the seller (often "Speaker 1" or matches seller name)
+                      const sellerName = selectedEvaluation.evaluation?.seller_identification?.name
+                      const isSeller = sellerName
+                        ? speaker.toLowerCase().includes(sellerName.toLowerCase()) || speaker === 'Speaker 1'
+                        : speaker === 'Speaker 1' || speaker.includes('Speaker 0')
+
+                      return (
+                        <div key={idx} className={`flex gap-2.5 ${isSeller ? 'flex-row-reverse' : ''}`}>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
+                            isSeller ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {speaker.charAt(0).toUpperCase()}
+                          </div>
+                          <div className={`flex-1 max-w-[85%] ${isSeller ? 'text-right' : ''}`}>
+                            <div className="text-[10px] text-gray-400 mb-0.5">
+                              <span className={`font-medium ${isSeller ? 'text-green-600' : 'text-gray-500'}`}>
+                                {speaker}
+                              </span>
+                            </div>
+                            <div className={`inline-block px-3 py-2 rounded-2xl text-xs leading-relaxed ${
+                              isSeller
+                                ? 'bg-green-50 text-gray-700 border border-green-100 rounded-tr-sm'
+                                : 'bg-gray-100 text-gray-700 rounded-tl-sm'
+                            }`}>
+                              {text}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
