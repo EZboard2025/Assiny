@@ -10,12 +10,18 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/calendar/callback'
 
-// Scopes for read-only calendar access + email for identification
+// Read-write scopes: calendar.events gives full CRUD on events + read calendar metadata
 export const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/calendar.events.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
 ]
+
+// Check if connection has write scopes
+export function hasWriteScopes(scopes: string[] | null): boolean {
+  if (!scopes) return false
+  return scopes.includes('https://www.googleapis.com/auth/calendar.events')
+}
 
 /**
  * Create a base OAuth2 client (without user tokens)
@@ -177,6 +183,7 @@ export interface CalendarEvent {
   start: string
   end: string | null
   meetLink: string
+  colorId?: string
   attendees: Array<{ email: string; displayName?: string; responseStatus?: string }>
   organizer: { email: string; displayName?: string } | null
   description: string | null
@@ -226,6 +233,7 @@ export async function fetchUpcomingMeetEvents(
           start: event.start?.dateTime || event.start?.date || '',
           end: event.end?.dateTime || event.end?.date || null,
           meetLink: meetEntry!.uri!,
+          colorId: event.colorId || undefined,
           attendees: (event.attendees || []).map(a => ({
             email: a.email || '',
             displayName: a.displayName || undefined,
@@ -249,6 +257,415 @@ export async function fetchUpcomingMeetEvents(
         .eq('id', client.connection.id)
     }
 
+    return null
+  }
+}
+
+/**
+ * Fetch ALL upcoming events (not just Meet) from a user's calendar
+ */
+export async function fetchAllEvents(
+  userId: string,
+  daysAhead: number = 7
+): Promise<CalendarEvent[] | null> {
+  const client = await getCalendarClient(userId)
+  if (!client) return null
+
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const future = new Date(startOfToday.getTime() + (daysAhead + 1) * 24 * 60 * 60 * 1000)
+
+  try {
+    const response = await client.calendar.events.list({
+      calendarId: client.connection.calendar_id || 'primary',
+      timeMin: startOfToday.toISOString(),
+      timeMax: future.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 250,
+    })
+
+    const events = response.data.items || []
+
+    return events
+      .filter(event => event.status !== 'cancelled')
+      .map(event => {
+        const meetEntry = event.conferenceData?.entryPoints?.find(
+          ep => ep.entryPointType === 'video' && ep.uri?.includes('meet.google.com')
+        )
+
+        return {
+          id: event.id!,
+          title: event.summary || 'Sem título',
+          start: event.start?.dateTime || event.start?.date || '',
+          end: event.end?.dateTime || event.end?.date || null,
+          meetLink: meetEntry?.uri || '',
+          colorId: event.colorId || undefined,
+          attendees: (event.attendees || []).map(a => ({
+            email: a.email || '',
+            displayName: a.displayName || undefined,
+            responseStatus: a.responseStatus || undefined,
+          })),
+          organizer: event.organizer ? {
+            email: event.organizer.email || '',
+            displayName: event.organizer.displayName || undefined,
+          } : null,
+          description: event.description || null,
+        }
+      })
+  } catch (err: any) {
+    console.error('[Google Calendar] Failed to fetch all events:', err.message)
+    if (err.code === 401 || err.code === 403) {
+      await supabaseAdmin
+        .from('google_calendar_connections')
+        .update({ status: 'expired', updated_at: new Date().toISOString() })
+        .eq('id', client.connection.id)
+    }
+    return null
+  }
+}
+
+/**
+ * Create a new event on the user's Google Calendar
+ */
+export interface CreateEventInput {
+  title: string
+  description?: string
+  startDateTime: string
+  endDateTime: string
+  attendees?: string[]
+  addMeetLink: boolean
+  timeZone?: string
+}
+
+export async function createCalendarEvent(
+  userId: string,
+  input: CreateEventInput
+): Promise<CalendarEvent | null> {
+  const client = await getCalendarClient(userId)
+  if (!client) return null
+
+  try {
+    const eventBody: any = {
+      summary: input.title,
+      description: input.description || '',
+      start: { dateTime: input.startDateTime, timeZone: input.timeZone || 'America/Sao_Paulo' },
+      end: { dateTime: input.endDateTime, timeZone: input.timeZone || 'America/Sao_Paulo' },
+    }
+
+    if (input.attendees?.length) {
+      eventBody.attendees = input.attendees.map(email => ({ email }))
+    }
+
+    console.log('[Google Calendar] Creating event with body:', JSON.stringify(eventBody, null, 2))
+
+    if (input.addMeetLink) {
+      eventBody.conferenceData = {
+        createRequest: {
+          requestId: `ramppy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      }
+    }
+
+    const response = await client.calendar.events.insert({
+      calendarId: client.connection.calendar_id || 'primary',
+      requestBody: eventBody,
+      conferenceDataVersion: input.addMeetLink ? 1 : 0,
+      sendUpdates: 'all',
+    })
+
+    const created = response.data
+    console.log('[Google Calendar] Created event, attendees from Google:', JSON.stringify(created.attendees || []))
+
+    const meetEntry = created.conferenceData?.entryPoints?.find(
+      ep => ep.entryPointType === 'video' && ep.uri?.includes('meet.google.com')
+    )
+
+    return {
+      id: created.id!,
+      title: created.summary || input.title,
+      start: created.start?.dateTime || created.start?.date || input.startDateTime,
+      end: created.end?.dateTime || created.end?.date || null,
+      meetLink: meetEntry?.uri || '',
+      colorId: created.colorId || undefined,
+      attendees: (created.attendees || []).map(a => ({
+        email: a.email || '',
+        displayName: a.displayName || undefined,
+        responseStatus: a.responseStatus || undefined,
+      })),
+      organizer: created.organizer ? {
+        email: created.organizer.email || '',
+        displayName: created.organizer.displayName || undefined,
+      } : null,
+      description: created.description || null,
+    }
+  } catch (err: any) {
+    console.error('[Google Calendar] Failed to create event:', err.message)
+    return null
+  }
+}
+
+/**
+ * Delete an event from the user's Google Calendar
+ */
+export async function deleteCalendarEvent(
+  userId: string,
+  eventId: string
+): Promise<boolean> {
+  const client = await getCalendarClient(userId)
+  if (!client) return false
+
+  try {
+    await client.calendar.events.delete({
+      calendarId: client.connection.calendar_id || 'primary',
+      eventId,
+      sendUpdates: 'all',
+    })
+    return true
+  } catch (err: any) {
+    console.error('[Google Calendar] Failed to delete event:', err.message)
+    return false
+  }
+}
+
+/**
+ * Add attendees to an existing event (PATCH)
+ */
+export async function updateEventAttendees(
+  userId: string,
+  eventId: string,
+  attendees: string[]
+): Promise<{ attendees: Array<{ email: string; displayName?: string; responseStatus?: string }> } | null> {
+  const client = await getCalendarClient(userId)
+  if (!client) return null
+
+  try {
+    // First fetch the existing event to preserve current attendees
+    const existing = await client.calendar.events.get({
+      calendarId: client.connection.calendar_id || 'primary',
+      eventId,
+    })
+
+    const currentAttendees = existing.data.attendees || []
+    const currentEmails = new Set(currentAttendees.map(a => a.email?.toLowerCase()))
+
+    // Merge: keep existing + add new
+    const merged = [
+      ...currentAttendees,
+      ...attendees
+        .filter(email => !currentEmails.has(email.toLowerCase()))
+        .map(email => ({ email })),
+    ]
+
+    const response = await client.calendar.events.patch({
+      calendarId: client.connection.calendar_id || 'primary',
+      eventId,
+      sendUpdates: 'all',
+      requestBody: {
+        attendees: merged,
+      },
+    })
+
+    return {
+      attendees: (response.data.attendees || []).map(a => ({
+        email: a.email || '',
+        displayName: a.displayName || undefined,
+        responseStatus: a.responseStatus || 'needsAction',
+      })),
+    }
+  } catch (err: any) {
+    console.error('[Google Calendar] Failed to update attendees:', err.message)
+    return null
+  }
+}
+
+/**
+ * Update an existing calendar event (title, time, description, attendees, Meet link)
+ */
+export interface UpdateEventData {
+  title?: string
+  startDateTime?: string
+  endDateTime?: string
+  description?: string
+  attendees?: string[]
+  addMeetLink?: boolean
+}
+
+export async function updateCalendarEvent(
+  userId: string,
+  eventId: string,
+  data: UpdateEventData
+): Promise<CalendarEvent | null> {
+  const client = await getCalendarClient(userId)
+  if (!client) return null
+
+  try {
+    const requestBody: any = {}
+
+    if (data.title !== undefined) {
+      requestBody.summary = data.title
+    }
+
+    if (data.startDateTime) {
+      requestBody.start = {
+        dateTime: data.startDateTime,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
+    }
+
+    if (data.endDateTime) {
+      requestBody.end = {
+        dateTime: data.endDateTime,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }
+    }
+
+    if (data.description !== undefined) {
+      requestBody.description = data.description
+    }
+
+    if (data.attendees !== undefined) {
+      requestBody.attendees = data.attendees.map(email => ({ email }))
+    }
+
+    // Add or keep Meet link
+    if (data.addMeetLink) {
+      // First check if event already has conference data
+      const existing = await client.calendar.events.get({
+        calendarId: client.connection.calendar_id || 'primary',
+        eventId,
+      })
+
+      if (!existing.data.conferenceData) {
+        requestBody.conferenceData = {
+          createRequest: {
+            requestId: `meet-${Date.now()}`,
+            conferenceSolutionKey: { type: 'hangoutsMeet' },
+          },
+        }
+      }
+    }
+
+    const response = await client.calendar.events.patch({
+      calendarId: client.connection.calendar_id || 'primary',
+      eventId,
+      sendUpdates: 'all',
+      conferenceDataVersion: 1,
+      requestBody,
+    })
+
+    const event = response.data
+    const meetEntry = event.conferenceData?.entryPoints?.find(
+      (e: any) => e.entryPointType === 'video'
+    )
+
+    return {
+      id: event.id!,
+      title: event.summary || 'Sem título',
+      start: event.start?.dateTime || event.start?.date || '',
+      end: event.end?.dateTime || event.end?.date || null,
+      meetLink: meetEntry?.uri || '',
+      colorId: event.colorId || undefined,
+      attendees: (event.attendees || []).map(a => ({
+        email: a.email || '',
+        displayName: a.displayName || undefined,
+        responseStatus: a.responseStatus || 'needsAction',
+      })),
+      organizer: event.organizer ? {
+        email: event.organizer.email || '',
+        displayName: event.organizer.displayName || undefined,
+      } : null,
+      description: event.description || null,
+    }
+  } catch (err: any) {
+    console.error('[Google Calendar] Failed to update event:', err.message)
+    return null
+  }
+}
+
+/**
+ * QuickAdd: create event from natural language text
+ */
+export async function quickAddEvent(
+  userId: string,
+  text: string
+): Promise<CalendarEvent | null> {
+  const client = await getCalendarClient(userId)
+  if (!client) return null
+
+  try {
+    const response = await client.calendar.events.quickAdd({
+      calendarId: client.connection.calendar_id || 'primary',
+      text,
+    })
+
+    const event = response.data
+    const meetEntry = event.conferenceData?.entryPoints?.find(
+      ep => ep.entryPointType === 'video' && ep.uri?.includes('meet.google.com')
+    )
+
+    return {
+      id: event.id!,
+      title: event.summary || text,
+      start: event.start?.dateTime || event.start?.date || '',
+      end: event.end?.dateTime || event.end?.date || null,
+      meetLink: meetEntry?.uri || '',
+      colorId: event.colorId || undefined,
+      attendees: (event.attendees || []).map(a => ({
+        email: a.email || '',
+        displayName: a.displayName || undefined,
+        responseStatus: a.responseStatus || undefined,
+      })),
+      organizer: event.organizer ? {
+        email: event.organizer.email || '',
+        displayName: event.organizer.displayName || undefined,
+      } : null,
+      description: event.description || null,
+    }
+  } catch (err: any) {
+    console.error('[Google Calendar] QuickAdd failed:', err.message)
+    return null
+  }
+}
+
+/**
+ * Check free/busy availability for a set of emails
+ */
+export interface FreeBusyResult {
+  email: string
+  busy: Array<{ start: string; end: string }>
+}
+
+export async function checkFreeBusy(
+  userId: string,
+  timeMin: string,
+  timeMax: string,
+  emails: string[]
+): Promise<FreeBusyResult[] | null> {
+  const client = await getCalendarClient(userId)
+  if (!client) return null
+
+  try {
+    const response = await client.calendar.freebusy.query({
+      requestBody: {
+        timeMin,
+        timeMax,
+        timeZone: 'America/Sao_Paulo',
+        items: emails.map(email => ({ id: email })),
+      },
+    })
+
+    const calendars = response.data.calendars || {}
+    return Object.entries(calendars).map(([email, data]) => ({
+      email,
+      busy: ((data as any).busy || []).map((slot: any) => ({
+        start: slot.start || '',
+        end: slot.end || '',
+      })),
+    }))
+  } catch (err: any) {
+    console.error('[Google Calendar] FreeBusy failed:', err.message)
     return null
   }
 }
