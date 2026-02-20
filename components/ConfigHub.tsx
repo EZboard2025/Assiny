@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare, Send, Bot } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -534,12 +534,13 @@ function ConfigurationInterface({
   // Estados para Tópicos de Extração
   const [meetTopics, setMeetTopics] = useState<{id: string, title: string, description: string | null, enabled: boolean, sort_order: number}[]>([])
   const [loadingTopics, setLoadingTopics] = useState(false)
-  const [addingTopic, setAddingTopic] = useState(false)
-  const [newTopicTitle, setNewTopicTitle] = useState('')
-  const [newTopicDescription, setNewTopicDescription] = useState('')
-  const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
-  const [editingTopicTitle, setEditingTopicTitle] = useState('')
-  const [editingTopicDescription, setEditingTopicDescription] = useState('')
+
+  // Chat configurador de tópicos
+  const [topicChatMessages, setTopicChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([])
+  const [topicChatInput, setTopicChatInput] = useState('')
+  const [topicChatLoading, setTopicChatLoading] = useState(false)
+  const topicChatRef = useRef<HTMLDivElement>(null)
+  const topicChatInitialized = useRef(false)
 
   // Carregar PDFs salvos da empresa
   const loadSavedPdfs = async (companyId: string) => {
@@ -609,15 +610,6 @@ function ConfigurationInterface({
   }
 
   // === Tópicos de Extração ===
-  const DEFAULT_TOPICS = [
-    { title: 'Quem é o Lead', description: 'Nome, cargo, empresa, setor de atuação' },
-    { title: 'Situação Atual', description: 'Como opera hoje, o que usa, como funciona o processo atual' },
-    { title: 'Dores e Desafios', description: 'Problemas, frustrações, gargalos mencionados' },
-    { title: 'O que Busca', description: 'Necessidades, expectativas, o que espera da solução' },
-    { title: 'Orçamento e Prazo', description: 'Budget, timeline, urgência, quando pretende decidir' },
-    { title: 'Objeções e Preocupações', description: 'Dúvidas, resistências, preocupações levantadas' },
-  ]
-
   const loadMeetTopics = async () => {
     if (!userCompanyId) return
     setLoadingTopics(true)
@@ -628,28 +620,7 @@ function ConfigurationInterface({
         .select('id, title, description, enabled, sort_order')
         .eq('company_id', userCompanyId)
         .order('sort_order', { ascending: true })
-
-      if (data && data.length > 0) {
-        setMeetTopics(data)
-      } else {
-        // Seed defaults for this company
-        const inserts = DEFAULT_TOPICS.map((t, i) => ({
-          company_id: userCompanyId,
-          title: t.title,
-          description: t.description,
-          enabled: true,
-          sort_order: i
-        }))
-        const { error } = await supabase.from('meet_note_topics').insert(inserts)
-        if (!error) {
-          const { data: seeded } = await supabase
-            .from('meet_note_topics')
-            .select('id, title, description, enabled, sort_order')
-            .eq('company_id', userCompanyId)
-            .order('sort_order', { ascending: true })
-          setMeetTopics(seeded || [])
-        }
-      }
+      setMeetTopics(data || [])
     } catch (err) {
       console.error('Erro ao carregar tópicos:', err)
     }
@@ -666,28 +637,6 @@ function ConfigurationInterface({
     }
   }
 
-  const addMeetTopic = async () => {
-    if (!newTopicTitle.trim() || !userCompanyId) return
-    setLoadingTopics(true)
-    try {
-      const { supabase } = await import('@/lib/supabase')
-      await supabase.from('meet_note_topics').insert({
-        company_id: userCompanyId,
-        title: newTopicTitle.trim(),
-        description: newTopicDescription.trim() || null,
-        enabled: true,
-        sort_order: meetTopics.length
-      })
-      setNewTopicTitle('')
-      setNewTopicDescription('')
-      setAddingTopic(false)
-      await loadMeetTopics()
-    } catch (err) {
-      console.error('Erro ao adicionar tópico:', err)
-    }
-    setLoadingTopics(false)
-  }
-
   const removeMeetTopic = async (id: string) => {
     try {
       const { supabase } = await import('@/lib/supabase')
@@ -698,40 +647,101 @@ function ConfigurationInterface({
     }
   }
 
-  const saveEditTopic = async () => {
-    if (!editingTopicId || !editingTopicTitle.trim()) return
+  const saveTopicsFromAI = async (topics: {title: string, description: string, enabled: boolean}[]) => {
+    if (!userCompanyId) return
     try {
       const { supabase } = await import('@/lib/supabase')
-      await supabase.from('meet_note_topics').update({
-        title: editingTopicTitle.trim(),
-        description: editingTopicDescription.trim() || null,
-      }).eq('id', editingTopicId)
-      setMeetTopics(prev => prev.map(t => t.id === editingTopicId ? { ...t, title: editingTopicTitle.trim(), description: editingTopicDescription.trim() || null } : t))
-      setEditingTopicId(null)
+      // Replace all topics with the AI-generated ones
+      await supabase.from('meet_note_topics').delete().eq('company_id', userCompanyId)
+      const inserts = topics.map((t, i) => ({
+        company_id: userCompanyId,
+        title: t.title,
+        description: t.description || null,
+        enabled: t.enabled !== false,
+        sort_order: i
+      }))
+      if (inserts.length > 0) {
+        await supabase.from('meet_note_topics').insert(inserts)
+      }
+      await loadMeetTopics()
     } catch (err) {
-      console.error('Erro ao editar tópico:', err)
+      console.error('Erro ao salvar tópicos da IA:', err)
     }
   }
 
-  const resetTopicsToDefaults = async () => {
-    if (!userCompanyId) return
-    setLoadingTopics(true)
+  const sendTopicChatMessage = async () => {
+    const msg = topicChatInput.trim()
+    if (!msg || topicChatLoading) return
+
+    const userMsg = { role: 'user' as const, content: msg }
+    setTopicChatMessages(prev => [...prev, userMsg])
+    setTopicChatInput('')
+    setTopicChatLoading(true)
+
+    // Scroll to bottom
+    setTimeout(() => topicChatRef.current?.scrollTo({ top: topicChatRef.current.scrollHeight, behavior: 'smooth' }), 50)
+
     try {
-      const { supabase } = await import('@/lib/supabase')
-      await supabase.from('meet_note_topics').delete().eq('company_id', userCompanyId)
-      const inserts = DEFAULT_TOPICS.map((t, i) => ({
-        company_id: userCompanyId,
-        title: t.title,
-        description: t.description,
-        enabled: true,
-        sort_order: i
-      }))
-      await supabase.from('meet_note_topics').insert(inserts)
-      await loadMeetTopics()
-    } catch (err) {
-      console.error('Erro ao resetar tópicos:', err)
+      const res = await fetch('/api/meet/configure-topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: msg,
+          conversationHistory: topicChatMessages,
+          currentTopics: meetTopics.map(t => ({ title: t.title, description: t.description, enabled: t.enabled })),
+          companyId: userCompanyId
+        })
+      })
+
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      const assistantMsg = { role: 'assistant' as const, content: data.message }
+      setTopicChatMessages(prev => [...prev, assistantMsg])
+
+      // If AI returned updated topics, save them
+      if (data.topics && Array.isArray(data.topics)) {
+        await saveTopicsFromAI(data.topics)
+      }
+    } catch (err: any) {
+      setTopicChatMessages(prev => [...prev, { role: 'assistant', content: 'Erro ao processar. Tente novamente.' }])
+      console.error('Erro no chat de tópicos:', err)
     }
-    setLoadingTopics(false)
+
+    setTopicChatLoading(false)
+    setTimeout(() => topicChatRef.current?.scrollTo({ top: topicChatRef.current.scrollHeight, behavior: 'smooth' }), 100)
+  }
+
+  const initTopicChat = async () => {
+    if (topicChatInitialized.current || topicChatMessages.length > 0) return
+    topicChatInitialized.current = true
+    setTopicChatLoading(true)
+
+    try {
+      const res = await fetch('/api/meet/configure-topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: meetTopics.length > 0
+            ? 'Olá, já tenho tópicos configurados. Me apresente brevemente e pergunte se quero ajustar algo.'
+            : 'Olá, não tenho nenhum tópico configurado ainda. Me apresente e me ajude a configurar.',
+          conversationHistory: [],
+          currentTopics: meetTopics.map(t => ({ title: t.title, description: t.description, enabled: t.enabled })),
+          companyId: userCompanyId
+        })
+      })
+
+      const data = await res.json()
+      if (data.message) {
+        setTopicChatMessages([{ role: 'assistant', content: data.message }])
+        if (data.topics && Array.isArray(data.topics)) {
+          await saveTopicsFromAI(data.topics)
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao iniciar chat:', err)
+    }
+    setTopicChatLoading(false)
   }
 
   const loadPlaybook = async () => {
@@ -776,10 +786,13 @@ function ConfigurationInterface({
     }
   }, [userCompanyId, playbookLoaded])
 
-  // Carregar tópicos quando tab meet_notes estiver ativa
+  // Carregar tópicos e iniciar chat quando tab meet_notes estiver ativa
   useEffect(() => {
     if (activeTab === 'meet_notes' && userCompanyId) {
-      loadMeetTopics()
+      loadMeetTopics().then(() => {
+        // Init chat after topics are loaded (needs topics for context)
+        setTimeout(() => initTopicChat(), 300)
+      })
     }
   }, [activeTab, userCompanyId])
 
@@ -2971,104 +2984,97 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
   }
 
   return (
-    <div className="space-y-6">
-      {/* Tabs - Novo estilo claro */}
-      <div className="bg-white rounded-xl border border-gray-200 p-1.5 shadow-sm">
-        <div className="flex gap-1 overflow-x-auto">
-          {/* Funcionários - Apenas para planos Team, Business e Enterprise */}
-          {trainingPlan !== PlanType.INDIVIDUAL && (
-            <button
-              onClick={() => setActiveTab('employees')}
-              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                activeTab === 'employees'
-                  ? 'bg-green-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Funcionários</span>
-              {pendingRegistrations.length > 0 && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  activeTab === 'employees'
-                    ? 'bg-white/20 text-white'
-                    : 'bg-orange-500 text-white'
-                }`}>
-                  {pendingRegistrations.length}
-                </span>
-              )}
-            </button>
-          )}
+    <div className="flex h-full">
+      {/* Sidebar */}
+      <div className="w-52 flex-shrink-0 border-r border-gray-200 py-4 px-3 space-y-0.5 overflow-y-auto">
+        {trainingPlan !== PlanType.INDIVIDUAL && (
           <button
-            onClick={() => setActiveTab('personas')}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'personas'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            onClick={() => setActiveTab('employees')}
+            className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
+              activeTab === 'employees'
+                ? 'bg-gray-100 text-gray-900 font-medium'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <UserCircle2 className="w-4 h-4" />
-            <span>Personas</span>
+            <Users className="w-4 h-4 flex-shrink-0" />
+            <span>Funcionários</span>
+            {pendingRegistrations.length > 0 && (
+              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500 text-white">
+                {pendingRegistrations.length}
+              </span>
+            )}
           </button>
-          <button
-            onClick={() => setActiveTab('objections')}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'objections'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Target className="w-4 h-4" />
-            <span>Objeções</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('objectives')}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'objectives'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span>Objetivos</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('files')}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'files'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Dados da Empresa</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('meet_notes')}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'meet_notes'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Video className="w-4 h-4" />
-            <span>Notas de Reunião</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('usage')}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'usage'
-                ? 'bg-green-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Uso</span>
-          </button>
-        </div>
+        )}
+        <button
+          onClick={() => setActiveTab('personas')}
+          className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
+            activeTab === 'personas'
+              ? 'bg-gray-100 text-gray-900 font-medium'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          <UserCircle2 className="w-4 h-4 flex-shrink-0" />
+          <span>Personas</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('objections')}
+          className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
+            activeTab === 'objections'
+              ? 'bg-gray-100 text-gray-900 font-medium'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          <Target className="w-4 h-4 flex-shrink-0" />
+          <span>Objeções</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('objectives')}
+          className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
+            activeTab === 'objectives'
+              ? 'bg-gray-100 text-gray-900 font-medium'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+          <span>Objetivos</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('files')}
+          className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
+            activeTab === 'files'
+              ? 'bg-gray-100 text-gray-900 font-medium'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          <Building2 className="w-4 h-4 flex-shrink-0" />
+          <span>Dados da Empresa</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('meet_notes')}
+          className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
+            activeTab === 'meet_notes'
+              ? 'bg-gray-100 text-gray-900 font-medium'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          <Video className="w-4 h-4 flex-shrink-0" />
+          <span>Notas de Reunião</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('usage')}
+          className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
+            activeTab === 'usage'
+              ? 'bg-gray-100 text-gray-900 font-medium'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 flex-shrink-0" />
+          <span>Uso</span>
+        </button>
       </div>
 
       {/* Content */}
-      <div className="py-4">
+      <div className="flex-1 min-w-0 overflow-y-auto p-6">
         {/* Funcionários Tab - Apenas para planos Team, Business e Enterprise */}
         {activeTab === 'employees' && trainingPlan !== PlanType.INDIVIDUAL && (
           <div className="space-y-6">
@@ -4783,138 +4789,128 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
         {/* Meet Notes Tab */}
         {activeTab === 'meet_notes' && (
-          <div className="space-y-6">
-            {/* Tópicos de Extração */}
+          <div className="space-y-4">
+            {/* Tópicos atuais — compact pills with toggles */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Video className="w-5 h-5 text-cyan-600" />
-                      <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Tópicos de Extração</h3>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      A IA vai extrair informações sobre estes tópicos de cada reunião. Ative, desative, edite ou adicione novos tópicos.
-                    </p>
-                  </div>
-                  <button
-                    onClick={resetTopicsToDefaults}
-                    className="text-[11px] text-gray-400 hover:text-cyan-600 transition-colors flex items-center gap-1"
-                    title="Restaurar tópicos padrão"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Restaurar padrão</span>
-                  </button>
+              <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Video className="w-4 h-4 text-cyan-600" />
+                  <h3 className="text-sm font-semibold text-gray-900">Tópicos de Extração</h3>
+                  {meetTopics.length > 0 && (
+                    <span className="text-[11px] text-gray-400">{meetTopics.filter(t => t.enabled).length}/{meetTopics.length} ativos</span>
+                  )}
                 </div>
               </div>
 
-              <div className="p-4 space-y-2">
-                {loadingTopics ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="w-5 h-5 animate-spin text-cyan-500" />
-                  </div>
-                ) : (
-                  <>
-                    {meetTopics.map((topic) => (
-                      <div key={topic.id} className={`group rounded-lg border transition-all ${topic.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
-                        {editingTopicId === topic.id ? (
-                          <div className="p-3 space-y-2">
-                            <input
-                              type="text"
-                              value={editingTopicTitle}
-                              onChange={(e) => setEditingTopicTitle(e.target.value)}
-                              className="w-full text-sm font-medium px-2 py-1.5 border border-cyan-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                              placeholder="Título do tópico"
-                            />
-                            <input
-                              type="text"
-                              value={editingTopicDescription}
-                              onChange={(e) => setEditingTopicDescription(e.target.value)}
-                              className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                              placeholder="Descrição (o que a IA deve extrair)"
-                            />
-                            <div className="flex gap-1.5 justify-end">
-                              <button onClick={() => setEditingTopicId(null)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1">Cancelar</button>
-                              <button onClick={saveEditTopic} className="text-xs bg-cyan-600 text-white px-3 py-1 rounded-md hover:bg-cyan-700">Salvar</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3 p-3">
-                            <button
-                              onClick={() => toggleMeetTopic(topic.id, topic.enabled)}
-                              className={`w-8 h-[18px] rounded-full transition-colors flex-shrink-0 relative ${topic.enabled ? 'bg-cyan-500' : 'bg-gray-300'}`}
-                            >
-                              <div className={`absolute top-[2px] w-[14px] h-[14px] bg-white rounded-full shadow-sm transition-transform ${topic.enabled ? 'left-[17px]' : 'left-[2px]'}`} />
-                            </button>
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium ${topic.enabled ? 'text-gray-900' : 'text-gray-500'}`}>{topic.title}</p>
-                              {topic.description && (
-                                <p className="text-[11px] text-gray-400 truncate">{topic.description}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => { setEditingTopicId(topic.id); setEditingTopicTitle(topic.title); setEditingTopicDescription(topic.description || '') }}
-                                className="p-1 text-gray-400 hover:text-cyan-600 transition-colors"
-                                title="Editar tópico"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => removeMeetTopic(topic.id)}
-                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                title="Remover tópico"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
+              {loadingTopics ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
+                </div>
+              ) : meetTopics.length > 0 ? (
+                <div className="p-3 space-y-1.5">
+                  {meetTopics.map((topic) => (
+                    <div
+                      key={topic.id}
+                      className={`group flex items-start gap-2.5 px-3 py-2 rounded-lg transition-all border ${
+                        topic.enabled
+                          ? 'bg-white border-gray-200 hover:border-cyan-200'
+                          : 'bg-gray-50 border-gray-100 opacity-50'
+                      }`}
+                    >
+                      <button
+                        onClick={() => toggleMeetTopic(topic.id, topic.enabled)}
+                        className={`w-8 h-[18px] rounded-full transition-colors flex-shrink-0 relative mt-0.5 ${topic.enabled ? 'bg-cyan-500' : 'bg-gray-300'}`}
+                      >
+                        <div className={`absolute top-[2px] w-[14px] h-[14px] bg-white rounded-full shadow-sm transition-transform ${topic.enabled ? 'left-[17px]' : 'left-[2px]'}`} />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium leading-tight ${topic.enabled ? 'text-gray-900' : 'text-gray-400'}`}>{topic.title}</p>
+                        {topic.description && (
+                          <p className={`text-[11px] leading-snug mt-0.5 ${topic.enabled ? 'text-gray-400' : 'text-gray-300'}`}>{topic.description}</p>
                         )}
                       </div>
-                    ))}
-
-                    {/* Adicionar novo tópico */}
-                    {addingTopic ? (
-                      <div className="rounded-lg border border-cyan-200 bg-cyan-50/30 p-3 space-y-2">
-                        <input
-                          type="text"
-                          value={newTopicTitle}
-                          onChange={(e) => setNewTopicTitle(e.target.value)}
-                          className="w-full text-sm font-medium px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                          placeholder="Título do tópico"
-                          autoFocus
-                        />
-                        <input
-                          type="text"
-                          value={newTopicDescription}
-                          onChange={(e) => setNewTopicDescription(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && addMeetTopic()}
-                          className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                          placeholder="Descrição — o que a IA deve extrair sobre este tópico"
-                        />
-                        <div className="flex gap-1.5 justify-end">
-                          <button onClick={() => { setAddingTopic(false); setNewTopicTitle(''); setNewTopicDescription('') }} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1">Cancelar</button>
-                          <button onClick={addMeetTopic} disabled={!newTopicTitle.trim()} className="text-xs bg-cyan-600 text-white px-3 py-1 rounded-md hover:bg-cyan-700 disabled:opacity-50">Adicionar</button>
-                        </div>
-                      </div>
-                    ) : (
                       <button
-                        onClick={() => setAddingTopic(true)}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 rounded-lg border border-dashed border-cyan-200 transition-colors"
+                        onClick={() => removeMeetTopic(topic.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all flex-shrink-0"
+                        title="Remover tópico"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Adicionar tópico personalizado</span>
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                    )}
-                  </>
-                )}
-
-                <p className="text-[11px] text-gray-400 pt-1">
-                  {meetTopics.filter(t => t.enabled).length}/{meetTopics.length} tópicos ativos. A IA cria seções dinâmicas baseadas nesses tópicos + contexto da reunião.
-                </p>
-              </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center">
+                  <p className="text-xs text-gray-400">Nenhum tópico configurado. Use o chat abaixo para criar.</p>
+                </div>
+              )}
             </div>
 
+            {/* Chat configurador */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col" style={{ height: '420px' }}>
+              {/* Chat messages */}
+              <div ref={topicChatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                {topicChatMessages.length === 0 && !topicChatLoading && (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <Bot className="w-8 h-8 mb-2 text-cyan-400" />
+                    <p className="text-sm">Carregando assistente...</p>
+                  </div>
+                )}
+
+                {topicChatMessages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-cyan-600 text-white rounded-br-md'
+                        : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                    }`}>
+                      {msg.role === 'assistant' ? (
+                        <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{
+                          __html: msg.content
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\n- /g, '\n• ')
+                            .replace(/\n(\d+)\. /g, '\n$1. ')
+                        }} />
+                      ) : (
+                        <span>{msg.content}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {topicChatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat input */}
+              <div className="border-t border-gray-100 p-3 flex gap-2">
+                <input
+                  type="text"
+                  value={topicChatInput}
+                  onChange={(e) => setTopicChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
+                  placeholder="Descreva seu negócio, cole um template de notas, ou peça ajustes..."
+                  className="flex-1 text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
+                  disabled={topicChatLoading}
+                />
+                <button
+                  onClick={sendTopicChatMessage}
+                  disabled={!topicChatInput.trim() || topicChatLoading}
+                  className="p-2 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -6131,32 +6127,24 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-start justify-center pt-8 px-4 pb-4">
-      <div className={`relative max-w-5xl w-full max-h-[calc(100vh-64px)] flex flex-col transition-transform duration-300 ${
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-3">
+      <div className={`relative max-w-[1400px] w-full h-[calc(100vh-24px)] flex flex-col transition-transform duration-300 ${
         showCompanyEvaluationModal || showAIModal ? 'sm:-translate-x-[250px]' : ''
       }`}>
-        <div className="bg-white rounded-2xl shadow-2xl flex flex-col max-h-full overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 bg-gradient-to-r from-green-50 to-white">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                <Settings className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Hub de Configuração</h2>
-                <p className="text-xs text-gray-500">Gerencie sua empresa e equipe</p>
-              </div>
-            </div>
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-200 flex-shrink-0">
+            <h2 className="text-lg font-semibold text-gray-900">Configurações</h2>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6 overflow-y-auto flex-1 min-h-0 bg-gray-50">
+          <div className="flex-1 min-h-0 overflow-hidden">
             {loading ? (
               // Loading state
               <div className="flex items-center justify-center py-12">
