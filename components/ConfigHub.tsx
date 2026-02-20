@@ -330,7 +330,7 @@ function ConfigurationInterface({
 
   // Plano Individual não tem acesso à aba de funcionários
   const isIndividualPlan = trainingPlan === PlanType.INDIVIDUAL
-  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'usage'>(isIndividualPlan ? 'personas' : 'employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'meet_notes' | 'usage'>(isIndividualPlan ? 'personas' : 'employees')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
@@ -526,6 +526,11 @@ function ConfigurationInterface({
   const [playbookFileUploading, setPlaybookFileUploading] = useState(false)
   const [playbookFileError, setPlaybookFileError] = useState<string | null>(null)
 
+  // Estados para Observações de Notas de Reunião
+  const [meetObservations, setMeetObservations] = useState<{id: string, text: string}[]>([])
+  const [newMeetObservation, setNewMeetObservation] = useState('')
+  const [savingMeetObservation, setSavingMeetObservation] = useState(false)
+
   // Carregar PDFs salvos da empresa
   const loadSavedPdfs = async (companyId: string) => {
     try {
@@ -540,6 +545,59 @@ function ConfigurationInterface({
   }
 
   // Carregar Playbook da empresa
+  // CRUD para Observações de Notas de Reunião
+  const loadMeetObservations = async () => {
+    if (!userCompanyId) return
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data } = await supabase
+        .from('meet_note_observations')
+        .select('id, text')
+        .eq('company_id', userCompanyId)
+        .order('sort_order', { ascending: true })
+      if (data) setMeetObservations(data)
+    } catch (err) {
+      console.error('Erro ao carregar observações:', err)
+    }
+  }
+
+  const addMeetObservation = async () => {
+    if (!newMeetObservation.trim() || !userCompanyId || meetObservations.length >= 10) return
+    setSavingMeetObservation(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { error } = await supabase
+        .from('meet_note_observations')
+        .insert({
+          company_id: userCompanyId,
+          text: newMeetObservation.trim(),
+          sort_order: meetObservations.length
+        })
+      if (error) {
+        console.error('Erro RLS/insert observação:', error)
+      } else {
+        setNewMeetObservation('')
+        await loadMeetObservations()
+      }
+    } catch (err) {
+      console.error('Erro ao adicionar observação:', err)
+    }
+    setSavingMeetObservation(false)
+  }
+
+  const removeMeetObservation = async (id: string) => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase
+        .from('meet_note_observations')
+        .delete()
+        .eq('id', id)
+      await loadMeetObservations()
+    } catch (err) {
+      console.error('Erro ao remover observação:', err)
+    }
+  }
+
   const loadPlaybook = async () => {
     if (!userCompanyId) {
       setPlaybookLoaded(true)
@@ -581,6 +639,13 @@ function ConfigurationInterface({
       loadPlaybook()
     }
   }, [userCompanyId, playbookLoaded])
+
+  // Carregar observações de notas quando tab meet_notes estiver ativa
+  useEffect(() => {
+    if (activeTab === 'meet_notes' && userCompanyId) {
+      loadMeetObservations()
+    }
+  }, [activeTab, userCompanyId])
 
   // Carregar subdomínio da empresa do usuário logado (para o link de convite)
   useEffect(() => {
@@ -2842,6 +2907,17 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             <span>Dados da Empresa</span>
           </button>
           <button
+            onClick={() => setActiveTab('meet_notes')}
+            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'meet_notes'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Video className="w-4 h-4" />
+            <span>Notas de Reunião</span>
+          </button>
+          <button
             onClick={() => setActiveTab('usage')}
             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'usage'
@@ -4565,6 +4641,74 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   )}
                 </div>
               </CompanyDataChat>
+            </div>
+          </div>
+        )}
+
+        {/* Meet Notes Tab */}
+        {activeTab === 'meet_notes' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white">
+                <div className="flex items-center gap-2">
+                  <Video className="w-5 h-5 text-cyan-600" />
+                  <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Observações para Notas de Reunião</h3>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Configure instruções extras para a IA extrair dados específicos das suas reuniões de vendas. A IA já gera notas inteligentes automaticamente — use isso para personalizar pontos específicos do seu negócio.
+                </p>
+              </div>
+
+              <div className="p-4 space-y-3">
+                {/* Lista de observações */}
+                {meetObservations.length > 0 ? (
+                  <div className="space-y-2">
+                    {meetObservations.map((obs) => (
+                      <div key={obs.id} className="flex items-start gap-2 group">
+                        <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 flex-shrink-0" />
+                        <p className="text-sm text-gray-700 flex-1 leading-relaxed">{obs.text}</p>
+                        <button
+                          onClick={() => removeMeetObservation(obs.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all flex-shrink-0"
+                          title="Remover observação"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">Nenhuma observação configurada.</p>
+                )}
+
+                {/* Input para nova observação */}
+                {meetObservations.length < 10 && (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={newMeetObservation}
+                      onChange={(e) => setNewMeetObservation(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addMeetObservation()}
+                      placeholder='Ex: "Identificar menções a orçamento disponível"'
+                      className="flex-1 text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
+                      disabled={savingMeetObservation}
+                    />
+                    <button
+                      onClick={addMeetObservation}
+                      disabled={!newMeetObservation.trim() || savingMeetObservation}
+                      className="px-3 py-2 bg-cyan-600 text-white text-sm rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                    >
+                      {savingMeetObservation ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      <span>Adicionar</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Info */}
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {meetObservations.length}/10 observações.
+                </p>
+              </div>
             </div>
           </div>
         )}

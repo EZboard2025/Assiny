@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from './evaluateMeetTranscript'
+import { generateSmartNotes } from './generateSmartNotes'
 import { fetchTranscriptFromRecallApi, TranscriptSegment } from './recallApi'
 
 const supabaseAdmin = createClient(
@@ -85,18 +86,34 @@ export async function processCompletedBot(botId: string): Promise<void> {
       .map((s: TranscriptSegment) => `${s.speaker}: ${s.text}`)
       .join('\n')
 
-    // 7. Run SPIN evaluation
-    const result = await evaluateMeetTranscript({
-      transcript: transcriptText,
-      meetingId: botId,
-      companyId: company_id
-    })
+    // 7. Run SPIN evaluation AND smart notes in parallel
+    const [evalResult, notesResult] = await Promise.allSettled([
+      evaluateMeetTranscript({
+        transcript: transcriptText,
+        meetingId: botId,
+        companyId: company_id
+      }),
+      generateSmartNotes({
+        transcript: transcriptText,
+        companyId: company_id
+      })
+    ])
 
-    if (!result.success || !result.evaluation) {
-      throw new Error(result.error || 'Avaliação falhou')
+    // Extract evaluation (required)
+    const result = evalResult.status === 'fulfilled' ? evalResult.value : null
+    if (!result?.success || !result.evaluation) {
+      throw new Error(result?.error || 'Avaliação falhou')
     }
-
     const evalData = result.evaluation
+
+    // Extract smart notes (optional — failure does NOT block evaluation)
+    const smartNotes = notesResult.status === 'fulfilled' && notesResult.value.success
+      ? notesResult.value.notes : null
+    if (notesResult.status === 'rejected') {
+      console.error(`[MeetBG] Smart notes generation failed (non-fatal):`, notesResult.reason)
+    } else if (notesResult.status === 'fulfilled' && !notesResult.value.success) {
+      console.warn(`[MeetBG] Smart notes generation returned error: ${notesResult.value.error}`)
+    }
 
     // 8. Save to meet_evaluations
     let overallScore = evalData.overall_score
@@ -120,7 +137,8 @@ export async function processCompletedBot(botId: string): Promise<void> {
         spin_s_score: evalData.spin_evaluation?.S?.final_score || 0,
         spin_p_score: evalData.spin_evaluation?.P?.final_score || 0,
         spin_i_score: evalData.spin_evaluation?.I?.final_score || 0,
-        spin_n_score: evalData.spin_evaluation?.N?.final_score || 0
+        spin_n_score: evalData.spin_evaluation?.N?.final_score || 0,
+        smart_notes: smartNotes
       })
       .select('id')
       .single()

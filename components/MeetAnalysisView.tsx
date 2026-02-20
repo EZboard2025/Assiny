@@ -694,7 +694,8 @@ export default function MeetAnalysisView() {
   const saveEvaluationToHistory = async (
     evalData: MeetEvaluation,
     transcriptData: TranscriptSegment[],
-    botId: string
+    botId: string,
+    smartNotes?: any
   ) => {
     setIsSaving(true)
     try {
@@ -733,7 +734,8 @@ export default function MeetAnalysisView() {
         spin_s_score: evalData.spin_evaluation?.S?.final_score || 0,
         spin_p_score: evalData.spin_evaluation?.P?.final_score || 0,
         spin_i_score: evalData.spin_evaluation?.I?.final_score || 0,
-        spin_n_score: evalData.spin_evaluation?.N?.final_score || 0
+        spin_n_score: evalData.spin_evaluation?.N?.final_score || 0,
+        ...(smartNotes ? { smart_notes: smartNotes } : {})
       }
 
       console.log('💾 Salvando avaliação no histórico...', insertData.meeting_id)
@@ -821,7 +823,7 @@ export default function MeetAnalysisView() {
 
         // Save to history + generate simulation in parallel
         const savePromise = session?.botId
-          ? saveEvaluationToHistory(data.evaluation, transcriptToUse, session.botId)
+          ? saveEvaluationToHistory(data.evaluation, transcriptToUse, session.botId, data.smartNotes || null)
           : Promise.resolve()
 
         // Auto-generate simulation based on evaluation
