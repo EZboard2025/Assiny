@@ -5676,15 +5676,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1400px] h-[calc(100vh-80px)] flex overflow-hidden" style={{ animation: closingTopicChat ? 'overlayOut 0.2s ease-in forwards' : 'overlayIn 0.2s ease-out' }}>
             {/* Left: Chat */}
-            <div className="w-1/2 flex flex-col border-r border-gray-200">
-              <div className="px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-cyan-600" />
+            <div className="w-1/2 flex flex-col border-r border-gray-100">
+              {/* Header */}
+              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100 bg-gray-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-cyan-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Assistente de Tópicos</p>
-                    <p className="text-[10px] text-gray-400">Personaliza a extração de dados das reuniões</p>
+                    <h3 className="text-sm font-semibold text-gray-900">Assistente de Tópicos</h3>
+                    <p className="text-[11px] text-gray-400">Personaliza a extração de dados das reuniões</p>
                   </div>
                 </div>
                 <button
@@ -5695,53 +5696,66 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </button>
               </div>
 
-              <div ref={topicChatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* Messages */}
+              <div ref={topicChatRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
                 {topicChatMessages.length === 0 && !topicChatLoading && (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                    <Bot className="w-10 h-10 mb-3 text-cyan-300" />
-                    <p className="text-sm">Carregando assistente...</p>
+                  <div className="flex flex-col items-center justify-center h-full text-gray-300">
+                    <div className="w-12 h-12 rounded-xl bg-cyan-50 flex items-center justify-center mb-3">
+                      <Sparkles className="w-6 h-6 text-cyan-400" />
+                    </div>
+                    <p className="text-sm text-gray-400">Carregando assistente...</p>
                   </div>
                 )}
 
                 {topicChatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-cyan-600 text-white rounded-br-md'
-                        : 'bg-gray-100 text-gray-800 rounded-bl-md'
-                    }`}>
-                      {msg.role === 'assistant' ? (
-                        <div className="chat-md" dangerouslySetInnerHTML={{
+                  msg.role === 'user' ? (
+                    <div key={i} className="flex justify-end">
+                      <div className="max-w-[80%] px-3.5 py-2.5 rounded-2xl rounded-br-md bg-cyan-600 text-white text-sm leading-relaxed shadow-sm">
+                        {msg.content}
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={i} className="flex gap-2.5 max-w-[92%]">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Sparkles className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0 px-3.5 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm">
+                        <div className="text-sm text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{
                           __html: msg.content
                             .replace(/—/g, '-')
-                            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-gray-900">$1</strong>')
+                            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-gray-900 font-semibold">$1</strong>')
                             .split('\n\n').map((block: string) => {
                               const trimmed = block.trim()
                               if (!trimmed) return ''
                               const lines = trimmed.split('\n')
                               const isNumberedList = lines.every((l: string) => /^\d+\./.test(l.trim()) || !l.trim())
                               const isBulletList = lines.every((l: string) => /^[-•]/.test(l.trim()) || !l.trim())
-                              if (isNumberedList || isBulletList) {
+                              if (isNumberedList) {
                                 const items = lines.filter((l: string) => l.trim()).map((l: string) => {
-                                  const text = l.trim().replace(/^(\d+\.\s*|-\s*|•\s*)/, '')
+                                  const text = l.trim().replace(/^(\d+\.\s*)/, '')
                                   const num = l.trim().match(/^(\d+)\./)?.[1]
-                                  return `<li class="ml-4 mb-0.5">${num ? `<span class="text-cyan-600 font-medium">${num}.</span> ` : ''}${text}</li>`
+                                  return `<div class="flex items-start gap-2.5"><span class="w-5 h-5 rounded-full bg-cyan-100 text-cyan-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">${num}</span><span class="text-gray-700 text-sm leading-relaxed">${text}</span></div>`
                                 }).join('')
-                                return `<ul class="my-1.5 space-y-0.5">${items}</ul>`
+                                return `<div class="my-2 space-y-1.5">${items}</div>`
                               }
-                              return `<p class="mb-2">${trimmed.replace(/\n/g, '<br/>')}</p>`
+                              if (isBulletList) {
+                                const items = lines.filter((l: string) => l.trim()).map((l: string) => {
+                                  const text = l.trim().replace(/^(-\s*|•\s*)/, '')
+                                  return `<div class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-cyan-500 mt-[7px] shrink-0"></span><span class="text-gray-700 text-sm leading-relaxed">${text}</span></div>`
+                                }).join('')
+                                return `<div class="my-2 space-y-1 pl-0.5">${items}</div>`
+                              }
+                              return `<p class="mb-2 last:mb-0">${trimmed.replace(/\n/g, '<br/>')}</p>`
                             }).join('')
                         }} />
-                      ) : (
-                        <span>{msg.content}</span>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  )
                 ))}
 
-                {/* Quick replies - only after first AI message, before user sends anything */}
+                {/* Quick replies */}
                 {topicChatMessages.length === 1 && topicChatMessages[0].role === 'assistant' && !topicChatLoading && (
-                  <div className="flex flex-wrap gap-2 px-1">
+                  <div className="flex flex-wrap gap-2 pl-10">
                     {[
                       { label: 'Adicionar novos tópicos', msg: 'Sugira novos tópicos que façam sentido para o meu tipo de negócio e adicione aos existentes' },
                       { label: 'Tenho um template de notas', msg: 'Quero colar um template de notas que já uso para você extrair os tópicos' },
@@ -5750,7 +5764,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       <button
                         key={i}
                         onClick={() => sendQuickReply(opt.msg)}
-                        className="px-3 py-1.5 text-xs border border-cyan-200 text-cyan-700 bg-cyan-50 rounded-full hover:bg-cyan-100 hover:border-cyan-300 transition-colors"
+                        className="px-3 py-1.5 text-xs text-cyan-700 border border-cyan-200 rounded-full hover:bg-cyan-50 hover:border-cyan-300 transition-colors"
                       >
                         {opt.label}
                       </button>
@@ -5758,42 +5772,38 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                 )}
 
-                {/* Inline topic review - one by one in chat */}
+                {/* Inline topic review */}
                 {reviewQueue.length > 0 && (
-                  <div className="space-y-2 px-1">
+                  <div className="space-y-2 pl-10">
                     <div className="flex items-center gap-2 mb-1">
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span className="text-xs font-medium text-gray-500">
+                      <span className="text-xs font-medium text-gray-400">
                         Revisão de tópicos ({reviewQueue.filter(t => t.status !== 'pending').length}/{reviewQueue.length})
                       </span>
                     </div>
 
                     {reviewQueue.map((topic, idx) => {
-                      // Hide future pending topics (one-by-one reveal)
                       if (topic.status === 'pending' && idx !== currentReviewIdx) return null
 
-                      // Accepted - compact green card
                       if (topic.status === 'accepted') {
                         return (
                           <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs" style={{ animation: 'topicAppear 0.25s ease-out' }}>
                             <Check className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                             <span className="font-medium text-green-800">{topic.title}</span>
-                            <span className="text-green-600/60 truncate flex-1">- {topic.description}</span>
+                            <span className="text-green-600/50 truncate flex-1">- {topic.description}</span>
                           </div>
                         )
                       }
 
-                      // Rejected - compact red card
                       if (topic.status === 'rejected') {
                         return (
-                          <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-red-50/60 border border-red-200/50 rounded-xl text-xs opacity-50" style={{ animation: 'topicAppear 0.25s ease-out' }}>
-                            <X className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                            <span className="font-medium text-red-700 line-through">{topic.title}</span>
+                          <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs opacity-50" style={{ animation: 'topicAppear 0.25s ease-out' }}>
+                            <X className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                            <span className="font-medium text-gray-500 line-through">{topic.title}</span>
                           </div>
                         )
                       }
 
-                      // Editing - expanded card with input
                       if (topic.status === 'editing') {
                         return (
                           <div key={idx} className="px-4 py-3 bg-white border-2 border-cyan-300 rounded-xl shadow-sm">
@@ -5802,15 +5812,15 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               type="text"
                               value={editingReviewDesc}
                               onChange={(e) => setEditingReviewDesc(e.target.value)}
-                              className="w-full text-xs px-3 py-2 border border-cyan-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-400 mb-2"
+                              className="w-full text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400 mb-2"
                               autoFocus
                               onKeyDown={(e) => e.key === 'Enter' && saveEditReview(idx)}
                             />
                             <div className="flex gap-1.5">
-                              <button onClick={() => saveEditReview(idx)} className="text-[11px] px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors">
+                              <button onClick={() => saveEditReview(idx)} className="text-[11px] px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors font-medium">
                                 Salvar e aceitar
                               </button>
-                              <button onClick={() => rejectReviewTopic(idx)} className="text-[11px] px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors">
+                              <button onClick={() => rejectReviewTopic(idx)} className="text-[11px] px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                                 Recusar
                               </button>
                             </div>
@@ -5818,33 +5828,32 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         )
                       }
 
-                      // Current pending topic - expanded card with action buttons
                       if (idx === currentReviewIdx) {
                         return (
-                          <div key={idx} className="px-4 py-3 bg-white border-2 border-amber-200 rounded-xl shadow-sm" style={{ animation: 'topicAppear 0.3s ease-out' }}>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full font-medium">
+                          <div key={idx} className="px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm" style={{ animation: 'topicAppear 0.3s ease-out' }}>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-[10px] text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-full font-medium">
                                 {idx + 1} de {reviewQueue.length}
                               </span>
                             </div>
-                            <p className="text-sm font-medium text-gray-900">{topic.title}</p>
-                            <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{topic.description}</p>
-                            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100">
+                            <p className="text-sm font-semibold text-gray-900">{topic.title}</p>
+                            <p className="text-xs text-gray-500 mt-0.5 leading-snug">{topic.description}</p>
+                            <div className="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-gray-100">
                               <button
                                 onClick={() => acceptReviewTopic(idx)}
-                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors font-medium"
+                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors font-medium"
                               >
                                 <Check className="w-3 h-3" /> Aceitar
                               </button>
                               <button
                                 onClick={() => startEditReview(idx)}
-                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors"
+                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
                               >
                                 <Edit2 className="w-3 h-3" /> Personalizar
                               </button>
                               <button
                                 onClick={() => rejectReviewTopic(idx)}
-                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
                               >
                                 <X className="w-3 h-3" /> Recusar
                               </button>
@@ -5856,13 +5865,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       return null
                     })}
 
-                    {/* Confirm button after all reviewed */}
                     {reviewDone && (
                       <div className="pt-1">
                         {reviewQueue.filter(t => t.status === 'accepted').length > 0 ? (
                           <button
                             onClick={confirmReviewedTopics}
-                            className="w-full text-sm py-2.5 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors font-medium shadow-sm"
+                            className="w-full text-sm py-2.5 rounded-xl bg-cyan-600 text-white hover:bg-cyan-700 transition-colors font-medium shadow-sm"
                           >
                             Confirmar {reviewQueue.filter(t => t.status === 'accepted').length} tópico{reviewQueue.filter(t => t.status === 'accepted').length !== 1 ? 's' : ''}
                           </button>
@@ -5879,47 +5887,51 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                 )}
 
+                {/* Loading */}
                 {topicChatLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </div>
+                  <div className="flex gap-2.5 max-w-[92%]">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-400 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-3.5 h-3.5 text-white animate-pulse" />
+                    </div>
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" />
+                      <span className="text-xs text-gray-400">Analisando...</span>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="border-t border-gray-100 p-3 flex gap-2 items-center">
-                <input
-                  type="text"
-                  value={topicChatInput}
-                  onChange={(e) => setTopicChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
-                  placeholder={topicChatRecording ? 'Ouvindo...' : 'Descreva seu negócio, cole um template, ou peça ajustes...'}
-                  className={`flex-1 text-sm px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400 transition-colors ${topicChatRecording ? 'border-red-300 bg-red-50/30' : 'border-gray-200'}`}
-                  disabled={topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
-                />
-                <button
-                  onClick={toggleDictation}
-                  disabled={topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
-                  className={`p-2.5 rounded-xl transition-all ${
-                    topicChatRecording
-                      ? 'bg-red-500 text-white shadow-md shadow-red-200 animate-pulse'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
-                  } disabled:opacity-40 disabled:cursor-not-allowed`}
-                >
-                  <Mic className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => { if (topicChatRecording) { speechRecRef.current?.stop(); setTopicChatRecording(false) } sendTopicChatMessage() }}
-                  disabled={!topicChatInput.trim() || topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
-                  className="p-2.5 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+              {/* Input bar */}
+              <div className="px-4 py-3 border-t border-gray-100">
+                <div className={`flex items-end gap-2 bg-gray-50 rounded-2xl border px-3 py-2 transition-colors ${topicChatRecording ? 'border-red-300 bg-red-50/30' : 'border-gray-200 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-500/10'}`}>
+                  <input
+                    type="text"
+                    value={topicChatInput}
+                    onChange={(e) => setTopicChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
+                    placeholder={topicChatRecording ? 'Ouvindo...' : 'Descreva seu negócio, cole um template, ou peça ajustes...'}
+                    className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none min-h-[36px] py-1"
+                    disabled={topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
+                  />
+                  <button
+                    onClick={toggleDictation}
+                    disabled={topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
+                    className={`p-2 rounded-full transition-all flex-shrink-0 ${
+                      topicChatRecording
+                        ? 'bg-red-500 text-white shadow-md shadow-red-300 animate-pulse ring-4 ring-red-200'
+                        : 'bg-cyan-500 text-white hover:bg-cyan-600 shadow-sm shadow-cyan-200'
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
+                  >
+                    <Mic className="w-[18px] h-[18px]" />
+                  </button>
+                  <button
+                    onClick={() => { if (topicChatRecording) { speechRecRef.current?.stop(); setTopicChatRecording(false) } sendTopicChatMessage() }}
+                    disabled={!topicChatInput.trim() || topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
+                    className="p-1.5 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
