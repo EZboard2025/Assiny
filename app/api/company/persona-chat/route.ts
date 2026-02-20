@@ -46,6 +46,13 @@ ALINHAMENTO SPIN SELLING (use como guia ao propor valores):
 - I (Implicacao): Deve ser possivel explorar impacto financeiro/operacional (B2B) ou emocional/pratico (B2C)
 - N (Need-Payoff): O que a persona busca deve estar conectado as dores, com clareza sobre valor/beneficio esperado
 
+CAMPOS QUE NAO FAZEM PARTE DA PERSONA (NUNCA pergunte sobre eles):
+- IDADE: configurada separadamente antes de cada roleplay
+- NOME: nao faz parte da persona
+- TEMPERAMENTO: configurado separadamente antes de cada roleplay
+- OBJECOES: configuradas separadamente
+Foque EXCLUSIVAMENTE nos campos listados acima ({PERSONA_TYPE}).
+
 REGRAS DE CONVERSA:
 
 - Seja amigavel, direto, encorajador e profissional
@@ -56,6 +63,10 @@ REGRAS DE CONVERSA:
 - SEMPRE proponha valores no nivel EXCELENTE com detalhes ricos, numeros e cenarios concretos
 - Se a informacao so permite nivel BOM, proponha e pergunte se pode complementar com mais detalhes
 - Use os DADOS DA EMPRESA para enriquecer a persona com contexto real (ex: se a empresa vende software, a persona pode ter dores relacionadas a tecnologia)
+- NUNCA pergunte sobre idade, nome ou temperamento — esses dados NAO fazem parte da persona
+- Quando pedir informacoes ao usuario, SEMPRE formate como topicos usando "• " (bullet point). Exemplo:
+  "Para enriquecer o perfil, me conta:\n\n• Qual o segmento exato da empresa?\n• Qual o faturamento anual aproximado?\n• Quantos funcionarios tem?\n• Em que momento a empresa esta?"
+  NUNCA escreva tudo em um unico paragrafo corrido. Separe CADA pergunta/informacao em um topico com "• ".
 
 REGRAS DE PROPOSALS:
 
@@ -117,9 +128,9 @@ const B2C_FIELDS_SECTION = `CAMPOS B2C E CRITERIOS DETALHADOS DO AVALIADOR:
 
 1. profession (Profissao/Perfil) - OBRIGATORIO:
    Insuficiente (0-3): "Trabalhador" — nao diz nada
-   Aceitavel (4-7): "Professor, 35 anos" — basico
-   Excelente (8-10): "Mulher, 38 anos, casada, mae de 2 filhos (8 e 5 anos), Gerente de Projetos em empresa de tecnologia. Renda familiar R$28k/mes, classe A, mora em apartamento 140m2 em condominio fechado zona sul SP" — perfil demografico completo + profissao + contexto familiar + renda + localizacao
-   Pergunte: profissao, idade, estado civil, filhos, onde mora, renda familiar, classe social.
+   Aceitavel (4-7): "Professor" — basico
+   Excelente (8-10): "Mulher, casada, mae de 2 filhos (8 e 5 anos), Gerente de Projetos em empresa de tecnologia. Renda familiar R$28k/mes, classe A, mora em apartamento 140m2 em condominio fechado zona sul SP" — perfil demografico completo + profissao + contexto familiar + renda + localizacao
+   Pergunte: profissao, estado civil, filhos, onde mora, renda familiar, classe social.
 
 2. context (Contexto):
    Insuficiente (0-3): "Pessoa normal" — inutil
@@ -156,7 +167,7 @@ Note: numeros concretos (R$, %, dias, pessoas), dores conectadas aos objetivos, 
 
 const B2C_REFERENCE = `EXEMPLO DE REFERENCIA B2C (PERSONA 10/10 - use como norte de qualidade):
 
-Perfil: Mulher, 38 anos, casada, mae de 2 filhos (8 e 5 anos), Gerente de Projetos em empresa de tecnologia. Renda familiar R$28k/mes, classe A, mora em apartamento 140m2 zona sul SP.
+Perfil: Mulher, casada, mae de 2 filhos (8 e 5 anos), Gerente de Projetos em empresa de tecnologia. Renda familiar R$28k/mes, classe A, mora em apartamento 140m2 zona sul SP.
 Contexto: Acorda 6h, leva filhos a escola 7h30, trabalha 9h-18h (hibrido 3 dias presencial), busca filhos 18h30. Ativa no Instagram e LinkedIn, pesquisa muito antes de compras grandes. Decide compras aos finais de semana apos pesquisar na semana. Influenciada por amigas e especialistas nas redes. Preza otimizacao de tempo e qualidade de vida familiar.
 O que busca: Economizar tempo sem perder qualidade em tarefas domesticas para dedicar mais tempo aos filhos (meta: ganhar 5-7h/semana). Manter alimentacao saudavel sem passar 2h/dia cozinhando. Sentir que e "boa mae" mesmo com rotina corrida. Valoriza experiencias mais que bens materiais.
 Dores: Frustracao diaria ao chegar cansada 19h e ainda precisar cozinhar, ajudar licao, organizar casa. Pede delivery R$1.2k/mes ou faz comida rapida menos saudavel. Domingo gasta 3h planejando refeicoes mas desperdica R$400/mes em alimentos. Dorme 6h/noite, cansaco impacta trabalho e paciencia com criancas.

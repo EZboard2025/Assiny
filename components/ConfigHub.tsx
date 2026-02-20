@@ -404,6 +404,7 @@ function ConfigurationInterface({
   const [filterBusinessType, setFilterBusinessType] = useState<'' | 'B2B' | 'B2C'>('')
   const [expandedPersonas, setExpandedPersonas] = useState<Set<string>>(new Set())
   const [showTagForm, setShowTagForm] = useState(false)
+  const [tagsExpanded, setTagsExpanded] = useState(false)
 
   // Estados para controle de limites
   const [personaLimitReached, setPersonaLimitReached] = useState(false)
@@ -3512,25 +3513,25 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               </div>
 
-              {/* Aviso de Qualidade */}
-              <div className="mx-5 mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-amber-800 leading-relaxed">
-                      <span className="font-semibold">Atenção:</span> Personas com pontuação abaixo de 7.0 podem comprometer a eficiência e o realismo dos roleplays de vendas.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Seção de Gerenciar Etiquetas */}
+              {/* Seção de Gerenciar Etiquetas (minimizada por padrão) */}
               <div className="p-5 border-t border-gray-100">
-                <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setTagsExpanded(!tagsExpanded)}
+                  className="flex items-center justify-between w-full"
+                >
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                     <TagIcon className="w-4 h-4" />
                     Etiquetas
+                    {tags.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500">{tags.length}</span>
+                    )}
                   </h4>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${tagsExpanded ? 'rotate-180' : ''}`} />
+                </button>
+
+                {tagsExpanded && (
+                <div className="mt-4">
+                <div className="flex items-center justify-end mb-4">
                   {!showTagForm && (
                     <button
                       onClick={() => setShowTagForm(true)}
@@ -3747,6 +3748,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     <p className="text-gray-600 text-sm text-center">Nenhuma etiqueta criada ainda.</p>
                     <p className="text-gray-500 text-xs text-center mt-1">Crie etiquetas para organizar suas personas.</p>
                   </div>
+                )}
+                </div>
                 )}
               </div>
 

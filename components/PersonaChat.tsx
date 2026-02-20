@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Send, Loader2, Check, X, Pencil, Bot, CheckCircle, Mic, MicOff } from 'lucide-react'
-import { addPersona } from '@/lib/config'
+import { supabase } from '@/lib/supabase'
+import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import type { Persona, PersonaB2B, PersonaB2C } from '@/lib/config'
 
 // Web Speech API types (not in default TS lib)
@@ -95,10 +96,19 @@ export default function PersonaChat({ personaType, personaData, companyData, onF
   const [isListening, setIsListening] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [cachedCompanyId, setCachedCompanyId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+
+  // Cache company_id on mount (auth is fresh at this point)
+  useEffect(() => {
+    getCompanyId().then(id => {
+      if (id) setCachedCompanyId(id)
+      else console.error('[PersonaChat] Não foi possível obter company_id no mount')
+    })
+  }, [])
 
   const filledCount = fieldKeys.filter(f => personaData[f]?.trim()).length
   const totalFields = fieldKeys.length
@@ -129,11 +139,27 @@ export default function PersonaChat({ personaType, personaData, companyData, onF
   }, [])
 
   const handleSavePersona = async () => {
+    if (!cachedCompanyId) {
+      console.error('[PersonaChat] company_id não disponível, tentando obter novamente...')
+      const freshId = await getCompanyId()
+      if (!freshId) {
+        console.error('[PersonaChat] Falha ao obter company_id')
+        return
+      }
+      setCachedCompanyId(freshId)
+    }
+
+    const companyId = cachedCompanyId || await getCompanyId()
+    if (!companyId) {
+      console.error('[PersonaChat] company_id não disponível para salvar')
+      return
+    }
+
     setIsSaving(true)
     try {
-      let result: Persona | null
+      let insertData: Record<string, string>
       if (personaType === 'B2B') {
-        const b2b: Omit<PersonaB2B, 'id' | 'created_at' | 'updated_at'> = {
+        insertData = {
           business_type: 'B2B',
           job_title: personaData.job_title || '',
           company_type: personaData.company_type || '',
@@ -141,25 +167,37 @@ export default function PersonaChat({ personaType, personaData, companyData, onF
           company_goals: personaData.company_goals || '',
           business_challenges: personaData.business_challenges || '',
           prior_knowledge: personaData.prior_knowledge || '',
+          company_id: companyId,
         }
-        result = await addPersona(b2b)
       } else {
-        const b2c: Omit<PersonaB2C, 'id' | 'created_at' | 'updated_at'> = {
+        insertData = {
           business_type: 'B2C',
           profession: personaData.profession || '',
           context: personaData.context || '',
           what_seeks: personaData.what_seeks || '',
           main_pains: personaData.main_pains || '',
           prior_knowledge: personaData.prior_knowledge || '',
+          company_id: companyId,
         }
-        result = await addPersona(b2c)
       }
-      if (result) {
+
+      const { data, error } = await supabase
+        .from('personas')
+        .insert([insertData])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('[PersonaChat] Erro ao salvar persona:', error)
+        return
+      }
+
+      if (data) {
         setIsSaved(true)
-        onPersonaSaved(result)
+        onPersonaSaved(data as Persona)
       }
     } catch (err) {
-      console.error('Erro ao salvar persona:', err)
+      console.error('[PersonaChat] Erro ao salvar persona:', err)
     } finally {
       setIsSaving(false)
     }
@@ -390,6 +428,60 @@ export default function PersonaChat({ personaType, personaData, companyData, onF
     setIsListening(true)
   }
 
+  const renderMessageContent = (content: string) => {
+    // Split by lines and detect bullet points (•, -, *)
+    const lines = content.split('\n')
+    const blocks: { type: 'text' | 'bullets'; lines: string[] }[] = []
+
+    let currentBlock: { type: 'text' | 'bullets'; lines: string[] } | null = null
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      const isBullet = /^[•\-\*]\s/.test(trimmed)
+
+      if (isBullet) {
+        if (currentBlock?.type !== 'bullets') {
+          if (currentBlock) blocks.push(currentBlock)
+          currentBlock = { type: 'bullets', lines: [] }
+        }
+        currentBlock.lines.push(trimmed.replace(/^[•\-\*]\s*/, ''))
+      } else {
+        if (trimmed === '') {
+          if (currentBlock) {
+            blocks.push(currentBlock)
+            currentBlock = null
+          }
+        } else {
+          if (currentBlock?.type !== 'text') {
+            if (currentBlock) blocks.push(currentBlock)
+            currentBlock = { type: 'text', lines: [] }
+          }
+          currentBlock.lines.push(trimmed)
+        }
+      }
+    }
+    if (currentBlock) blocks.push(currentBlock)
+
+    return (
+      <div className="space-y-2">
+        {blocks.map((block, i) =>
+          block.type === 'bullets' ? (
+            <div key={i} className="bg-green-50/60 border border-green-100 rounded-lg p-2.5 space-y-1.5">
+              {block.lines.map((item, j) => (
+                <div key={j} className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-[7px] flex-shrink-0" />
+                  <span className="text-sm text-gray-700 leading-relaxed">{item}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p key={i} className="text-sm text-gray-700 leading-relaxed">{block.lines.join(' ')}</p>
+          )
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       {/* Header */}
@@ -428,7 +520,7 @@ export default function PersonaChat({ personaType, personaData, companyData, onF
                 </div>
                 <div className="flex-1 space-y-2">
                   <div className="px-3.5 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm">
-                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{msg.content}</p>
+                    {renderMessageContent(msg.content)}
                   </div>
                   {msg.proposals?.map((p) => (
                     <div
