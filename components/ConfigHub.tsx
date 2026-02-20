@@ -31,7 +31,6 @@ import {
   getObjections,
   addObjection,
   updateObjection,
-  updateObjectionScore,
   deleteObjection,
   getPersonas,
   addPersona,
@@ -302,14 +301,6 @@ function SortableStageCard({
 
 // Component for the main configuration interface
 function ConfigurationInterface({
-  personaEvaluation,
-  setPersonaEvaluation,
-  showPersonaEvaluationModal,
-  setShowPersonaEvaluationModal,
-  objectionEvaluation,
-  setObjectionEvaluation,
-  showObjectionEvaluationModal,
-  setShowObjectionEvaluationModal,
   qualityEvaluation,
   setQualityEvaluation,
   showCompanyEvaluationModal,
@@ -319,14 +310,6 @@ function ConfigurationInterface({
   showAIGenerateModal,
   setShowAIGenerateModal
 }: {
-  personaEvaluation: any
-  setPersonaEvaluation: (val: any) => void
-  showPersonaEvaluationModal: boolean
-  setShowPersonaEvaluationModal: (val: boolean) => void
-  objectionEvaluation: any
-  setObjectionEvaluation: (val: any) => void
-  showObjectionEvaluationModal: boolean
-  setShowObjectionEvaluationModal: (val: boolean) => void
   qualityEvaluation: any
   setQualityEvaluation: (val: any) => void
   showCompanyEvaluationModal: boolean
@@ -380,7 +363,6 @@ function ConfigurationInterface({
   const [newRebuttal, setNewRebuttal] = useState('')
   const [editingObjectionId, setEditingObjectionId] = useState<string | null>(null)
   const [expandedObjections, setExpandedObjections] = useState<Set<string>>(new Set())
-  const [evaluatingObjection, setEvaluatingObjection] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Estados para Objetivos de Roleplay
@@ -466,9 +448,6 @@ function ConfigurationInterface({
   const [currentUploadIndex, setCurrentUploadIndex] = useState<number>(-1)
   const [uploadProgress, setUploadProgress] = useState<{ total: number; completed: number }>({ total: 0, completed: 0 })
   const [evaluatingQuality, setEvaluatingQuality] = useState(false)
-  const [evaluatingPersona, setEvaluatingPersona] = useState(false)
-  const [editedPersonaIds, setEditedPersonaIds] = useState<Set<string>>(new Set())
-  const [editedObjectionIds, setEditedObjectionIds] = useState<Set<string>>(new Set())
   const [editingObjectionName, setEditingObjectionName] = useState<string | null>(null)
   const [tempObjectionName, setTempObjectionName] = useState('')
   const [editingRebuttalId, setEditingRebuttalId] = useState<{objectionId: string, index: number} | null>(null)
@@ -2191,9 +2170,7 @@ function ConfigurationInterface({
         }
 
         setPersonas(personas.map(p => p.id === editingPersonaId ? data : p))
-        // Marcar persona como editada (permite reavaliação)
         if (editingPersonaId) {
-          setEditedPersonaIds(prev => new Set(prev).add(editingPersonaId))
           // Atualizar tags da persona
           await handlePersonaTagsUpdate(editingPersonaId, selectedPersonaTags)
         }
@@ -2239,9 +2216,7 @@ function ConfigurationInterface({
         }
 
         setPersonas(personas.map(p => p.id === editingPersonaId ? data : p))
-        // Marcar persona como editada (permite reavaliação)
         if (editingPersonaId) {
-          setEditedPersonaIds(prev => new Set(prev).add(editingPersonaId))
           // Atualizar tags da persona
           await handlePersonaTagsUpdate(editingPersonaId, selectedPersonaTags)
         }
@@ -2282,146 +2257,6 @@ function ConfigurationInterface({
     }
   }
 
-  const handleEvaluatePersona = async (persona: Persona) => {
-    setEvaluatingPersona(true)
-    try {
-      console.log('📊 Enviando persona para avaliação...', persona)
-
-      // Buscar dados da empresa e company_type
-      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
-      const { supabase } = await import('@/lib/supabase')
-
-      const companyId = await getCompanyId()
-      let companyData = null
-      let companyType = 'B2C' // Default
-
-      if (companyId) {
-        // Buscar company_data
-        const { data: companyDataResult, error: companyError } = await supabase
-          .from('company_data')
-          .select('*')
-          .eq('company_id', companyId)
-          .single()
-
-        if (!companyError && companyDataResult) {
-          companyData = companyDataResult
-          console.log('🏢 Dados da empresa carregados:', companyDataResult.nome)
-        }
-
-        // Buscar company_type
-        const { data: companyTypeResult, error: typeError } = await supabase
-          .from('company_type')
-          .select('name')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-
-        if (typeError) {
-          console.warn('⚠️ Erro ao buscar company_type:', typeError)
-        }
-
-        if (companyTypeResult) {
-          companyType = companyTypeResult.name
-          console.log('🏷️ Company type encontrado:', companyType)
-        } else {
-          console.warn('⚠️ Company type não encontrado, usando default:', companyType)
-        }
-      }
-
-      // Juntar todos os campos do formulário em um único texto
-      let personaText = ''
-
-      if (persona.business_type === 'B2B') {
-        const personaB2B = persona as PersonaB2B
-        personaText = `Tipo de Negócio: B2B\n\nCargo: ${personaB2B.job_title || 'N/A'}\n\nTipo de Empresa: ${personaB2B.company_type || 'N/A'}\n\nContexto: ${personaB2B.context || 'N/A'}\n\nO que busca para a empresa: ${personaB2B.company_goals || 'N/A'}\n\nPrincipais desafios/dores do negócio: ${personaB2B.business_challenges || 'N/A'}\n\nO que já sabe sobre a empresa: ${personaB2B.prior_knowledge || 'N/A'}`
-      } else {
-        const personaB2C = persona as PersonaB2C
-        personaText = `Tipo de Negócio: B2C\n\nProfissão: ${personaB2C.profession || 'N/A'}\n\nContexto: ${personaB2C.context || 'N/A'}\n\nO que busca/valoriza: ${personaB2C.what_seeks || 'N/A'}\n\nPrincipais dores/problemas: ${personaB2C.main_pains || 'N/A'}\n\nO que já sabe sobre a empresa: ${personaB2C.prior_knowledge || 'N/A'}`
-      }
-
-      const payload = {
-        persona: personaText,
-        companyData: companyData, // Dados da empresa
-        companyType: companyType   // B2B ou B2C
-      }
-
-      console.log('📤 Payload enviado para N8N:', {
-        hasCompanyData: !!companyData,
-        companyType: companyType,
-        companyName: companyData?.nome
-      })
-
-      const response = await fetch('https://ezboard.app.n8n.cloud/webhook/persona-consultor', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        console.log('✅ Resposta recebida:', result)
-
-        // Parse do JSON retornado pelo N8N
-        let evaluation
-
-        // N8N retorna array com objeto {output: "```json\n{...}\n```"}
-        if (Array.isArray(result) && result[0]?.output) {
-          const outputString = result[0].output
-          // Remover ```json e ``` do início e fim
-          const jsonString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
-          evaluation = JSON.parse(jsonString)
-        } else if (result.output) {
-          const outputString = result.output
-          const jsonString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
-          evaluation = JSON.parse(jsonString)
-        } else {
-          evaluation = result
-        }
-
-        console.log('✅ Avaliação processada:', evaluation)
-        setPersonaEvaluation(evaluation)
-        setShowPersonaEvaluationModal(true)
-
-        // Salvar o score no banco de dados
-        if (evaluation.score_geral && persona.id) {
-          const { supabase } = await import('@/lib/supabase')
-          const { error: updateError } = await supabase
-            .from('personas')
-            .update({ evaluation_score: evaluation.score_geral })
-            .eq('id', persona.id)
-
-          if (!updateError) {
-            // Atualizar a lista local de personas
-            setPersonas(personas.map(p =>
-              p.id === persona.id
-                ? { ...p, evaluation_score: evaluation.score_geral }
-                : p
-            ))
-            // Remover da lista de editadas (desabilita o botão)
-            if (persona.id) {
-              setEditedPersonaIds(prev => {
-                const newSet = new Set(prev)
-                newSet.delete(persona.id!)
-                return newSet
-              })
-            }
-          }
-        }
-      } else {
-        console.error('❌ Erro ao avaliar persona:', response.status)
-        alert(`Erro ao avaliar persona (${response.status})`)
-      }
-    } catch (error) {
-      console.error('💥 Erro ao avaliar persona:', error)
-      alert('Erro ao conectar com o serviço de avaliação')
-    } finally {
-      setEvaluatingPersona(false)
-    }
-  }
-
   const handleAddObjection = async () => {
     if (newObjection.trim()) {
       const objection = await addObjection(newObjection.trim(), [])
@@ -2448,8 +2283,6 @@ function ConfigurationInterface({
         o.id === objectionId ? { ...o, rebuttals: updatedRebuttals, evaluation_score: null } : o
       ))
       setNewRebuttal('')
-      // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
@@ -2467,8 +2300,6 @@ function ConfigurationInterface({
       ))
       setEditingObjectionName(null)
       setTempObjectionName('')
-      // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
@@ -2489,8 +2320,6 @@ function ConfigurationInterface({
       ))
       setEditingRebuttalId(null)
       setTempRebuttalText('')
-      // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
@@ -2505,8 +2334,6 @@ function ConfigurationInterface({
       setObjections(objections.map(o =>
         o.id === objectionId ? { ...o, rebuttals: updatedRebuttals, evaluation_score: null } : o
       ))
-      // Marcar como editada para permitir reavaliação
-      setEditedObjectionIds(prev => new Set(Array.from(prev).concat(objectionId)))
     }
   }
 
@@ -2541,135 +2368,6 @@ function ConfigurationInterface({
       }
       return newSet
     })
-  }
-
-  const handleEvaluateObjection = async (objection: Objection) => {
-    setEvaluatingObjection(true)
-    setObjectionEvaluation(null)
-
-    try {
-      console.log('🔍 Iniciando avaliação da objeção:', objection.name)
-
-      // Buscar dados da empresa e company_type
-      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
-      const { supabase } = await import('@/lib/supabase')
-
-      const companyId = await getCompanyId()
-      let companyData = null
-      let companyType = 'B2C' // Default
-
-      if (companyId) {
-        // Buscar company_data
-        const { data, error } = await supabase
-          .from('company_data')
-          .select('*')
-          .eq('company_id', companyId)
-          .single()
-
-        if (!error && data) {
-          companyData = data
-          console.log('🏢 Dados da empresa carregados:', data.nome)
-        }
-
-        // Buscar company_type
-        const { data: companyTypeResult, error: typeError } = await supabase
-          .from('company_type')
-          .select('name')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-
-        if (!typeError && companyTypeResult) {
-          companyType = companyTypeResult.name
-          console.log('🏷️ Company type:', companyType)
-        }
-      }
-
-      // Formatar como texto único
-      let objectionText = `OBJEÇÃO:\n${objection.name}\n\nFORMAS DE QUEBRAR:`
-
-      if (objection.rebuttals && objection.rebuttals.length > 0) {
-        objection.rebuttals.forEach((rebuttal, index) => {
-          // Garantir que rebuttal é string (pode vir como objeto do banco)
-          const rebuttalText = typeof rebuttal === 'string' ? rebuttal : JSON.stringify(rebuttal)
-          objectionText += `\n${index + 1}. ${rebuttalText}`
-        })
-      } else {
-        objectionText += `\nNenhuma forma de quebrar cadastrada.`
-      }
-
-      const payload = {
-        objecao_completa: objectionText,
-        companyData: companyData, // Dados da empresa para contexto
-        companyType: companyType   // B2B ou B2C
-      }
-
-      console.log('📤 Enviando para N8N:', payload)
-
-      const response = await fetch('https://ezboard.app.n8n.cloud/webhook/ed84cced-6bf5-4c4d-87e7-4ca3057be871', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`)
-      }
-
-      const result = await response.json()
-      console.log('📥 Resposta N8N:', result)
-
-      // Parse do formato N8N
-      let evaluation = result
-      if (Array.isArray(result) && result[0]?.output) {
-        let outputString = result[0].output
-        // Remover markdown code blocks se existirem
-        if (outputString.includes('```json')) {
-          outputString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
-        }
-        evaluation = JSON.parse(outputString)
-      } else if (result?.output && typeof result.output === 'string') {
-        let outputString = result.output
-        // Remover markdown code blocks se existirem
-        if (outputString.includes('```json')) {
-          outputString = outputString.replace(/```json\n/, '').replace(/\n```$/, '')
-        }
-        evaluation = JSON.parse(outputString)
-      }
-
-      console.log('✅ Avaliação processada:', evaluation)
-
-      // Salvar score no banco de dados
-      if (evaluation?.nota_final !== undefined) {
-        const success = await updateObjectionScore(objection.id, evaluation.nota_final)
-        if (success) {
-          console.log('💾 Score salvo no banco:', evaluation.nota_final)
-          // Atualizar state local
-          setObjections(objections.map(o =>
-            o.id === objection.id ? { ...o, evaluation_score: evaluation.nota_final } : o
-          ))
-        }
-      }
-
-      setObjectionEvaluation(evaluation)
-      setShowObjectionEvaluationModal(true)
-
-      // Limpar flag de edição após avaliação bem-sucedida
-      setEditedObjectionIds(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(objection.id)
-        return newSet
-      })
-
-    } catch (error) {
-      console.error('💥 Erro ao avaliar objeção:', error)
-      alert('Erro ao conectar com o serviço de avaliação')
-    } finally {
-      setEvaluatingObjection(false)
-    }
   }
 
   // Funções para Objetivos de Roleplay
@@ -3853,16 +3551,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               )}
                             </div>
                           )}
-                          {/* Score compacto */}
-                          {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
-                            <div className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                              persona.evaluation_score >= 7 ? 'bg-green-100 text-green-700' :
-                              persona.evaluation_score >= 4 ? 'bg-amber-100 text-amber-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {persona.evaluation_score.toFixed(1)}
-                            </div>
-                          )}
                           <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                         </div>
                       </div>
@@ -3963,44 +3651,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
                           {/* Botões de ação */}
                           <div className="flex gap-2 flex-shrink-0 items-center mt-3 pt-3 border-t border-gray-200">
-                            {/* Score da avaliação */}
-                            {persona.evaluation_score !== undefined && persona.evaluation_score !== null && (
-                              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
-                                persona.evaluation_score >= 7 ? 'bg-green-50 border border-green-200' :
-                                persona.evaluation_score >= 4 ? 'bg-amber-50 border border-amber-200' :
-                                'bg-red-50 border border-red-200'
-                              }`}>
-                                <span className="text-xs text-gray-500">Nota:</span>
-                                <span className={`text-sm font-bold ${
-                                  persona.evaluation_score >= 7 ? 'text-green-700' :
-                                  persona.evaluation_score >= 4 ? 'text-amber-700' :
-                                  'text-red-700'
-                                }`}>{persona.evaluation_score.toFixed(1)}</span>
-                              </div>
-                            )}
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEvaluatePersona(persona)
-                              }}
-                              disabled={evaluatingPersona || (persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!))}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-                              title={
-                                persona.evaluation_score !== undefined && persona.evaluation_score !== null && !editedPersonaIds.has(persona.id!)
-                                  ? 'Edite a persona para poder reavaliá-la'
-                                  : editedPersonaIds.has(persona.id!)
-                                  ? 'Reavaliar persona após edição'
-                                  : 'Avaliar persona'
-                              }
-                            >
-                              {evaluatingPersona && <Loader2 className="w-3 h-3 animate-spin" />}
-                              {evaluatingPersona
-                                ? 'Avaliando...'
-                                : editedPersonaIds.has(persona.id!)
-                                ? 'Reavaliar'
-                                : 'Avaliar'}
-                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -4359,16 +4009,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </p>
               </div>
 
-              {/* Aviso de Qualidade */}
-              <div className="mx-5 mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800 leading-relaxed">
-                    <span className="font-semibold">Atenção:</span> Objeções com pontuação abaixo de 7.0 podem comprometer a qualidade do treinamento.
-                  </p>
-                </div>
-              </div>
-
               {/* Lista de objeções */}
               {objections.length > 0 && (
                 <div className="p-5 space-y-3">
@@ -4447,33 +4087,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {/* Score Badge */}
-                          {objection.evaluation_score !== null && objection.evaluation_score !== undefined && (
-                            <div className={`px-2 py-0.5 rounded text-xs font-bold ${
-                              objection.evaluation_score >= 7 ? 'bg-green-100 text-green-700' :
-                              objection.evaluation_score >= 4 ? 'bg-amber-100 text-amber-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {objection.evaluation_score.toFixed(1)}
-                            </div>
-                          )}
-
-                          <button
-                            onClick={() => handleEvaluateObjection(objection)}
-                            disabled={evaluatingObjection || (objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id))}
-                            className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={
-                              objection.evaluation_score !== null && objection.evaluation_score !== undefined && !editedObjectionIds.has(objection.id)
-                                ? 'Edite a objeção para poder reavaliar'
-                                : ''
-                            }
-                          >
-                            {evaluatingObjection ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              objection.evaluation_score !== null && objection.evaluation_score !== undefined ? 'Reavaliar' : 'Avaliar'
-                            )}
-                          </button>
                           <button
                             onClick={() => handleRemoveObjection(objection.id)}
                             className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
@@ -6113,40 +5726,6 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
   const { showToast } = useToast()
   const [companyId, setCompanyId] = useState<string | null>(null)
 
-  // Estados para avaliação de persona
-  const [personaEvaluation, setPersonaEvaluation] = useState<{
-    qualidade_geral: string
-    score_geral: number
-    nivel_qualidade_textual: string
-    score_detalhado: {
-      cargo: number
-      tipo_empresa_faturamento: number
-      contexto: number
-      busca: number
-      dores: number
-    }
-    destaques_positivos: string[]
-    spin_readiness: {
-      situacao: string
-      problema: string
-      implicacao: string
-      need_payoff: string
-      score_spin_total: number
-    }
-    campos_excelentes: string[]
-    campos_que_precisam_ajuste: string[]
-    sugestoes_melhora_prioritarias: string[]
-    pronto_para_roleplay: boolean
-    nivel_complexidade_roleplay: string
-    proxima_acao_recomendada: string
-    mensagem_motivacional: string
-  } | null>(null)
-  const [showPersonaEvaluationModal, setShowPersonaEvaluationModal] = useState(false)
-
-  // Estados para avaliação de objeção
-  const [objectionEvaluation, setObjectionEvaluation] = useState<any>(null)
-  const [showObjectionEvaluationModal, setShowObjectionEvaluationModal] = useState(false)
-
   // Estados para avaliação de dados da empresa
   const [qualityEvaluation, setQualityEvaluation] = useState<{
     nota_final: number
@@ -6205,8 +5784,7 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-start justify-center pt-8 px-4 pb-4">
       <div className={`relative max-w-5xl w-full max-h-[calc(100vh-64px)] flex flex-col transition-transform duration-300 ${
-        showPersonaEvaluationModal || showCompanyEvaluationModal || showAIModal ? 'sm:-translate-x-[250px]' :
-        showObjectionEvaluationModal ? 'sm:-translate-x-[210px]' : ''
+        showCompanyEvaluationModal || showAIModal ? 'sm:-translate-x-[250px]' : ''
       }`}>
         <div className="bg-white rounded-2xl shadow-2xl flex flex-col max-h-full overflow-hidden">
           {/* Header */}
@@ -6238,14 +5816,6 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
             ) : userRole?.toLowerCase() === 'admin' ? (
               // Configuration Interface - Admin only
               <ConfigurationInterface
-                personaEvaluation={personaEvaluation}
-                setPersonaEvaluation={setPersonaEvaluation}
-                showPersonaEvaluationModal={showPersonaEvaluationModal}
-                setShowPersonaEvaluationModal={setShowPersonaEvaluationModal}
-                objectionEvaluation={objectionEvaluation}
-                setObjectionEvaluation={setObjectionEvaluation}
-                showObjectionEvaluationModal={showObjectionEvaluationModal}
-                setShowObjectionEvaluationModal={setShowObjectionEvaluationModal}
                 qualityEvaluation={qualityEvaluation}
                 setQualityEvaluation={setQualityEvaluation}
                 showCompanyEvaluationModal={showCompanyEvaluationModal}
@@ -6273,322 +5843,6 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
         </div>
       </div>
       </div>
-
-    {/* Modal de Avaliação de Persona - Side Panel (fora do ConfigHub) */}
-    {showPersonaEvaluationModal && personaEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[500px] z-[100] p-4">
-        <style jsx>{`
-          @keyframes slide-in {
-            from {
-              transform: translateX(100%);
-              opacity: 0;
-            }
-            to {
-              transform: translateX(0);
-              opacity: 1;
-            }
-          }
-          .animate-slide-in {
-            animation: slide-in 0.3s ease-out;
-          }
-        `}</style>
-        <div className="relative h-full animate-slide-in">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-transparent rounded-3xl blur-xl"></div>
-          <div className="relative bg-gray-900/98 backdrop-blur-xl rounded-3xl border border-green-500/30 h-full flex flex-col overflow-hidden shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-green-500/20 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-green-600/20 rounded-xl flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-400" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Avaliação</h2>
-                  <p className="text-xs text-gray-400">{personaEvaluation.mensagem_motivacional}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowPersonaEvaluationModal(false)}
-                className="text-gray-400 hover:text-gray-700 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 overflow-y-auto flex-1 space-y-4">
-              {/* Score Geral */}
-              <div className="bg-gradient-to-br from-green-900/30 to-transparent border border-green-500/30 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="text-base font-bold text-white mb-0.5">Score Geral</h3>
-                    <p className="text-xs text-gray-400 capitalize">{personaEvaluation.qualidade_geral} • {personaEvaluation.nivel_qualidade_textual}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-green-400">{personaEvaluation.score_geral.toFixed(1)}</div>
-                    <div className="text-xs text-gray-500">/10</div>
-                  </div>
-                </div>
-
-                {/* Barra de progresso */}
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-green-600 to-green-400 h-2 rounded-full transition-all"
-                    style={{ width: `${(personaEvaluation.score_geral / 10) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Scores Detalhados */}
-              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-3">
-                <h3 className="text-sm font-bold text-white mb-3">Scores por Campo</h3>
-                <div className="space-y-2">
-                  {personaEvaluation.score_detalhado && Object.entries(personaEvaluation.score_detalhado).map(([campo, scoreData]: [string, any]) => {
-                    // Mapeamento de nomes para exibição
-                    const fieldNames: Record<string, string> = {
-                      'cargo_perfil': 'Cargo/Perfil',
-                      'tipo_empresa_faturamento_perfil_socioeconomico': 'Tipo Empresa/Perfil',
-                      'contexto': 'Contexto',
-                      'busca': 'O que Busca',
-                      'dores': 'Dores/Desafios'
-                    }
-
-                    // Extrair o score numérico do objeto
-                    const scoreValue = typeof scoreData === 'object' ? (scoreData.score || 0) : scoreData;
-
-                    return (
-                      <div key={campo}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-700">
-                            {fieldNames[campo] || campo}
-                          </span>
-                          <span className="text-xs font-bold text-green-400">{scoreValue}/10</span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full transition-all ${
-                              scoreValue >= 9 ? 'bg-green-500' :
-                              scoreValue >= 7 ? 'bg-blue-500' :
-                              scoreValue >= 5 ? 'bg-yellow-500' :
-                              'bg-orange-500'
-                            }`}
-                            style={{ width: `${(scoreValue / 10) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Destaques Positivos */}
-              {personaEvaluation.destaques_positivos?.length > 0 && (
-                <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
-                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    Destaques Positivos
-                  </h3>
-                  <ul className="space-y-1.5">
-                    {personaEvaluation.destaques_positivos.map((destaque, idx) => (
-                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
-                        <span className="text-green-400 mt-0.5">•</span>
-                        <span>{destaque}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* SPIN Readiness */}
-              <div className="bg-gray-900/50 border border-green-500/20 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-white">Prontidão SPIN</h3>
-                  <span className="text-lg font-bold text-green-400">
-                    {personaEvaluation.spin_readiness.score_spin_total}/10
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(personaEvaluation.spin_readiness)
-                    .filter(([key]) => key !== 'score_spin_total')
-                    .map(([etapa, statusData]) => {
-                      // Extrair o status do objeto
-                      const statusValue = typeof statusData === 'object' ? ((statusData as any).status || 'insuficiente') : statusData;
-
-                      return (
-                        <div key={etapa} className="bg-gray-100/50 rounded-lg p-2">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-medium text-gray-400 uppercase">
-                              {etapa.replace(/_/g, ' ')}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold text-center ${
-                              statusValue === 'pronto' ? 'bg-green-100 text-green-700' :
-                              statusValue === 'precisa_ajuste' ? 'bg-amber-100 text-amber-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {statusValue === 'pronto' ? '✓ Pronto' :
-                               statusValue === 'precisa_ajuste' ? '⚠ Ajustar' :
-                               '✗ Insuf.'}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-
-              {/* Campos Excelentes */}
-              {personaEvaluation.campos_excelentes?.length > 0 && (
-                <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3">
-                  <h3 className="text-sm font-bold text-white mb-2">
-                    🌟 Excelentes (≥9)
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {personaEvaluation.campos_excelentes.map((campo, idx) => (
-                      <span key={idx} className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded-full text-[10px]">
-                        {campo.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Campos que Precisam Ajuste */}
-              {personaEvaluation.campos_que_precisam_ajuste?.length > 0 && (
-                <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-3">
-                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 text-orange-400" />
-                    Para Ajustar
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {personaEvaluation.campos_que_precisam_ajuste.map((campo, idx) => (
-                      <span key={idx} className="px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full text-[10px]">
-                        {campo.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Sugestões de Melhoria */}
-              {personaEvaluation.sugestoes_melhora_prioritarias?.length > 0 && (
-                <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-3">
-                  <h3 className="text-sm font-bold text-white mb-2">
-                    💡 Sugestões Prioritárias
-                  </h3>
-                  <ul className="space-y-1.5">
-                    {personaEvaluation.sugestoes_melhora_prioritarias.map((sugestao, idx) => (
-                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
-                        <span className="text-blue-400 mt-0.5 font-bold text-[10px]">{idx + 1}.</span>
-                        <span className="leading-tight">{sugestao}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Status e Recomendação */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className={`rounded-lg p-2.5 border ${
-                  personaEvaluation.pronto_para_roleplay
-                    ? 'bg-green-900/20 border-green-500/30'
-                    : 'bg-yellow-900/20 border-yellow-500/30'
-                }`}>
-                  <h4 className="text-xs font-semibold mb-1 text-white">Status</h4>
-                  <p className={`text-xs font-bold ${
-                    personaEvaluation.pronto_para_roleplay ? 'text-green-400' : 'text-yellow-400'
-                  }`}>
-                    {personaEvaluation.pronto_para_roleplay ? '✓ Pronto' : '⚠ Ajustar'}
-                  </p>
-                </div>
-                <div className="bg-gray-900/50 border border-green-500/20 rounded-lg p-2.5">
-                  <h4 className="text-xs font-semibold mb-1 text-white">Nível</h4>
-                  <p className="text-xs text-green-400 capitalize font-bold">
-                    {personaEvaluation.nivel_complexidade_roleplay}
-                  </p>
-                </div>
-              </div>
-
-              {/* Próxima Ação */}
-              <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-500/30 rounded-xl p-3">
-                <h3 className="text-sm font-bold text-white mb-1.5">🎯 Próxima Ação</h3>
-                <p className="text-xs text-gray-700 leading-tight">
-                  {(() => {
-                    const actionMap: Record<string, string> = {
-                      'usar_imediatamente': '✅ Usar imediatamente no treinamento',
-                      'refinar_campos_especificos': '⚠️ Refinar campos específicos',
-                      'reescrever_persona': '🔄 Reescrever persona do zero'
-                    }
-                    return actionMap[personaEvaluation.proxima_acao_recomendada] || personaEvaluation.proxima_acao_recomendada
-                  })()}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* Modal de Avaliação de Objeção - Side Panel (fora do ConfigHub) */}
-    {showObjectionEvaluationModal && objectionEvaluation && (
-      <div className="fixed top-0 right-0 h-screen w-full sm:w-[420px] z-[100] p-3 bg-gradient-to-br from-green-950/90 via-gray-900/95 to-gray-900/95">
-        <div className="h-full bg-gradient-to-b from-green-900/20 to-gray-900/50 border border-green-500/30 rounded-lg shadow-2xl overflow-y-auto animate-slide-in">
-          <div className="sticky top-0 bg-gradient-to-b from-green-900/80 to-gray-900/80 backdrop-blur-sm border-b border-green-500/30 p-3 flex items-center justify-between z-10">
-            <h3 className="font-bold text-white text-sm">Avaliação da Objeção</h3>
-            <button
-              onClick={() => setShowObjectionEvaluationModal(false)}
-              className="text-gray-400 hover:text-gray-700 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="p-3 space-y-3">
-            {/* Score Geral */}
-            <div className={`rounded-lg p-3 text-center ${
-              objectionEvaluation.status === 'APROVADA' ? 'bg-green-500/20 border border-green-500/30' :
-              objectionEvaluation.status === 'REVISAR' ? 'bg-yellow-500/20 border border-yellow-500/30' :
-              'bg-red-500/20 border border-red-500/30'
-            }`}>
-              <div className="text-3xl font-bold text-white mb-1">
-                {objectionEvaluation.nota_final?.toFixed(1)}/10
-              </div>
-              <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                objectionEvaluation.status === 'APROVADA' ? 'bg-green-600/30 text-green-300' :
-                objectionEvaluation.status === 'REVISAR' ? 'bg-yellow-600/30 text-yellow-300' :
-                'bg-red-600/30 text-red-300'
-              }`}>
-                {objectionEvaluation.status}
-              </div>
-            </div>
-
-            {/* Como Melhorar */}
-            {objectionEvaluation.como_melhorar?.length > 0 && (
-              <div className="bg-gray-100/50 border border-green-500/20 rounded-lg p-3">
-                <h4 className="font-semibold text-green-400 mb-2 text-xs">
-                  💡 Como Melhorar
-                </h4>
-                <ul className="space-y-1.5">
-                  {objectionEvaluation.como_melhorar.map((sugestao: string, idx: number) => (
-                    <li key={idx} className="text-xs text-gray-700 flex items-start">
-                      <span className="text-green-400 mr-1.5 font-bold">{idx + 1}.</span>
-                      <span className="flex-1 leading-relaxed">{sugestao}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Mensagem de Aprovação */}
-            {objectionEvaluation.status === 'APROVADA' && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
-                <p className="text-green-300 text-xs">
-                  ✅ Objeção bem estruturada e pronta para usar no treinamento!
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
 
     {/* Painel Lateral de Avaliação de Dados da Empresa */}
     {showCompanyEvaluationModal && qualityEvaluation && (
