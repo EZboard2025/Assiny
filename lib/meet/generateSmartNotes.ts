@@ -88,49 +88,12 @@ EXEMPLO DE SECAO RUIM:
 }
 
 ═══════════════════════════════════════
-SECOES COMUNS POR TIPO DE NEGOCIO
+TOPICOS DE EXTRACAO CONFIGURADOS
 ═══════════════════════════════════════
 
-Use como INSPIRACAO, nao como template rigido. Crie secoes que facam sentido para O QUE FOI DISCUTIDO na reuniao e o CONTEXTO DA EMPRESA VENDEDORA fornecido.
+O gestor configurou topicos especificos que devem ser PRIORIZADOS na extracao. Eles serao fornecidos na mensagem do usuario como "TOPICOS DE EXTRACAO". Use-os como GUIA principal para criar secoes, mas mantenha flexibilidade: se a reuniao revelou algo importante que nao esta nos topicos, crie uma secao adicional. Da mesma forma, se um topico nao teve dados na reuniao, nao force uma secao vazia — inclua um item "Nao explorado na reuniao" na secao mais relevante.
 
-Exemplos por tipo de negocio (adapte ao contexto real):
-
-Para vendas B2B/SaaS/Software:
-- Perfil da Empresa do Lead (setor, tamanho, faturamento, estrutura, decisores)
-- Stack Atual e Ferramentas (o que usam hoje, integracoes, contratos vigentes)
-- Processo de Decisao (decisores, comite, aprovacoes, timeline)
-- Orcamento e Modelo Financeiro (budget disponivel, ciclo de compra, ROI esperado)
-- Dores Operacionais (problemas especificos com sub-topicos)
-- Demo/POC Discutido (o que foi mostrado, reacao, feedback)
-- Requisitos Tecnicos (integracoes necessarias, seguranca, compliance)
-
-Para vendas de marketing/publicidade:
-- Perfil da Empresa (nicho, publico-alvo, posicionamento atual)
-- Investimento e Performance Atual (canais, budget mensal, ROAS, CAC, LTV)
-- Desafios de Growth (gargalos, concorrencia, sazonalidade)
-- Proposta Discutida (servicos, valores, projecoes apresentadas)
-- Equipe e Estrutura (time interno vs agencia, ferramentas usadas)
-
-Para vendas de servicos financeiros/pagamentos:
-- Contexto Geral do Lead (perfil, origem, modelo comercial, maturidade)
-- Modelo de Venda & Ticket (ticket medio, formas de pagamento, recorrencia)
-- Historico na Plataforma Atual (provedor, taxas, prazos, volumes, limitacoes)
-- Principais Dores Identificadas (com sub-topicos por dor)
-- Simulacoes Financeiras Realizadas na Call (comparativos, calculos)
-- Compliance & Onboarding (documentacao, processo, prazos)
-
-Para vendas de consultoria/treinamento/RH:
-- Perfil da Empresa e Equipe (tamanho, areas, turnover, maturidade)
-- Desafios e Gaps Identificados (competencias, processos, resultados)
-- Iniciativas Anteriores (o que ja tentaram, resultados, frustrações)
-- Escopo Discutido (servicos propostos, formato, duracao, investimento)
-- Metricas de Sucesso (KPIs esperados, como vao medir resultado)
-
-Para vendas de produtos fisicos/e-commerce:
-- Perfil do Negocio (canais de venda, marketplaces, logistica)
-- Volume e Metricas Atuais (GMV, pedidos/mes, ticket medio, margem)
-- Desafios Operacionais (estoque, fulfillment, atendimento)
-- Ferramentas e Integracoes (ERP, WMS, plataforma de e-commerce)
+Se NENHUM topico customizado for fornecido, use sua propria inteligencia para identificar os temas mais relevantes baseado no contexto da empresa e no conteudo da reuniao.
 
 ═══════════════════════════════════════
 SIMULACOES E CALCULOS (IMPORTANTE)
@@ -306,7 +269,20 @@ export async function generateSmartNotes(params: GenerateSmartNotesParams): Prom
     }
   }
 
-  // 2. Fetch custom observations from manager
+  // 2. Fetch custom extraction topics
+  let topicsSection = ''
+  const { data: topics } = await supabaseAdmin
+    .from('meet_note_topics')
+    .select('title, description, enabled')
+    .eq('company_id', companyId)
+    .eq('enabled', true)
+    .order('sort_order', { ascending: true })
+
+  if (topics && topics.length > 0) {
+    topicsSection = `\n\nTOPICOS DE EXTRACAO (configurados pelo gestor — priorize estes):\n${topics.map((t, i) => `${i + 1}. ${t.title}${t.description ? ` — ${t.description}` : ''}`).join('\n')}`
+  }
+
+  // 3. Fetch custom observations from manager
   let observationsSection = ''
   const { data: observations } = await supabaseAdmin
     .from('meet_note_observations')
@@ -319,14 +295,14 @@ export async function generateSmartNotes(params: GenerateSmartNotesParams): Prom
     observationsSection = `\n\nOBSERVACOES PERSONALIZADAS DO GESTOR:\nO gestor configurou as seguintes observacoes especificas. Para CADA uma, identifique se a informacao foi mencionada na reuniao e extraia os detalhes. Se NAO foi mencionada, explique brevemente. Inclua os resultados em "custom_observations" no JSON.\n\n${observations.map((obs, i) => `${i + 1}. "${obs.text}"`).join('\n')}`
   }
 
-  // 3. Build user prompt
+  // 4. Build user prompt
   const maxChars = 50000
   let processedTranscript = transcript
   if (transcript.length > maxChars) {
     processedTranscript = transcript.substring(0, maxChars) + '\n\n[... transcricao truncada ...]'
   }
 
-  const userPrompt = `Analise esta transcricao de reuniao de vendas e extraia TODAS as informacoes do cliente/prospect em notas de inteligencia comercial de altissimo nivel.${companyContext}${observationsSection}
+  const userPrompt = `Analise esta transcricao de reuniao de vendas e extraia TODAS as informacoes do cliente/prospect em notas de inteligencia comercial de altissimo nivel.${companyContext}${topicsSection}${observationsSection}
 
 TRANSCRICAO DA REUNIAO:
 ${processedTranscript}
@@ -338,9 +314,9 @@ Gere notas inteligentes no formato JSON especificado. Lembre-se:
 - Priorize ESPECIFICIDADE e DADOS CONCRETOS sobre generalidades
 - Ordene secoes por relevancia estrategica${!observations?.length ? '\nNao inclua o campo "custom_observations" no JSON pois nao ha observacoes personalizadas configuradas.' : ''}`
 
-  console.log(`[SmartNotes] Prompt: ${userPrompt.length} chars, ${observations?.length || 0} observacoes customizadas`)
+  console.log(`[SmartNotes] Prompt: ${userPrompt.length} chars, ${topics?.length || 0} topicos, ${observations?.length || 0} observacoes`)
 
-  // 4. Call OpenAI
+  // 5. Call OpenAI
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1',
     messages: [

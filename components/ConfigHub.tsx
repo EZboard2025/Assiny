@@ -531,6 +531,16 @@ function ConfigurationInterface({
   const [newMeetObservation, setNewMeetObservation] = useState('')
   const [savingMeetObservation, setSavingMeetObservation] = useState(false)
 
+  // Estados para Tópicos de Extração
+  const [meetTopics, setMeetTopics] = useState<{id: string, title: string, description: string | null, enabled: boolean, sort_order: number}[]>([])
+  const [loadingTopics, setLoadingTopics] = useState(false)
+  const [addingTopic, setAddingTopic] = useState(false)
+  const [newTopicTitle, setNewTopicTitle] = useState('')
+  const [newTopicDescription, setNewTopicDescription] = useState('')
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
+  const [editingTopicTitle, setEditingTopicTitle] = useState('')
+  const [editingTopicDescription, setEditingTopicDescription] = useState('')
+
   // Carregar PDFs salvos da empresa
   const loadSavedPdfs = async (companyId: string) => {
     try {
@@ -598,6 +608,132 @@ function ConfigurationInterface({
     }
   }
 
+  // === Tópicos de Extração ===
+  const DEFAULT_TOPICS = [
+    { title: 'Quem é o Lead', description: 'Nome, cargo, empresa, setor de atuação' },
+    { title: 'Situação Atual', description: 'Como opera hoje, o que usa, como funciona o processo atual' },
+    { title: 'Dores e Desafios', description: 'Problemas, frustrações, gargalos mencionados' },
+    { title: 'O que Busca', description: 'Necessidades, expectativas, o que espera da solução' },
+    { title: 'Orçamento e Prazo', description: 'Budget, timeline, urgência, quando pretende decidir' },
+    { title: 'Objeções e Preocupações', description: 'Dúvidas, resistências, preocupações levantadas' },
+  ]
+
+  const loadMeetTopics = async () => {
+    if (!userCompanyId) return
+    setLoadingTopics(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data } = await supabase
+        .from('meet_note_topics')
+        .select('id, title, description, enabled, sort_order')
+        .eq('company_id', userCompanyId)
+        .order('sort_order', { ascending: true })
+
+      if (data && data.length > 0) {
+        setMeetTopics(data)
+      } else {
+        // Seed defaults for this company
+        const inserts = DEFAULT_TOPICS.map((t, i) => ({
+          company_id: userCompanyId,
+          title: t.title,
+          description: t.description,
+          enabled: true,
+          sort_order: i
+        }))
+        const { error } = await supabase.from('meet_note_topics').insert(inserts)
+        if (!error) {
+          const { data: seeded } = await supabase
+            .from('meet_note_topics')
+            .select('id, title, description, enabled, sort_order')
+            .eq('company_id', userCompanyId)
+            .order('sort_order', { ascending: true })
+          setMeetTopics(seeded || [])
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao carregar tópicos:', err)
+    }
+    setLoadingTopics(false)
+  }
+
+  const toggleMeetTopic = async (id: string, currentEnabled: boolean) => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('meet_note_topics').update({ enabled: !currentEnabled }).eq('id', id)
+      setMeetTopics(prev => prev.map(t => t.id === id ? { ...t, enabled: !currentEnabled } : t))
+    } catch (err) {
+      console.error('Erro ao alternar tópico:', err)
+    }
+  }
+
+  const addMeetTopic = async () => {
+    if (!newTopicTitle.trim() || !userCompanyId) return
+    setLoadingTopics(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('meet_note_topics').insert({
+        company_id: userCompanyId,
+        title: newTopicTitle.trim(),
+        description: newTopicDescription.trim() || null,
+        enabled: true,
+        sort_order: meetTopics.length
+      })
+      setNewTopicTitle('')
+      setNewTopicDescription('')
+      setAddingTopic(false)
+      await loadMeetTopics()
+    } catch (err) {
+      console.error('Erro ao adicionar tópico:', err)
+    }
+    setLoadingTopics(false)
+  }
+
+  const removeMeetTopic = async (id: string) => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('meet_note_topics').delete().eq('id', id)
+      setMeetTopics(prev => prev.filter(t => t.id !== id))
+    } catch (err) {
+      console.error('Erro ao remover tópico:', err)
+    }
+  }
+
+  const saveEditTopic = async () => {
+    if (!editingTopicId || !editingTopicTitle.trim()) return
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('meet_note_topics').update({
+        title: editingTopicTitle.trim(),
+        description: editingTopicDescription.trim() || null,
+      }).eq('id', editingTopicId)
+      setMeetTopics(prev => prev.map(t => t.id === editingTopicId ? { ...t, title: editingTopicTitle.trim(), description: editingTopicDescription.trim() || null } : t))
+      setEditingTopicId(null)
+    } catch (err) {
+      console.error('Erro ao editar tópico:', err)
+    }
+  }
+
+  const resetTopicsToDefaults = async () => {
+    if (!userCompanyId) return
+    setLoadingTopics(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase.from('meet_note_topics').delete().eq('company_id', userCompanyId)
+      const inserts = DEFAULT_TOPICS.map((t, i) => ({
+        company_id: userCompanyId,
+        title: t.title,
+        description: t.description,
+        enabled: true,
+        sort_order: i
+      }))
+      await supabase.from('meet_note_topics').insert(inserts)
+      await loadMeetTopics()
+    } catch (err) {
+      console.error('Erro ao resetar tópicos:', err)
+    }
+    setLoadingTopics(false)
+  }
+
   const loadPlaybook = async () => {
     if (!userCompanyId) {
       setPlaybookLoaded(true)
@@ -640,10 +776,10 @@ function ConfigurationInterface({
     }
   }, [userCompanyId, playbookLoaded])
 
-  // Carregar observações de notas quando tab meet_notes estiver ativa
+  // Carregar tópicos quando tab meet_notes estiver ativa
   useEffect(() => {
     if (activeTab === 'meet_notes' && userCompanyId) {
-      loadMeetObservations()
+      loadMeetTopics()
     }
   }, [activeTab, userCompanyId])
 
@@ -4648,68 +4784,137 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Meet Notes Tab */}
         {activeTab === 'meet_notes' && (
           <div className="space-y-6">
+            {/* Tópicos de Extração */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white">
-                <div className="flex items-center gap-2">
-                  <Video className="w-5 h-5 text-cyan-600" />
-                  <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Observações para Notas de Reunião</h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Video className="w-5 h-5 text-cyan-600" />
+                      <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Tópicos de Extração</h3>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      A IA vai extrair informações sobre estes tópicos de cada reunião. Ative, desative, edite ou adicione novos tópicos.
+                    </p>
+                  </div>
+                  <button
+                    onClick={resetTopicsToDefaults}
+                    className="text-[11px] text-gray-400 hover:text-cyan-600 transition-colors flex items-center gap-1"
+                    title="Restaurar tópicos padrão"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Restaurar padrão</span>
+                  </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Configure instruções extras para a IA extrair dados específicos das suas reuniões de vendas. A IA já gera notas inteligentes automaticamente — use isso para personalizar pontos específicos do seu negócio.
-                </p>
               </div>
 
-              <div className="p-4 space-y-3">
-                {/* Lista de observações */}
-                {meetObservations.length > 0 ? (
-                  <div className="space-y-2">
-                    {meetObservations.map((obs) => (
-                      <div key={obs.id} className="flex items-start gap-2 group">
-                        <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 flex-shrink-0" />
-                        <p className="text-sm text-gray-700 flex-1 leading-relaxed">{obs.text}</p>
-                        <button
-                          onClick={() => removeMeetObservation(obs.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all flex-shrink-0"
-                          title="Remover observação"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+              <div className="p-4 space-y-2">
+                {loadingTopics ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-cyan-500" />
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400 italic">Nenhuma observação configurada.</p>
+                  <>
+                    {meetTopics.map((topic) => (
+                      <div key={topic.id} className={`group rounded-lg border transition-all ${topic.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
+                        {editingTopicId === topic.id ? (
+                          <div className="p-3 space-y-2">
+                            <input
+                              type="text"
+                              value={editingTopicTitle}
+                              onChange={(e) => setEditingTopicTitle(e.target.value)}
+                              className="w-full text-sm font-medium px-2 py-1.5 border border-cyan-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                              placeholder="Título do tópico"
+                            />
+                            <input
+                              type="text"
+                              value={editingTopicDescription}
+                              onChange={(e) => setEditingTopicDescription(e.target.value)}
+                              className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                              placeholder="Descrição (o que a IA deve extrair)"
+                            />
+                            <div className="flex gap-1.5 justify-end">
+                              <button onClick={() => setEditingTopicId(null)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1">Cancelar</button>
+                              <button onClick={saveEditTopic} className="text-xs bg-cyan-600 text-white px-3 py-1 rounded-md hover:bg-cyan-700">Salvar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 p-3">
+                            <button
+                              onClick={() => toggleMeetTopic(topic.id, topic.enabled)}
+                              className={`w-8 h-[18px] rounded-full transition-colors flex-shrink-0 relative ${topic.enabled ? 'bg-cyan-500' : 'bg-gray-300'}`}
+                            >
+                              <div className={`absolute top-[2px] w-[14px] h-[14px] bg-white rounded-full shadow-sm transition-transform ${topic.enabled ? 'left-[17px]' : 'left-[2px]'}`} />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium ${topic.enabled ? 'text-gray-900' : 'text-gray-500'}`}>{topic.title}</p>
+                              {topic.description && (
+                                <p className="text-[11px] text-gray-400 truncate">{topic.description}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => { setEditingTopicId(topic.id); setEditingTopicTitle(topic.title); setEditingTopicDescription(topic.description || '') }}
+                                className="p-1 text-gray-400 hover:text-cyan-600 transition-colors"
+                                title="Editar tópico"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => removeMeetTopic(topic.id)}
+                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Remover tópico"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Adicionar novo tópico */}
+                    {addingTopic ? (
+                      <div className="rounded-lg border border-cyan-200 bg-cyan-50/30 p-3 space-y-2">
+                        <input
+                          type="text"
+                          value={newTopicTitle}
+                          onChange={(e) => setNewTopicTitle(e.target.value)}
+                          className="w-full text-sm font-medium px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                          placeholder="Título do tópico"
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          value={newTopicDescription}
+                          onChange={(e) => setNewTopicDescription(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && addMeetTopic()}
+                          className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                          placeholder="Descrição — o que a IA deve extrair sobre este tópico"
+                        />
+                        <div className="flex gap-1.5 justify-end">
+                          <button onClick={() => { setAddingTopic(false); setNewTopicTitle(''); setNewTopicDescription('') }} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1">Cancelar</button>
+                          <button onClick={addMeetTopic} disabled={!newTopicTitle.trim()} className="text-xs bg-cyan-600 text-white px-3 py-1 rounded-md hover:bg-cyan-700 disabled:opacity-50">Adicionar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setAddingTopic(true)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 rounded-lg border border-dashed border-cyan-200 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Adicionar tópico personalizado</span>
+                      </button>
+                    )}
+                  </>
                 )}
 
-                {/* Input para nova observação */}
-                {meetObservations.length < 10 && (
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="text"
-                      value={newMeetObservation}
-                      onChange={(e) => setNewMeetObservation(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addMeetObservation()}
-                      placeholder='Ex: "Identificar menções a orçamento disponível"'
-                      className="flex-1 text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
-                      disabled={savingMeetObservation}
-                    />
-                    <button
-                      onClick={addMeetObservation}
-                      disabled={!newMeetObservation.trim() || savingMeetObservation}
-                      className="px-3 py-2 bg-cyan-600 text-white text-sm rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                    >
-                      {savingMeetObservation ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                      <span>Adicionar</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Info */}
-                <p className="text-[11px] text-gray-400 mt-1">
-                  {meetObservations.length}/10 observações.
+                <p className="text-[11px] text-gray-400 pt-1">
+                  {meetTopics.filter(t => t.enabled).length}/{meetTopics.length} tópicos ativos. A IA cria seções dinâmicas baseadas nesses tópicos + contexto da reunião.
                 </p>
               </div>
             </div>
+
           </div>
         )}
 
