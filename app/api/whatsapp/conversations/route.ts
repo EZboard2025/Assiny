@@ -105,8 +105,9 @@ export async function GET(request: NextRequest) {
           }
         }
         // Always prefer the most recently updated contact_name
+        // But also fallback to ANY available name if winner has none
         const winner = deduplicatedMap.get(dedupeKey)
-        if (conv.contact_name && currentUpdated >= existingUpdated) {
+        if (conv.contact_name && (currentUpdated >= existingUpdated || !winner.contact_name)) {
           winner.contact_name = conv.contact_name
         }
       }
@@ -140,12 +141,16 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Add sender info to each conversation
+      // Add sender info to each conversation + enrich missing contact names
       for (const conv of conversations) {
         const info = latestByPhone.get(conv.contact_phone)
         if (info) {
           conv.last_message_from_me = info.direction === 'outbound'
           conv.last_message_sender = info.direction === 'outbound' ? 'Você' : (info.contact_name || conv.contact_name || null)
+          // Enrich missing contact_name from latest message's contact_name
+          if (!conv.contact_name && info.contact_name) {
+            conv.contact_name = info.contact_name
+          }
         }
       }
     }

@@ -2528,7 +2528,8 @@ export default function FollowUpView() {
     const displayName = selectedConversation.contact_name || formatPhone(selectedConversation.contact_phone)
 
     return (
-      <div className="flex-1 flex flex-col min-h-0 bg-[#0b141a] relative overflow-clip">
+      <div className="flex-1 flex bg-[#0b141a] relative overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Chat Header */}
           <div className="h-[60px] flex-shrink-0 bg-[#202c33] px-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -3301,6 +3302,7 @@ export default function FollowUpView() {
 
           {/* Hidden file input */}
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
+        </div>
 
         {/* Contact Picker Modal */}
         {showContactPicker && (
@@ -3767,7 +3769,7 @@ export default function FollowUpView() {
   )}
 
   return (
-    <div className="flex h-full overflow-clip bg-[#111b21]">
+    <div className="flex h-screen overflow-hidden bg-[#111b21]">
       {connectionStatus === 'connected' ? (
         <>
           {renderChatSidebar()}

@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
     let messages: any[] = []
     let error: any = null
 
-    if (isGroup || contactPhone.startsWith('lid_')) {
-      // Groups and LID contacts: exact match on contact_phone
+    if (isGroup) {
+      // Groups: exact match on serialized ID
       const result = await supabaseAdmin
         .from('whatsapp_messages')
         .select('*')
@@ -69,19 +69,35 @@ export async function GET(request: NextRequest) {
       messages = result.data || []
       error = result.error
     } else {
-      // Regular contacts: suffix match on last 9 digits
-      const result = await supabaseAdmin
+      // Regular and LID contacts: try exact match first, then suffix match
+      // This handles phone format variations (lid_ prefix, country code, area code)
+
+      // Step 1: Exact match (fastest, handles LID and regular)
+      const exactResult = await supabaseAdmin
         .from('whatsapp_messages')
         .select('*')
         .eq('user_id', user.id)
-        .like('contact_phone', `%${normalizedRequestPhone}`)
+        .eq('contact_phone', contactPhone)
         .order('message_timestamp', { ascending: true })
         .limit(limit)
-      messages = result.data || []
-      error = result.error
+      messages = exactResult.data || []
+      error = exactResult.error
 
-      // If no results with suffix match, also check lid_ contacts by resolving phone
-      if (messages.length === 0) {
+      // Step 2: If no exact match, try suffix match on last 9 digits
+      if (messages.length === 0 && !error) {
+        const suffixResult = await supabaseAdmin
+          .from('whatsapp_messages')
+          .select('*')
+          .eq('user_id', user.id)
+          .like('contact_phone', `%${normalizedRequestPhone}`)
+          .order('message_timestamp', { ascending: true })
+          .limit(limit)
+        messages = suffixResult.data || []
+        error = suffixResult.error
+      }
+
+      // Step 3: If still no results, check lid_ contacts by resolving phone
+      if (messages.length === 0 && !error) {
         const lidResult = await supabaseAdmin
           .from('whatsapp_messages')
           .select('*')
