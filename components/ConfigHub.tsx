@@ -542,6 +542,8 @@ function ConfigurationInterface({
   const [topicChatLoading, setTopicChatLoading] = useState(false)
   const topicChatRef = useRef<HTMLDivElement>(null)
   const topicChatInitialized = useRef(false)
+  const [highlightedTopics, setHighlightedTopics] = useState<Set<string>>(new Set())
+  const prevTopicTitles = useRef<Set<string>>(new Set())
 
   // Carregar PDFs salvos da empresa
   const loadSavedPdfs = async (companyId: string) => {
@@ -652,6 +654,10 @@ function ConfigurationInterface({
     if (!userCompanyId) return
     try {
       const { supabase } = await import('@/lib/supabase')
+      // Track previous titles for animation
+      const oldTitles = new Set(meetTopics.map(t => t.title))
+      prevTopicTitles.current = oldTitles
+
       // Replace all topics with the AI-generated ones
       await supabase.from('meet_note_topics').delete().eq('company_id', userCompanyId)
       const inserts = topics.map((t, i) => ({
@@ -665,13 +671,29 @@ function ConfigurationInterface({
         await supabase.from('meet_note_topics').insert(inserts)
       }
       await loadMeetTopics()
+
+      // Highlight new/changed topics
+      const newHighlights = new Set<string>()
+      topics.forEach(t => {
+        if (!oldTitles.has(t.title)) {
+          newHighlights.add(t.title)
+        }
+      })
+      if (newHighlights.size > 0) {
+        setHighlightedTopics(newHighlights)
+        setTimeout(() => setHighlightedTopics(new Set()), 2000)
+      }
     } catch (err) {
       console.error('Erro ao salvar tópicos da IA:', err)
     }
   }
 
-  const sendTopicChatMessage = async () => {
-    const msg = topicChatInput.trim()
+  const sendQuickReply = (text: string) => {
+    sendTopicChatMessage(text)
+  }
+
+  const sendTopicChatMessage = async (directMsg?: string) => {
+    const msg = (directMsg || topicChatInput).trim()
     if (!msg || topicChatLoading) return
 
     const userMsg = { role: 'user' as const, content: msg }
@@ -4852,112 +4874,16 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             </div>
 
             {/* Botão para abrir assistente IA */}
-            {!showTopicChat ? (
-              <button
-                onClick={() => setShowTopicChat(true)}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-dashed border-cyan-300 rounded-xl hover:border-cyan-400 hover:from-cyan-100 hover:to-blue-100 transition-all group"
-              >
-                <Bot className="w-5 h-5 text-cyan-600 group-hover:scale-110 transition-transform" />
-                <div className="text-left">
-                  <p className="text-sm font-medium text-gray-800">Personalizar com IA</p>
-                  <p className="text-[11px] text-gray-500">Adicione, edite ou cole um template de notas</p>
-                </div>
-              </button>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col" style={{ height: '420px' }}>
-                {/* Chat header */}
-                <div className="px-4 py-2.5 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-cyan-600" />
-                    <span className="text-xs font-medium text-gray-700">Assistente de Tópicos</span>
-                  </div>
-                  <button
-                    onClick={() => setShowTopicChat(false)}
-                    className="text-gray-400 hover:text-gray-600 text-xs"
-                  >
-                    Fechar
-                  </button>
-                </div>
-
-                {/* Chat messages */}
-                <div ref={topicChatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {topicChatMessages.length === 0 && !topicChatLoading && (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                      <Bot className="w-8 h-8 mb-2 text-cyan-400" />
-                      <p className="text-sm">Carregando assistente...</p>
-                    </div>
-                  )}
-
-                  {topicChatMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-cyan-600 text-white rounded-br-md'
-                          : 'bg-gray-100 text-gray-800 rounded-bl-md'
-                      }`}>
-                        {msg.role === 'assistant' ? (
-                          <div className="chat-md" dangerouslySetInnerHTML={{
-                            __html: msg.content
-                              .replace(/—/g, '-')
-                              .replace(/\*\*(.*?)\*\*/g, '<strong class="text-gray-900">$1</strong>')
-                              .split('\n\n').map((block: string) => {
-                                const trimmed = block.trim()
-                                if (!trimmed) return ''
-                                const lines = trimmed.split('\n')
-                                const isNumberedList = lines.every((l: string) => /^\d+\./.test(l.trim()) || !l.trim())
-                                const isBulletList = lines.every((l: string) => /^[-•]/.test(l.trim()) || !l.trim())
-                                if (isNumberedList || isBulletList) {
-                                  const items = lines.filter((l: string) => l.trim()).map((l: string) => {
-                                    const text = l.trim().replace(/^(\d+\.\s*|-\s*|•\s*)/, '')
-                                    const num = l.trim().match(/^(\d+)\./)?.[1]
-                                    return `<li class="ml-4 mb-0.5">${num ? `<span class="text-cyan-600 font-medium">${num}.</span> ` : ''}${text}</li>`
-                                  }).join('')
-                                  return `<ul class="my-1.5 space-y-0.5">${items}</ul>`
-                                }
-                                return `<p class="mb-2">${trimmed.replace(/\n/g, '<br/>')}</p>`
-                              }).join('')
-                          }} />
-                        ) : (
-                          <span>{msg.content}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {topicChatLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Chat input */}
-                <div className="border-t border-gray-100 p-3 flex gap-2">
-                  <input
-                    type="text"
-                    value={topicChatInput}
-                    onChange={(e) => setTopicChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
-                    placeholder="Descreva seu negócio, cole um template de notas, ou peça ajustes..."
-                    className="flex-1 text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
-                    disabled={topicChatLoading}
-                  />
-                  <button
-                    onClick={sendTopicChatMessage}
-                    disabled={!topicChatInput.trim() || topicChatLoading}
-                    className="p-2 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
+            <button
+              onClick={() => setShowTopicChat(true)}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-dashed border-cyan-300 rounded-xl hover:border-cyan-400 hover:from-cyan-100 hover:to-blue-100 transition-all group"
+            >
+              <Bot className="w-5 h-5 text-cyan-600 group-hover:scale-110 transition-transform" />
+              <div className="text-left">
+                <p className="text-sm font-medium text-gray-800">Personalizar com IA</p>
+                <p className="text-[11px] text-gray-500">Adicione, edite ou cole um template de notas</p>
               </div>
-            )}
+            </button>
           </div>
         )}
 
@@ -5629,6 +5555,197 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           confirmButtonClass="bg-red-600 hover:bg-red-700"
         />
       </div>
+
+      {/* Overlay do Assistente IA de Tópicos */}
+      {showTopicChat && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1400px] h-[calc(100vh-80px)] flex overflow-hidden" style={{ animation: 'overlayIn 0.2s ease-out' }}>
+            {/* Left: Chat */}
+            <div className="w-1/2 flex flex-col border-r border-gray-200">
+              <div className="px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-cyan-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Assistente de Tópicos</p>
+                    <p className="text-[10px] text-gray-400">Personaliza a extração de dados das reuniões</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowTopicChat(false)}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div ref={topicChatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                {topicChatMessages.length === 0 && !topicChatLoading && (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <Bot className="w-10 h-10 mb-3 text-cyan-300" />
+                    <p className="text-sm">Carregando assistente...</p>
+                  </div>
+                )}
+
+                {topicChatMessages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-cyan-600 text-white rounded-br-md'
+                        : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                    }`}>
+                      {msg.role === 'assistant' ? (
+                        <div className="chat-md" dangerouslySetInnerHTML={{
+                          __html: msg.content
+                            .replace(/—/g, '-')
+                            .replace(/\*\*(.*?)\*\*/g, '<strong class="text-gray-900">$1</strong>')
+                            .split('\n\n').map((block: string) => {
+                              const trimmed = block.trim()
+                              if (!trimmed) return ''
+                              const lines = trimmed.split('\n')
+                              const isNumberedList = lines.every((l: string) => /^\d+\./.test(l.trim()) || !l.trim())
+                              const isBulletList = lines.every((l: string) => /^[-•]/.test(l.trim()) || !l.trim())
+                              if (isNumberedList || isBulletList) {
+                                const items = lines.filter((l: string) => l.trim()).map((l: string) => {
+                                  const text = l.trim().replace(/^(\d+\.\s*|-\s*|•\s*)/, '')
+                                  const num = l.trim().match(/^(\d+)\./)?.[1]
+                                  return `<li class="ml-4 mb-0.5">${num ? `<span class="text-cyan-600 font-medium">${num}.</span> ` : ''}${text}</li>`
+                                }).join('')
+                                return `<ul class="my-1.5 space-y-0.5">${items}</ul>`
+                              }
+                              return `<p class="mb-2">${trimmed.replace(/\n/g, '<br/>')}</p>`
+                            }).join('')
+                        }} />
+                      ) : (
+                        <span>{msg.content}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Quick replies - only after first AI message, before user sends anything */}
+                {topicChatMessages.length === 1 && topicChatMessages[0].role === 'assistant' && !topicChatLoading && (
+                  <div className="flex flex-wrap gap-2 px-1">
+                    {[
+                      { label: 'Adicionar novos tópicos', msg: 'Sugira novos tópicos que façam sentido para o meu tipo de negócio e adicione aos existentes' },
+                      { label: 'Tenho um template de notas', msg: 'Quero colar um template de notas que já uso para você extrair os tópicos' },
+                      { label: 'Me sugira tópicos com base na minha empresa', msg: 'Analise todos os dados da minha empresa, o que vendemos, para quem, nossos diferenciais e concorrentes, e me sugira os tópicos de extração mais estratégicos para capturar os dados certos dos prospects nas reuniões' },
+                    ].map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => sendQuickReply(opt.msg)}
+                        className="px-3 py-1.5 text-xs border border-cyan-200 text-cyan-700 bg-cyan-50 rounded-full hover:bg-cyan-100 hover:border-cyan-300 transition-colors"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {topicChatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-gray-100 p-3 flex gap-2">
+                <input
+                  type="text"
+                  value={topicChatInput}
+                  onChange={(e) => setTopicChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
+                  placeholder="Descreva seu negócio, cole um template, ou peça ajustes..."
+                  className="flex-1 text-sm px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
+                  disabled={topicChatLoading}
+                />
+                <button
+                  onClick={() => sendTopicChatMessage()}
+                  disabled={!topicChatInput.trim() || topicChatLoading}
+                  className="p-2.5 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Live Topics */}
+            <div className="w-1/2 flex flex-col bg-gray-50">
+              <div className="px-5 py-3.5 border-b border-gray-200 bg-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Video className="w-4 h-4 text-cyan-600" />
+                  <p className="text-sm font-semibold text-gray-900">Tópicos de Extração</p>
+                  {meetTopics.length > 0 && (
+                    <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{meetTopics.filter(t => t.enabled).length}/{meetTopics.length} ativos</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {meetTopics.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <Video className="w-10 h-10 mb-3 text-gray-300" />
+                    <p className="text-sm">Os tópicos aparecerão aqui</p>
+                    <p className="text-xs text-gray-300 mt-1">Converse com o assistente para criar</p>
+                  </div>
+                ) : (
+                  meetTopics.map((topic, idx) => {
+                    const isHighlighted = highlightedTopics.has(topic.title)
+                    return (
+                      <div
+                        key={topic.id}
+                        className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-500 ${
+                          isHighlighted
+                            ? 'bg-cyan-50 border-cyan-300 shadow-md shadow-cyan-100 scale-[1.02]'
+                            : topic.enabled
+                              ? 'bg-white border-gray-200'
+                              : 'bg-gray-50 border-gray-100 opacity-50'
+                        }`}
+                        style={{
+                          animation: isHighlighted ? `topicAppear 0.4s ease-out ${idx * 80}ms both` : undefined
+                        }}
+                      >
+                        <button
+                          onClick={() => toggleMeetTopic(topic.id, topic.enabled)}
+                          className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 relative mt-0.5 ${topic.enabled ? 'bg-cyan-500' : 'bg-gray-300'}`}
+                        >
+                          <div className={`absolute top-[3px] w-[14px] h-[14px] bg-white rounded-full shadow-sm transition-transform ${topic.enabled ? 'left-[18px]' : 'left-[3px]'}`} />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium leading-tight ${topic.enabled ? 'text-gray-900' : 'text-gray-400'}`}>
+                            {topic.title}
+                            {isHighlighted && <span className="ml-2 text-[10px] text-cyan-600 font-normal bg-cyan-100 px-1.5 py-0.5 rounded-full">novo</span>}
+                          </p>
+                          {topic.description && (
+                            <p className={`text-[11px] leading-snug mt-0.5 ${topic.enabled ? 'text-gray-500' : 'text-gray-300'}`}>{topic.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+          <style jsx>{`
+            @keyframes overlayIn {
+              from { opacity: 0; transform: scale(0.96); }
+              to { opacity: 1; transform: scale(1); }
+            }
+            @keyframes topicAppear {
+              from { opacity: 0; transform: translateY(8px) scale(0.97); }
+              to { opacity: 1; transform: translateY(0) scale(1.02); }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   )
 }
