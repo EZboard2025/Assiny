@@ -536,6 +536,7 @@ function ConfigurationInterface({
   const [loadingTopics, setLoadingTopics] = useState(false)
 
   // Chat configurador de tópicos
+  const [showTopicChat, setShowTopicChat] = useState(false)
   const [topicChatMessages, setTopicChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([])
   const [topicChatInput, setTopicChatInput] = useState('')
   const [topicChatLoading, setTopicChatLoading] = useState(false)
@@ -786,15 +787,19 @@ function ConfigurationInterface({
     }
   }, [userCompanyId, playbookLoaded])
 
-  // Carregar tópicos e iniciar chat quando tab meet_notes estiver ativa
+  // Carregar tópicos quando tab meet_notes estiver ativa
   useEffect(() => {
     if (activeTab === 'meet_notes' && userCompanyId) {
-      loadMeetTopics().then(() => {
-        // Init chat after topics are loaded (needs topics for context)
-        setTimeout(() => initTopicChat(), 300)
-      })
+      loadMeetTopics()
     }
   }, [activeTab, userCompanyId])
+
+  // Iniciar chat quando o botão de personalizar for clicado
+  useEffect(() => {
+    if (showTopicChat && !topicChatInitialized.current) {
+      setTimeout(() => initTopicChat(), 300)
+    }
+  }, [showTopicChat])
 
   // Carregar subdomínio da empresa do usuário logado (para o link de convite)
   useEffect(() => {
@@ -4841,76 +4846,118 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               ) : (
                 <div className="p-4 text-center">
-                  <p className="text-xs text-gray-400">Nenhum tópico configurado. Use o chat abaixo para criar.</p>
+                  <p className="text-xs text-gray-400">Nenhum tópico configurado. Clique em "Personalizar com IA" para criar.</p>
                 </div>
               )}
             </div>
 
-            {/* Chat configurador */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col" style={{ height: '420px' }}>
-              {/* Chat messages */}
-              <div ref={topicChatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-                {topicChatMessages.length === 0 && !topicChatLoading && (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                    <Bot className="w-8 h-8 mb-2 text-cyan-400" />
-                    <p className="text-sm">Carregando assistente...</p>
+            {/* Botão para abrir assistente IA */}
+            {!showTopicChat ? (
+              <button
+                onClick={() => setShowTopicChat(true)}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-dashed border-cyan-300 rounded-xl hover:border-cyan-400 hover:from-cyan-100 hover:to-blue-100 transition-all group"
+              >
+                <Bot className="w-5 h-5 text-cyan-600 group-hover:scale-110 transition-transform" />
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-800">Personalizar com IA</p>
+                  <p className="text-[11px] text-gray-500">Adicione, edite ou cole um template de notas</p>
+                </div>
+              </button>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col" style={{ height: '420px' }}>
+                {/* Chat header */}
+                <div className="px-4 py-2.5 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-cyan-600" />
+                    <span className="text-xs font-medium text-gray-700">Assistente de Tópicos</span>
                   </div>
-                )}
+                  <button
+                    onClick={() => setShowTopicChat(false)}
+                    className="text-gray-400 hover:text-gray-600 text-xs"
+                  >
+                    Fechar
+                  </button>
+                </div>
 
-                {topicChatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-cyan-600 text-white rounded-br-md'
-                        : 'bg-gray-100 text-gray-800 rounded-bl-md'
-                    }`}>
-                      {msg.role === 'assistant' ? (
-                        <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{
-                          __html: msg.content
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\n- /g, '\n• ')
-                            .replace(/\n(\d+)\. /g, '\n$1. ')
-                        }} />
-                      ) : (
-                        <span>{msg.content}</span>
-                      )}
+                {/* Chat messages */}
+                <div ref={topicChatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {topicChatMessages.length === 0 && !topicChatLoading && (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Bot className="w-8 h-8 mb-2 text-cyan-400" />
+                      <p className="text-sm">Carregando assistente...</p>
                     </div>
-                  </div>
-                ))}
+                  )}
 
-                {topicChatLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  {topicChatMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-cyan-600 text-white rounded-br-md'
+                          : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                      }`}>
+                        {msg.role === 'assistant' ? (
+                          <div className="chat-md" dangerouslySetInnerHTML={{
+                            __html: msg.content
+                              .replace(/—/g, '-')
+                              .replace(/\*\*(.*?)\*\*/g, '<strong class="text-gray-900">$1</strong>')
+                              .split('\n\n').map((block: string) => {
+                                const trimmed = block.trim()
+                                if (!trimmed) return ''
+                                const lines = trimmed.split('\n')
+                                const isNumberedList = lines.every((l: string) => /^\d+\./.test(l.trim()) || !l.trim())
+                                const isBulletList = lines.every((l: string) => /^[-•]/.test(l.trim()) || !l.trim())
+                                if (isNumberedList || isBulletList) {
+                                  const items = lines.filter((l: string) => l.trim()).map((l: string) => {
+                                    const text = l.trim().replace(/^(\d+\.\s*|-\s*|•\s*)/, '')
+                                    const num = l.trim().match(/^(\d+)\./)?.[1]
+                                    return `<li class="ml-4 mb-0.5">${num ? `<span class="text-cyan-600 font-medium">${num}.</span> ` : ''}${text}</li>`
+                                  }).join('')
+                                  return `<ul class="my-1.5 space-y-0.5">${items}</ul>`
+                                }
+                                return `<p class="mb-2">${trimmed.replace(/\n/g, '<br/>')}</p>`
+                              }).join('')
+                          }} />
+                        ) : (
+                          <span>{msg.content}</span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  ))}
 
-              {/* Chat input */}
-              <div className="border-t border-gray-100 p-3 flex gap-2">
-                <input
-                  type="text"
-                  value={topicChatInput}
-                  onChange={(e) => setTopicChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
-                  placeholder="Descreva seu negócio, cole um template de notas, ou peça ajustes..."
-                  className="flex-1 text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
-                  disabled={topicChatLoading}
-                />
-                <button
-                  onClick={sendTopicChatMessage}
-                  disabled={!topicChatInput.trim() || topicChatLoading}
-                  className="p-2 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+                  {topicChatLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat input */}
+                <div className="border-t border-gray-100 p-3 flex gap-2">
+                  <input
+                    type="text"
+                    value={topicChatInput}
+                    onChange={(e) => setTopicChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
+                    placeholder="Descreva seu negócio, cole um template de notas, ou peça ajustes..."
+                    className="flex-1 text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
+                    disabled={topicChatLoading}
+                  />
+                  <button
+                    onClick={sendTopicChatMessage}
+                    disabled={!topicChatInput.trim() || topicChatLoading}
+                    className="p-2 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
