@@ -487,28 +487,45 @@ export default function MeetHistoryContent() {
                         const IconComp = getSmartNoteIcon(section.icon)
                         return (
                           <div key={section.id} className="bg-gray-50 rounded-xl p-4">
-                            <div className="flex items-center gap-2 mb-3">
+                            <div className="flex items-center gap-2 mb-2">
                               <IconComp className="w-4 h-4 text-gray-500" />
                               <h4 className="text-sm font-semibold text-gray-800">{section.title}</h4>
                               {section.priority === 'high' && (
                                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700">Importante</span>
                               )}
                             </div>
+                            {section.insight && (
+                              <p className="text-xs text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-1.5 mb-3 leading-relaxed">
+                                {section.insight}
+                              </p>
+                            )}
                             <div className="space-y-2">
                               {section.items?.map((item: any, idx: number) => (
-                                <div key={idx} className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <span className="text-xs text-gray-500">{item.label}</span>
-                                    <p className="text-sm text-gray-900 font-medium">{item.value}</p>
-                                    {item.transcript_ref && (
-                                      <p className="text-[11px] text-gray-400 italic mt-0.5">&ldquo;{item.transcript_ref}&rdquo;</p>
-                                    )}
+                                <div key={idx}>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <span className="text-xs text-gray-500">{item.label}</span>
+                                      <p className="text-sm text-gray-900 font-medium">{item.value}</p>
+                                      {item.transcript_ref && (
+                                        <p className="text-[11px] text-gray-400 italic mt-0.5">&ldquo;{item.transcript_ref}&rdquo;</p>
+                                      )}
+                                    </div>
+                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${
+                                      item.source === 'explicit' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                    }`}>
+                                      {item.source === 'explicit' ? 'citado' : 'inferido'}
+                                    </span>
                                   </div>
-                                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${
-                                    item.source === 'explicit' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                  }`}>
-                                    {item.source === 'explicit' ? 'citado' : 'inferido'}
-                                  </span>
+                                  {item.sub_items?.length > 0 && (
+                                    <div className="ml-3 mt-1 space-y-0.5">
+                                      {item.sub_items.map((sub: string, si: number) => (
+                                        <div key={si} className="flex items-start gap-1.5">
+                                          <div className="w-1 h-1 bg-gray-400 rounded-full mt-1.5 flex-shrink-0" />
+                                          <p className="text-xs text-gray-600">{sub}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -566,6 +583,11 @@ export default function MeetHistoryContent() {
                             <Target className="w-4 h-4 text-gray-600" />
                             Status da Oportunidade
                           </h4>
+                          {selectedEvaluation.smart_notes.deal_status.summary && (
+                            <p className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 mb-3 leading-relaxed">
+                              {selectedEvaluation.smart_notes.deal_status.summary}
+                            </p>
+                          )}
                           <div className="grid grid-cols-2 gap-3 mb-3">
                             <div>
                               <span className="text-[11px] text-gray-500">Temperatura</span>
@@ -633,10 +655,10 @@ export default function MeetHistoryContent() {
                                 )}
                                 <div>
                                   <p className="text-xs text-gray-500">{obs.observation}</p>
-                                  {obs.found && obs.details && (
-                                    <p className="text-sm text-gray-800 font-medium mt-0.5">{obs.details}</p>
+                                  {obs.details && (
+                                    <p className={`text-sm mt-0.5 ${obs.found ? 'text-gray-800 font-medium' : 'text-gray-400 italic'}`}>{obs.details}</p>
                                   )}
-                                  {!obs.found && (
+                                  {!obs.found && !obs.details && (
                                     <p className="text-xs text-gray-400 italic mt-0.5">Nao mencionado na reuniao</p>
                                   )}
                                 </div>
