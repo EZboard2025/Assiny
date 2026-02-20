@@ -110,7 +110,7 @@ export default function CorrectionHistoryContent() {
   const [sessions, setSessions] = useState<RoleplaySession[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
-  const [activeTab, setActiveTab] = useState<'resumo' | 'transcricao'>('resumo')
+  const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
   useEffect(() => {
     loadSessions()
@@ -414,7 +414,7 @@ export default function CorrectionHistoryContent() {
                   key={session.id}
                   onClick={() => {
                     setSelectedSession(session)
-                    setActiveTab('resumo')
+                    setExpandedSection(null)
                   }}
                   className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
                     selectedSession?.id === session.id
@@ -542,211 +542,318 @@ export default function CorrectionHistoryContent() {
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-              <button
-                onClick={() => setActiveTab('resumo')}
-                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                  activeTab === 'resumo'
-                    ? 'bg-green-500 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                }`}
-              >
-                Resumo
-              </button>
-              <button
-                onClick={() => setActiveTab('transcricao')}
-                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                  activeTab === 'transcricao'
-                    ? 'bg-green-500 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                }`}
-              >
-                Transcricao
-              </button>
-            </div>
+            {/* Collapsible detail cards */}
+            {(() => {
+              const evaluation = getProcessedEvaluation(selectedSession)
+              const score = evaluation?.overall_score !== undefined
+                ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
+                : null
+              const spin = evaluation?.spin_evaluation
 
-            {/* Tab content */}
-            {activeTab === 'resumo' ? (
-              <div className="space-y-4">
-                {/* Overall score */}
-                {(() => {
-                  const evaluation = getProcessedEvaluation(selectedSession)
-                  if (!evaluation) {
-                    return (
-                      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                          <AlertCircle className="w-8 h-8 text-gray-400" />
+              const hasComparison = (selectedSession.config.meet_simulation_config?.coaching_focus || []).some(
+                (f: any) => f.spin_score !== undefined && f.spin_score !== null
+              )
+              const hasObservation = !!evaluation?.meet_correction
+              const hasObjections = evaluation?.objections_analysis?.length > 0
+              const hasInsights = evaluation?.top_strengths?.length > 0 || evaluation?.critical_gaps?.length > 0 || evaluation?.priority_improvements?.length > 0
+
+              return (
+                <div className="space-y-3">
+                  {/* Card: Avaliacao */}
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSection(expandedSection === 'avaliacao' ? null : 'avaliacao')}
+                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                          <TrendingUp className="w-5 h-5 text-blue-600" />
                         </div>
-                        <p className="text-gray-500">Esta sessao nao possui avaliacao</p>
+                        <div className="text-left">
+                          <h3 className="text-sm font-semibold text-gray-900">Avaliacao</h3>
+                          <p className="text-xs text-gray-500">
+                            {score !== null
+                              ? `${score.toFixed(1)}/10 - ${
+                                  evaluation?.performance_level === 'legendary' ? 'Lendario' :
+                                  evaluation?.performance_level === 'excellent' ? 'Excelente' :
+                                  evaluation?.performance_level === 'very_good' ? 'Muito Bom' :
+                                  evaluation?.performance_level === 'good' ? 'Bom' :
+                                  evaluation?.performance_level === 'needs_improvement' ? 'Precisa Melhorar' :
+                                  evaluation?.performance_level === 'poor' ? 'Em Desenvolvimento' :
+                                  evaluation?.performance_level || ''
+                                }`
+                              : 'Sem avaliacao'}
+                          </p>
+                        </div>
                       </div>
-                    )
-                  }
+                      {expandedSection === 'avaliacao' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </button>
+                    {expandedSection === 'avaliacao' && (
+                      <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                        {!evaluation ? (
+                          <div className="text-center py-6">
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                              <AlertCircle className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <p className="text-gray-500">Esta sessao nao possui avaliacao</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {/* Score card */}
+                            {(() => {
+                              const scoreBgGradient = score !== null
+                                ? score >= 8
+                                  ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
+                                  : score >= 6
+                                    ? 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200'
+                                    : score >= 4
+                                      ? 'bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200'
+                                      : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
+                                : 'bg-gray-50 border-gray-200'
+                              return (
+                                <div className={`rounded-2xl border p-6 text-center ${scoreBgGradient}`}>
+                                  <div className={`text-5xl font-bold mb-1 ${score !== null ? getScoreColor(score) : 'text-gray-400'}`}>
+                                    {score !== null ? score.toFixed(1) : 'N/A'}
+                                  </div>
+                                  {evaluation.performance_level && (
+                                    <div className={`text-sm font-medium ${score !== null ? getScoreColor(score) : 'text-gray-400'} opacity-80`}>
+                                      {evaluation.performance_level === 'legendary' ? 'Lendario' :
+                                       evaluation.performance_level === 'excellent' ? 'Excelente' :
+                                       evaluation.performance_level === 'very_good' ? 'Muito Bom' :
+                                       evaluation.performance_level === 'good' ? 'Bom' :
+                                       evaluation.performance_level === 'needs_improvement' ? 'Precisa Melhorar' :
+                                       evaluation.performance_level === 'poor' ? 'Em Desenvolvimento' :
+                                       evaluation.performance_level}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
 
-                  const score = evaluation.overall_score !== undefined
-                    ? (evaluation.overall_score > 10 ? evaluation.overall_score / 10 : evaluation.overall_score)
-                    : null
-
-                  const scoreBgGradient = score !== null
-                    ? score >= 8
-                      ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
-                      : score >= 6
-                        ? 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200'
-                        : score >= 4
-                          ? 'bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200'
-                          : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
-                    : 'bg-gray-50 border-gray-200'
-
-                  return (
-                    <>
-                      {/* Score card */}
-                      <div className={`rounded-2xl border p-6 text-center ${scoreBgGradient}`}>
-                        <div className={`text-5xl font-bold mb-1 ${score !== null ? getScoreColor(score) : 'text-gray-400'}`}>
-                          {score !== null ? score.toFixed(1) : 'N/A'}
-                        </div>
-                        {evaluation.performance_level && (
-                          <div className={`text-sm font-medium ${score !== null ? getScoreColor(score) : 'text-gray-400'} opacity-80`}>
-                            {evaluation.performance_level === 'legendary' ? 'Lendario' :
-                             evaluation.performance_level === 'excellent' ? 'Excelente' :
-                             evaluation.performance_level === 'very_good' ? 'Muito Bom' :
-                             evaluation.performance_level === 'good' ? 'Bom' :
-                             evaluation.performance_level === 'needs_improvement' ? 'Precisa Melhorar' :
-                             evaluation.performance_level === 'poor' ? 'Em Desenvolvimento' :
-                             evaluation.performance_level}
+                            {/* Executive summary */}
+                            {evaluation.executive_summary && (
+                              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                                  Resumo Executivo
+                                </h4>
+                                <p className="text-gray-700 text-sm leading-relaxed">
+                                  {stripMarkdown(evaluation.executive_summary)}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
+                    )}
+                  </div>
 
-                      {/* Executive summary */}
-                      {evaluation.executive_summary && (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                            Resumo Executivo
-                          </h4>
-                          <p className="text-gray-700 text-sm leading-relaxed">
-                            {stripMarkdown(evaluation.executive_summary)}
+                  {/* Card: Comparacao Antes/Depois */}
+                  {hasComparison && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedSection(expandedSection === 'comparacao' ? null : 'comparacao')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                            <TrendingUp className="w-5 h-5 text-green-600" />
+                          </div>
+                          <div className="text-left">
+                            <h3 className="text-sm font-semibold text-gray-900">Comparacao Antes/Depois</h3>
+                            <p className="text-xs text-gray-500">Evolucao das areas de foco</p>
+                          </div>
+                        </div>
+                        {expandedSection === 'comparacao' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                      </button>
+                      {expandedSection === 'comparacao' && (
+                        <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                          {renderBeforeAfterComparison(selectedSession)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Card: Observacoes da Correcao */}
+                  {hasObservation && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedSection(expandedSection === 'observacoes' ? null : 'observacoes')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                            <AlertCircle className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div className="text-left">
+                            <h3 className="text-sm font-semibold text-gray-900">Observacoes da Correcao</h3>
+                            <p className="text-xs text-gray-500">Analise da IA sobre a pratica</p>
+                          </div>
+                        </div>
+                        {expandedSection === 'observacoes' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                      </button>
+                      {expandedSection === 'observacoes' && (
+                        <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                          {renderMeetCorrectionObservation(selectedSession)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Card: Analise SPIN */}
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSection(expandedSection === 'spin' ? null : 'spin')}
+                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center">
+                          <Target className="w-5 h-5 text-cyan-600" />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="text-sm font-semibold text-gray-900">Analise SPIN</h3>
+                          <p className="text-xs text-gray-500">
+                            {spin
+                              ? `S: ${spin.S?.final_score !== undefined ? spin.S.final_score.toFixed(1) : '--'} | P: ${spin.P?.final_score !== undefined ? spin.P.final_score.toFixed(1) : '--'} | I: ${spin.I?.final_score !== undefined ? spin.I.final_score.toFixed(1) : '--'} | N: ${spin.N?.final_score !== undefined ? spin.N.final_score.toFixed(1) : '--'}`
+                              : 'Sem analise SPIN'}
                           </p>
                         </div>
-                      )}
-
-                      {/* Before/After comparison */}
-                      {renderBeforeAfterComparison(selectedSession)}
-
-                      {/* Meet correction observations */}
-                      {renderMeetCorrectionObservation(selectedSession)}
-
-                      {/* SPIN Scores - Compact overview */}
-                      {evaluation.spin_evaluation && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Scores SPIN</h4>
-                          <div className="grid grid-cols-4 gap-3 mb-4">
-                            {[
-                              { letter: 'S', label: 'Situação' },
-                              { letter: 'P', label: 'Problema' },
-                              { letter: 'I', label: 'Implicação' },
-                              { letter: 'N', label: 'Necessidade' },
-                            ].map(({ letter, label }) => {
-                              const spinScore = evaluation.spin_evaluation[letter]?.final_score
-                              return (
-                                <div key={letter} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
-                                  <div className={`text-3xl font-bold mb-1 ${
-                                    spinScore !== null && spinScore !== undefined && spinScore >= 7 ? 'text-green-600' :
-                                    spinScore !== null && spinScore !== undefined && spinScore >= 5 ? 'text-yellow-600' :
-                                    spinScore !== null && spinScore !== undefined ? 'text-red-600' : 'text-gray-400'
-                                  }`}>
-                                    {spinScore !== null && spinScore !== undefined ? spinScore.toFixed(1) : '--'}
-                                  </div>
-                                  <div className="text-xs font-medium text-gray-500">{label}</div>
-                                </div>
-                              )
-                            })}
-                          </div>
-
-                          {/* SPIN Detailed breakdown - 2 columns */}
-                          <div className="grid grid-cols-2 gap-4">
-                            {['S', 'P', 'I', 'N'].map((letter) => {
-                              const spinDetail = evaluation.spin_evaluation[letter]
-                              if (!spinDetail) return null
-                              const spinScore = spinDetail.final_score || 0
-                              const labels: Record<string, string> = { 'S': 'Situação', 'P': 'Problema', 'I': 'Implicação', 'N': 'Necessidade' }
-
-                              return (
-                                <div key={letter} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                                  <div className="flex items-center gap-3 mb-3">
-                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
-                                      spinScore >= 7 ? 'bg-green-500' :
-                                      spinScore >= 5 ? 'bg-yellow-500' :
-                                      'bg-red-500'
+                      </div>
+                      {expandedSection === 'spin' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </button>
+                    {expandedSection === 'spin' && (
+                      <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                        {spin ? (
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Scores SPIN</h4>
+                            <div className="grid grid-cols-4 gap-3 mb-4">
+                              {[
+                                { letter: 'S', label: 'Situacao' },
+                                { letter: 'P', label: 'Problema' },
+                                { letter: 'I', label: 'Implicacao' },
+                                { letter: 'N', label: 'Necessidade' },
+                              ].map(({ letter, label }) => {
+                                const spinScore = spin[letter]?.final_score
+                                return (
+                                  <div key={letter} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+                                    <div className={`text-3xl font-bold mb-1 ${
+                                      spinScore !== null && spinScore !== undefined && spinScore >= 7 ? 'text-green-600' :
+                                      spinScore !== null && spinScore !== undefined && spinScore >= 5 ? 'text-yellow-600' :
+                                      spinScore !== null && spinScore !== undefined ? 'text-red-600' : 'text-gray-400'
                                     }`}>
-                                      {letter}
+                                      {spinScore !== null && spinScore !== undefined ? spinScore.toFixed(1) : '--'}
                                     </div>
-                                    <div>
-                                      <div className="text-sm font-semibold text-gray-900">{labels[letter]}</div>
-                                      <div className={`text-xs font-medium ${
-                                        spinScore >= 7 ? 'text-green-600' :
-                                        spinScore >= 5 ? 'text-yellow-600' :
-                                        'text-red-600'
+                                    <div className="text-xs font-medium text-gray-500">{label}</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+
+                            {/* SPIN Detailed breakdown - 2 columns */}
+                            <div className="grid grid-cols-2 gap-4">
+                              {['S', 'P', 'I', 'N'].map((letter) => {
+                                const spinDetail = spin[letter]
+                                if (!spinDetail) return null
+                                const spinScore = spinDetail.final_score || 0
+                                const labels: Record<string, string> = { 'S': 'Situacao', 'P': 'Problema', 'I': 'Implicacao', 'N': 'Necessidade' }
+
+                                return (
+                                  <div key={letter} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                    <div className="flex items-center gap-3 mb-3">
+                                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
+                                        spinScore >= 7 ? 'bg-green-500' :
+                                        spinScore >= 5 ? 'bg-yellow-500' :
+                                        'bg-red-500'
                                       }`}>
-                                        {spinScore.toFixed(1)}/10
+                                        {letter}
+                                      </div>
+                                      <div>
+                                        <div className="text-sm font-semibold text-gray-900">{labels[letter]}</div>
+                                        <div className={`text-xs font-medium ${
+                                          spinScore >= 7 ? 'text-green-600' :
+                                          spinScore >= 5 ? 'text-yellow-600' :
+                                          'text-red-600'
+                                        }`}>
+                                          {spinScore.toFixed(1)}/10
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
 
-                                  {spinDetail.indicators && Object.keys(spinDetail.indicators).length > 0 && (
-                                    <div className="space-y-2 mb-3">
-                                      {Object.entries(spinDetail.indicators).map(([key, value]: [string, any]) => (
-                                        <div key={key}>
-                                          <div className="flex items-center justify-between mb-0.5">
-                                            <span className="text-xs text-gray-600">{translateIndicator(key)}</span>
-                                            <span className={`text-xs font-semibold ${
-                                              Number(value) >= 7 ? 'text-green-600' :
-                                              Number(value) >= 5 ? 'text-yellow-600' : 'text-red-600'
-                                            }`}>{value}/10</span>
+                                    {spinDetail.indicators && Object.keys(spinDetail.indicators).length > 0 && (
+                                      <div className="space-y-2 mb-3">
+                                        {Object.entries(spinDetail.indicators).map(([key, value]: [string, any]) => (
+                                          <div key={key}>
+                                            <div className="flex items-center justify-between mb-0.5">
+                                              <span className="text-xs text-gray-600">{translateIndicator(key)}</span>
+                                              <span className={`text-xs font-semibold ${
+                                                Number(value) >= 7 ? 'text-green-600' :
+                                                Number(value) >= 5 ? 'text-yellow-600' : 'text-red-600'
+                                              }`}>{value}/10</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                              <div
+                                                className={`h-full rounded-full transition-all ${
+                                                  Number(value) >= 7 ? 'bg-green-500' :
+                                                  Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                                                }`}
+                                                style={{ width: `${(Number(value) / 10) * 100}%` }}
+                                              />
+                                            </div>
                                           </div>
-                                          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                            <div
-                                              className={`h-full rounded-full transition-all ${
-                                                Number(value) >= 7 ? 'bg-green-500' :
-                                                Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'
-                                              }`}
-                                              style={{ width: `${(Number(value) / 10) * 100}%` }}
-                                            />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {spinDetail.technical_feedback && (
-                                    <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-3 mb-3">
-                                      {stripMarkdown(spinDetail.technical_feedback)}
-                                    </p>
-                                  )}
-
-                                  {spinDetail.missed_opportunities?.length > 0 && (
-                                    <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
-                                      <p className="text-[11px] font-semibold text-orange-700 mb-1.5">Oportunidades perdidas</p>
-                                      <ul className="space-y-1">
-                                        {spinDetail.missed_opportunities.map((opp: string, idx: number) => (
-                                          <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
-                                            <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>
-                                            {stripMarkdown(opp)}
-                                          </li>
                                         ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
+                                      </div>
+                                    )}
+
+                                    {spinDetail.technical_feedback && (
+                                      <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-200 pt-3 mb-3">
+                                        {stripMarkdown(spinDetail.technical_feedback)}
+                                      </p>
+                                    )}
+
+                                    {spinDetail.missed_opportunities?.length > 0 && (
+                                      <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                                        <p className="text-[11px] font-semibold text-orange-700 mb-1.5">Oportunidades perdidas</p>
+                                        <ul className="space-y-1">
+                                          {spinDetail.missed_opportunities.map((opp: string, idx: number) => (
+                                            <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                              <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>
+                                              {stripMarkdown(opp)}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm text-center py-4">Sem analise SPIN disponivel</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card: Objecoes */}
+                  {hasObjections && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedSection(expandedSection === 'objecoes' ? null : 'objecoes')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+                            <AlertTriangle className="w-5 h-5 text-red-600" />
+                          </div>
+                          <div className="text-left">
+                            <h3 className="text-sm font-semibold text-gray-900">Objecoes</h3>
+                            <p className="text-xs text-gray-500">{evaluation.objections_analysis.length} objecoes analisadas</p>
                           </div>
                         </div>
-                      )}
-
-                      {/* Objections Analysis */}
-                      {evaluation.objections_analysis?.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Análise de Objeções</h4>
+                        {expandedSection === 'objecoes' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                      </button>
+                      {expandedSection === 'objecoes' && (
+                        <div className="px-4 pb-4 border-t border-gray-100 pt-4">
                           <div className="space-y-4">
                             {evaluation.objections_analysis.map((obj: any, idx: number) => (
                               <div key={idx} className="bg-gray-50 rounded-xl p-5 border border-gray-200">
@@ -754,10 +861,10 @@ export default function CorrectionHistoryContent() {
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
                                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                                        obj.objection_type === 'preço' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
+                                        obj.objection_type === 'preco' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
                                         obj.objection_type === 'timing' ? 'bg-blue-100 text-blue-700' :
                                         obj.objection_type === 'autoridade' ? 'bg-purple-100 text-purple-700' :
-                                        obj.objection_type === 'concorrência' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
+                                        obj.objection_type === 'concorrencia' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
                                         'bg-gray-100 text-gray-700'
                                       }`}>
                                         {obj.objection_type}
@@ -807,82 +914,134 @@ export default function CorrectionHistoryContent() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
 
-                      {/* Strengths & gaps */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {evaluation.top_strengths?.length > 0 && (
-                          <div className="bg-green-50 rounded-2xl border border-green-100 p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                              <h4 className="text-sm font-semibold text-green-700">Pontos Fortes</h4>
-                            </div>
-                            <ul className="space-y-2">
-                              {evaluation.top_strengths.map((strength: string, i: number) => (
-                                <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                  <span className="text-green-500 mt-1 flex-shrink-0">•</span>
-                                  {stripMarkdown(strength)}
-                                </li>
-                              ))}
-                            </ul>
+                  {/* Card: Pontos Fortes & Melhorias */}
+                  {hasInsights && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedSection(expandedSection === 'insights' ? null : 'insights')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                            <CheckCircle className="w-5 h-5 text-green-600" />
                           </div>
-                        )}
-
-                        {evaluation.critical_gaps?.length > 0 && (
-                          <div className="bg-red-50 rounded-2xl border border-red-100 p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                              <AlertCircle className="w-5 h-5 text-red-600" />
-                              <h4 className="text-sm font-semibold text-red-700">Pontos a Melhorar</h4>
-                            </div>
-                            <ul className="space-y-2">
-                              {evaluation.critical_gaps.map((gap: string, i: number) => (
-                                <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                                  <span className="text-red-500 mt-1 flex-shrink-0">•</span>
-                                  {stripMarkdown(gap)}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Priority Improvements */}
-                      {evaluation.priority_improvements?.length > 0 && (
-                        <div className="bg-purple-50 rounded-2xl border border-purple-100 p-5">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Lightbulb className="w-5 h-5 text-purple-600" />
-                            <h4 className="text-sm font-semibold text-purple-700">Melhorias Prioritárias</h4>
-                          </div>
-                          <div className="space-y-3">
-                            {evaluation.priority_improvements.map((imp: any, i: number) => (
-                              <div key={i} className="bg-white/50 rounded-xl border border-purple-100 p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                  {imp.priority && (
-                                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                                      imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
-                                      imp.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                                      'bg-yellow-100 text-yellow-700'
-                                    }`}>
-                                      {imp.priority === 'critical' ? 'Crítico' :
-                                       imp.priority === 'high' ? 'Alta' : 'Média'}
-                                    </span>
-                                  )}
-                                  <span className="text-sm font-semibold text-gray-900">{imp.area || imp}</span>
-                                </div>
-                                {imp.action_plan && (
-                                  <p className="text-sm text-gray-600">{stripMarkdown(imp.action_plan)}</p>
-                                )}
-                              </div>
-                            ))}
+                          <div className="text-left">
+                            <h3 className="text-sm font-semibold text-gray-900">Pontos Fortes & Melhorias</h3>
+                            <p className="text-xs text-gray-500">
+                              {[
+                                evaluation?.top_strengths?.length ? `${evaluation.top_strengths.length} pontos fortes` : null,
+                                evaluation?.critical_gaps?.length ? `${evaluation.critical_gaps.length} gaps` : null,
+                                evaluation?.priority_improvements?.length ? `${evaluation.priority_improvements.length} melhorias` : null,
+                              ].filter(Boolean).join(', ')}
+                            </p>
                           </div>
                         </div>
+                        {expandedSection === 'insights' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                      </button>
+                      {expandedSection === 'insights' && (
+                        <div className="px-4 pb-4 border-t border-gray-100 pt-4 space-y-4">
+                          {/* Strengths & gaps */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {evaluation?.top_strengths?.length > 0 && (
+                              <div className="bg-green-50 rounded-2xl border border-green-100 p-5">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <CheckCircle className="w-5 h-5 text-green-600" />
+                                  <h4 className="text-sm font-semibold text-green-700">Pontos Fortes</h4>
+                                </div>
+                                <ul className="space-y-2">
+                                  {evaluation.top_strengths.map((strength: string, i: number) => (
+                                    <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                      <span className="text-green-500 mt-1 flex-shrink-0">•</span>
+                                      {stripMarkdown(strength)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {evaluation?.critical_gaps?.length > 0 && (
+                              <div className="bg-red-50 rounded-2xl border border-red-100 p-5">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <AlertCircle className="w-5 h-5 text-red-600" />
+                                  <h4 className="text-sm font-semibold text-red-700">Pontos a Melhorar</h4>
+                                </div>
+                                <ul className="space-y-2">
+                                  {evaluation.critical_gaps.map((gap: string, i: number) => (
+                                    <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                      <span className="text-red-500 mt-1 flex-shrink-0">•</span>
+                                      {stripMarkdown(gap)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Priority Improvements */}
+                          {evaluation?.priority_improvements?.length > 0 && (
+                            <div className="bg-purple-50 rounded-2xl border border-purple-100 p-5">
+                              <div className="flex items-center gap-2 mb-4">
+                                <Lightbulb className="w-5 h-5 text-purple-600" />
+                                <h4 className="text-sm font-semibold text-purple-700">Melhorias Prioritarias</h4>
+                              </div>
+                              <div className="space-y-3">
+                                {evaluation.priority_improvements.map((imp: any, i: number) => (
+                                  <div key={i} className="bg-white/50 rounded-xl border border-purple-100 p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      {imp.priority && (
+                                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                                          imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                                          imp.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                          'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                          {imp.priority === 'critical' ? 'Critico' :
+                                           imp.priority === 'high' ? 'Alta' : 'Media'}
+                                        </span>
+                                      )}
+                                      <span className="text-sm font-semibold text-gray-900">{imp.area || imp}</span>
+                                    </div>
+                                    {imp.action_plan && (
+                                      <p className="text-sm text-gray-600">{stripMarkdown(imp.action_plan)}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
-                    </>
-                  )
-                })()}
-              </div>
-            ) : (
-              renderTranscription(selectedSession)
-            )}
+                    </div>
+                  )}
+
+                  {/* Card: Transcricao */}
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSection(expandedSection === 'transcricao' ? null : 'transcricao')}
+                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                          <MessageCircle className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="text-sm font-semibold text-gray-900">Transcricao</h3>
+                          <p className="text-xs text-gray-500">Transcricao da sessao</p>
+                        </div>
+                      </div>
+                      {expandedSection === 'transcricao' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </button>
+                    {expandedSection === 'transcricao' && (
+                      <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                        {renderTranscription(selectedSession)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
       </div>
