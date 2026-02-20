@@ -205,7 +205,6 @@ export async function fetchUpcomingMeetEvents(
       singleEvents: true,
       orderBy: 'startTime',
       maxResults: 100,
-      conferenceDataVersion: 2,
     })
 
     const events = response.data.items || []

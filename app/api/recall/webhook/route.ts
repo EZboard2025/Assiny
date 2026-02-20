@@ -138,11 +138,12 @@ export async function POST(request: Request) {
         }
         const calBotStatus = calendarStatusMap[mappedStatus]
         if (calBotStatus) {
-          await supabaseAdmin
-            .from('calendar_scheduled_bots')
-            .update({ bot_status: calBotStatus, updated_at: new Date().toISOString() })
-            .eq('bot_id', botId)
-            .catch(() => {}) // Non-fatal
+          try {
+            await supabaseAdmin
+              .from('calendar_scheduled_bots')
+              .update({ bot_status: calBotStatus, updated_at: new Date().toISOString() })
+              .eq('bot_id', botId)
+          } catch { /* Non-fatal */ }
         }
       }
 
@@ -173,11 +174,12 @@ export async function POST(request: Request) {
           .eq('bot_id', botId)
 
         // Also update calendar_scheduled_bots
-        await supabaseAdmin
-          .from('calendar_scheduled_bots')
-          .update({ bot_status: 'error', error_message: 'Bot fatal error', updated_at: new Date().toISOString() })
-          .eq('bot_id', botId)
-          .catch(() => {})
+        try {
+          await supabaseAdmin
+            .from('calendar_scheduled_bots')
+            .update({ bot_status: 'error', error_message: 'Bot fatal error', updated_at: new Date().toISOString() })
+            .eq('bot_id', botId)
+        } catch { /* Non-fatal */ }
       }
     }
 
