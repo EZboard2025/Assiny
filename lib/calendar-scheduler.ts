@@ -17,6 +17,11 @@ declare global {
 }
 
 export function startCalendarScheduler() {
+  if (process.env.DISABLE_INTERNAL_SCHEDULER === 'true') {
+    console.log('[Calendar Scheduler] Disabled via DISABLE_INTERNAL_SCHEDULER — using VPS crontab')
+    return
+  }
+
   if (globalThis.calendarSchedulerRunning) {
     return // Already running
   }

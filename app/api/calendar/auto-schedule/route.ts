@@ -46,7 +46,7 @@ async function handleSchedule() {
   // Find enabled meetings with pending status starting soon
   const { data: upcomingMeetings, error } = await supabaseAdmin
     .from('calendar_scheduled_bots')
-    .select('*, google_calendar_connections!calendar_scheduled_bots_calendar_connection_id_fkey(user_id, status)')
+    .select('*, google_calendar_connections!calendar_scheduled_bots_calendar_connection_id_fkey(user_id, status, auto_record_enabled)')
     .eq('bot_enabled', true)
     .eq('bot_status', 'pending')
     .gte('event_start', now.toISOString())
@@ -62,9 +62,10 @@ async function handleSchedule() {
 
   for (const meeting of upcomingMeetings || []) {
     try {
-      // Skip if calendar connection is not active
+      // Skip if calendar connection is not active or auto-record is disabled
       const conn = meeting.google_calendar_connections
       if (conn && conn.status !== 'active') continue
+      if (conn && conn.auto_record_enabled === false) continue
 
       // Create Recall.ai bot for this meeting
       const botResponse = await createRecallBot(meeting.meet_link, meeting.user_id, meeting.company_id)
@@ -127,8 +128,9 @@ async function handleSync() {
   // Fetch all active connections
   const { data: connections, error } = await supabaseAdmin
     .from('google_calendar_connections')
-    .select('user_id, id, status')
+    .select('user_id, id, status, auto_record_enabled')
     .eq('status', 'active')
+    .neq('auto_record_enabled', false)
 
   if (error || !connections) {
     return NextResponse.json({ error: 'Failed to fetch connections' }, { status: 500 })

@@ -26,7 +26,10 @@ import {
   ChevronRight,
   CalendarDays,
   Power,
-  Plus
+  Plus,
+  Mic,
+  Sparkles,
+  Globe
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -193,6 +196,8 @@ export default function MeetAnalysisView() {
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null)
   const [calendarNoticeType, setCalendarNoticeType] = useState<'success' | 'error' | 'warning'>('success')
   const [hasWriteAccess, setHasWriteAccess] = useState(false)
+  const [autoRecordEnabled, setAutoRecordEnabled] = useState(true)
+  const [togglingAutoRecord, setTogglingAutoRecord] = useState(false)
   const [showCreateEventModal, setShowCreateEventModal] = useState(false)
   const [createEventDate, setCreateEventDate] = useState<Date | undefined>(undefined)
   const [createEventHour, setCreateEventHour] = useState<number | undefined>(undefined)
@@ -997,6 +1002,7 @@ export default function MeetAnalysisView() {
         setCalendarConnected(data.connected)
         setCalendarEmail(data.email || '')
         setHasWriteAccess(data.hasWriteAccess || false)
+        setAutoRecordEnabled(data.autoRecordEnabled !== false)
         if (data.connected) {
           loadCalendarEvents(authSession.access_token)
         }
@@ -1387,27 +1393,39 @@ export default function MeetAnalysisView() {
         {/* Content Section */}
         {!session && (
           <>
-            {/* Google Calendar Connection Card (not connected) */}
+            {/* Google Calendar Connection Card (not connected) — Enhanced onboarding */}
             {!calendarConnected && !calendarLoading && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                      <CalendarDays className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900">Conecte seu Google Calendar</h3>
-                      <p className="text-xs text-gray-500">Análise automática de todas as suas reuniões com Meet</p>
-                    </div>
+              <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 rounded-2xl p-6 mb-4 text-white shadow-lg shadow-blue-200/50">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
+                    <CalendarDays className="w-6 h-6 text-white" />
                   </div>
-                  <button
-                    onClick={connectCalendar}
-                    disabled={connectingCalendar}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {connectingCalendar ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
-                    Conectar
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-bold mb-1">Conecte seu Google Calendar</h3>
+                    <p className="text-sm text-blue-100 mb-4">Suas reuniões com Meet serão gravadas e avaliadas automaticamente</p>
+                    <div className="space-y-2 mb-5">
+                      {[
+                        { icon: Mic, text: 'Bot entra automaticamente nas reuniões' },
+                        { icon: Globe, text: 'Transcrição em PT-BR com Deepgram' },
+                        { icon: Sparkles, text: 'Avaliação SPIN automática ao final' },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center gap-2.5">
+                          <div className="w-5 h-5 bg-green-400/90 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                          <span className="text-sm text-blue-50">{item.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={connectCalendar}
+                      disabled={connectingCalendar}
+                      className="px-5 py-2.5 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-50 shadow-sm"
+                    >
+                      {connectingCalendar ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
+                      Conectar Google Calendar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1455,8 +1473,54 @@ export default function MeetAnalysisView() {
                   </div>
                   <div className="flex items-center gap-2">
                     {calendarEmail && (
-                      <span className="text-xs text-gray-400 hidden sm:inline">{calendarEmail}</span>
+                      <div className="flex items-center gap-1.5 hidden sm:flex">
+                        <div className="w-2 h-2 rounded-full bg-green-400" />
+                        <span className="text-xs text-gray-400">{calendarEmail}</span>
+                      </div>
                     )}
+
+                    {/* Auto-record toggle */}
+                    <button
+                      onClick={async () => {
+                        setTogglingAutoRecord(true)
+                        try {
+                          const { data: { session: authSession } } = await supabase.auth.getSession()
+                          if (!authSession?.access_token) return
+                          const res = await fetch('/api/calendar/toggle-auto-record', {
+                            method: 'POST',
+                            headers: {
+                              Authorization: `Bearer ${authSession.access_token}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ enabled: !autoRecordEnabled }),
+                          })
+                          if (res.ok) {
+                            setAutoRecordEnabled(!autoRecordEnabled)
+                          }
+                        } catch (e) {
+                          console.error('Toggle auto-record failed:', e)
+                        } finally {
+                          setTogglingAutoRecord(false)
+                        }
+                      }}
+                      disabled={togglingAutoRecord}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        autoRecordEnabled
+                          ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      } disabled:opacity-50`}
+                      title={autoRecordEnabled ? 'Gravação automática ativada' : 'Gravação automática desativada'}
+                    >
+                      {togglingAutoRecord ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <div className={`w-7 h-4 rounded-full relative transition-colors ${autoRecordEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
+                          <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-all shadow-sm ${autoRecordEnabled ? 'left-3.5' : 'left-0.5'}`} />
+                        </div>
+                      )}
+                      <span className="hidden sm:inline">Gravação auto</span>
+                    </button>
+
                     {hasWriteAccess && (
                       <button
                         onClick={() => { setCreateEventDate(undefined); setCreateEventHour(undefined); setShowCreateEventModal(true) }}
@@ -1469,7 +1533,7 @@ export default function MeetAnalysisView() {
                     <button
                       onClick={() => loadCalendarEvents()}
                       className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                      title="Atualizar eventos"
+                      title="Sincronizar eventos"
                     >
                       <RefreshCw className={`w-4 h-4 ${calendarEventsLoading ? 'animate-spin' : ''}`} />
                     </button>

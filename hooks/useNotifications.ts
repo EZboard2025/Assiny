@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export interface UserNotification {
   id: string
@@ -17,6 +18,7 @@ export interface UserNotification {
 export function useNotifications(userId: string | null) {
   const [notifications, setNotifications] = useState<UserNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const fetchNotifications = useCallback(async () => {
     if (!userId) return
@@ -51,12 +53,46 @@ export function useNotifications(userId: string | null) {
     }
   }, [userId])
 
-  // Poll every 30 seconds
+  // Supabase Realtime subscription for instant notifications
+  useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newNotif = payload.new as UserNotification
+          if (newNotif && !newNotif.is_read) {
+            setNotifications(prev => [newNotif, ...prev])
+            setUnreadCount(prev => prev + 1)
+          }
+        }
+      )
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [userId])
+
+  // Polling as fallback (reduced to 60s since Realtime handles instant delivery)
   useEffect(() => {
     if (!userId) return
 
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000)
+    const interval = setInterval(fetchNotifications, 60000)
     return () => clearInterval(interval)
   }, [userId, fetchNotifications])
 
