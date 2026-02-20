@@ -33,6 +33,7 @@ import { supabase } from '@/lib/supabase'
 import CalendarWeekView from './CalendarWeekView'
 import CalendarEventPopover from './CalendarEventPopover'
 import CalendarEventModal, { CreateEventData } from './CalendarEventModal'
+import MiniCalendar from './MiniCalendar'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'waiting_room' | 'in_meeting' | 'transcribing' | 'ended' | 'evaluating' | 'error'
 
@@ -1338,7 +1339,7 @@ export default function MeetAnalysisView() {
 
   return (
     <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected ? 'pt-[22vh]' : 'pt-8'}`}>
-      <div className={`w-full ${calendarConnected && activeTab === 'calendar' ? 'max-w-6xl' : 'max-w-4xl'}`}>
+      <div className={`w-full ${calendarConnected && activeTab === 'calendar' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
         {/* Compact Header */}
         <div className="flex items-center justify-center gap-4 mb-6">
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -1485,59 +1486,76 @@ export default function MeetAnalysisView() {
 
             {/* ========== TAB: Calendário (Google Calendar style) ========== */}
             {calendarConnected && activeTab === 'calendar' && (
-              <CalendarWeekView
-                events={calendarEvents}
-                loading={calendarEventsLoading}
-                currentWeekStart={currentWeekStart}
-                onPrevWeek={handlePrevWeek}
-                onNextWeek={handleNextWeek}
-                onToday={handleToday}
-                onEventClick={(event, anchorRect) => {
-                  setPopoverEvent(event as CalendarEvent)
-                  setPopoverAnchor(anchorRect)
-                }}
-                onCreateEvent={hasWriteAccess ? (date, hour) => {
-                  setCreateEventDate(date)
-                  setCreateEventHour(hour)
-                  setShowCreateEventModal(true)
-                } : undefined}
-                onEventTimeUpdate={hasWriteAccess ? async (eventId, newStart, newEnd) => {
-                  const { data: { session: authSession } } = await supabase.auth.getSession()
-                  if (!authSession?.access_token) return
+              <div className="flex gap-4">
+                {/* Mini month calendar sidebar */}
+                <MiniCalendar
+                  currentWeekStart={currentWeekStart}
+                  onDateClick={(date) => {
+                    const d = new Date(date)
+                    const day = d.getDay()
+                    d.setDate(d.getDate() - day) // go to Sunday
+                    d.setHours(0, 0, 0, 0)
+                    setCurrentWeekStart(d)
+                  }}
+                />
 
-                  // Optimistic UI: update local state immediately
-                  setCalendarEvents(prev => prev.map(ev =>
-                    ev.id === eventId ? { ...ev, start: newStart, end: newEnd } : ev
-                  ))
+                {/* Main week view */}
+                <div className="flex-1 min-w-0">
+                  <CalendarWeekView
+                    events={calendarEvents}
+                    loading={calendarEventsLoading}
+                    currentWeekStart={currentWeekStart}
+                    onPrevWeek={handlePrevWeek}
+                    onNextWeek={handleNextWeek}
+                    onToday={handleToday}
+                    onEventClick={(event, anchorRect) => {
+                      setPopoverEvent(event as CalendarEvent)
+                      setPopoverAnchor(anchorRect)
+                    }}
+                    onCreateEvent={hasWriteAccess ? (date, hour) => {
+                      setCreateEventDate(date)
+                      setCreateEventHour(hour)
+                      setShowCreateEventModal(true)
+                    } : undefined}
+                    onEventTimeUpdate={hasWriteAccess ? async (eventId, newStart, newEnd) => {
+                      const { data: { session: authSession } } = await supabase.auth.getSession()
+                      if (!authSession?.access_token) return
 
-                  try {
-                    const res = await fetch('/api/calendar/events/update', {
-                      method: 'POST',
-                      headers: {
-                        Authorization: `Bearer ${authSession.access_token}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        eventId,
-                        startDateTime: newStart,
-                        endDateTime: newEnd,
-                      }),
-                    })
+                      // Optimistic UI: update local state immediately
+                      setCalendarEvents(prev => prev.map(ev =>
+                        ev.id === eventId ? { ...ev, start: newStart, end: newEnd } : ev
+                      ))
 
-                    if (!res.ok) {
-                      // Revert on error
-                      await loadCalendarEvents()
-                      const err = await res.json()
-                      setCalendarNoticeType('error')
-                      setCalendarNotice(err.error || 'Erro ao mover evento')
-                    }
-                  } catch {
-                    await loadCalendarEvents()
-                    setCalendarNoticeType('error')
-                    setCalendarNotice('Erro ao atualizar evento')
-                  }
-                } : undefined}
-              />
+                      try {
+                        const res = await fetch('/api/calendar/events/update', {
+                          method: 'POST',
+                          headers: {
+                            Authorization: `Bearer ${authSession.access_token}`,
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            eventId,
+                            startDateTime: newStart,
+                            endDateTime: newEnd,
+                          }),
+                        })
+
+                        if (!res.ok) {
+                          // Revert on error
+                          await loadCalendarEvents()
+                          const err = await res.json()
+                          setCalendarNoticeType('error')
+                          setCalendarNotice(err.error || 'Erro ao mover evento')
+                        }
+                      } catch {
+                        await loadCalendarEvents()
+                        setCalendarNoticeType('error')
+                        setCalendarNotice('Erro ao atualizar evento')
+                      }
+                    } : undefined}
+                  />
+                </div>
+              </div>
             )}
 
             {/* Popover for event details */}
