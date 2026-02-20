@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare, Send, Bot } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare, Send, Bot, Mic } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -544,6 +544,11 @@ function ConfigurationInterface({
   const topicChatInitialized = useRef(false)
   const [highlightedTopics, setHighlightedTopics] = useState<Set<string>>(new Set())
   const prevTopicTitles = useRef<Set<string>>(new Set())
+  const [reviewQueue, setReviewQueue] = useState<{title: string, description: string, status: 'pending' | 'accepted' | 'rejected' | 'editing'}[]>([])
+  const [editingReviewDesc, setEditingReviewDesc] = useState('')
+  const [closingTopicChat, setClosingTopicChat] = useState(false)
+  const [topicChatRecording, setTopicChatRecording] = useState(false)
+  const speechRecRef = useRef<any>(null)
 
   // Carregar PDFs salvos da empresa
   const loadSavedPdfs = async (companyId: string) => {
@@ -688,6 +693,95 @@ function ConfigurationInterface({
     }
   }
 
+  const currentReviewIdx = reviewQueue.findIndex(t => t.status === 'pending')
+  const reviewDone = reviewQueue.length > 0 && currentReviewIdx === -1
+
+  const acceptReviewTopic = (idx: number) => {
+    setReviewQueue(prev => prev.map((t, i) => i === idx ? { ...t, status: 'accepted' } : t))
+    setTimeout(() => topicChatRef.current?.scrollTo({ top: topicChatRef.current?.scrollHeight, behavior: 'smooth' }), 100)
+  }
+
+  const rejectReviewTopic = (idx: number) => {
+    setReviewQueue(prev => prev.map((t, i) => i === idx ? { ...t, status: 'rejected' } : t))
+    setTimeout(() => topicChatRef.current?.scrollTo({ top: topicChatRef.current?.scrollHeight, behavior: 'smooth' }), 100)
+  }
+
+  const startEditReview = (idx: number) => {
+    setEditingReviewDesc(reviewQueue[idx].description)
+    setReviewQueue(prev => prev.map((t, i) => i === idx ? { ...t, status: 'editing' } : t))
+  }
+
+  const saveEditReview = (idx: number) => {
+    setReviewQueue(prev => prev.map((t, i) => i === idx ? { ...t, description: editingReviewDesc, status: 'accepted' } : t))
+    setTimeout(() => topicChatRef.current?.scrollTo({ top: topicChatRef.current?.scrollHeight, behavior: 'smooth' }), 100)
+  }
+
+  const confirmReviewedTopics = async () => {
+    const accepted = reviewQueue.filter(t => t.status === 'accepted')
+    if (accepted.length > 0) {
+      const allTopics = [
+        ...meetTopics.map(t => ({ title: t.title, description: t.description || '', enabled: t.enabled })),
+        ...accepted.map(t => ({ title: t.title, description: t.description, enabled: true }))
+      ]
+      await saveTopicsFromAI(allTopics)
+    }
+    setReviewQueue([])
+  }
+
+  const toggleDictation = () => {
+    if (topicChatRecording) {
+      speechRecRef.current?.stop()
+      setTopicChatRecording(false)
+      return
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) return
+
+    const rec = new SpeechRecognition()
+    rec.lang = 'pt-BR'
+    rec.continuous = true
+    rec.interimResults = true
+    speechRecRef.current = rec
+
+    let finalTranscript = ''
+
+    rec.onresult = (e: any) => {
+      let interim = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalTranscript += e.results[i][0].transcript
+        } else {
+          interim = e.results[i][0].transcript
+        }
+      }
+      setTopicChatInput(prev => {
+        const base = prev.replace(/\u200B.*$/, '').trimEnd()
+        const final = finalTranscript.trim()
+        const parts = [base, final].filter(Boolean).join(' ')
+        return interim ? `${parts} \u200B${interim}` : parts
+      })
+    }
+
+    rec.onerror = () => setTopicChatRecording(false)
+    rec.onend = () => setTopicChatRecording(false)
+
+    rec.start()
+    setTopicChatRecording(true)
+  }
+
+  const closeTopicChat = () => {
+    if (topicChatRecording) {
+      speechRecRef.current?.stop()
+      setTopicChatRecording(false)
+    }
+    setClosingTopicChat(true)
+    setTimeout(() => {
+      setShowTopicChat(false)
+      setClosingTopicChat(false)
+    }, 200)
+  }
+
   const sendQuickReply = (text: string) => {
     sendTopicChatMessage(text)
   }
@@ -722,9 +816,29 @@ function ConfigurationInterface({
       const assistantMsg = { role: 'assistant' as const, content: data.message }
       setTopicChatMessages(prev => [...prev, assistantMsg])
 
-      // If AI returned updated topics, save them
+      // If AI returned topics, decide: direct action vs pending suggestions
       if (data.topics && Array.isArray(data.topics)) {
-        await saveTopicsFromAI(data.topics)
+        const existingTitles = new Set(meetTopics.map(t => t.title))
+        const newTopics = data.topics.filter((t: any) => !existingTitles.has(t.title))
+
+        if (newTopics.length === 0) {
+          // No new topics — this is a removal/reorder/toggle operation, execute directly
+          await saveTopicsFromAI(data.topics)
+        } else {
+          // Has new topics — queue for one-by-one review in chat
+          setReviewQueue(newTopics.map((t: any) => ({
+            title: t.title,
+            description: t.description || '',
+            status: 'pending' as const
+          })))
+          // Also apply any removals from existing topics immediately
+          const returnedTitles = new Set(data.topics.map((t: any) => t.title))
+          const removedExisting = meetTopics.filter(t => !returnedTitles.has(t.title))
+          if (removedExisting.length > 0) {
+            const keptTopics = data.topics.filter((t: any) => existingTitles.has(t.title))
+            await saveTopicsFromAI(keptTopics)
+          }
+        }
       }
     } catch (err: any) {
       setTopicChatMessages(prev => [...prev, { role: 'assistant', content: 'Erro ao processar. Tente novamente.' }])
@@ -757,9 +871,6 @@ function ConfigurationInterface({
       const data = await res.json()
       if (data.message) {
         setTopicChatMessages([{ role: 'assistant', content: data.message }])
-        if (data.topics && Array.isArray(data.topics)) {
-          await saveTopicsFromAI(data.topics)
-        }
       }
     } catch (err) {
       console.error('Erro ao iniciar chat:', err)
@@ -5558,8 +5669,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
       {/* Overlay do Assistente IA de Tópicos */}
       {showTopicChat && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1400px] h-[calc(100vh-80px)] flex overflow-hidden" style={{ animation: 'overlayIn 0.2s ease-out' }}>
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 transition-opacity duration-200"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)', opacity: closingTopicChat ? 0 : 1 }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeTopicChat() }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1400px] h-[calc(100vh-80px)] flex overflow-hidden" style={{ animation: closingTopicChat ? 'overlayOut 0.2s ease-in forwards' : 'overlayIn 0.2s ease-out' }}>
             {/* Left: Chat */}
             <div className="w-1/2 flex flex-col border-r border-gray-200">
               <div className="px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white flex items-center justify-between">
@@ -5573,7 +5688,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowTopicChat(false)}
+                  onClick={closeTopicChat}
                   className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -5643,6 +5758,127 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                   </div>
                 )}
 
+                {/* Inline topic review - one by one in chat */}
+                {reviewQueue.length > 0 && (
+                  <div className="space-y-2 px-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="text-xs font-medium text-gray-500">
+                        Revisão de tópicos ({reviewQueue.filter(t => t.status !== 'pending').length}/{reviewQueue.length})
+                      </span>
+                    </div>
+
+                    {reviewQueue.map((topic, idx) => {
+                      // Hide future pending topics (one-by-one reveal)
+                      if (topic.status === 'pending' && idx !== currentReviewIdx) return null
+
+                      // Accepted - compact green card
+                      if (topic.status === 'accepted') {
+                        return (
+                          <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs" style={{ animation: 'topicAppear 0.25s ease-out' }}>
+                            <Check className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                            <span className="font-medium text-green-800">{topic.title}</span>
+                            <span className="text-green-600/60 truncate flex-1">- {topic.description}</span>
+                          </div>
+                        )
+                      }
+
+                      // Rejected - compact red card
+                      if (topic.status === 'rejected') {
+                        return (
+                          <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-red-50/60 border border-red-200/50 rounded-xl text-xs opacity-50" style={{ animation: 'topicAppear 0.25s ease-out' }}>
+                            <X className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                            <span className="font-medium text-red-700 line-through">{topic.title}</span>
+                          </div>
+                        )
+                      }
+
+                      // Editing - expanded card with input
+                      if (topic.status === 'editing') {
+                        return (
+                          <div key={idx} className="px-4 py-3 bg-white border-2 border-cyan-300 rounded-xl shadow-sm">
+                            <p className="text-sm font-medium text-gray-900 mb-2">{topic.title}</p>
+                            <input
+                              type="text"
+                              value={editingReviewDesc}
+                              onChange={(e) => setEditingReviewDesc(e.target.value)}
+                              className="w-full text-xs px-3 py-2 border border-cyan-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-400 mb-2"
+                              autoFocus
+                              onKeyDown={(e) => e.key === 'Enter' && saveEditReview(idx)}
+                            />
+                            <div className="flex gap-1.5">
+                              <button onClick={() => saveEditReview(idx)} className="text-[11px] px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors">
+                                Salvar e aceitar
+                              </button>
+                              <button onClick={() => rejectReviewTopic(idx)} className="text-[11px] px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors">
+                                Recusar
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // Current pending topic - expanded card with action buttons
+                      if (idx === currentReviewIdx) {
+                        return (
+                          <div key={idx} className="px-4 py-3 bg-white border-2 border-amber-200 rounded-xl shadow-sm" style={{ animation: 'topicAppear 0.3s ease-out' }}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full font-medium">
+                                {idx + 1} de {reviewQueue.length}
+                              </span>
+                            </div>
+                            <p className="text-sm font-medium text-gray-900">{topic.title}</p>
+                            <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{topic.description}</p>
+                            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100">
+                              <button
+                                onClick={() => acceptReviewTopic(idx)}
+                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors font-medium"
+                              >
+                                <Check className="w-3 h-3" /> Aceitar
+                              </button>
+                              <button
+                                onClick={() => startEditReview(idx)}
+                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors"
+                              >
+                                <Edit2 className="w-3 h-3" /> Personalizar
+                              </button>
+                              <button
+                                onClick={() => rejectReviewTopic(idx)}
+                                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                              >
+                                <X className="w-3 h-3" /> Recusar
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      return null
+                    })}
+
+                    {/* Confirm button after all reviewed */}
+                    {reviewDone && (
+                      <div className="pt-1">
+                        {reviewQueue.filter(t => t.status === 'accepted').length > 0 ? (
+                          <button
+                            onClick={confirmReviewedTopics}
+                            className="w-full text-sm py-2.5 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors font-medium shadow-sm"
+                          >
+                            Confirmar {reviewQueue.filter(t => t.status === 'accepted').length} tópico{reviewQueue.filter(t => t.status === 'accepted').length !== 1 ? 's' : ''}
+                          </button>
+                        ) : (
+                          <div className="text-center py-2">
+                            <p className="text-xs text-gray-400">Todos os tópicos foram recusados</p>
+                            <button onClick={() => setReviewQueue([])} className="text-[11px] text-cyan-600 hover:text-cyan-700 mt-1">
+                              Continuar conversa
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {topicChatLoading && (
                   <div className="flex justify-start">
                     <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
@@ -5656,19 +5892,30 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 )}
               </div>
 
-              <div className="border-t border-gray-100 p-3 flex gap-2">
+              <div className="border-t border-gray-100 p-3 flex gap-2 items-center">
                 <input
                   type="text"
                   value={topicChatInput}
                   onChange={(e) => setTopicChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendTopicChatMessage()}
-                  placeholder="Descreva seu negócio, cole um template, ou peça ajustes..."
-                  className="flex-1 text-sm px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400"
-                  disabled={topicChatLoading}
+                  placeholder={topicChatRecording ? 'Ouvindo...' : 'Descreva seu negócio, cole um template, ou peça ajustes...'}
+                  className={`flex-1 text-sm px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-400 transition-colors ${topicChatRecording ? 'border-red-300 bg-red-50/30' : 'border-gray-200'}`}
+                  disabled={topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
                 />
                 <button
-                  onClick={() => sendTopicChatMessage()}
-                  disabled={!topicChatInput.trim() || topicChatLoading}
+                  onClick={toggleDictation}
+                  disabled={topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
+                  className={`p-2.5 rounded-xl transition-all ${
+                    topicChatRecording
+                      ? 'bg-red-500 text-white shadow-md shadow-red-200 animate-pulse'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                  } disabled:opacity-40 disabled:cursor-not-allowed`}
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => { if (topicChatRecording) { speechRecRef.current?.stop(); setTopicChatRecording(false) } sendTopicChatMessage() }}
+                  disabled={!topicChatInput.trim() || topicChatLoading || (reviewQueue.length > 0 && !reviewDone)}
                   className="p-2.5 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <Send className="w-4 h-4" />
@@ -5676,7 +5923,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
             </div>
 
-            {/* Right: Live Topics */}
+            {/* Right: Topics Panel - always shows saved topics */}
             <div className="w-1/2 flex flex-col bg-gray-50">
               <div className="px-5 py-3.5 border-b border-gray-200 bg-white flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -5738,6 +5985,10 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             @keyframes overlayIn {
               from { opacity: 0; transform: scale(0.96); }
               to { opacity: 1; transform: scale(1); }
+            }
+            @keyframes overlayOut {
+              from { opacity: 1; transform: scale(1); }
+              to { opacity: 0; transform: scale(0.94); }
             }
             @keyframes topicAppear {
               from { opacity: 0; transform: translateY(8px) scale(0.97); }
