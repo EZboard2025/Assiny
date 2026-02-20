@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Video,
@@ -26,10 +26,12 @@ import {
   ChevronRight,
   CalendarDays,
   ChevronDown,
-  Power
+  Power,
+  Plus
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
+import CalendarWeekView from './CalendarWeekView'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'waiting_room' | 'in_meeting' | 'transcribing' | 'ended' | 'evaluating' | 'error'
 
@@ -185,6 +187,45 @@ export default function MeetAnalysisView() {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null)
   const [calendarNoticeType, setCalendarNoticeType] = useState<'success' | 'error' | 'warning'>('success')
+
+  // Tab & calendar week state
+  type MeetTab = 'calendar' | 'meet' | 'manual'
+  const [activeTab, setActiveTab] = useState<MeetTab>('calendar')
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = now.getDate() - day // Sunday start
+    const sunday = new Date(now)
+    sunday.setDate(diff)
+    sunday.setHours(0, 0, 0, 0)
+    return sunday
+  })
+
+  const handlePrevWeek = useCallback(() => {
+    setCurrentWeekStart(prev => {
+      const d = new Date(prev)
+      d.setDate(d.getDate() - 7)
+      return d
+    })
+  }, [])
+
+  const handleNextWeek = useCallback(() => {
+    setCurrentWeekStart(prev => {
+      const d = new Date(prev)
+      d.setDate(d.getDate() + 7)
+      return d
+    })
+  }, [])
+
+  const handleToday = useCallback(() => {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = now.getDate() - day
+    const sunday = new Date(now)
+    sunday.setDate(diff)
+    sunday.setHours(0, 0, 0, 0)
+    setCurrentWeekStart(sunday)
+  }, [])
 
   // Restore active session from localStorage + load data on mount
   useEffect(() => {
@@ -1212,15 +1253,19 @@ export default function MeetAnalysisView() {
 
   return (
     <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected ? 'pt-[22vh]' : 'pt-8'}`}>
-      <div className="max-w-4xl w-full">
+      <div className={`w-full ${calendarConnected && activeTab === 'calendar' ? 'max-w-6xl' : 'max-w-4xl'}`}>
         {/* Compact Header */}
         <div className="flex items-center justify-center gap-4 mb-6">
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
             <Video className="w-5 h-5 text-green-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Análise Meet</h1>
-            <p className="text-sm text-gray-500">Avaliação automática de reuniões com IA</p>
+            <h1 className="text-xl font-bold text-gray-900">
+              {calendarConnected ? 'Calendário & Análise Meet' : 'Análise Meet'}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {calendarConnected ? 'Gerencie sua agenda e avalie reuniões com IA' : 'Avaliação automática de reuniões com IA'}
+            </p>
           </div>
         </div>
 
@@ -1279,17 +1324,74 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {/* Calendar Events List (when connected) */}
+            {/* Tab Navigation (when connected) */}
             {calendarConnected && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                    {([
+                      { id: 'calendar' as MeetTab, icon: CalendarDays, label: 'Calendário' },
+                      { id: 'meet' as MeetTab, icon: Video, label: 'Reuniões Meet' },
+                      { id: 'manual' as MeetTab, icon: Link2, label: 'Manual' },
+                    ]).map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          activeTab === tab.id
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        <tab.icon className="w-4 h-4" />
+                        <span className="hidden sm:inline">{tab.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {calendarEmail && (
+                      <span className="text-xs text-gray-400 hidden sm:inline">{calendarEmail}</span>
+                    )}
+                    <button
+                      onClick={() => loadCalendarEvents()}
+                      className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      title="Atualizar eventos"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${calendarEventsLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                      onClick={disconnectCalendar}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Desconectar Google Calendar"
+                    >
+                      <Power className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========== TAB: Calendário (Google Calendar style) ========== */}
+            {calendarConnected && activeTab === 'calendar' && (
+              <CalendarWeekView
+                events={calendarEvents}
+                loading={calendarEventsLoading}
+                currentWeekStart={currentWeekStart}
+                onPrevWeek={handlePrevWeek}
+                onNextWeek={handleNextWeek}
+                onToday={handleToday}
+                onEventClick={(event) => setExpandedEventId(event.scheduledBotId || event.id)}
+              />
+            )}
+
+            {/* ========== TAB: Reuniões Meet (lista original) ========== */}
+            {calendarConnected && activeTab === 'meet' && (
               <div className="mb-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-green-600" />
-                    <h2 className="text-sm font-semibold text-gray-700">Reuniões da Semana</h2>
-                    {calendarEmail && (
-                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{calendarEmail}</span>
-                    )}
+                    <Video className="w-4 h-4 text-green-600" />
+                    <h2 className="text-sm font-semibold text-gray-700">Reuniões com Google Meet</h2>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -1476,16 +1578,8 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {/* Divider between calendar and manual input */}
-            {calendarConnected && (
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-gray-400">ou cole um link manualmente</span>
-                <div className="flex-1 h-px bg-gray-200" />
-              </div>
-            )}
-
-            {/* Manual Input */}
+            {/* ========== TAB: Manual (or when not connected) ========== */}
+            {(activeTab === 'manual' || !calendarConnected) && (
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -1527,6 +1621,7 @@ export default function MeetAnalysisView() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Steps + Background notice (only when calendar not connected) */}
             {!calendarConnected && (
