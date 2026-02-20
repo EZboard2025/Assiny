@@ -449,12 +449,21 @@ export default function ChallengeHistoryContent({ onStartChallenge }: Props) {
                         </div>
                         <div className="text-left">
                           <h3 className="text-sm font-semibold text-gray-900">Análise SPIN</h3>
-                          <p className="text-xs text-gray-500">
-                            {['S', 'P', 'I', 'N'].map((letter) => {
-                              const score = selectedChallenge.evaluation?.spin_evaluation?.[letter]?.final_score
-                              return score !== undefined ? `${letter}: ${score.toFixed(1)}` : null
-                            }).filter(Boolean).join(' | ') || 'Sem análise SPIN'}
-                          </p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {['S', 'P', 'I', 'N'].map((key) => {
+                              const s = selectedChallenge.evaluation?.spin_evaluation?.[key]?.final_score
+                              return (
+                                <span key={key} className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+                                  s !== undefined && s >= 7 ? 'bg-green-100 text-green-700' :
+                                  s !== undefined && s >= 5 ? 'bg-yellow-100 text-yellow-700' :
+                                  s !== undefined ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-500'
+                                }`}>
+                                  {key}: {s !== undefined ? s.toFixed(1) : '--'}
+                                </span>
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
                       {expandedSection === 'spin' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}

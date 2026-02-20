@@ -18,6 +18,21 @@ const mapAreaToSpinLetter = (area: string): string | null => {
   return null
 }
 
+const getAreaShortLabel = (area: string): string => {
+  const spinLetter = mapAreaToSpinLetter(area)
+  if (spinLetter) return spinLetter
+  const n = area.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  if (n.includes('personaliz')) return 'Perso.'
+  if (n.includes('tratamento') || n.includes('objecao') || n.includes('objecoe')) return 'Objeç.'
+  if (n.includes('fechamento') || n.includes('closing')) return 'Fech.'
+  if (n.includes('abertura') || n.includes('opening')) return 'Abert.'
+  if (n.includes('rapport')) return 'Rapp.'
+  if (n.includes('escuta') || n.includes('listening')) return 'Escuta'
+  // fallback: first word
+  const firstWord = area.split(/[\s,]/)[0]
+  return firstWord.length > 6 ? firstWord.slice(0, 5) + '.' : firstWord
+}
+
 const getProcessedEvaluation = (session: RoleplaySession) => {
   let evaluation = (session as any).evaluation
   if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
@@ -456,7 +471,7 @@ export default function CorrectionHistoryContent() {
                             <div key={idx} className="flex items-center gap-1">
                               <span className={`w-2 h-2 rounded-full ${getSeverityColor(focus.severity)}`} />
                               <span className="text-[10px] text-gray-400 truncate max-w-[60px]">
-                                {mapAreaToSpinLetter(focus.area) || focus.area.slice(0, 4)}
+                                {getAreaShortLabel(focus.area)}
                               </span>
                             </div>
                           ))}
@@ -710,12 +725,26 @@ export default function CorrectionHistoryContent() {
                           <Target className="w-5 h-5 text-cyan-600" />
                         </div>
                         <div className="text-left">
-                          <h3 className="text-sm font-semibold text-gray-900">Analise SPIN</h3>
-                          <p className="text-xs text-gray-500">
-                            {spin
-                              ? `S: ${spin.S?.final_score !== undefined ? spin.S.final_score.toFixed(1) : '--'} | P: ${spin.P?.final_score !== undefined ? spin.P.final_score.toFixed(1) : '--'} | I: ${spin.I?.final_score !== undefined ? spin.I.final_score.toFixed(1) : '--'} | N: ${spin.N?.final_score !== undefined ? spin.N.final_score.toFixed(1) : '--'}`
-                              : 'Sem analise SPIN'}
-                          </p>
+                          <h3 className="text-sm font-semibold text-gray-900">Análise SPIN</h3>
+                          {spin ? (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {['S', 'P', 'I', 'N'].map((key) => {
+                                const s = spin[key]?.final_score
+                                return (
+                                  <span key={key} className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+                                    s !== undefined && s >= 7 ? 'bg-green-100 text-green-700' :
+                                    s !== undefined && s >= 5 ? 'bg-yellow-100 text-yellow-700' :
+                                    s !== undefined ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    {key}: {s !== undefined ? s.toFixed(1) : '--'}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-500">Sem análise SPIN</p>
+                          )}
                         </div>
                       </div>
                       {expandedSection === 'spin' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}

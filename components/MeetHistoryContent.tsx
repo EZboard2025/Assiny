@@ -410,19 +410,20 @@ export default function MeetHistoryContent() {
                     </div>
                     <div className="text-left">
                       <h3 className="text-sm font-semibold text-gray-900">Análise SPIN</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-1">
                         {[
                           { letter: 'S', score: selectedEvaluation.spin_s_score },
                           { letter: 'P', score: selectedEvaluation.spin_p_score },
                           { letter: 'I', score: selectedEvaluation.spin_i_score },
                           { letter: 'N', score: selectedEvaluation.spin_n_score },
                         ].map(({ letter, score }) => (
-                          <span key={letter} className={`text-xs font-bold ${
-                            score !== null && score >= 7 ? 'text-green-600' :
-                            score !== null && score >= 5 ? 'text-yellow-600' :
-                            score !== null ? 'text-red-600' : 'text-gray-400'
+                          <span key={letter} className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+                            score !== null && score >= 7 ? 'bg-green-100 text-green-700' :
+                            score !== null && score >= 5 ? 'bg-yellow-100 text-yellow-700' :
+                            score !== null ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-500'
                           }`}>
-                            {letter}:{score !== null ? score.toFixed(1) : '--'}
+                            {letter}: {score !== null ? score.toFixed(1) : '--'}
                           </span>
                         ))}
                       </div>

@@ -515,7 +515,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
                     </div>
 
                     {/* Cards de configuração */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex flex-wrap gap-2">
                       <div className="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
                         <span className="text-[10px] text-purple-600 font-medium uppercase tracking-wider">Temperamento</span>
                         <span className="text-gray-900 font-semibold block">{selectedSession.config.temperament}</span>
@@ -524,9 +524,9 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
                         <span className="text-[10px] text-blue-600 font-medium uppercase tracking-wider">Idade</span>
                         <span className="text-gray-900 font-semibold block">{selectedSession.config.age} anos</span>
                       </div>
-                      <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 sm:col-span-1">
+                      <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex-1 min-w-0">
                         <span className="text-[10px] text-amber-600 font-medium uppercase tracking-wider">Persona</span>
-                        <span className="text-gray-900 font-medium text-sm leading-snug block">{selectedSession.config.segment}</span>
+                        <span className="text-gray-900 font-medium text-sm leading-snug block line-clamp-2">{selectedSession.config.segment}</span>
                       </div>
                     </div>
                   </div>
@@ -680,11 +680,29 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
                               </div>
                               <div className="text-left">
                                 <h3 className="text-sm font-semibold text-gray-900">Análise SPIN</h3>
-                                <p className="text-xs text-gray-500">
-                                  {spin
-                                    ? `S: ${(spin.S?.final_score || 0).toFixed(1)} | P: ${(spin.P?.final_score || 0).toFixed(1)} | I: ${(spin.I?.final_score || 0).toFixed(1)} | N: ${(spin.N?.final_score || 0).toFixed(1)}`
-                                    : 'Sem análise SPIN'}
-                                </p>
+                                {spin ? (
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    {[
+                                      { key: 'S', label: 'S', color: 'cyan' },
+                                      { key: 'P', label: 'P', color: 'green' },
+                                      { key: 'I', label: 'I', color: 'amber' },
+                                      { key: 'N', label: 'N', color: 'pink' },
+                                    ].map(({ key, label, color }) => {
+                                      const s = spin[key]?.final_score || 0
+                                      return (
+                                        <span key={key} className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+                                          s >= 7 ? 'bg-green-100 text-green-700' :
+                                          s >= 5 ? 'bg-yellow-100 text-yellow-700' :
+                                          'bg-red-100 text-red-700'
+                                        }`}>
+                                          {label}: {s.toFixed(1)}
+                                        </span>
+                                      )
+                                    })}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-gray-500">Sem análise SPIN</p>
+                                )}
                               </div>
                             </div>
                             {expandedSection === 'spin' ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
