@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Video,
@@ -24,7 +24,9 @@ import {
   Link2,
   UserCheck,
   ChevronRight,
-  CalendarDays
+  CalendarDays,
+  ChevronDown,
+  Power
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -43,6 +45,21 @@ interface MeetingSession {
   status: BotStatus
   startTime?: Date
   transcript: TranscriptSegment[]
+}
+
+interface CalendarEvent {
+  id: string
+  title: string
+  start: string
+  end: string | null
+  meetLink: string
+  attendees: Array<{ email: string; displayName?: string; responseStatus?: string }>
+  botEnabled: boolean
+  botStatus: string
+  botId: string | null
+  evaluationId: string | null
+  scheduledBotId: string | null
+  evaluation?: { overall_score: number; performance_level: string } | null
 }
 
 interface MeetEvaluation {
@@ -157,6 +174,18 @@ export default function MeetAnalysisView() {
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
   const hasRestoredSessionRef = useRef<boolean>(false)
 
+  // Calendar integration state
+  const [calendarConnected, setCalendarConnected] = useState(false)
+  const [calendarEmail, setCalendarEmail] = useState('')
+  const [calendarLoading, setCalendarLoading] = useState(true)
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
+  const [calendarEventsLoading, setCalendarEventsLoading] = useState(false)
+  const [connectingCalendar, setConnectingCalendar] = useState(false)
+  const [togglingEventId, setTogglingEventId] = useState<string | null>(null)
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
+  const [calendarNotice, setCalendarNotice] = useState<string | null>(null)
+  const [calendarNoticeType, setCalendarNoticeType] = useState<'success' | 'error' | 'warning'>('success')
+
   // Restore active session from localStorage + load data on mount
   useEffect(() => {
     let restoredBotId: string | null = null
@@ -257,6 +286,38 @@ export default function MeetAnalysisView() {
       localStorage.removeItem('meetActiveSession')
     }
   }, [session])
+
+  // Calendar: check connection status + handle URL params on mount
+  useEffect(() => {
+    checkCalendarStatus()
+
+    const params = new URLSearchParams(window.location.search)
+    const calendarParam = params.get('calendar')
+    if (calendarParam === 'connected') {
+      setCalendarNoticeType('success')
+      setCalendarNotice('Google Calendar conectado com sucesso!')
+      window.history.replaceState({}, '', window.location.pathname + '?view=meet-analysis')
+    } else if (calendarParam === 'denied') {
+      setCalendarNoticeType('warning')
+      setCalendarNotice('Conexão com Google Calendar foi negada.')
+      window.history.replaceState({}, '', window.location.pathname + '?view=meet-analysis')
+    } else if (calendarParam === 'error') {
+      const reason = params.get('reason') || ''
+      const errorMessages: Record<string, string> = {
+        'table_not_found': 'Erro: tabela google_calendar_connections não existe no banco. Execute o SQL de migração.',
+        'db_error': 'Erro ao salvar no banco de dados.',
+        'token_exchange_failed': 'Erro ao trocar código OAuth por tokens. Tente novamente.',
+        'missing_tokens': 'Google não retornou refresh_token. Remova o app em myaccount.google.com/permissions e tente novamente.',
+        'missing_params': 'Parâmetros faltando no callback.',
+        'invalid_state': 'State param inválido.',
+      }
+      const msg = errorMessages[reason] || `Erro ao conectar Google Calendar. ${reason ? `(${reason})` : 'Tente novamente.'}`
+      setCalendarNoticeType('error')
+      setCalendarNotice(msg)
+      window.history.replaceState({}, '', window.location.pathname + '?view=meet-analysis')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Save simulation for later (Supabase)
   const saveSimulationForLater = async () => {
@@ -864,6 +925,264 @@ export default function MeetAnalysisView() {
     return () => stopPolling()
   }, [])
 
+  // === Calendar Integration Functions ===
+
+  const checkCalendarStatus = async () => {
+    try {
+      setCalendarLoading(true)
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      if (!authSession?.access_token) {
+        setCalendarLoading(false)
+        return
+      }
+
+      const res = await fetch('/api/calendar/status', {
+        headers: { Authorization: `Bearer ${authSession.access_token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCalendarConnected(data.connected)
+        setCalendarEmail(data.email || '')
+        if (data.connected) {
+          loadCalendarEvents(authSession.access_token)
+        }
+      }
+    } catch (e) {
+      console.error('Calendar status check failed:', e)
+    } finally {
+      setCalendarLoading(false)
+    }
+  }
+
+  const loadCalendarEvents = async (token?: string) => {
+    try {
+      setCalendarEventsLoading(true)
+      let authToken = token
+      if (!authToken) {
+        const { data: { session: authSession } } = await supabase.auth.getSession()
+        authToken = authSession?.access_token || ''
+      }
+
+      const res = await fetch('/api/calendar/events', {
+        headers: { Authorization: `Bearer ${authToken}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const allEvents: CalendarEvent[] = [...(data.events || [])]
+        const seenIds = new Set(allEvents.map((e: CalendarEvent) => e.id))
+        for (const past of data.pastEvents || []) {
+          if (!seenIds.has(past.id)) {
+            allEvents.push(past)
+          }
+        }
+        setCalendarEvents(allEvents)
+      }
+    } catch (e) {
+      console.error('Failed to load calendar events:', e)
+    } finally {
+      setCalendarEventsLoading(false)
+    }
+  }
+
+  const connectCalendar = async () => {
+    try {
+      setConnectingCalendar(true)
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      if (!authSession?.access_token) return
+
+      const res = await fetch('/api/calendar/connect', {
+        headers: { Authorization: `Bearer ${authSession.access_token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.authUrl) {
+          window.location.href = data.authUrl
+        }
+      }
+    } catch (e) {
+      console.error('Failed to start calendar connection:', e)
+    } finally {
+      setConnectingCalendar(false)
+    }
+  }
+
+  const disconnectCalendar = async () => {
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      if (!authSession?.access_token) return
+
+      await fetch('/api/calendar/disconnect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authSession.access_token}` }
+      })
+      setCalendarConnected(false)
+      setCalendarEmail('')
+      setCalendarEvents([])
+    } catch (e) {
+      console.error('Failed to disconnect calendar:', e)
+    }
+  }
+
+  const toggleCalendarBot = async (scheduledBotId: string, enabled: boolean) => {
+    try {
+      setTogglingEventId(scheduledBotId)
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      if (!authSession?.access_token) return
+
+      const res = await fetch('/api/calendar/toggle-bot', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ scheduledBotId, enabled })
+      })
+
+      if (res.ok) {
+        setCalendarEvents(prev => prev.map(e =>
+          e.scheduledBotId === scheduledBotId
+            ? { ...e, botEnabled: enabled, botStatus: enabled ? 'pending' : 'skipped' }
+            : e
+        ))
+      }
+    } catch (e) {
+      console.error('Failed to toggle bot:', e)
+    } finally {
+      setTogglingEventId(null)
+    }
+  }
+
+  const [sendingBotEventId, setSendingBotEventId] = useState<string | null>(null)
+
+  const sendCalendarBot = async (event: CalendarEvent) => {
+    if (!event.meetLink || !event.scheduledBotId) return
+    try {
+      setSendingBotEventId(event.scheduledBotId)
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!authSession?.access_token || !user) return
+
+      const companyId = await getCompanyId()
+      if (!companyId) return
+
+      // Create Recall bot with the meet link
+      const res = await fetch('/api/recall/create-bot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          meetingUrl: event.meetLink,
+          userId: user.id,
+          companyId,
+          botName: 'Ramppy'
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        // Update the calendar_scheduled_bot with the bot_id
+        const supabaseAdmin = await fetch('/api/calendar/update-bot-id', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${authSession.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            scheduledBotId: event.scheduledBotId,
+            botId: data.botId,
+            botStatus: 'scheduled'
+          })
+        })
+
+        setCalendarEvents(prev => prev.map(e =>
+          e.scheduledBotId === event.scheduledBotId
+            ? { ...e, botStatus: 'scheduled', botId: data.botId }
+            : e
+        ))
+      } else {
+        const err = await res.json()
+        console.error('Failed to create bot:', err)
+        alert('Erro ao enviar bot: ' + (err.error || 'Tente novamente'))
+      }
+    } catch (e) {
+      console.error('Failed to send calendar bot:', e)
+    } finally {
+      setSendingBotEventId(null)
+    }
+  }
+
+  // Auto-schedule: check every 2 minutes for meetings starting within 5 min
+  useEffect(() => {
+    if (!calendarConnected || calendarEvents.length === 0) return
+
+    const autoSchedule = async () => {
+      const now = Date.now()
+      const fiveMinFromNow = now + 5 * 60 * 1000
+
+      for (const event of calendarEvents) {
+        // Only auto-send for pending events that are enabled and starting within 5 min
+        if (event.botEnabled && event.botStatus === 'pending' && event.meetLink && event.scheduledBotId) {
+          const eventStart = new Date(event.start).getTime()
+          if (eventStart >= now && eventStart <= fiveMinFromNow) {
+            console.log(`[Auto-schedule] Sending bot for "${event.title}" starting at ${event.start}`)
+            await sendCalendarBot(event)
+          }
+        }
+      }
+    }
+
+    // Run immediately on mount
+    autoSchedule()
+
+    // Then every 2 minutes
+    const interval = setInterval(autoSchedule, 2 * 60 * 1000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarConnected, calendarEvents])
+
+  // Group calendar events by day
+  const groupedEvents = useMemo(() => {
+    if (calendarEvents.length === 0) return []
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const dayAfterTomorrow = new Date(tomorrow)
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+
+    const groups = new Map<string, CalendarEvent[]>()
+
+    for (const event of calendarEvents) {
+      const eventDate = new Date(event.start)
+      eventDate.setHours(0, 0, 0, 0)
+      const key = eventDate.toISOString().split('T')[0]
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(event)
+    }
+
+    const sortedKeys = Array.from(groups.keys()).sort()
+
+    return sortedKeys.map(key => {
+      const date = new Date(key + 'T12:00:00')
+      let label: string
+      if (date >= today && date < tomorrow) {
+        label = 'Hoje'
+      } else if (date >= tomorrow && date < dayAfterTomorrow) {
+        label = 'Amanhã'
+      } else {
+        label = date.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
+      }
+
+      return {
+        label,
+        date: key,
+        events: groups.get(key)!.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+      }
+    })
+  }, [calendarEvents])
+
   // Get status display
   const getStatusDisplay = () => {
     if (!session) return null
@@ -892,7 +1211,7 @@ export default function MeetAnalysisView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-6 flex items-start justify-center pt-[22vh]">
+    <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected ? 'pt-[22vh]' : 'pt-8'}`}>
       <div className="max-w-4xl w-full">
         {/* Compact Header */}
         <div className="flex items-center justify-center gap-4 mb-6">
@@ -905,9 +1224,268 @@ export default function MeetAnalysisView() {
           </div>
         </div>
 
-        {/* Input Section */}
+        {/* Calendar connection notice */}
+        {calendarNotice && (
+          <div className={`mb-4 flex items-center justify-between rounded-xl px-4 py-3 ${
+            calendarNoticeType === 'error' ? 'bg-red-50 border border-red-200' :
+            calendarNoticeType === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
+            'bg-green-50 border border-green-200'
+          }`}>
+            <div className={`flex items-center gap-2 text-sm ${
+              calendarNoticeType === 'error' ? 'text-red-700' :
+              calendarNoticeType === 'warning' ? 'text-yellow-700' :
+              'text-green-700'
+            }`}>
+              {calendarNoticeType === 'error' ? <XCircle className="w-4 h-4" /> :
+               calendarNoticeType === 'warning' ? <AlertTriangle className="w-4 h-4" /> :
+               <CheckCircle className="w-4 h-4" />}
+              {calendarNotice}
+            </div>
+            <button onClick={() => setCalendarNotice(null)} className={`${
+              calendarNoticeType === 'error' ? 'text-red-400 hover:text-red-600' :
+              calendarNoticeType === 'warning' ? 'text-yellow-400 hover:text-yellow-600' :
+              'text-green-400 hover:text-green-600'
+            }`}>
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Content Section */}
         {!session && (
           <>
+            {/* Google Calendar Connection Card (not connected) */}
+            {!calendarConnected && !calendarLoading && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                      <CalendarDays className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">Conecte seu Google Calendar</h3>
+                      <p className="text-xs text-gray-500">Análise automática de todas as suas reuniões com Meet</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={connectCalendar}
+                    disabled={connectingCalendar}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {connectingCalendar ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
+                    Conectar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Calendar Events List (when connected) */}
+            {calendarConnected && (
+              <div className="mb-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-green-600" />
+                    <h2 className="text-sm font-semibold text-gray-700">Reuniões da Semana</h2>
+                    {calendarEmail && (
+                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{calendarEmail}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => loadCalendarEvents()}
+                      className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      title="Atualizar eventos"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${calendarEventsLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                      onClick={disconnectCalendar}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Desconectar Google Calendar"
+                    >
+                      <Power className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Events by day */}
+                {calendarEventsLoading && calendarEvents.length === 0 ? (
+                  <div className="bg-white rounded-xl p-8 border border-gray-200 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-green-600 mr-2" />
+                    <span className="text-sm text-gray-500">Carregando reuniões...</span>
+                  </div>
+                ) : groupedEvents.length === 0 ? (
+                  <div className="bg-white rounded-xl p-6 border border-gray-200 text-center">
+                    <CalendarDays className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Nenhuma reunião com Google Meet nos próximos 7 dias</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {groupedEvents.map(group => (
+                      <div key={group.date}>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
+                          {group.label}
+                        </h3>
+                        <div className="space-y-2">
+                          {group.events.map(event => {
+                            const startTime = new Date(event.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                            const endTime = event.end ? new Date(event.end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''
+                            const isExpanded = expandedEventId === event.scheduledBotId
+                            const isToggling = togglingEventId === event.scheduledBotId
+                            const isPast = new Date(event.start) < new Date()
+                            const evalScore = event.evaluation?.overall_score
+
+                            const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
+                              pending: { color: 'text-gray-500', bg: 'bg-gray-100', label: 'Aguardando' },
+                              scheduled: { color: 'text-blue-600', bg: 'bg-blue-50', label: 'Bot agendado' },
+                              joining: { color: 'text-amber-600', bg: 'bg-amber-50', label: 'Entrando...' },
+                              recording: { color: 'text-red-600', bg: 'bg-red-50', label: 'Gravando' },
+                              completed: { color: 'text-green-600', bg: 'bg-green-50', label: 'Avaliado' },
+                              skipped: { color: 'text-gray-400', bg: 'bg-gray-50', label: 'Desabilitado' },
+                              error: { color: 'text-red-600', bg: 'bg-red-50', label: 'Erro' },
+                            }
+                            const status = statusConfig[event.botStatus] || statusConfig.pending
+
+                            return (
+                              <div
+                                key={event.scheduledBotId || event.id}
+                                className={`bg-white rounded-xl border transition-all ${
+                                  event.botStatus === 'recording' ? 'border-red-200 shadow-sm' :
+                                  event.botStatus === 'completed' ? 'border-green-200' :
+                                  'border-gray-200'
+                                } ${isPast && event.botStatus !== 'completed' && event.botStatus !== 'recording' ? 'opacity-60' : ''}`}
+                              >
+                                {/* Main row */}
+                                <div
+                                  className="p-4 flex items-center gap-3 cursor-pointer"
+                                  onClick={() => setExpandedEventId(isExpanded ? null : event.scheduledBotId)}
+                                >
+                                  {/* Time */}
+                                  <div className="text-sm font-mono text-gray-600 w-12 flex-shrink-0">
+                                    {startTime}
+                                  </div>
+
+                                  {/* Recording pulse */}
+                                  {event.botStatus === 'recording' && (
+                                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                                  )}
+
+                                  {/* Title + Status */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{event.title || 'Reunião sem título'}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className={`text-xs px-1.5 py-0.5 rounded ${status.bg} ${status.color} font-medium`}>
+                                        {status.label}
+                                      </span>
+                                      {evalScore !== undefined && evalScore !== null && (
+                                        <span className={`text-xs font-bold ${
+                                          evalScore >= 70 ? 'text-green-600' :
+                                          evalScore >= 50 ? 'text-amber-600' : 'text-red-600'
+                                        }`}>
+                                          {(evalScore / 10).toFixed(1)}/10
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Toggle switch */}
+                                  <div onClick={e => e.stopPropagation()}>
+                                    <button
+                                      onClick={() => event.scheduledBotId && toggleCalendarBot(event.scheduledBotId, !event.botEnabled)}
+                                      disabled={isToggling || !event.scheduledBotId || event.botStatus === 'recording' || event.botStatus === 'completed'}
+                                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        event.botEnabled ? 'bg-green-500' : 'bg-gray-300'
+                                      } ${isToggling ? 'opacity-50' : ''} disabled:cursor-not-allowed`}
+                                    >
+                                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                                        event.botEnabled ? 'translate-x-6' : 'translate-x-1'
+                                      }`} />
+                                    </button>
+                                  </div>
+
+                                  {/* Expand chevron */}
+                                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+                                </div>
+
+                                {/* Expanded details */}
+                                {isExpanded && (
+                                  <div className="px-4 pb-4 pt-0 border-t border-gray-100 space-y-2">
+                                    {endTime && (
+                                      <div className="flex items-center gap-2 text-xs text-gray-500 pt-2">
+                                        <Clock className="w-3.5 h-3.5" />
+                                        <span>{startTime} - {endTime}</span>
+                                      </div>
+                                    )}
+                                    {event.meetLink && (
+                                      <div className="flex items-center gap-2 text-xs">
+                                        <Link2 className="w-3.5 h-3.5 text-gray-400" />
+                                        <a href={event.meetLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
+                                          {event.meetLink}
+                                        </a>
+                                      </div>
+                                    )}
+                                    {event.attendees && event.attendees.length > 0 && (
+                                      <div className="flex items-start gap-2 text-xs text-gray-500">
+                                        <Users className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                        <span className="break-all">{event.attendees.map((a: any) => a.displayName || a.email || a).join(', ')}</span>
+                                      </div>
+                                    )}
+                                    {event.botStatus === 'completed' && event.evaluationId && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); router.push('/history?tab=meet') }}
+                                        className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1 mt-1"
+                                      >
+                                        Ver avaliação completa
+                                        <ChevronRight className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                    {/* Send bot manually button */}
+                                    {event.botEnabled && ['pending', 'error'].includes(event.botStatus) && event.meetLink && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); sendCalendarBot(event) }}
+                                        disabled={sendingBotEventId === event.scheduledBotId}
+                                        className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                                      >
+                                        {sendingBotEventId === event.scheduledBotId ? (
+                                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando bot...</>
+                                        ) : (
+                                          <><Send className="w-3.5 h-3.5" /> Enviar Bot para reunião</>
+                                        )}
+                                      </button>
+                                    )}
+                                    {event.botStatus === 'error' && event.scheduledBotId && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); toggleCalendarBot(event.scheduledBotId!, true) }}
+                                        className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 mt-1"
+                                      >
+                                        <RefreshCw className="w-3 h-3" />
+                                        Resetar status
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Divider between calendar and manual input */}
+            {calendarConnected && (
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400">ou cole um link manualmente</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+            )}
+
+            {/* Manual Input */}
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -950,33 +1528,36 @@ export default function MeetAnalysisView() {
               )}
             </div>
 
-            {/* Steps - 3 horizontal cards */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Link2 className="w-4 h-4 text-green-600" />
+            {/* Steps + Background notice (only when calendar not connected) */}
+            {!calendarConnected && (
+              <>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+                    <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Link2 className="w-4 h-4 text-green-600" />
+                    </div>
+                    <span className="text-sm text-gray-700">Cole o link da reunião</span>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+                    <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <UserCheck className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <span className="text-sm text-gray-700">Aceite o bot na reunião</span>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm text-gray-700">Receba a avaliação</span>
+                  </div>
                 </div>
-                <span className="text-sm text-gray-700">Cole o link da reunião</span>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
-                <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <UserCheck className="w-4 h-4 text-amber-600" />
-                </div>
-                <span className="text-sm text-gray-700">Aceite o bot na reunião</span>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-4 h-4 text-blue-600" />
-                </div>
-                <span className="text-sm text-gray-700">Receba a avaliação</span>
-              </div>
-            </div>
 
-            {/* Background notice - subtle pill */}
-            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-8">
-              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-              <span>A avaliação é gerada em background automaticamente</span>
-            </div>
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-8">
+                  <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                  <span>A avaliação é gerada em background automaticamente</span>
+                </div>
+              </>
+            )}
 
             {/* Recent Analyses */}
             {recentEvaluations.length > 0 && (

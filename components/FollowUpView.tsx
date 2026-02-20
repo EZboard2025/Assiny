@@ -123,6 +123,7 @@ export default function FollowUpView() {
   const [messageInput, setMessageInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const selectedConvRef = useRef<WhatsAppConversation | null>(null)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
 
@@ -639,7 +640,10 @@ export default function FollowUpView() {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+    }
   }, [messages])
 
   // Poll for new messages when a conversation is selected
@@ -1708,8 +1712,12 @@ export default function FollowUpView() {
 
   const scrollToMessage = (messageId: string) => {
     const el = document.getElementById(`msg-${messageId}`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const container = messagesContainerRef.current
+    if (el && container) {
+      const elTop = el.offsetTop
+      const elHeight = el.offsetHeight
+      const containerHeight = container.clientHeight
+      container.scrollTo({ top: elTop - containerHeight / 2 + elHeight / 2, behavior: 'smooth' })
     }
   }
 
@@ -2521,7 +2529,6 @@ export default function FollowUpView() {
 
     return (
       <div className="flex-1 flex bg-[#0b141a] relative overflow-hidden">
-        {/* Messages Column */}
         <div className="flex-1 flex flex-col min-h-0">
           {/* Chat Header */}
           <div className="h-[60px] flex-shrink-0 bg-[#202c33] px-4 flex items-center justify-between">
@@ -2618,7 +2625,7 @@ export default function FollowUpView() {
           )}
 
           {/* Messages Area */}
-          <div className="flex-1 min-h-0 overflow-y-auto whatsapp-scrollbar px-16 py-4 bg-[#0b141a] whatsapp-chat-bg">
+          <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto whatsapp-scrollbar px-16 py-2 bg-[#0b141a] whatsapp-chat-bg">
             {error && (
               <div className="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-lg flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />

@@ -389,6 +389,7 @@ export default function SalesCopilot({
   const [revealedChunks, setRevealedChunks] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastUserMsgRef = useRef<HTMLDivElement>(null)
+  const copilotScrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const prevConvRef = useRef<string | null>(null)
 
@@ -544,12 +545,17 @@ export default function SalesCopilot({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [copilotMessages])
 
-  // Auto-scroll: scroll last user message to top of viewport (Gemini behavior)
+  // Auto-scroll: scroll within the copilot messages container only
+  // IMPORTANT: Do NOT use scrollIntoView — it cascades to parent containers
+  // and displaces the FollowUpView headers (same bug as #ac08592)
   useEffect(() => {
+    const container = copilotScrollRef.current
+    if (!container) return
     if (lastUserMsgRef.current) {
-      lastUserMsgRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const elTop = lastUserMsgRef.current.offsetTop
+      container.scrollTo({ top: elTop, behavior: 'smooth' })
     } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
     }
   }, [copilotMessages, isLoading])
 
@@ -1036,7 +1042,7 @@ export default function SalesCopilot({
         {hasMessages && (
           <>
             {/* Messages area */}
-            <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+            <div ref={copilotScrollRef} className="flex-1 min-h-0 overflow-y-auto whatsapp-scrollbar">
               <div className="px-5 py-4 space-y-6 flex flex-col" style={{ minHeight: '100%' }}>
               {(() => {
                 const lastUserIdx = copilotMessages.reduce((last, m, i) => m.role === 'user' ? i : last, -1)
