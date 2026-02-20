@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { exchangeCodeForTokens, getGoogleEmail } from '@/lib/google-calendar'
+import { exchangeCodeForTokens, getGoogleEmail, GOOGLE_SCOPES } from '@/lib/google-calendar'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -70,6 +70,11 @@ export async function GET(request: NextRequest) {
       ? new Date(tokens.expiry_date).toISOString()
       : new Date(Date.now() + 3600 * 1000).toISOString()
 
+    // Determine which scopes were granted
+    const grantedScopes = tokens.scope
+      ? tokens.scope.split(' ').filter(Boolean)
+      : GOOGLE_SCOPES
+
     // Upsert connection (one per user)
     const { error: upsertError } = await supabaseAdmin
       .from('google_calendar_connections')
@@ -81,6 +86,7 @@ export async function GET(request: NextRequest) {
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
           token_expires_at: tokenExpiresAt,
+          scopes: grantedScopes,
           status: 'active',
           updated_at: new Date().toISOString(),
         },

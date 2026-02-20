@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { hasWriteScopes } from '@/lib/google-calendar'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Fetch connection
     const { data: connection } = await supabaseAdmin
       .from('google_calendar_connections')
-      .select('id, google_email, status, auto_record_enabled, created_at, updated_at')
+      .select('id, google_email, status, auto_record_enabled, scopes, created_at, updated_at')
       .eq('user_id', user.id)
       .single()
 
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
       email: connection.google_email,
       status: connection.status,
       autoRecordEnabled: connection.auto_record_enabled,
+      hasWriteAccess: hasWriteScopes(connection.scopes),
       connectedAt: connection.created_at,
     })
   } catch (error: any) {

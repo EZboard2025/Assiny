@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { fetchUpcomingMeetEvents } from '@/lib/google-calendar'
+import { fetchUpcomingMeetEvents, fetchAllEvents } from '@/lib/google-calendar'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,74 +44,94 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Calendar not connected', events: [] }, { status: 200 })
     }
 
+    // Check view param: ?view=all fetches ALL events, default fetches only Meet events
+    const { searchParams } = new URL(request.url)
+    const viewAll = searchParams.get('view') === 'all'
+
     // Fetch events from Google Calendar
-    const calendarEvents = await fetchUpcomingMeetEvents(user.id, 7)
+    const calendarEvents = viewAll
+      ? await fetchAllEvents(user.id, 7)
+      : await fetchUpcomingMeetEvents(user.id, 7)
 
     if (!calendarEvents) {
       return NextResponse.json({ error: 'Failed to fetch calendar events', events: [] }, { status: 200 })
     }
 
-    // Upsert events into calendar_scheduled_bots and fetch current state
+    // Upsert events into calendar_scheduled_bots (only for events with Meet links)
     const enrichedEvents = []
 
     for (const event of calendarEvents) {
-      // Upsert: create if not exists, don't overwrite bot_enabled or bot_status
-      const { data: existing } = await supabaseAdmin
-        .from('calendar_scheduled_bots')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('google_event_id', event.id)
-        .single()
+      const hasMeet = !!event.meetLink
 
-      if (!existing) {
-        // New event — insert with defaults (bot_enabled: true, bot_status: pending)
-        const { data: inserted } = await supabaseAdmin
+      if (hasMeet) {
+        // Upsert: create if not exists, don't overwrite bot_enabled or bot_status
+        const { data: existing } = await supabaseAdmin
           .from('calendar_scheduled_bots')
-          .insert({
-            user_id: user.id,
-            company_id: employee.company_id,
-            calendar_connection_id: connection.id,
-            google_event_id: event.id,
-            event_title: event.title,
-            event_start: event.start,
-            event_end: event.end,
-            meet_link: event.meetLink,
-            attendees: event.attendees,
-            bot_enabled: true,
-            bot_status: 'pending',
-          })
-          .select()
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('google_event_id', event.id)
           .single()
 
+        if (!existing) {
+          // New event — insert with defaults (bot_enabled: true, bot_status: pending)
+          const { data: inserted } = await supabaseAdmin
+            .from('calendar_scheduled_bots')
+            .insert({
+              user_id: user.id,
+              company_id: employee.company_id,
+              calendar_connection_id: connection.id,
+              google_event_id: event.id,
+              event_title: event.title,
+              event_start: event.start,
+              event_end: event.end,
+              meet_link: event.meetLink,
+              attendees: event.attendees,
+              bot_enabled: true,
+              bot_status: 'pending',
+            })
+            .select()
+            .single()
+
+          enrichedEvents.push({
+            ...event,
+            botEnabled: true,
+            botStatus: 'pending',
+            botId: null,
+            evaluationId: null,
+            scheduledBotId: inserted?.id || null,
+          })
+        } else {
+          // Existing — update event details (title, time, attendees may change)
+          await supabaseAdmin
+            .from('calendar_scheduled_bots')
+            .update({
+              event_title: event.title,
+              event_start: event.start,
+              event_end: event.end,
+              meet_link: event.meetLink,
+              attendees: event.attendees,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id)
+
+          enrichedEvents.push({
+            ...event,
+            botEnabled: existing.bot_enabled,
+            botStatus: existing.bot_status,
+            botId: existing.bot_id,
+            evaluationId: existing.evaluation_id,
+            scheduledBotId: existing.id,
+          })
+        }
+      } else {
+        // No Meet link — just pass through without bot info
         enrichedEvents.push({
           ...event,
-          botEnabled: true,
-          botStatus: 'pending',
+          botEnabled: false,
+          botStatus: null,
           botId: null,
           evaluationId: null,
-          scheduledBotId: inserted?.id || null,
-        })
-      } else {
-        // Existing — update event details (title, time, attendees may change)
-        await supabaseAdmin
-          .from('calendar_scheduled_bots')
-          .update({
-            event_title: event.title,
-            event_start: event.start,
-            event_end: event.end,
-            meet_link: event.meetLink,
-            attendees: event.attendees,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id)
-
-        enrichedEvents.push({
-          ...event,
-          botEnabled: existing.bot_enabled,
-          botStatus: existing.bot_status,
-          botId: existing.bot_id,
-          evaluationId: existing.evaluation_id,
-          scheduledBotId: existing.id,
+          scheduledBotId: null,
         })
       }
     }

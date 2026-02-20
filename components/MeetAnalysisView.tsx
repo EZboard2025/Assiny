@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Video,
@@ -25,11 +25,15 @@ import {
   UserCheck,
   ChevronRight,
   CalendarDays,
-  ChevronDown,
-  Power
+  Power,
+  Plus
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
+import CalendarWeekView from './CalendarWeekView'
+import CalendarEventPopover from './CalendarEventPopover'
+import CalendarEventModal, { CreateEventData } from './CalendarEventModal'
+import MiniCalendar from './MiniCalendar'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'waiting_room' | 'in_meeting' | 'transcribing' | 'ended' | 'evaluating' | 'error'
 
@@ -53,6 +57,8 @@ interface CalendarEvent {
   start: string
   end: string | null
   meetLink: string
+  colorId?: string
+  description?: string | null
   attendees: Array<{ email: string; displayName?: string; responseStatus?: string }>
   botEnabled: boolean
   botStatus: string
@@ -182,9 +188,54 @@ export default function MeetAnalysisView() {
   const [calendarEventsLoading, setCalendarEventsLoading] = useState(false)
   const [connectingCalendar, setConnectingCalendar] = useState(false)
   const [togglingEventId, setTogglingEventId] = useState<string | null>(null)
-  const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
+  const [popoverEvent, setPopoverEvent] = useState<CalendarEvent | null>(null)
+  const [popoverAnchor, setPopoverAnchor] = useState<{ top: number; left: number; width: number; height: number } | null>(null)
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null)
   const [calendarNoticeType, setCalendarNoticeType] = useState<'success' | 'error' | 'warning'>('success')
+  const [hasWriteAccess, setHasWriteAccess] = useState(false)
+  const [showCreateEventModal, setShowCreateEventModal] = useState(false)
+  const [createEventDate, setCreateEventDate] = useState<Date | undefined>(undefined)
+  const [createEventHour, setCreateEventHour] = useState<number | undefined>(undefined)
+  const [editEventData, setEditEventData] = useState<{ id: string; title: string; start: string; end: string | null; meetLink?: string; attendees?: Array<{ email: string; displayName?: string; responseStatus?: string }>; description?: string | null } | null>(null)
+
+  // Tab & calendar week state
+  type MeetTab = 'calendar' | 'manual'
+  const [activeTab, setActiveTab] = useState<MeetTab>('calendar')
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = now.getDate() - day // Sunday start
+    const sunday = new Date(now)
+    sunday.setDate(diff)
+    sunday.setHours(0, 0, 0, 0)
+    return sunday
+  })
+
+  const handlePrevWeek = useCallback(() => {
+    setCurrentWeekStart(prev => {
+      const d = new Date(prev)
+      d.setDate(d.getDate() - 7)
+      return d
+    })
+  }, [])
+
+  const handleNextWeek = useCallback(() => {
+    setCurrentWeekStart(prev => {
+      const d = new Date(prev)
+      d.setDate(d.getDate() + 7)
+      return d
+    })
+  }, [])
+
+  const handleToday = useCallback(() => {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = now.getDate() - day
+    const sunday = new Date(now)
+    sunday.setDate(diff)
+    sunday.setHours(0, 0, 0, 0)
+    setCurrentWeekStart(sunday)
+  }, [])
 
   // Restore active session from localStorage + load data on mount
   useEffect(() => {
@@ -945,6 +996,7 @@ export default function MeetAnalysisView() {
         const data = await res.json()
         setCalendarConnected(data.connected)
         setCalendarEmail(data.email || '')
+        setHasWriteAccess(data.hasWriteAccess || false)
         if (data.connected) {
           loadCalendarEvents(authSession.access_token)
         }
@@ -965,7 +1017,7 @@ export default function MeetAnalysisView() {
         authToken = authSession?.access_token || ''
       }
 
-      const res = await fetch('/api/calendar/events', {
+      const res = await fetch('/api/calendar/events?view=all', {
         headers: { Authorization: `Bearer ${authToken}` }
       })
       if (res.ok) {
@@ -1051,6 +1103,121 @@ export default function MeetAnalysisView() {
       console.error('Failed to toggle bot:', e)
     } finally {
       setTogglingEventId(null)
+    }
+  }
+
+  const handleCreateEvent = async (data: CreateEventData) => {
+    const { data: { session: authSession } } = await supabase.auth.getSession()
+    if (!authSession?.access_token) throw new Error('Não autenticado')
+
+    const isEdit = !!data.eventId
+
+    if (isEdit) {
+      // Update existing event
+      const res = await fetch('/api/calendar/events/update', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: data.eventId,
+          title: data.title,
+          startDateTime: data.startDateTime,
+          endDateTime: data.endDateTime,
+          description: data.description,
+          attendees: data.attendees,
+          addMeetLink: data.addMeetLink,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro ao editar evento')
+      }
+
+      await loadCalendarEvents()
+      setPopoverEvent(null)
+      setPopoverAnchor(null)
+      setEditEventData(null)
+      setCalendarNoticeType('success')
+      setCalendarNotice('Evento atualizado com sucesso!')
+      setTimeout(() => setCalendarNotice(null), 4000)
+    } else {
+      // Create new event
+      const res = await fetch('/api/calendar/events/create', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro ao criar evento')
+      }
+
+      await loadCalendarEvents()
+      setCalendarNoticeType('success')
+      setCalendarNotice('Evento criado com sucesso!')
+      setTimeout(() => setCalendarNotice(null), 4000)
+    }
+  }
+
+  const handleDeleteEvent = async (eventId: string) => {
+    const { data: { session: authSession } } = await supabase.auth.getSession()
+    if (!authSession?.access_token) return
+
+    const res = await fetch('/api/calendar/events/delete', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ eventId }),
+    })
+
+    if (res.ok) {
+      setCalendarEvents(prev => prev.filter(e => e.id !== eventId))
+      setPopoverEvent(null)
+      setPopoverAnchor(null)
+      setCalendarNoticeType('success')
+      setCalendarNotice('Evento removido com sucesso')
+      setTimeout(() => setCalendarNotice(null), 4000)
+    } else {
+      const err = await res.json()
+      setCalendarNoticeType('error')
+      setCalendarNotice(err.error || 'Erro ao apagar evento')
+    }
+  }
+
+  const handleAddAttendees = async (eventId: string, emails: string[]) => {
+    const { data: { session: authSession } } = await supabase.auth.getSession()
+    if (!authSession?.access_token) return null
+
+    const res = await fetch('/api/calendar/events/update', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${authSession.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ eventId, attendees: emails }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      // Update the event in calendarEvents list
+      setCalendarEvents(prev => prev.map(e =>
+        e.id === eventId ? { ...e, attendees: data.attendees } : e
+      ))
+      return data.attendees
+    } else {
+      const err = await res.json()
+      setCalendarNoticeType('error')
+      setCalendarNotice(err.error || 'Erro ao adicionar convidado')
+      return null
     }
   }
 
@@ -1143,47 +1310,7 @@ export default function MeetAnalysisView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarConnected, calendarEvents])
 
-  // Group calendar events by day
-  const groupedEvents = useMemo(() => {
-    if (calendarEvents.length === 0) return []
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const dayAfterTomorrow = new Date(tomorrow)
-    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
-
-    const groups = new Map<string, CalendarEvent[]>()
-
-    for (const event of calendarEvents) {
-      const eventDate = new Date(event.start)
-      eventDate.setHours(0, 0, 0, 0)
-      const key = eventDate.toISOString().split('T')[0]
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(event)
-    }
-
-    const sortedKeys = Array.from(groups.keys()).sort()
-
-    return sortedKeys.map(key => {
-      const date = new Date(key + 'T12:00:00')
-      let label: string
-      if (date >= today && date < tomorrow) {
-        label = 'Hoje'
-      } else if (date >= tomorrow && date < dayAfterTomorrow) {
-        label = 'Amanhã'
-      } else {
-        label = date.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
-      }
-
-      return {
-        label,
-        date: key,
-        events: groups.get(key)!.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-      }
-    })
-  }, [calendarEvents])
 
   // Get status display
   const getStatusDisplay = () => {
@@ -1214,15 +1341,19 @@ export default function MeetAnalysisView() {
 
   return (
     <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected ? 'pt-[22vh]' : 'pt-8'}`}>
-      <div className="max-w-4xl w-full">
+      <div className={`w-full ${calendarConnected && activeTab === 'calendar' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
         {/* Compact Header */}
         <div className="flex items-center justify-center gap-4 mb-6">
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
             <Video className="w-5 h-5 text-green-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Análise Meet</h1>
-            <p className="text-sm text-gray-500">Avaliação automática de reuniões com IA</p>
+            <h1 className="text-xl font-bold text-gray-900">
+              {calendarConnected ? 'Calendário & Análise Meet' : 'Análise Meet'}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {calendarConnected ? 'Gerencie sua agenda e avalie reuniões com IA' : 'Avaliação automática de reuniões com IA'}
+            </p>
           </div>
         </div>
 
@@ -1281,19 +1412,60 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {/* Calendar Events List (when connected) */}
+            {/* Re-auth banner (write scopes needed) */}
+            {calendarConnected && !hasWriteAccess && (
+              <div className="mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2 text-sm text-amber-700">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  <span>Atualize as permissões para criar eventos no calendário</span>
+                </div>
+                <button
+                  onClick={connectCalendar}
+                  disabled={connectingCalendar}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {connectingCalendar ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Reautorizar
+                </button>
+              </div>
+            )}
+
+            {/* Tab Navigation (when connected) */}
             {calendarConnected && (
-              <div className="mb-6">
-                {/* Header */}
+              <div className="mb-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-green-600" />
-                    <h2 className="text-sm font-semibold text-gray-700">Reuniões da Semana</h2>
-                    {calendarEmail && (
-                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{calendarEmail}</span>
-                    )}
+                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                    {([
+                      { id: 'calendar' as MeetTab, icon: CalendarDays, label: 'Calendário' },
+                      { id: 'manual' as MeetTab, icon: Link2, label: 'Manual' },
+                    ]).map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          activeTab === tab.id
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        <tab.icon className="w-4 h-4" />
+                        <span className="hidden sm:inline">{tab.label}</span>
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
+                    {calendarEmail && (
+                      <span className="text-xs text-gray-400 hidden sm:inline">{calendarEmail}</span>
+                    )}
+                    {hasWriteAccess && (
+                      <button
+                        onClick={() => { setCreateEventDate(undefined); setCreateEventHour(undefined); setShowCreateEventModal(true) }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Criar evento"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => loadCalendarEvents()}
                       className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -1311,183 +1483,129 @@ export default function MeetAnalysisView() {
                   </div>
                 </div>
 
-                {/* Events by day */}
-                {calendarEventsLoading && calendarEvents.length === 0 ? (
-                  <div className="bg-white rounded-xl p-8 border border-gray-200 flex items-center justify-center">
-                    <Loader2 className="w-5 h-5 animate-spin text-green-600 mr-2" />
-                    <span className="text-sm text-gray-500">Carregando reuniões...</span>
-                  </div>
-                ) : groupedEvents.length === 0 ? (
-                  <div className="bg-white rounded-xl p-6 border border-gray-200 text-center">
-                    <CalendarDays className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Nenhuma reunião com Google Meet nos próximos 7 dias</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {groupedEvents.map(group => (
-                      <div key={group.date}>
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
-                          {group.label}
-                        </h3>
-                        <div className="space-y-2">
-                          {group.events.map(event => {
-                            const startTime = new Date(event.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                            const endTime = event.end ? new Date(event.end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''
-                            const isExpanded = expandedEventId === event.scheduledBotId
-                            const isToggling = togglingEventId === event.scheduledBotId
-                            const isPast = new Date(event.start) < new Date()
-                            const evalScore = event.evaluation?.overall_score
-
-                            const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
-                              pending: { color: 'text-gray-500', bg: 'bg-gray-100', label: 'Aguardando' },
-                              scheduled: { color: 'text-blue-600', bg: 'bg-blue-50', label: 'Bot agendado' },
-                              joining: { color: 'text-amber-600', bg: 'bg-amber-50', label: 'Entrando...' },
-                              recording: { color: 'text-red-600', bg: 'bg-red-50', label: 'Gravando' },
-                              completed: { color: 'text-green-600', bg: 'bg-green-50', label: 'Avaliado' },
-                              skipped: { color: 'text-gray-400', bg: 'bg-gray-50', label: 'Desabilitado' },
-                              error: { color: 'text-red-600', bg: 'bg-red-50', label: 'Erro' },
-                            }
-                            const status = statusConfig[event.botStatus] || statusConfig.pending
-
-                            return (
-                              <div
-                                key={event.scheduledBotId || event.id}
-                                className={`bg-white rounded-xl border transition-all ${
-                                  event.botStatus === 'recording' ? 'border-red-200 shadow-sm' :
-                                  event.botStatus === 'completed' ? 'border-green-200' :
-                                  'border-gray-200'
-                                } ${isPast && event.botStatus !== 'completed' && event.botStatus !== 'recording' ? 'opacity-60' : ''}`}
-                              >
-                                {/* Main row */}
-                                <div
-                                  className="p-4 flex items-center gap-3 cursor-pointer"
-                                  onClick={() => setExpandedEventId(isExpanded ? null : event.scheduledBotId)}
-                                >
-                                  {/* Time */}
-                                  <div className="text-sm font-mono text-gray-600 w-12 flex-shrink-0">
-                                    {startTime}
-                                  </div>
-
-                                  {/* Recording pulse */}
-                                  {event.botStatus === 'recording' && (
-                                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
-                                  )}
-
-                                  {/* Title + Status */}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">{event.title || 'Reunião sem título'}</p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className={`text-xs px-1.5 py-0.5 rounded ${status.bg} ${status.color} font-medium`}>
-                                        {status.label}
-                                      </span>
-                                      {evalScore !== undefined && evalScore !== null && (
-                                        <span className={`text-xs font-bold ${
-                                          evalScore >= 70 ? 'text-green-600' :
-                                          evalScore >= 50 ? 'text-amber-600' : 'text-red-600'
-                                        }`}>
-                                          {(evalScore / 10).toFixed(1)}/10
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Toggle switch */}
-                                  <div onClick={e => e.stopPropagation()}>
-                                    <button
-                                      onClick={() => event.scheduledBotId && toggleCalendarBot(event.scheduledBotId, !event.botEnabled)}
-                                      disabled={isToggling || !event.scheduledBotId || event.botStatus === 'recording' || event.botStatus === 'completed'}
-                                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        event.botEnabled ? 'bg-green-500' : 'bg-gray-300'
-                                      } ${isToggling ? 'opacity-50' : ''} disabled:cursor-not-allowed`}
-                                    >
-                                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
-                                        event.botEnabled ? 'translate-x-6' : 'translate-x-1'
-                                      }`} />
-                                    </button>
-                                  </div>
-
-                                  {/* Expand chevron */}
-                                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
-
-                                {/* Expanded details */}
-                                {isExpanded && (
-                                  <div className="px-4 pb-4 pt-0 border-t border-gray-100 space-y-2">
-                                    {endTime && (
-                                      <div className="flex items-center gap-2 text-xs text-gray-500 pt-2">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        <span>{startTime} - {endTime}</span>
-                                      </div>
-                                    )}
-                                    {event.meetLink && (
-                                      <div className="flex items-center gap-2 text-xs">
-                                        <Link2 className="w-3.5 h-3.5 text-gray-400" />
-                                        <a href={event.meetLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
-                                          {event.meetLink}
-                                        </a>
-                                      </div>
-                                    )}
-                                    {event.attendees && event.attendees.length > 0 && (
-                                      <div className="flex items-start gap-2 text-xs text-gray-500">
-                                        <Users className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                                        <span className="break-all">{event.attendees.map((a: any) => a.displayName || a.email || a).join(', ')}</span>
-                                      </div>
-                                    )}
-                                    {event.botStatus === 'completed' && event.evaluationId && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); router.push('/history?tab=meet') }}
-                                        className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1 mt-1"
-                                      >
-                                        Ver avaliação completa
-                                        <ChevronRight className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                    {/* Send bot manually button */}
-                                    {event.botEnabled && ['pending', 'error'].includes(event.botStatus) && event.meetLink && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); sendCalendarBot(event) }}
-                                        disabled={sendingBotEventId === event.scheduledBotId}
-                                        className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
-                                      >
-                                        {sendingBotEventId === event.scheduledBotId ? (
-                                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando bot...</>
-                                        ) : (
-                                          <><Send className="w-3.5 h-3.5" /> Enviar Bot para reunião</>
-                                        )}
-                                      </button>
-                                    )}
-                                    {event.botStatus === 'error' && event.scheduledBotId && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); toggleCalendarBot(event.scheduledBotId!, true) }}
-                                        className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 mt-1"
-                                      >
-                                        <RefreshCw className="w-3 h-3" />
-                                        Resetar status
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Divider between calendar and manual input */}
-            {calendarConnected && (
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-gray-400">ou cole um link manualmente</span>
-                <div className="flex-1 h-px bg-gray-200" />
+            {/* ========== TAB: Calendário (Google Calendar style) ========== */}
+            {calendarConnected && activeTab === 'calendar' && (
+              <div className="flex gap-4">
+                {/* Mini month calendar sidebar */}
+                <MiniCalendar
+                  currentWeekStart={currentWeekStart}
+                  onDateClick={(date) => {
+                    const d = new Date(date)
+                    const day = d.getDay()
+                    d.setDate(d.getDate() - day) // go to Sunday
+                    d.setHours(0, 0, 0, 0)
+                    setCurrentWeekStart(d)
+                  }}
+                />
+
+                {/* Main week view */}
+                <div className="flex-1 min-w-0">
+                  <CalendarWeekView
+                    events={calendarEvents}
+                    loading={calendarEventsLoading}
+                    currentWeekStart={currentWeekStart}
+                    onPrevWeek={handlePrevWeek}
+                    onNextWeek={handleNextWeek}
+                    onToday={handleToday}
+                    onEventClick={(event, anchorRect) => {
+                      setPopoverEvent(event as CalendarEvent)
+                      setPopoverAnchor(anchorRect)
+                    }}
+                    onCreateEvent={hasWriteAccess ? (date, hour) => {
+                      setCreateEventDate(date)
+                      setCreateEventHour(hour)
+                      setShowCreateEventModal(true)
+                    } : undefined}
+                    onEventTimeUpdate={hasWriteAccess ? async (eventId, newStart, newEnd) => {
+                      const { data: { session: authSession } } = await supabase.auth.getSession()
+                      if (!authSession?.access_token) return
+
+                      // Optimistic UI: update local state immediately
+                      setCalendarEvents(prev => prev.map(ev =>
+                        ev.id === eventId ? { ...ev, start: newStart, end: newEnd } : ev
+                      ))
+
+                      try {
+                        const res = await fetch('/api/calendar/events/update', {
+                          method: 'POST',
+                          headers: {
+                            Authorization: `Bearer ${authSession.access_token}`,
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            eventId,
+                            startDateTime: newStart,
+                            endDateTime: newEnd,
+                          }),
+                        })
+
+                        if (!res.ok) {
+                          // Revert on error
+                          await loadCalendarEvents()
+                          const err = await res.json()
+                          setCalendarNoticeType('error')
+                          setCalendarNotice(err.error || 'Erro ao mover evento')
+                        }
+                      } catch {
+                        await loadCalendarEvents()
+                        setCalendarNoticeType('error')
+                        setCalendarNotice('Erro ao atualizar evento')
+                      }
+                    } : undefined}
+                  />
+                </div>
               </div>
             )}
 
-            {/* Manual Input */}
+            {/* Popover for event details */}
+            {popoverEvent && (
+              <CalendarEventPopover
+                event={popoverEvent as any}
+                anchorRect={popoverAnchor}
+                onClose={() => { setPopoverEvent(null); setPopoverAnchor(null) }}
+                onToggleBot={(scheduledBotId, enabled) => {
+                  toggleCalendarBot(scheduledBotId, enabled)
+                  setPopoverEvent(prev => prev ? { ...prev, botEnabled: enabled, botStatus: enabled ? 'pending' : 'skipped' } : null)
+                }}
+                onViewEvaluation={() => router.push('/history?tab=meet')}
+                onResetStatus={(scheduledBotId) => toggleCalendarBot(scheduledBotId, true)}
+                onDeleteEvent={hasWriteAccess ? handleDeleteEvent : undefined}
+                onAddAttendees={hasWriteAccess ? handleAddAttendees : undefined}
+                onEditEvent={hasWriteAccess ? (ev) => {
+                  // Find full event data (popoverEvent has the CalendarEvent with description)
+                  const fullEvent = calendarEvents.find(e => e.id === ev.id)
+                  setEditEventData({
+                    id: ev.id,
+                    title: ev.title,
+                    start: ev.start,
+                    end: ev.end,
+                    meetLink: ev.meetLink,
+                    attendees: ev.attendees,
+                    description: fullEvent?.description || null,
+                  })
+                  setShowCreateEventModal(true)
+                  setPopoverEvent(null)
+                  setPopoverAnchor(null)
+                } : undefined}
+                togglingEventId={togglingEventId}
+              />
+            )}
+
+            {/* Create/Edit Event Modal */}
+            <CalendarEventModal
+              isOpen={showCreateEventModal}
+              onClose={() => { setShowCreateEventModal(false); setEditEventData(null) }}
+              onSubmit={handleCreateEvent}
+              prefillDate={createEventDate}
+              prefillHour={createEventHour}
+              editEvent={editEventData}
+            />
+
+            {/* ========== TAB: Manual (or when not connected) ========== */}
+            {(activeTab === 'manual' || !calendarConnected) && (
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -1529,6 +1647,7 @@ export default function MeetAnalysisView() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Steps + Background notice (only when calendar not connected) */}
             {!calendarConnected && (
