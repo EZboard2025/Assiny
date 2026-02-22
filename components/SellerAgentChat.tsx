@@ -219,7 +219,6 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       }
 
       const data = await response.json()
-      if (data._debug) console.log('[SellerAgent] DEBUG:', JSON.stringify(data._debug, null, 2))
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
     } catch (error) {
       console.error('[SellerAgent] Error:', error)
@@ -344,17 +343,6 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
   const MeetingCard = ({ title, date, time, link, participants, botStatus }: {
     title: string; date: string; time: string; link?: string; participants?: string; botStatus?: string
   }) => {
-    const actionBtn = (label: string, icon: React.ReactNode, message: string) => (
-      <button
-        onClick={() => sendMessage(message)}
-        disabled={isLoading}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-gray-500 hover:text-green-700 hover:bg-green-50 transition-colors disabled:opacity-40"
-      >
-        {icon}
-        {label}
-      </button>
-    )
-
     return (
       <div className="bg-gray-50 rounded-xl p-3 my-1.5 border border-gray-100">
         <div className="flex items-start gap-3">
@@ -390,21 +378,22 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           </div>
         </div>
         {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-1.5 mt-2.5 pt-2.5 border-t border-gray-200/60">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
           {link && link !== 'none' && (
-            <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors col-span-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-              Entrar na reunião
+            <a href={link} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, background: '#10b981', color: '#fff', textDecoration: 'none' }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              Entrar
             </a>
           )}
           <button onClick={() => sendMessage(`Reagenda a reunião "${title}" do dia ${date}. Para quando?`)} disabled={isLoading}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:border-green-300 hover:text-green-700 hover:bg-green-50 transition-all disabled:opacity-40">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', cursor: 'pointer', opacity: isLoading ? 0.4 : 1 }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             Reagendar
           </button>
           <button onClick={() => sendMessage(`Adiciona convidados na reunião "${title}" do dia ${date}. Quem devo adicionar?`)} disabled={isLoading}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:border-green-300 hover:text-green-700 hover:bg-green-50 transition-all disabled:opacity-40">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', cursor: 'pointer', opacity: isLoading ? 0.4 : 1 }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
             Convidados
           </button>
           {link && link !== 'none' && botStatus !== 'completed' && botStatus !== 'recording' && (
@@ -413,18 +402,14 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
                 ? `Desativa o bot de análise na reunião "${title}" do dia ${date}`
                 : `Ativa o bot de análise na reunião "${title}" do dia ${date}`
             )} disabled={isLoading}
-              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all disabled:opacity-40 ${
-                botStatus === 'scheduled' || botStatus === 'pending'
-                  ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
-                  : 'bg-white border-gray-200 text-gray-700 hover:border-green-300 hover:text-green-700 hover:bg-green-50'
-              }`}>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, background: botStatus === 'scheduled' || botStatus === 'pending' ? '#fef3c7' : '#faf5ff', color: botStatus === 'scheduled' || botStatus === 'pending' ? '#92400e' : '#7e22ce', border: `1px solid ${botStatus === 'scheduled' || botStatus === 'pending' ? '#fde68a' : '#e9d5ff'}`, cursor: 'pointer', opacity: isLoading ? 0.4 : 1 }}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
               {botStatus === 'scheduled' || botStatus === 'pending' ? 'Desativar bot' : 'Ativar bot'}
             </button>
           )}
           <button onClick={() => sendMessage(`Cancela a reunião "${title}" do dia ${date}`)} disabled={isLoading}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-all disabled:opacity-40">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', cursor: 'pointer', opacity: isLoading ? 0.4 : 1 }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             Cancelar
           </button>
         </div>

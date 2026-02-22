@@ -1279,7 +1279,6 @@ export async function POST(req: NextRequest) {
 
     // Tool calling loop (max 5 rounds to prevent infinite loops)
     const toolsUsed: string[] = []
-    const toolResults_debug: Array<{ tool: string; result_preview: string }> = []
     const MAX_ROUNDS = 5
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -1298,7 +1297,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           response: choice.message.content || 'Desculpe, não consegui processar sua pergunta.',
           toolsUsed,
-          _debug: { userId: user.id, companyId, sellerName, toolResults: toolResults_debug },
         })
       }
 
@@ -1309,7 +1307,6 @@ export async function POST(req: NextRequest) {
           toolsUsed.push(tcFn.function.name)
           const result = await executeFunction(tc, user.id, companyId)
           const resultStr = JSON.stringify(result)
-          toolResults_debug.push({ tool: tcFn.function.name, result_preview: resultStr.slice(0, 300) })
           return {
             role: 'tool' as const,
             tool_call_id: tc.id,
@@ -1334,7 +1331,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       response: finalResponse.choices[0].message.content || 'Desculpe, ocorreu um erro.',
       toolsUsed,
-      _debug: { userId: user.id, companyId, sellerName, toolResults: toolResults_debug },
     })
 
   } catch (error) {
