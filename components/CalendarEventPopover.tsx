@@ -321,7 +321,7 @@ export default function CalendarEventPopover({
           {/* Divider */}
           {hasMeet && event.scheduledBotId && (
             <div className="border-t border-gray-100 pt-3">
-              {/* Bot Status */}
+              {/* Bot Status + Toggle (hide toggle for past events) */}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Bot de Análise</span>
@@ -333,18 +333,20 @@ export default function CalendarEventPopover({
                   </span>
                 </div>
 
-                {/* Toggle switch */}
-                <button
-                  onClick={() => event.scheduledBotId && onToggleBot(event.scheduledBotId, !botEnabled)}
-                  disabled={isToggling || !event.scheduledBotId || botStatus === 'recording' || botStatus === 'completed'}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    botEnabled ? 'bg-green-500' : 'bg-gray-300'
-                  } ${isToggling ? 'opacity-50' : ''} disabled:cursor-not-allowed`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm ${
-                    botEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  }`} />
-                </button>
+                {/* Toggle switch - hidden for past events */}
+                {!isPast && (
+                  <button
+                    onClick={() => event.scheduledBotId && onToggleBot(event.scheduledBotId, !botEnabled)}
+                    disabled={isToggling || !event.scheduledBotId || botStatus === 'recording' || botStatus === 'completed'}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      botEnabled ? 'bg-green-500' : 'bg-gray-300'
+                    } ${isToggling ? 'opacity-50' : ''} disabled:cursor-not-allowed`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm ${
+                      botEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`} />
+                  </button>
+                )}
               </div>
 
               {/* Evaluation score */}
