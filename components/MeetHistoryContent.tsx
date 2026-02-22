@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target, MessageCircle, CheckCheck, Shield, ScrollText, Settings, Building, DollarSign, CreditCard, TrendingDown, Zap, Award, Heart, Star, Flag, Bookmark, Package, Truck, ShoppingCart, Percent, PieChart, Activity, Layers, Database, Lock, Unlock, Eye, Search, Filter, Tag, Hash, ArrowUpRight, ArrowDownRight, Globe, Phone, Mail, MessageSquare, HelpCircle, BarChart, Briefcase, XCircle, Share2, X, Users as UsersIcon } from 'lucide-react'
+import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target, MessageCircle, CheckCheck, Shield, ScrollText, Settings, Building, DollarSign, CreditCard, TrendingDown, Zap, Award, Heart, Star, Flag, Bookmark, Package, Truck, ShoppingCart, Percent, PieChart, Activity, Layers, Database, Lock, Unlock, Eye, Search, Filter, Tag, Hash, ArrowUpRight, ArrowDownRight, Globe, Phone, Mail, MessageSquare, HelpCircle, BarChart, Briefcase, XCircle, Share2, X, Users as UsersIcon, Copy, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface MeetEvaluation {
@@ -48,6 +48,52 @@ function cleanGptText(text: string): string {
     .replace(/\s*–\s*/g, ': ')
     .replace(/^Tecnica:\s*/i, '')
     .trim()
+}
+
+function formatSmartNotesForCopy(notes: any): string {
+  const lines: string[] = []
+  if (notes.lead_name) lines.push(`Lead: ${notes.lead_name}`)
+  if (notes.lead_role) lines.push(`Cargo: ${notes.lead_role}`)
+  if (notes.lead_company) lines.push(`Empresa: ${notes.lead_company}`)
+  if (lines.length) lines.push('')
+
+  notes.sections?.forEach((s: any) => {
+    lines.push(`## ${s.title}`)
+    if (s.insight) lines.push(s.insight)
+    s.items?.forEach((item: any) => {
+      lines.push(`- ${item.label}: ${item.value}`)
+      item.sub_items?.forEach((sub: string) => lines.push(`  - ${sub}`))
+    })
+    lines.push('')
+  })
+
+  if (notes.next_steps?.length) {
+    lines.push('## Próximos Passos')
+    notes.next_steps.forEach((step: any, i: number) => {
+      lines.push(`${i + 1}. ${step.action}${step.deadline ? ` (${step.deadline})` : ''}`)
+    })
+    lines.push('')
+  }
+
+  if (notes.deal_status) {
+    lines.push('## Status da Oportunidade')
+    if (notes.deal_status.summary) lines.push(notes.deal_status.summary)
+    if (notes.deal_status.temperature) {
+      const temp = notes.deal_status.temperature === 'hot' ? 'Quente' : notes.deal_status.temperature === 'warm' ? 'Morno' : 'Frio'
+      lines.push(`Temperatura: ${temp}`)
+    }
+    if (notes.deal_status.probability) lines.push(`Probabilidade: ${notes.deal_status.probability}`)
+  }
+
+  return lines.join('\n')
+}
+
+function formatTranscriptForCopy(transcript: any[], sellerName?: string): string {
+  return transcript.map(seg => {
+    const speaker = seg.speaker || 'Desconhecido'
+    const text = seg.text || seg.words?.map((w: any) => w.text).join(' ') || ''
+    return `${speaker}: ${text}`
+  }).filter(Boolean).join('\n\n')
 }
 
 function mapAreaToSpinLetter(area: string): string | null {
@@ -103,6 +149,15 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
   const [correctionSessions, setCorrectionSessions] = useState<Record<string, any>>({})
   const [expandedCorrectionSection, setExpandedCorrectionSection] = useState<string | null>(null)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
+  const [copiedSection, setCopiedSection] = useState<string | null>(null)
+
+  const handleCopySection = async (key: string, getText: () => string) => {
+    try {
+      await navigator.clipboard.writeText(getText())
+      setCopiedSection(key)
+      setTimeout(() => setCopiedSection(null), 2000)
+    } catch {}
+  }
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false)
@@ -719,6 +774,15 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
 
                   {expandedSection === 'smart_notes' && (
                     <div className="px-4 pb-4 border-t border-gray-100 space-y-4">
+                      {/* Copy button */}
+                      <div className="flex justify-end mt-2">
+                        <button
+                          onClick={() => handleCopySection('smart_notes', () => formatSmartNotesForCopy(selectedEvaluation.smart_notes))}
+                          className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100"
+                        >
+                          {copiedSection === 'smart_notes' ? <><Check className="w-3 h-3 text-green-500" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar notas</>}
+                        </button>
+                      </div>
                       {/* Lead Profile Card */}
                       {(selectedEvaluation.smart_notes.lead_name || selectedEvaluation.smart_notes.lead_company || selectedEvaluation.smart_notes.lead_role) && (
                         <div className="mt-4 bg-cyan-50/50 border border-cyan-100 rounded-xl p-4">
@@ -1258,6 +1322,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
 
                   {expandedSection === 'transcript' && (
                     <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+                      <div className="flex justify-end mb-2">
+                        <button
+                          onClick={() => handleCopySection('transcript', () => formatTranscriptForCopy(selectedEvaluation.transcript))}
+                          className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100"
+                        >
+                          {copiedSection === 'transcript' ? <><Check className="w-3 h-3 text-green-500" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar transcrição</>}
+                        </button>
+                      </div>
                       <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
                         {selectedEvaluation.transcript.map((segment: any, idx: number) => {
                           const speaker = segment.speaker || 'Desconhecido'
