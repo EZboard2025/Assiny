@@ -1661,7 +1661,10 @@ export default function MeetAnalysisView() {
                   toggleCalendarBot(scheduledBotId, enabled)
                   setPopoverEvent(prev => prev ? { ...prev, botEnabled: enabled, botStatus: enabled ? 'pending' : 'skipped' } : null)
                 }}
-                onViewEvaluation={() => router.push('/history?tab=meet')}
+                onViewEvaluation={(ev) => {
+                  const evalId = ev.evaluationId
+                  router.push(evalId ? `/history?tab=meet&evaluationId=${evalId}` : '/history?tab=meet')
+                }}
                 onResetStatus={(scheduledBotId) => toggleCalendarBot(scheduledBotId, true)}
                 onDeleteEvent={hasWriteAccess ? handleDeleteEvent : undefined}
                 onAddAttendees={hasWriteAccess ? handleAddAttendees : undefined}
@@ -1794,7 +1797,7 @@ export default function MeetAnalysisView() {
                     return (
                       <div
                         key={ev.id}
-                        onClick={() => router.push('/history?tab=meet')}
+                        onClick={() => router.push(`/history?tab=meet&evaluationId=${ev.id}`)}
                         className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-4 cursor-pointer hover:border-green-300 hover:shadow-sm transition-all"
                       >
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center border font-bold text-lg ${scoreColor}`}>

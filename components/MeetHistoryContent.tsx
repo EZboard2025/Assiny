@@ -87,7 +87,12 @@ function translateIndicator(key: string): string {
     .replace(/\b\w/g, (c: string) => c.toUpperCase())
 }
 
-export default function MeetHistoryContent() {
+interface MeetHistoryContentProps {
+  newEvaluationIds?: string[]
+  initialEvaluationId?: string | null
+}
+
+export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId }: MeetHistoryContentProps) {
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
   const [loading, setLoading] = useState(true)
@@ -149,7 +154,11 @@ export default function MeetHistoryContent() {
 
       setEvaluations(enrichedData)
       if (enrichedData.length > 0) {
-        setSelectedEvaluation(enrichedData[0])
+        // Auto-select specific evaluation if navigated from calendar
+        const target = initialEvaluationId
+          ? enrichedData.find((e: MeetEvaluation) => e.id === initialEvaluationId)
+          : null
+        setSelectedEvaluation(target || enrichedData[0])
       }
 
       // Load saved simulations linked to evaluations
@@ -336,55 +345,70 @@ export default function MeetHistoryContent() {
               const correctionScore = correctionScores[evaluation.id]
               const hasSim = !!sim
               const isCompleted = sim?.status === 'completed'
+              const isNew = newEvaluationIds.includes(evaluation.id)
 
               return (
-                <button
-                  key={evaluation.id}
-                  onClick={() => { setSelectedEvaluation(evaluation); setExpandedSection(null) }}
-                  className={`w-full text-left p-4 border-b border-gray-100 transition-all ${
-                    selectedEvaluation?.id === evaluation.id
-                      ? 'bg-green-50 border-l-4 border-l-green-500'
-                      : 'hover:bg-gray-50 border-l-4 border-l-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Score */}
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${getScoreBg(evaluation.overall_score)}`}>
-                      <span className={`text-lg font-bold ${getScoreColor(evaluation.overall_score)}`}>
-                        {evaluation.overall_score !== null ? Math.round(evaluation.overall_score / 10) : '--'}
-                      </span>
-                    </div>
+                <div key={evaluation.id} className="relative">
+                  {/* Glow effect for new evaluations */}
+                  {isNew && (
+                    <div className="absolute inset-0 bg-blue-400/10 animate-pulse pointer-events-none" />
+                  )}
+                  <button
+                    onClick={() => { setSelectedEvaluation(evaluation); setExpandedSection(null) }}
+                    className={`relative w-full text-left p-4 border-b border-gray-100 transition-all ${
+                      selectedEvaluation?.id === evaluation.id
+                        ? 'bg-green-50 border-l-4 border-l-green-500'
+                        : isNew
+                          ? 'bg-blue-50/50 border-l-4 border-l-blue-400'
+                          : 'hover:bg-gray-50 border-l-4 border-l-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Score */}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isNew ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${getScoreBg(evaluation.overall_score)}`}>
+                        <span className={`text-lg font-bold ${getScoreColor(evaluation.overall_score)}`}>
+                          {evaluation.overall_score !== null ? Math.round(evaluation.overall_score / 10) : '--'}
+                        </span>
+                      </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">
-                        {evaluation.seller_name}
-                      </div>
-                      <div className="text-[11px] text-gray-400">
-                        {formatDate(evaluation.created_at)}
-                      </div>
-                      {evaluation.calendar_event_title && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                          <span className="text-[11px] text-blue-500 truncate">{evaluation.calendar_event_title}</span>
-                        </div>
-                      )}
-                      {hasSim && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Target className="w-3 h-3 text-purple-500 flex-shrink-0" />
-                          <span className={`text-[11px] font-medium ${isCompleted ? 'text-green-600' : 'text-purple-500'}`}>
-                            {isCompleted ? 'Correção feita' : 'Correção pendente'}
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium text-gray-900 truncate">
+                            {evaluation.seller_name}
                           </span>
-                          {isCompleted && correctionScore !== undefined && correctionScore !== null && (
-                            <span className={`text-[11px] font-bold ${getScoreColor(correctionScore)}`}>
-                              ({correctionScore.toFixed(1)})
+                          {isNew && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold text-blue-600 bg-blue-100 rounded-full animate-pulse flex-shrink-0">
+                              NOVO
                             </span>
                           )}
                         </div>
-                      )}
+                        <div className="text-[11px] text-gray-400">
+                          {formatDate(evaluation.created_at)}
+                        </div>
+                        {evaluation.calendar_event_title && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Calendar className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                            <span className="text-[11px] text-blue-500 truncate">{evaluation.calendar_event_title}</span>
+                          </div>
+                        )}
+                        {hasSim && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Target className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                            <span className={`text-[11px] font-medium ${isCompleted ? 'text-green-600' : 'text-purple-500'}`}>
+                              {isCompleted ? 'Correção feita' : 'Correção pendente'}
+                            </span>
+                            {isCompleted && correctionScore !== undefined && correctionScore !== null && (
+                              <span className={`text-[11px] font-bold ${getScoreColor(correctionScore)}`}>
+                                ({correctionScore.toFixed(1)})
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                </div>
               )
             })}
           </div>
