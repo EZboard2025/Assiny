@@ -165,8 +165,21 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     setIsLoading(true)
 
     try {
+      // getSession() can return null on subdomains — use getUser() token fallback
+      let token: string | undefined
       const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
+      token = session?.access_token
+
+      if (!token) {
+        // Fallback: try to get token from the auth state
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Re-fetch session after getUser (can force refresh)
+          const { data: refreshed } = await supabase.auth.getSession()
+          token = refreshed.session?.access_token
+        }
+      }
+
       if (!token) {
         setMessages(prev => [...prev, { role: 'assistant', content: 'Sessão expirada. Por favor, recarregue a página.' }])
         return
