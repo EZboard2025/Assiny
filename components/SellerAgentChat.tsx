@@ -341,23 +341,94 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     </div>
   )
 
-  // ─── Text Renderer (markdown-like) ──────────────────────────────────
+  // ─── Rich Text Renderer ────────────────────────────────────────────
   const renderTextBlock = (text: string, keyPrefix: number) => {
     const lines = text.split('\n')
+
+    // Classify each line
+    type LineType = 'header' | 'bullet' | 'numbered' | 'empty' | 'paragraph'
+    const classified = lines.map(line => {
+      const trimmed = line.trim()
+      if (!trimmed) return { type: 'empty' as LineType, raw: line, content: '' }
+      // Markdown headers: ### Title or ## Title
+      if (trimmed.match(/^#{1,4}\s+/)) return { type: 'header' as LineType, raw: line, content: trimmed.replace(/^#{1,4}\s+/, '') }
+      // Bold-only line ending with : is a section header — e.g. **Recomendações:**
+      if (trimmed.match(/^\*\*[^*]+\*\*:?$/) && trimmed.length < 120) return { type: 'header' as LineType, raw: line, content: trimmed.replace(/\*\*/g, '') }
+      // Bullet items
+      if (trimmed.match(/^[-•]\s/)) return { type: 'bullet' as LineType, raw: line, content: trimmed.slice(2) }
+      // Numbered items
+      if (trimmed.match(/^\d+[\.\)]\s/)) return { type: 'numbered' as LineType, raw: line, content: trimmed.replace(/^\d+[\.\)]\s/, '') }
+      return { type: 'paragraph' as LineType, raw: line, content: trimmed }
+    })
+
+    // Group consecutive items of same type into blocks
+    type Block = { type: LineType; items: string[] }
+    const blocks: Block[] = []
+    for (const line of classified) {
+      const last = blocks[blocks.length - 1]
+      if (line.type === 'empty') {
+        blocks.push({ type: 'empty', items: [] })
+      } else if (last && last.type === line.type && (line.type === 'bullet' || line.type === 'numbered')) {
+        last.items.push(line.content)
+      } else {
+        blocks.push({ type: line.type, items: [line.content] })
+      }
+    }
+
+    const inlineMarkdown = (s: string) => {
+      let out = s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      out = out.replace(/\*(.*?)\*/g, '<em>$1</em>')
+      out = out.replace(/`([^`]+)`/g, '<code class="bg-gray-200 text-gray-700 px-1 py-0.5 rounded text-xs">$1</code>')
+      return out
+    }
+
     return (
-      <div key={`text-${keyPrefix}`}>
-        {lines.map((line, i) => {
-          let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-          processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>')
-          if (processed.match(/^[-•]\s/)) {
-            processed = `<span class="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-2 mt-2 flex-shrink-0"></span><span>${processed.slice(2)}</span>`
-            return <div key={`${keyPrefix}-${i}`} className="flex items-start ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
+      <div key={`text-${keyPrefix}`} className="space-y-1.5">
+        {blocks.map((block, bi) => {
+          switch (block.type) {
+            case 'empty':
+              return <div key={`${keyPrefix}-${bi}`} className="h-1" />
+
+            case 'header':
+              return (
+                <div key={`${keyPrefix}-${bi}`} className="flex items-center gap-2 pt-2 pb-0.5">
+                  <div className="w-1 h-4 bg-green-500 rounded-full flex-shrink-0" />
+                  <span className="text-sm font-bold text-gray-800" dangerouslySetInnerHTML={{ __html: inlineMarkdown(block.items[0]) }} />
+                </div>
+              )
+
+            case 'bullet':
+              return (
+                <div key={`${keyPrefix}-${bi}`} className="bg-gray-50 rounded-lg px-3 py-2 space-y-1.5">
+                  {block.items.map((item, ii) => (
+                    <div key={`${keyPrefix}-${bi}-${ii}`} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-[6px] flex-shrink-0" />
+                      <span className="text-sm text-gray-700 leading-snug" dangerouslySetInnerHTML={{ __html: inlineMarkdown(item) }} />
+                    </div>
+                  ))}
+                </div>
+              )
+
+            case 'numbered':
+              return (
+                <div key={`${keyPrefix}-${bi}`} className="bg-gray-50 rounded-lg px-3 py-2 space-y-1.5">
+                  {block.items.map((item, ii) => (
+                    <div key={`${keyPrefix}-${bi}-${ii}`} className="flex items-start gap-2">
+                      <span className="text-xs font-bold text-green-600 bg-green-50 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">{ii + 1}</span>
+                      <span className="text-sm text-gray-700 leading-snug" dangerouslySetInnerHTML={{ __html: inlineMarkdown(item) }} />
+                    </div>
+                  ))}
+                </div>
+              )
+
+            case 'paragraph':
+              return (
+                <div key={`${keyPrefix}-${bi}`} className="text-sm text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineMarkdown(block.items[0]) }} />
+              )
+
+            default:
+              return null
           }
-          if (processed.match(/^\d+\.\s/)) {
-            return <div key={`${keyPrefix}-${i}`} className="ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
-          }
-          if (!processed.trim()) return <div key={`${keyPrefix}-${i}`} className="h-2" />
-          return <div key={`${keyPrefix}-${i}`} className="my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
         })}
       </div>
     )
