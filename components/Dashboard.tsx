@@ -468,7 +468,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </div>
               {/* Notification bell */}
-              <div className="relative">
+              <div className="relative z-[100]">
                 <button
                   onClick={() => setShowNotifications(prev => !prev)}
                   className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
