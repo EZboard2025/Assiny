@@ -159,14 +159,14 @@ export default function NotificationPanel({
                 key={notif.id}
                 onClick={() => onNotificationClick(notif)}
                 className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-b-0 ${
-                  isRead ? 'opacity-60' : ''
+                  !isRead ? 'bg-green-50/40' : ''
                 }`}
               >
                 <div className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                   <Icon className={`w-4 h-4 ${color}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm ${isRead ? 'font-normal text-gray-600' : 'font-medium text-gray-800'} truncate`}>{notif.title}</p>
+                  <p className={`text-sm ${!isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'} truncate`}>{notif.title}</p>
                   {notif.message && (
                     <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notif.message}</p>
                   )}
