@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, X, Send, Loader2, TrendingUp, Target, Video, Dumbbell, CalendarDays, Clock } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, TrendingUp, Dumbbell, CalendarDays } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface Message {
@@ -15,11 +15,8 @@ interface SellerAgentChatProps {
 
 const QUICK_SUGGESTIONS = [
   { text: 'Como está minha performance?', icon: TrendingUp, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
-  { text: 'Qual meu ponto mais fraco?', icon: Target, color: 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' },
-  { text: 'Analise minha última reunião', icon: Video, color: 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100' },
   { text: 'O que devo treinar hoje?', icon: Dumbbell, color: 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100' },
-  { text: 'Quais reuniões tenho essa semana?', icon: CalendarDays, color: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100' },
-  { text: 'Quando estou livre amanhã?', icon: Clock, color: 'text-teal-600 bg-teal-50 border-teal-200 hover:bg-teal-100' },
+  { text: 'Gerenciar minha agenda', icon: CalendarDays, color: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100' },
 ]
 
 const MIN_W = 340
