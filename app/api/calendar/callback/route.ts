@@ -8,6 +8,9 @@ const supabaseAdmin = createClient(
 )
 
 export async function GET(request: NextRequest) {
+  // Use configured site URL for redirects (avoids localhost issues when Google redirects back)
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || request.url
+
   try {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')
@@ -17,12 +20,12 @@ export async function GET(request: NextRequest) {
     // Handle user denial
     if (error) {
       console.warn('[Calendar Callback] User denied access:', error)
-      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=denied', request.url))
+      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=denied', baseUrl))
     }
 
     if (!code || !state) {
       console.error('[Calendar Callback] Missing code or state param')
-      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=error&reason=missing_params', request.url))
+      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=error&reason=missing_params', baseUrl))
     }
 
     // Decode state to get userId and companyId
@@ -31,7 +34,7 @@ export async function GET(request: NextRequest) {
       stateData = JSON.parse(Buffer.from(state, 'base64url').toString())
     } catch {
       console.error('[Calendar Callback] Failed to decode state param')
-      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=error&reason=invalid_state', request.url))
+      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=error&reason=invalid_state', baseUrl))
     }
 
     const { userId, companyId } = stateData
@@ -47,12 +50,12 @@ export async function GET(request: NextRequest) {
       console.error('[Calendar Callback] Token exchange FAILED:', errMsg)
       console.error('[Calendar Callback] Full token error:', JSON.stringify(tokenError?.response?.data || tokenError?.message))
       const reason = encodeURIComponent(`token_exchange: ${errMsg}`.substring(0, 200))
-      return NextResponse.redirect(new URL(`/?view=meet-analysis&calendar=error&reason=${reason}`, request.url))
+      return NextResponse.redirect(new URL(`/?view=meet-analysis&calendar=error&reason=${reason}`, baseUrl))
     }
 
     if (!tokens.access_token || !tokens.refresh_token) {
       console.error('[Calendar Callback] Missing tokens - access:', !!tokens.access_token, 'refresh:', !!tokens.refresh_token)
-      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=error&reason=missing_tokens', request.url))
+      return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=error&reason=missing_tokens', baseUrl))
     }
 
     // Get Google email
@@ -96,17 +99,17 @@ export async function GET(request: NextRequest) {
     if (upsertError) {
       console.error('[Calendar Callback] DB upsert error:', JSON.stringify(upsertError))
       const reason = upsertError.code === '42P01' ? 'table_not_found' : 'db_error'
-      return NextResponse.redirect(new URL(`/?view=meet-analysis&calendar=error&reason=${reason}`, request.url))
+      return NextResponse.redirect(new URL(`/?view=meet-analysis&calendar=error&reason=${reason}`, baseUrl))
     }
 
     console.log(`[Calendar Callback] Connected ${googleEmail} for user ${userId}`)
 
     // Redirect back to the meet analysis page
-    return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=connected', request.url))
+    return NextResponse.redirect(new URL('/?view=meet-analysis&calendar=connected', baseUrl))
   } catch (error: any) {
     console.error('[Calendar Callback] FULL ERROR:', error?.message || error)
     console.error('[Calendar Callback] Stack:', error?.stack)
     const reason = encodeURIComponent(error?.message?.substring(0, 100) || 'unknown')
-    return NextResponse.redirect(new URL(`/?view=meet-analysis&calendar=error&reason=${reason}`, request.url))
+    return NextResponse.redirect(new URL(`/?view=meet-analysis&calendar=error&reason=${reason}`, baseUrl))
   }
 }
