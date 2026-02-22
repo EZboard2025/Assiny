@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
-import { getCalendarClient, fetchAllEvents, checkFreeBusy, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, quickAddEvent } from '@/lib/google-calendar'
+import { getCalendarClient, fetchAllEvents, checkFreeBusy, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, quickAddEvent, sendGmail } from '@/lib/google-calendar'
+import { buildShareEmailHtml } from '@/lib/meet/shareEmailBuilder'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
@@ -102,7 +103,18 @@ REGRAS DAS TAGS VISUAIS:
 - NÃO repita nos parágrafos os mesmos dados já exibidos nas tags (nomes de reuniões, scores, etc.)
 - Cada tag deve estar em sua própria linha
 - Após as tags, escreva texto normal com markdown (negrito, listas, etc.)
-- Só use tags quando tiver dados reais das ferramentas — nunca invente valores`
+- Só use tags quando tiver dados reais das ferramentas — nunca invente valores
+
+COMPARTILHAMENTO DE REUNIÕES:
+Você pode compartilhar avaliações de Meet com colegas da equipe. Fluxo:
+1. Busque a avaliação: get_meet_evaluations → encontrar evaluation_id
+2. Busque o destinatário: list_teammates → encontrar user_id pelo nome
+3. Compartilhe: share_meet_evaluation → cria notificação + envia email
+
+- Se o vendedor disser "compartilha minha última reunião com [nome]", siga o fluxo acima
+- Se o vendedor não especificar seções, compartilhe TODAS (smart_notes, spin, evaluation, transcript)
+- Se o email falhar (Google não conectado), o compartilhamento + notificação ainda funcionam — informe que o email não foi enviado
+- Após compartilhar, confirme: quem recebeu, quais seções, se email foi enviado`
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -398,6 +410,33 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
           text: { type: 'string', description: 'Descrição do evento em linguagem natural' }
         },
         required: ['text']
+      }
+    }
+  },
+  // ─── Meeting Sharing Tools ──────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'list_teammates',
+      description: 'Lista todos os colegas da mesma empresa (excluindo o próprio vendedor). Retorna user_id, nome, email e cargo. Use antes de compartilhar avaliações para encontrar o destinatário pelo nome.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'share_meet_evaluation',
+      description: 'Compartilha uma avaliação de reunião do Google Meet com colegas da equipe. Cria notificação na plataforma e opcionalmente envia email com os dados completos. Use list_teammates antes para obter os user_ids.',
+      parameters: {
+        type: 'object',
+        properties: {
+          evaluation_id: { type: 'string', description: 'ID da avaliação Meet (obtido via get_meet_evaluations)' },
+          teammate_user_ids: { type: 'array', items: { type: 'string' }, description: 'Array de user_ids dos destinatários (obtidos via list_teammates)' },
+          sections: { type: 'array', items: { type: 'string' }, description: 'Seções para compartilhar: smart_notes, spin, evaluation, transcript. Se omitido, compartilha todas.' },
+          message: { type: 'string', description: 'Mensagem pessoal opcional do vendedor para os destinatários' },
+          send_email: { type: 'boolean', description: 'Enviar email com os dados (padrão: true). Requer Google Calendar conectado.' }
+        },
+        required: ['evaluation_id', 'teammate_user_ids']
       }
     }
   }
@@ -1179,6 +1218,161 @@ async function executeFunction(
             start: event.start,
             end: event.end,
           }
+        }
+      }
+
+      // ─── Meeting Sharing Operations ──────────────────────────────────
+      case 'list_teammates': {
+        const { data: employees } = await supabaseAdmin
+          .from('employees')
+          .select('user_id, name, email, role')
+          .eq('company_id', companyId)
+          .neq('user_id', userId)
+
+        return {
+          total: employees?.length || 0,
+          teammates: (employees || []).map(e => ({
+            user_id: e.user_id,
+            name: e.name,
+            email: e.email,
+            role: e.role,
+          })),
+        }
+      }
+
+      case 'share_meet_evaluation': {
+        if (!params.evaluation_id || !params.teammate_user_ids?.length) {
+          return { error: 'evaluation_id e teammate_user_ids são obrigatórios' }
+        }
+
+        const sections = params.sections || ['smart_notes', 'spin', 'evaluation', 'transcript']
+        const sendEmail = params.send_email !== false
+
+        // Get sender info
+        const { data: sender } = await supabaseAdmin
+          .from('employees')
+          .select('company_id, name')
+          .eq('user_id', userId)
+          .single()
+
+        if (!sender?.company_id) return { error: 'Empresa não encontrada' }
+
+        // Fetch evaluation with full data for email
+        const { data: evaluation } = await supabaseAdmin
+          .from('meet_evaluations')
+          .select('id, seller_name, overall_score, performance_level, spin_s_score, spin_p_score, spin_i_score, spin_n_score, smart_notes, transcript, evaluation')
+          .eq('id', params.evaluation_id)
+          .eq('user_id', userId)
+          .single()
+
+        if (!evaluation) return { error: 'Avaliação não encontrada ou não pertence ao vendedor' }
+
+        // Verify recipients are from same company
+        const { data: recipients } = await supabaseAdmin
+          .from('employees')
+          .select('user_id, name')
+          .eq('company_id', sender.company_id)
+          .in('user_id', params.teammate_user_ids)
+
+        if (!recipients?.length) return { error: 'Nenhum destinatário válido encontrado na equipe' }
+
+        // Section labels for notification
+        const sectionLabels: Record<string, string> = {
+          smart_notes: 'Notas Inteligentes',
+          spin: 'Análise SPIN',
+          evaluation: 'Avaliação Detalhada',
+          transcript: 'Transcrição',
+        }
+        const sectionNames = sections.map((s: string) => sectionLabels[s] || s).join(', ')
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+
+        // Create shares and notifications
+        const results = await Promise.allSettled(
+          recipients.map(async (recipient) => {
+            const { data: share, error: shareError } = await supabaseAdmin
+              .from('shared_meet_evaluations')
+              .upsert({
+                evaluation_id: params.evaluation_id,
+                shared_by: userId,
+                shared_with: recipient.user_id,
+                shared_sections: sections,
+                message: params.message || null,
+                company_id: sender.company_id,
+                is_viewed: false,
+                viewed_at: null,
+              }, {
+                onConflict: 'evaluation_id,shared_by,shared_with',
+              })
+              .select('id')
+              .single()
+
+            if (shareError) throw shareError
+
+            await supabaseAdmin
+              .from('user_notifications')
+              .insert({
+                user_id: recipient.user_id,
+                type: 'shared_meeting',
+                title: `${sender.name} compartilhou uma reunião`,
+                message: params.message || `Compartilhou: ${sectionNames}`,
+                data: {
+                  shareId: share.id,
+                  evaluationId: params.evaluation_id,
+                  sharedBy: userId,
+                  senderName: sender.name,
+                  sections,
+                },
+              })
+
+            return { userId: recipient.user_id, name: recipient.name, success: true }
+          })
+        )
+
+        const successful = results.filter(r => r.status === 'fulfilled').length
+        const failed = results.filter(r => r.status === 'rejected').length
+        const sharedWith = results
+          .filter((r): r is PromiseFulfilledResult<{ userId: string; name: string; success: boolean }> => r.status === 'fulfilled')
+          .map(r => r.value.name)
+
+        // Send emails (non-blocking)
+        let emailsSent = 0
+        if (sendEmail) {
+          for (const recipient of recipients) {
+            try {
+              const { data: recipientData } = await supabaseAdmin.auth.admin.getUserById(recipient.user_id)
+              const recipientEmail = recipientData?.user?.email
+              if (!recipientEmail) continue
+
+              await sendGmail(userId, {
+                to: recipientEmail,
+                subject: `${sender.name} compartilhou uma reunião com você`,
+                htmlBody: buildShareEmailHtml(
+                  sender.name,
+                  evaluation.seller_name,
+                  sectionNames,
+                  params.message || null,
+                  appUrl,
+                  sections,
+                  evaluation
+                ),
+              })
+              emailsSent++
+            } catch (emailErr) {
+              console.warn(`[Agent Share] Failed to email recipient ${recipient.user_id}:`, emailErr)
+            }
+          }
+        }
+
+        return {
+          success: true,
+          shared_with: sharedWith,
+          shared_count: successful,
+          failed_count: failed,
+          emails_sent: emailsSent,
+          sections_shared: sectionNames,
+          evaluation_name: evaluation.seller_name,
+          message: `Avaliação "${evaluation.seller_name}" compartilhada com ${sharedWith.join(', ')}. ${emailsSent > 0 ? `${emailsSent} email(s) enviado(s).` : 'Nenhum email enviado (Google não conectado ou erro).'}`,
         }
       }
 
