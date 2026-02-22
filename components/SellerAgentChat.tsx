@@ -23,7 +23,7 @@ const QUICK_SUGGESTIONS = [
 ]
 
 export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -124,7 +124,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button when closed */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
@@ -135,11 +135,11 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
         </button>
       )}
 
-      {/* Chat panel */}
+      {/* Sidebar panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[400px] max-h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed top-0 right-0 z-40 w-[380px] h-screen bg-white border-l border-gray-200 flex flex-col shadow-2xl">
           {/* Header */}
-          <div className="bg-[#0D4A3A] px-4 py-3 flex items-center justify-between flex-shrink-0">
+          <div className="bg-[#0D4A3A] px-4 py-3.5 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-green-300" />
@@ -158,7 +158,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0" style={{ maxHeight: '400px' }}>
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0">
             {messages.length === 0 ? (
               <div className="space-y-4">
                 {/* Welcome */}
@@ -226,7 +226,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           )}
 
           {/* Input */}
-          <form onSubmit={handleSubmit} className="px-3 py-2.5 border-t border-gray-100 flex items-center gap-2 flex-shrink-0">
+          <form onSubmit={handleSubmit} className="px-3 py-3 border-t border-gray-100 flex items-center gap-2 flex-shrink-0">
             <input
               ref={inputRef}
               type="text"

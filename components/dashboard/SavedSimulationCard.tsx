@@ -115,7 +115,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
 
   return (
     <>
-      <div className="mt-6 bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Header */}
         <div className="p-4 flex items-start gap-3">
           <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">

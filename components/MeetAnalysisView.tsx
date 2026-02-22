@@ -1348,8 +1348,8 @@ export default function MeetAnalysisView() {
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected ? 'pt-[22vh]' : 'pt-8'}`}>
-      <div className={`w-full ${calendarConnected && activeTab === 'calendar' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
+    <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected && !calendarLoading ? 'pt-[22vh]' : 'pt-8'}`}>
+      <div className={`w-full ${(calendarConnected || calendarLoading) && activeTab === 'calendar' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
         {/* Compact Header */}
         <div className="flex items-center justify-center gap-4 mb-6">
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -1357,10 +1357,10 @@ export default function MeetAnalysisView() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">
-              {calendarConnected ? 'Calendário & Análise Meet' : 'Análise Meet'}
+              {calendarConnected || calendarLoading ? 'Calendário & Análise Meet' : 'Análise Meet'}
             </h1>
             <p className="text-sm text-gray-500">
-              {calendarConnected ? 'Gerencie sua agenda e avalie reuniões com IA' : 'Avaliação automática de reuniões com IA'}
+              {calendarConnected || calendarLoading ? 'Gerencie sua agenda e avalie reuniões com IA' : 'Avaliação automática de reuniões com IA'}
             </p>
           </div>
         </div>
@@ -1389,6 +1389,16 @@ export default function MeetAnalysisView() {
             }`}>
               <XCircle className="w-4 h-4" />
             </button>
+          </div>
+        )}
+
+        {/* Loading skeleton while checking calendar status */}
+        {calendarLoading && !session && (
+          <div className="animate-pulse space-y-4">
+            <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl w-56 h-10" />
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="h-[400px] bg-gray-100 rounded-lg" />
+            </div>
           </div>
         )}
 
@@ -1699,7 +1709,7 @@ export default function MeetAnalysisView() {
             />
 
             {/* ========== TAB: Manual (or when not connected) ========== */}
-            {(activeTab === 'manual' || !calendarConnected) && (
+            {(activeTab === 'manual' || (!calendarConnected && !calendarLoading)) && (
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -1744,7 +1754,7 @@ export default function MeetAnalysisView() {
             )}
 
             {/* Steps + Background notice (only when calendar not connected) */}
-            {!calendarConnected && (
+            {!calendarConnected && !calendarLoading && (
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">

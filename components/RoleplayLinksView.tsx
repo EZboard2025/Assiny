@@ -750,7 +750,7 @@ export default function RoleplayLinksView() {
           {/* Cabeçalho */}
           <div className="text-center mb-10">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-              Configure o <span className="text-green-600">Roleplay Público</span>
+              Configure a <span className="text-green-600">Simulação para Processo Seletivo</span>
             </h1>
             <p className="text-gray-600 text-lg max-w-2xl mx-auto">
               Defina o cenário de treinamento que sua equipe irá praticar através do link público

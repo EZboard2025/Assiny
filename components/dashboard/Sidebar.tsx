@@ -39,7 +39,7 @@ export default function Sidebar({
     { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
     { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI },
     { icon: TrendingUp, view: 'manager', label: 'Gestão', show: isAdmin || isGestor },
-    { icon: Link2, view: 'roleplay-links', label: 'Links Públicos', show: isAdmin || isGestor },
+    { icon: Link2, view: 'roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
   ]
 
   return (
@@ -80,7 +80,7 @@ export default function Sidebar({
             if (!item.show) return null
 
             const isActive = currentView === item.view
-            const isDisabled = 'disabled' in item && item.disabled
+            const isDisabled = 'disabled' in item && (item as any).disabled
             const Icon = item.icon
 
             return (
@@ -89,11 +89,11 @@ export default function Sidebar({
                 onClick={() => !isDisabled && onViewChange(item.view)}
                 title={!isExpanded ? item.label : undefined}
                 disabled={!!isDisabled}
-                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-left ${
+                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 text-left ${
                   isDisabled
                     ? 'opacity-40 cursor-not-allowed text-gray-500'
                     : isActive
-                      ? 'bg-green-500/20 text-white'
+                      ? 'bg-green-500/20 text-white font-semibold'
                       : 'text-gray-300 hover:text-white hover:bg-white/10'
                 }`}
               >
