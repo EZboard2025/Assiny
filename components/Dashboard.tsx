@@ -17,6 +17,7 @@ import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
 import ConfigurationRequired from './ConfigurationRequired'
 import SavedSimulationCard from './dashboard/SavedSimulationCard'
 import { useNotifications } from '@/hooks/useNotifications'
+import SellerAgentChat from './SellerAgentChat'
 
 // Loading skeleton for lazy-loaded views
 const ViewLoadingSkeleton = () => (
@@ -665,6 +666,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           setShowConfigHub(false)
           refetchConfig()
         }} />
+      )}
+
+      {/* Seller Agent Chat - only on home */}
+      {currentView === 'home' && (
+        <SellerAgentChat userName={userName || undefined} />
       )}
 
       {/* Configuration Required Overlay */}
