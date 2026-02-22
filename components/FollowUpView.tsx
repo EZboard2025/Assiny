@@ -104,6 +104,7 @@ export default function FollowUpView() {
   // WhatsApp state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('checking')
   const [copilotOpen, setCopilotOpen] = useState(true)
+  const [calendarConnected, setCalendarConnected] = useState(false)
   const [showAutopilotPanel, setShowAutopilotPanel] = useState(false)
   const [autopilotEnabled, setAutopilotEnabled] = useState(false)
   const [autopilotPhones, setAutopilotPhones] = useState<Map<string, { objective_reached: boolean, needs_human: boolean, enabled: boolean }>>(new Map())
@@ -335,6 +336,17 @@ export default function FollowUpView() {
       subscription?.unsubscribe()
     }
   }, [])
+
+  // Check Google Calendar connection status
+  useEffect(() => {
+    if (!authToken) return
+    fetch('/api/calendar/status', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+      .then(r => r.json())
+      .then(data => setCalendarConnected(data.connected === true))
+      .catch(() => {})
+  }, [authToken])
 
   // Load saved analyses from Supabase on mount (with localStorage fallback)
   useEffect(() => {
@@ -3856,6 +3868,7 @@ export default function FollowUpView() {
             isOpen={copilotOpen}
             onClose={() => setCopilotOpen(false)}
             onSendToChat={(text) => handleSendMessage(text)}
+            calendarConnected={calendarConnected}
           />
           {/* AutopilotActivityIndicator hidden */}
         </>

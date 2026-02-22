@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Send, Copy, ThumbsUp, ThumbsDown, Sparkles, Loader2, RefreshCw, ArrowLeft, Mic, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { X, Send, Copy, ThumbsUp, ThumbsDown, Sparkles, Loader2, RefreshCw, ArrowLeft, Mic, TrendingUp, TrendingDown, Minus, Calendar, Video, Check, AlertCircle } from 'lucide-react'
 
 interface WhatsAppConversation {
   id: string
@@ -45,6 +45,7 @@ interface SalesCopilotProps {
   isOpen: boolean
   onClose: () => void
   onSendToChat?: (text: string) => void
+  calendarConnected?: boolean
 }
 
 const QUICK_SUGGESTIONS = [
@@ -53,6 +54,8 @@ const QUICK_SUGGESTIONS = [
   'Como fechar essa venda?',
   'Sugira um follow-up',
 ]
+
+const CALENDAR_SUGGESTION = 'Agendar reunião com este cliente'
 
 // Score color helpers
 const getScoreColor = (score: number) => {
@@ -119,6 +122,139 @@ function TrendBadge({ trend }: { trend: string }) {
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/15 text-yellow-400 mx-1">
       <Minus className="w-3 h-3" /> {t === 'morno' ? 'Lead Morno' : 'Estável'}
     </span>
+  )
+}
+
+// Scheduling card for creating calendar events
+function SchedulingCard({ title, startISO, endISO, email, authToken }: {
+  title: string
+  startISO: string
+  endISO: string
+  email: string | null
+  authToken: string | null
+}) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [meetLink, setMeetLink] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const startDate = new Date(startISO)
+  const endDate = new Date(endISO)
+  const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+  const dayName = dayNames[startDate.getDay()]
+  const ddmm = `${String(startDate.getDate()).padStart(2, '0')}/${String(startDate.getMonth() + 1).padStart(2, '0')}`
+  const startTime = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`
+  const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
+
+  const handleSchedule = async () => {
+    if (!authToken || status === 'loading' || status === 'success') return
+    setStatus('loading')
+    setErrorMsg(null)
+
+    try {
+      const res = await fetch('/api/copilot/calendar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          title,
+          startDateTime: startISO,
+          endDateTime: endISO,
+          attendeeEmail: email || '_',
+          addMeetLink: true,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Falha ao criar evento')
+
+      setStatus('success')
+      if (data.event?.meetLink) setMeetLink(data.event.meetLink)
+    } catch (err: any) {
+      setStatus('error')
+      setErrorMsg(err.message || 'Erro ao agendar')
+    }
+  }
+
+  const copyMeetLink = () => {
+    if (meetLink) navigator.clipboard.writeText(meetLink)
+  }
+
+  return (
+    <div className="my-2 mx-1 bg-[#1a2730] rounded-xl border border-[#2a3942] overflow-hidden">
+      {/* Header */}
+      <div className="px-3 py-2.5 flex items-start gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5">
+          <Calendar className="w-4 h-4 text-blue-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[#e9edef] text-[13px] font-medium truncate">{title}</p>
+          <p className="text-[#8696a0] text-[11px] mt-0.5">
+            {dayName}, {ddmm} • {startTime} - {endTime}
+          </p>
+          {email && email !== '_' && (
+            <p className="text-[#8696a0] text-[11px] mt-0.5 truncate">
+              Convidado: {email}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Action */}
+      <div className="px-3 pb-2.5">
+        {status === 'idle' && (
+          <button
+            onClick={handleSchedule}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[#00a884] hover:bg-[#00917a] text-white text-xs font-medium transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            Agendar no Google Calendar
+          </button>
+        )}
+
+        {status === 'loading' && (
+          <div className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[#2a3942] text-[#8696a0] text-xs">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Criando evento...
+          </div>
+        )}
+
+        {status === 'success' && (
+          <div className="space-y-1.5">
+            <div className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[#00a884]/15 text-[#00a884] text-xs font-medium">
+              <Check className="w-3.5 h-3.5" />
+              Agendado!
+            </div>
+            {meetLink && (
+              <button
+                onClick={copyMeetLink}
+                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#2a3942] hover:bg-[#344854] text-[#d1d7db] text-[11px] transition-colors"
+              >
+                <Video className="w-3 h-3 text-blue-400" />
+                Copiar link do Meet
+                <Copy className="w-3 h-3 text-[#8696a0]" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div className="space-y-1.5">
+            <div className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {errorMsg || 'Erro ao agendar'}
+            </div>
+            <button
+              onClick={() => { setStatus('idle'); setErrorMsg(null) }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#2a3942] hover:bg-[#344854] text-[#d1d7db] text-[11px] transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -279,8 +415,8 @@ function StyledText({ text, onSendBubble, sentBubbles }: { text: string; onSendB
 }
 
 // Parse and render message content with visual tags
-function RichMessage({ content, onSendBubble, sentBubbles }: { content: string; onSendBubble?: (text: string, idx: number) => void; sentBubbles?: Set<number> }) {
-  const tagRegex = /\{\{(NOTA|BARRA|TENDENCIA):([^}]+)\}\}/g
+function RichMessage({ content, onSendBubble, sentBubbles, authToken }: { content: string; onSendBubble?: (text: string, idx: number) => void; sentBubbles?: Set<number>; authToken?: string | null }) {
+  const tagRegex = /\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):([^}]+)\}\}/g
   const parts: (string | JSX.Element)[] = []
   let lastIndex = 0
   let match
@@ -306,6 +442,24 @@ function RichMessage({ content, onSendBubble, sentBubbles }: { content: string; 
       case 'TENDENCIA':
         parts.push(<TrendBadge key={key} trend={data} />)
         break
+      case 'AGENDAR': {
+        const agendarParts = data.split('|')
+        const agTitle = agendarParts[0] || 'Reunião'
+        const agStart = agendarParts[1] || ''
+        const agEnd = agendarParts[2] || ''
+        const agEmail = agendarParts[3] && agendarParts[3] !== '_' ? agendarParts[3] : null
+        parts.push(
+          <SchedulingCard
+            key={key}
+            title={agTitle}
+            startISO={agStart}
+            endISO={agEnd}
+            email={agEmail}
+            authToken={authToken || null}
+          />
+        )
+        break
+      }
     }
 
     lastIndex = match.index + match[0].length
@@ -330,7 +484,7 @@ function RichMessage({ content, onSendBubble, sentBubbles }: { content: string; 
 // Removes AI framing like "Sugestão de mensagem:" and strips surrounding quotes
 // Extract ALL quoted messages as separate items (for multi-bubble sending)
 function extractAllQuotedMessages(text: string): string[] {
-  const cleaned0 = text.replace(/\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
+  const cleaned0 = text.replace(/\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
   const quoteMatches = cleaned0.match(/"([^"]+)"/g) || cleaned0.match(/«([^»]+)»/g) || cleaned0.match(/"([^"]+)"/g)
   if (quoteMatches && quoteMatches.length > 0) {
     const msgs = quoteMatches
@@ -344,7 +498,7 @@ function extractAllQuotedMessages(text: string): string[] {
 
 function extractCleanMessage(text: string): string {
   // First strip visual tags
-  const cleaned0 = text.replace(/\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
+  const cleaned0 = text.replace(/\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
   // Try to find the last quoted block (between " " or « »)
   const quoteMatches = cleaned0.match(/"([^"]+)"/g) || cleaned0.match(/«([^»]+)»/g) || cleaned0.match(/"([^"]+)"/g)
   if (quoteMatches && quoteMatches.length > 0) {
@@ -375,7 +529,8 @@ export default function SalesCopilot({
   isVisible,
   isOpen,
   onClose,
-  onSendToChat
+  onSendToChat,
+  calendarConnected
 }: SalesCopilotProps) {
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([])
   const [input, setInput] = useState('')
@@ -426,7 +581,7 @@ export default function SalesCopilot({
       if (/\s/.test(text[i])) { i++; continue }
       // Visual tag — reveal entire tag as one step
       if (text[i] === '{' && text[i + 1] === '{') {
-        const tagMatch = text.slice(i).match(/^\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/)
+        const tagMatch = text.slice(i).match(/^\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/)
         if (tagMatch) {
           i += tagMatch[0].length
           steps.push({ pos: i, isNewline: false })
@@ -742,7 +897,7 @@ export default function SalesCopilot({
   }
 
   const getPlainText = (content: string) => {
-    return content.replace(/\{\{(NOTA|BARRA|TENDENCIA):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
+    return content.replace(/\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim()
   }
 
   const handleCopy = (text: string, msgId: string) => {
@@ -1022,13 +1177,14 @@ export default function SalesCopilot({
 
               {/* Quick suggestions as cards */}
               <div className="w-full space-y-2">
-                {QUICK_SUGGESTIONS.map(suggestion => (
+                {[...QUICK_SUGGESTIONS, ...(calendarConnected ? [CALENDAR_SUGGESTION] : [])].map(suggestion => (
                   <button
                     key={suggestion}
                     onClick={() => handleSend(suggestion)}
                     disabled={isLoading}
-                    className="w-full text-left px-4 py-3 bg-[#202c33] text-[#e9edef] text-sm rounded-xl border border-[#2a3942] hover:border-[#00a884]/40 hover:bg-[#182229] transition-all disabled:opacity-50"
+                    className="w-full text-left px-4 py-3 bg-[#202c33] text-[#e9edef] text-sm rounded-xl border border-[#2a3942] hover:border-[#00a884]/40 hover:bg-[#182229] transition-all disabled:opacity-50 flex items-center gap-2"
                   >
+                    {suggestion === CALENDAR_SUGGESTION && <Calendar className="w-4 h-4 text-blue-400 shrink-0" />}
                     {suggestion}
                   </button>
                 ))}
@@ -1078,6 +1234,7 @@ export default function SalesCopilot({
                       <div className="flex-1 min-w-0">
                         <RichMessage
                           content={visibleContent}
+                          authToken={authToken}
                           onSendBubble={onSendToChat ? (text, idx) => {
                             onSendToChat(text)
                             setSentBubblesByMsg(prev => ({
@@ -1214,12 +1371,13 @@ export default function SalesCopilot({
             {/* Quick suggestions - compact pills */}
             {!isLoading && (
               <div className="px-4 py-2 flex flex-wrap gap-1.5 shrink-0 border-t border-[#222d34]">
-                {QUICK_SUGGESTIONS.map(suggestion => (
+                {[...QUICK_SUGGESTIONS, ...(calendarConnected ? [CALENDAR_SUGGESTION] : [])].map(suggestion => (
                   <button
                     key={suggestion}
                     onClick={() => handleSend(suggestion)}
-                    className="text-xs text-[#8696a0] px-3 py-1.5 rounded-full hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors border border-[#2a3942]"
+                    className="text-xs text-[#8696a0] px-3 py-1.5 rounded-full hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors border border-[#2a3942] flex items-center gap-1"
                   >
+                    {suggestion === CALENDAR_SUGGESTION && <Calendar className="w-3 h-3 text-blue-400" />}
                     {suggestion}
                   </button>
                 ))}

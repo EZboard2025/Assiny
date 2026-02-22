@@ -2,12 +2,134 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
+import { fetchAllEvents, CalendarEvent } from '@/lib/google-calendar'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+/**
+ * Format calendar events into human-readable agenda with free slots
+ */
+function formatCalendarContext(events: CalendarEvent[]): string {
+  const now = new Date()
+  const dayNames = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado']
+
+  // Group events by date
+  const eventsByDate = new Map<string, CalendarEvent[]>()
+  for (const event of events) {
+    const date = event.start.split('T')[0]
+    if (!eventsByDate.has(date)) eventsByDate.set(date, [])
+    eventsByDate.get(date)!.push(event)
+  }
+
+  // Build 7-day view
+  const lines: string[] = []
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(now)
+    date.setDate(date.getDate() + d)
+    const dateStr = date.toISOString().split('T')[0]
+    const dayName = dayNames[date.getDay()]
+    const ddmm = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`
+    const label = d === 0 ? `Hoje (${ddmm}, ${dayName})` : d === 1 ? `Amanha (${ddmm}, ${dayName})` : `${dayName} (${ddmm})`
+
+    const dayEvents = eventsByDate.get(dateStr) || []
+
+    if (dayEvents.length === 0) {
+      lines.push(`- ${label}: Livre o dia todo`)
+      continue
+    }
+
+    lines.push(`- ${label}:`)
+
+    // Sort by start time
+    dayEvents.sort((a, b) => a.start.localeCompare(b.start))
+
+    for (const ev of dayEvents) {
+      const startTime = ev.start.includes('T') ? ev.start.split('T')[1].slice(0, 5) : 'dia todo'
+      const endTime = ev.end?.includes('T') ? ev.end.split('T')[1].slice(0, 5) : ''
+      const timeRange = endTime ? `${startTime}-${endTime}` : startTime
+      lines.push(`  - ${timeRange} — ${ev.title}`)
+    }
+
+    // Calculate free slots (business hours 08:00-18:00, minimum 30min)
+    const freeSlots = calculateFreeSlots(dayEvents, d === 0 ? now : undefined)
+    if (freeSlots.length > 0) {
+      lines.push(`  Horarios livres: ${freeSlots.join(', ')}`)
+    }
+  }
+
+  return lines.join('\n')
+}
+
+function calculateFreeSlots(events: CalendarEvent[], now?: Date): string[] {
+  const businessStart = 8 * 60 // 08:00 in minutes
+  const businessEnd = 18 * 60 // 18:00 in minutes
+  const minSlot = 30 // minimum 30 minutes
+
+  // Get current time in minutes (for today)
+  let currentMin = businessStart
+  if (now) {
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    currentMin = Math.max(businessStart, nowMin)
+    // Round up to next 30-min boundary
+    currentMin = Math.ceil(currentMin / 30) * 30
+  }
+
+  // Build busy ranges in minutes
+  const busy: { start: number; end: number }[] = []
+  for (const ev of events) {
+    if (!ev.start.includes('T')) continue // all-day event blocks whole day
+    const [, startTime] = ev.start.split('T')
+    const [sh, sm] = startTime.split(':').map(Number)
+    const startMin = sh * 60 + sm
+
+    if (ev.end?.includes('T')) {
+      const [, endTime] = ev.end.split('T')
+      const [eh, em] = endTime.split(':').map(Number)
+      const endMin = eh * 60 + em
+      busy.push({ start: startMin, end: endMin })
+    } else {
+      busy.push({ start: startMin, end: startMin + 60 })
+    }
+  }
+
+  // Check for all-day events
+  const hasAllDay = events.some(ev => !ev.start.includes('T'))
+  if (hasAllDay) return []
+
+  busy.sort((a, b) => a.start - b.start)
+
+  // Find free gaps
+  const slots: string[] = []
+  let pointer = currentMin
+
+  for (const b of busy) {
+    if (b.start > pointer && (b.start - pointer) >= minSlot) {
+      const slotStart = Math.max(pointer, businessStart)
+      const slotEnd = Math.min(b.start, businessEnd)
+      if (slotEnd - slotStart >= minSlot) {
+        slots.push(`${formatTime(slotStart)}-${formatTime(slotEnd)}`)
+      }
+    }
+    pointer = Math.max(pointer, b.end)
+  }
+
+  // After last event
+  if (pointer < businessEnd && (businessEnd - pointer) >= minSlot) {
+    slots.push(`${formatTime(pointer)}-${formatTime(businessEnd)}`)
+  }
+
+  return slots
+}
+
+function formatTime(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,6 +207,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 2b. Calendar intent detection
+    const calendarKeywords = /\b(agenda|agendar|hor[aá]rio|reuni[ãa]o|marcar|disponib|calendar|livre|ocupado|semana que vem|amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|meet|call)\b/i
+    const recentHistory = copilotHistory?.slice?.(-2)?.map((m: any) => m.content).join(' ') || ''
+    const hasCalendarIntent = calendarKeywords.test(userMessage) || calendarKeywords.test(recentHistory)
+
     // 3. Generate embedding for RAG search
     const embeddingText = `${userMessage}\n${conversationContext.slice(-500)}`
     const embeddingResponse = await openai.embeddings.create({
@@ -93,7 +220,7 @@ export async function POST(req: NextRequest) {
     })
     const queryEmbedding = embeddingResponse.data[0].embedding
 
-    // 4. RAG: search for similar examples + company knowledge in parallel
+    // 4. RAG: search for similar examples + company knowledge + calendar in parallel
     const ragResults = await Promise.allSettled([
       supabaseAdmin.rpc('match_followup_success', {
         query_embedding: queryEmbedding,
@@ -116,13 +243,15 @@ export async function POST(req: NextRequest) {
         .from('company_data')
         .select('*')
         .eq('company_id', companyId)
-        .single()
+        .single(),
+      hasCalendarIntent ? fetchAllEvents(user.id, 7) : Promise.resolve(null),
     ])
 
     const successExamples = ragResults[0].status === 'fulfilled' ? (ragResults[0].value.data || []) : []
     const failureExamples = ragResults[1].status === 'fulfilled' ? (ragResults[1].value.data || []) : []
     const companyKnowledge = ragResults[2].status === 'fulfilled' ? (ragResults[2].value.data || []) : []
     const companyData = ragResults[3].status === 'fulfilled' ? ragResults[3].value.data : null
+    const calendarEvents: CalendarEvent[] | null = ragResults[4].status === 'fulfilled' ? (ragResults[4].value as CalendarEvent[] | null) : null
 
     // 5. Fetch business type for B2B/B2C adaptation
     const { data: companyTypeData } = await supabaseAdmin
@@ -164,7 +293,8 @@ Apos o diagnostico, se existem caminhos diferentes possiveis, faca 1-2 perguntas
   - Se e primeiro contato: "Qual o canal de origem desse lead? (indicacao, anuncio, inbound...) Isso muda totalmente o tom."
   - Se a conversa ta travada: "O que voce acha que ta travando? Preco, timing, ou o lead nao entendeu o valor?"
   - Se o lead respondeu algo ambiguo: "Como voce interpretou essa resposta? Interesse real ou so educacao?"
-  - Se o lead ACEITOU reuniao/call/demo: "Quais horarios voce tem disponiveis? Prefere por video, ligacao ou WhatsApp? Quanto tempo precisa?" — NUNCA invente horarios ou formatos sem perguntar ao vendedor primeiro. O vendedor precisa informar SUA disponibilidade real.
+  - Se o lead ACEITOU reuniao/call/demo E a AGENDA DO VENDEDOR esta disponivel abaixo: consulte os horarios livres e sugira 2-3 opcoes reais usando {{AGENDAR}}. NAO pergunte ao vendedor — use a agenda. Pergunte apenas a duracao se nao estiver clara (padrao: 30 min).
+  - Se o lead ACEITOU reuniao/call/demo SEM agenda conectada: "Quais horarios voce tem disponiveis? Prefere por video, ligacao ou WhatsApp? Quanto tempo precisa?" — NUNCA invente horarios sem perguntar ao vendedor.
   - Se o lead pediu algo especifico (contrato, proposta, material): "Voce ja tem isso pronto pra enviar? Quer que eu sugira como apresentar?"
 
 REGRA CRITICA — NUNCA INVENTE DADOS PRATICOS:
@@ -205,6 +335,12 @@ TAGS VISUAIS (use quando fizer analises ou avaliacoes — NAO use em sugestoes d
 - {{NOTA:7.5}} — badge colorido com score. Use para notas de analise (engajamento, qualidade da conversa, probabilidade de fechamento)
 - {{BARRA:Label|valor|maximo}} — barra de progresso. Ex: {{BARRA:Engajamento do Lead|7|10}}, {{BARRA:Probabilidade de Fechar|60|100}}
 - {{TENDENCIA:quente}} ou {{TENDENCIA:morno}} ou {{TENDENCIA:frio}} — temperatura do lead
+- {{AGENDAR:titulo|inicio|fim|email}} — Card para criar evento no Google Calendar do vendedor
+  - titulo: nome da reuniao (ex: "Reuniao com Joao")
+  - inicio/fim: formato ISO (YYYY-MM-DDTHH:mm)
+  - email: email do convidado (usar _ se nao tiver)
+  - Ex: {{AGENDAR:Reuniao com Joao|2026-02-24T14:00|2026-02-24T14:30|joao@empresa.com}}
+  - APENAS use quando o vendedor tem agenda conectada (indicado abaixo) e o lead aceitou reuniao
 - NUNCA use tags com valores inventados — so use quando a analise justificar
 - NUNCA use tags dentro de mensagens sugeridas entre aspas (as tags sao pro vendedor ver, nao pro cliente)
 - Use 1-3 tags por resposta no maximo. Nao exagere
@@ -366,6 +502,23 @@ CONTEXTO B2B:
     // Layer 6: Current conversation
     systemPrompt += `\n\nCONVERSA ATUAL NO WHATSAPP (com ${contactName || contactPhone}):\n${conversationContext}`
 
+    // Layer 7: Calendar context (only when calendar intent detected and events available)
+    if (calendarEvents && calendarEvents.length >= 0) {
+      systemPrompt += `\n\nAGENDA DO VENDEDOR (Google Calendar conectado — proximos 7 dias):\n`
+      systemPrompt += formatCalendarContext(calendarEvents)
+      systemPrompt += `\n\nREGRAS DE AGENDAMENTO:
+- Quando o lead aceitar reuniao, sugira horarios LIVRES reais baseados na agenda acima
+- Use {{AGENDAR:titulo|YYYY-MM-DDTHH:mm|YYYY-MM-DDTHH:mm|email}} para cada opcao
+- Ofereca 2-3 opcoes em dias/horarios diferentes
+- Duracao padrao: 30 minutos (ajuste se o vendedor especificar)
+- Sempre inclua o email do convidado se voce souber (pode ser do contexto da conversa ou o vendedor pode informar)
+- Se nao souber o email, use _ no campo email
+- Fuso horario: America/Sao_Paulo`
+    } else if (hasCalendarIntent) {
+      // Intent detected but no calendar connected
+      systemPrompt += `\n\nNOTA: O vendedor NAO tem Google Calendar conectado. Pergunte os horarios disponiveis ao vendedor manualmente.`
+    }
+
     // 6. Build messages array
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt }
@@ -420,6 +573,7 @@ CONTEXTO B2B:
           success_examples: successExamples.length,
           failure_examples: failureExamples.length,
           company_knowledge: companyKnowledge.length,
+          calendar_context: calendarEvents ? calendarEvents.length : 0,
           tokens: completion.usage?.total_tokens || 0
         }
       })
