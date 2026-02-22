@@ -1395,11 +1395,10 @@ export default function MeetAnalysisView() {
           <>
             {/* Google Calendar Connection Card (not connected) — Enhanced onboarding */}
             {!calendarConnected && !calendarLoading && (
-              <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 rounded-2xl p-6 mb-4 text-white shadow-lg shadow-blue-200/50">
+              <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 rounded-2xl p-6 mb-4 text-white shadow-lg shadow-blue-200/50 relative overflow-hidden">
+                <img src="/google-calendar-logo.png" alt="Google Calendar" className="absolute -top-2 -left-2 w-28 h-28 object-contain drop-shadow-md opacity-90" />
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
-                    <CalendarDays className="w-6 h-6 text-white" />
-                  </div>
+                  <div className="w-28 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-bold mb-1">Conecte seu Google Calendar</h3>
                     <p className="text-sm text-blue-100 mb-4">Suas reuniões com Meet serão gravadas e avaliadas automaticamente</p>
@@ -1422,7 +1421,7 @@ export default function MeetAnalysisView() {
                       disabled={connectingCalendar}
                       className="px-5 py-2.5 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-50 shadow-sm"
                     >
-                      {connectingCalendar ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
+                      {connectingCalendar ? <Loader2 className="w-4 h-4 animate-spin" /> : <img src="/google-calendar-logo.png" alt="" className="w-4 h-4 object-contain" />}
                       Conectar Google Calendar
                     </button>
                   </div>
