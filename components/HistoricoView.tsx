@@ -22,9 +22,12 @@ function LazySpinner() {
 
 interface HistoricoViewProps {
   onStartChallenge?: (challenge: any) => void
+  initialMeetEvaluationId?: string | null
+  initialHistoryTab?: string | null
+  onMeetEvaluationLoaded?: () => void
 }
 
-export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) {
+export default function HistoricoView({ onStartChallenge, initialMeetEvaluationId, initialHistoryTab, onMeetEvaluationLoaded }: HistoricoViewProps) {
   const searchParams = useSearchParams()
   const urlTab = searchParams.get('tab')
   const urlEvaluationId = searchParams.get('evaluationId')
@@ -35,7 +38,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
   const [mounted, setMounted] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
   const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | null>(
-    urlTab === 'meet' ? 'meet' : null
+    (initialHistoryTab as any) || (urlTab === 'meet' ? 'meet' : null)
   )
   const [userId, setUserId] = useState<string | null>(null)
 
@@ -444,7 +447,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
 
         ) : historyType === 'meet' ? (
           <Suspense fallback={<LazySpinner />}>
-            <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={urlEvaluationId} />
+            <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={initialMeetEvaluationId || urlEvaluationId} onInitialEvaluationLoaded={onMeetEvaluationLoaded} />
           </Suspense>
         ) : historyType === 'correcoes' ? (
           <Suspense fallback={<LazySpinner />}>

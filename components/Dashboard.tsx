@@ -92,6 +92,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { notifications, allNotifications, unreadCount, markAsRead, markAllAsRead, fetchAllNotifications } = useNotifications(userId)
   const [showNotifications, setShowNotifications] = useState(false)
   const [sharedModalShareId, setSharedModalShareId] = useState<string | null>(null)
+  const [pendingEvaluationId, setPendingEvaluationId] = useState<string | null>(null)
+  const [pendingHistoryTab, setPendingHistoryTab] = useState<string | null>(null)
 
   // Count meet-specific notifications for sidebar badge
   const meetNotificationCount = notifications.filter(n =>
@@ -107,6 +109,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (notification.type === 'shared_meeting' && notification.data?.shareId) {
       setSharedModalShareId(notification.data.shareId)
     } else if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error') {
+      console.log('[Notification Click] evaluationId:', notification.data?.evaluationId, 'data:', notification.data)
+      setPendingEvaluationId(notification.data?.evaluationId || null)
+      setPendingHistoryTab('meet')
       handleViewChange('historico')
     }
   }
@@ -371,7 +376,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (currentView === 'roleplay') {
       return (
         <RoleplayView
-          onNavigateToHistory={() => handleViewChange('historico')}
+          onNavigateToHistory={(historyTab) => {
+            if (historyTab) setPendingHistoryTab(historyTab)
+            handleViewChange('historico')
+          }}
           challengeConfig={activeChallenge?.challenge_config}
           challengeId={activeChallenge?.id}
           onChallengeComplete={() => setActiveChallenge(null)}
@@ -400,7 +408,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'historico') {
-      return <HistoricoView onStartChallenge={handleStartChallenge} />
+      return <HistoricoView onStartChallenge={handleStartChallenge} initialMeetEvaluationId={pendingEvaluationId} initialHistoryTab={pendingHistoryTab} onMeetEvaluationLoaded={() => { setPendingEvaluationId(null); setPendingHistoryTab(null) }} />
     }
 
     if (currentView === 'perfil') {
@@ -590,10 +598,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                     .filter(n => n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error')
                     .forEach(n => markAsRead(n.id))
                   // Navigate and open Meet tab
+                  setPendingHistoryTab('meet')
                   handleViewChange('historico')
-                  setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('setHistoryType', { detail: 'meet' }))
-                  }, 100)
                 } else {
                   handleViewChange('historico')
                 }
@@ -699,11 +705,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               companyId={companyId}
               onStartChallenge={handleStartChallenge}
               onViewHistory={() => {
+                setPendingHistoryTab('desafios')
                 setCurrentView('historico')
-                setTimeout(() => {
-                  const event = new CustomEvent('setHistoryType', { detail: 'desafios' })
-                  window.dispatchEvent(event)
-                }, 100)
               }}
             />
           ) : undefined}

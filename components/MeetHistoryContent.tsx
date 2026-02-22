@@ -136,9 +136,10 @@ function translateIndicator(key: string): string {
 interface MeetHistoryContentProps {
   newEvaluationIds?: string[]
   initialEvaluationId?: string | null
+  onInitialEvaluationLoaded?: () => void
 }
 
-export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId }: MeetHistoryContentProps) {
+export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded }: MeetHistoryContentProps) {
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
   const [loading, setLoading] = useState(true)
@@ -178,6 +179,17 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
   useEffect(() => {
     loadHistory()
   }, [])
+
+  // When initialEvaluationId changes (e.g. from notification click), select that evaluation
+  useEffect(() => {
+    if (initialEvaluationId && evaluations.length > 0) {
+      const target = evaluations.find((e: MeetEvaluation) => e.id === initialEvaluationId)
+      if (target) {
+        setSelectedEvaluation(target)
+        onInitialEvaluationLoaded?.()
+      }
+    }
+  }, [initialEvaluationId])
 
   const loadHistory = async () => {
     try {
@@ -225,11 +237,16 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
 
       setEvaluations(enrichedData)
       if (enrichedData.length > 0) {
-        // Auto-select specific evaluation if navigated from calendar
+        // Auto-select specific evaluation if navigated from notification or calendar
+        console.log('[MeetHistory] initialEvaluationId:', initialEvaluationId, 'available IDs:', enrichedData.map((e: MeetEvaluation) => e.id))
         const target = initialEvaluationId
           ? enrichedData.find((e: MeetEvaluation) => e.id === initialEvaluationId)
           : null
+        console.log('[MeetHistory] target found:', !!target, target?.seller_name)
         setSelectedEvaluation(target || enrichedData[0])
+        if (target && onInitialEvaluationLoaded) {
+          onInitialEvaluationLoaded()
+        }
       }
 
       // Load saved simulations linked to evaluations
