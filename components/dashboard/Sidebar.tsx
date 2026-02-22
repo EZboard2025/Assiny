@@ -103,7 +103,7 @@ export default function Sidebar({
                 )}
                 <div className="relative flex-shrink-0">
                   <Icon className="w-5 h-5" />
-                  {item.view === 'meet-analysis' && meetNotificationCount > 0 && (
+                  {item.view === 'historico' && meetNotificationCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
                       {meetNotificationCount}
                     </span>

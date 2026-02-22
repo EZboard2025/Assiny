@@ -3,6 +3,8 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, History, CheckCircle, Video, Users, AlertCircle, ArrowLeft, FileText } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
+import { useNotifications } from '@/hooks/useNotifications'
+import { supabase } from '@/lib/supabase'
 
 const FollowUpHistoryView = lazy(() => import('./FollowUpHistoryView'))
 const MeetHistoryContent = lazy(() => import('./MeetHistoryContent'))
@@ -28,10 +30,25 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
   const [mounted, setMounted] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
   const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  // Notifications for meet glow effect
+  const { notifications, markAsRead } = useNotifications(userId)
+  const meetNotifications = notifications.filter(n =>
+    n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error'
+  )
+  const newEvaluationIds = meetNotifications
+    .map(n => n.data?.evaluationId)
+    .filter(Boolean) as string[]
 
   useEffect(() => {
     setMounted(true)
     loadSessions()
+
+    // Get user ID for notifications
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id)
+    })
 
     // Listen for history type change event (from Dashboard)
     const handleSetHistoryType = (e: CustomEvent) => {
@@ -374,28 +391,53 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
         {/* Selector Screen */}
         {historyType === null ? (
           <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-            {historyOptions.map((option) => (
-              <button
-                key={option.key}
-                onClick={() => setHistoryType(option.key)}
-                className={`group bg-white rounded-2xl p-6 border-2 border-gray-200 ${option.hoverBg} ${option.hoverBorder} transition-all text-left shadow-sm hover:shadow-md`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${option.bgColor} group-hover:scale-110 transition-transform`}>
-                    <option.icon className={`w-7 h-7 ${option.iconColor}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">{option.label}</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed">{option.description}</p>
-                  </div>
+            {historyOptions.map((option) => {
+              const hasMeetGlow = option.key === 'meet' && meetNotifications.length > 0
+
+              return (
+                <div key={option.key} className="relative">
+                  {/* Glow effect behind card when there are new meet evaluations */}
+                  {hasMeetGlow && (
+                    <div className="absolute -inset-1 rounded-3xl bg-blue-400/30 blur-md animate-pulse pointer-events-none" />
+                  )}
+                  <button
+                    onClick={() => {
+                      setHistoryType(option.key)
+                      if (hasMeetGlow) {
+                        meetNotifications.forEach(n => markAsRead(n.id))
+                      }
+                    }}
+                    className={`relative w-full group bg-white rounded-2xl p-6 border-2 transition-all text-left shadow-sm hover:shadow-md ${
+                      hasMeetGlow
+                        ? 'border-blue-300 ring-1 ring-blue-200'
+                        : `border-gray-200 ${option.hoverBg} ${option.hoverBorder}`
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${option.bgColor} group-hover:scale-110 transition-transform`}>
+                        <option.icon className={`w-7 h-7 ${option.iconColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-gray-900 mb-1">{option.label}</h3>
+                          {hasMeetGlow && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold text-blue-600 bg-blue-100 rounded-full animate-pulse">
+                              {meetNotifications.length} NOVA{meetNotifications.length > 1 ? 'S' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 leading-relaxed">{option.description}</p>
+                      </div>
+                    </div>
+                  </button>
                 </div>
-              </button>
-            ))}
+              )
+            })}
           </div>
 
         ) : historyType === 'meet' ? (
           <Suspense fallback={<LazySpinner />}>
-            <MeetHistoryContent />
+            <MeetHistoryContent newEvaluationIds={newEvaluationIds} />
           </Suspense>
         ) : historyType === 'correcoes' ? (
           <Suspense fallback={<LazySpinner />}>
