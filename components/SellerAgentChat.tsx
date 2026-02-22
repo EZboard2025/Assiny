@@ -390,32 +390,43 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           </div>
         </div>
         {/* Action buttons */}
-        <div className="flex items-center gap-0.5 mt-2 pt-2 border-t border-gray-100 flex-wrap">
+        <div className="grid grid-cols-2 gap-1.5 mt-2.5 pt-2.5 border-t border-gray-200/60">
           {link && link !== 'none' && (
-            <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-green-600 hover:bg-green-50 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-              Entrar
+            <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors col-span-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              Entrar na reunião
             </a>
           )}
-          {actionBtn('Reagendar',
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
-            `Reagenda a reunião "${title}" do dia ${date}. Para quando?`
+          <button onClick={() => sendMessage(`Reagenda a reunião "${title}" do dia ${date}. Para quando?`)} disabled={isLoading}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:border-green-300 hover:text-green-700 hover:bg-green-50 transition-all disabled:opacity-40">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            Reagendar
+          </button>
+          <button onClick={() => sendMessage(`Adiciona convidados na reunião "${title}" do dia ${date}. Quem devo adicionar?`)} disabled={isLoading}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:border-green-300 hover:text-green-700 hover:bg-green-50 transition-all disabled:opacity-40">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+            Convidados
+          </button>
+          {link && link !== 'none' && botStatus !== 'completed' && botStatus !== 'recording' && (
+            <button onClick={() => sendMessage(
+              botStatus === 'scheduled' || botStatus === 'pending'
+                ? `Desativa o bot de análise na reunião "${title}" do dia ${date}`
+                : `Ativa o bot de análise na reunião "${title}" do dia ${date}`
+            )} disabled={isLoading}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all disabled:opacity-40 ${
+                botStatus === 'scheduled' || botStatus === 'pending'
+                  ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                  : 'bg-white border-gray-200 text-gray-700 hover:border-green-300 hover:text-green-700 hover:bg-green-50'
+              }`}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              {botStatus === 'scheduled' || botStatus === 'pending' ? 'Desativar bot' : 'Ativar bot'}
+            </button>
           )}
-          {actionBtn('Convidados',
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>,
-            `Adiciona convidados na reunião "${title}" do dia ${date}. Quem devo adicionar?`
-          )}
-          {link && link !== 'none' && botStatus !== 'completed' && botStatus !== 'recording' && actionBtn(
-            botStatus === 'scheduled' || botStatus === 'pending' ? 'Desativar bot' : 'Ativar bot',
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
-            botStatus === 'scheduled' || botStatus === 'pending'
-              ? `Desativa o bot de análise na reunião "${title}" do dia ${date}`
-              : `Ativa o bot de análise na reunião "${title}" do dia ${date}`
-          )}
-          {actionBtn('Cancelar',
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-            `Cancela a reunião "${title}" do dia ${date}`
-          )}
+          <button onClick={() => sendMessage(`Cancela a reunião "${title}" do dia ${date}`)} disabled={isLoading}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-all disabled:opacity-40">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Cancelar
+          </button>
         </div>
       </div>
     )
