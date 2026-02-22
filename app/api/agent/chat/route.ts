@@ -106,6 +106,12 @@ Use tags especiais para dados numéricos — elas são renderizadas como gráfic
   Ex: {{eval_card|abc-123|meet|Weekly Ramppy|20/02|7.5|8.0|7.2|6.5|5.8}}
   Ex: {{eval_card|def-456|roleplay|Diretor Financeiro|18/02|6.3|_|_|_|_}}
 
+• {{teammate|user_id|nome|cargo}} — Card clicável de colega para selecionar destinatário
+  - user_id: ID do colega (obtido de list_teammates)
+  - nome: nome completo
+  - cargo: cargo/role (opcional)
+  Ex: {{teammate|abc-123|Gabriel Silva|vendedor}}
+
 REGRAS DAS TAGS VISUAIS:
 - Coloque tags visuais ANTES do texto explicativo (elas ficam no topo da resposta)
 - Ao falar de performance, use {{score}} + {{spin}} + {{trend}} juntos
@@ -117,15 +123,17 @@ REGRAS DAS TAGS VISUAIS:
 - Só use tags quando tiver dados reais das ferramentas — nunca invente valores
 - Ao listar avaliações para compartilhamento, use {{eval_card}} para CADA item (um card por avaliação/sessão)
 - NÃO peça ao vendedor o ID — mostre os cards com botão "Compartilhar" para ele clicar
-- Quando o vendedor clicar "Compartilhar" em um card, o ID será enviado automaticamente — chame list_teammates e share_meet_evaluation
+- Quando o vendedor clicar "Compartilhar" em um card, o ID será enviado automaticamente — chame list_teammates e mostre destinatários com {{teammate}}
+- Ao listar destinatários para compartilhamento, use {{teammate}} para CADA colega (um card clicável por pessoa)
+- NÃO liste nomes em bullet points — SEMPRE use {{teammate}} cards para que o vendedor possa clicar e selecionar
 
 COMPARTILHAMENTO DE REUNIÕES:
 Você pode compartilhar avaliações de Meet com colegas da equipe. Fluxo:
-1. Busque a avaliação: get_meet_evaluations → encontrar evaluation_id
-2. Busque o destinatário: list_teammates → encontrar user_id pelo nome
-3. Compartilhe: share_meet_evaluation → cria notificação + envia email
+1. Busque a avaliação: get_meet_evaluations → mostre com {{eval_card}} para o vendedor escolher
+2. Quando o vendedor clicar "Compartilhar": chame list_teammates → mostre com {{teammate}} para selecionar destinatário
+3. Quando o vendedor clicar em um colega: chame share_meet_evaluation → cria notificação + envia email
 
-- Se o vendedor disser "compartilha minha última reunião com [nome]", siga o fluxo acima
+- Se o vendedor disser "compartilha minha última reunião com [nome]", pule direto para share_meet_evaluation (não precisa mostrar cards)
 - Se o vendedor não especificar seções, compartilhe TODAS (smart_notes, spin, evaluation, transcript)
 - Se o email falhar (Google não conectado), o compartilhamento + notificação ainda funcionam — informe que o email não foi enviado
 - Após compartilhar, confirme: quem recebeu, quais seções, se email foi enviado`

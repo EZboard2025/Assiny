@@ -238,8 +238,8 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
 
   // ─── Visual Tag Parser ─────────────────────────────────────────────
   const parseVisualTags = (content: string) => {
-    const TAG_REGEX = /\{\{(score|spin|trend|metric|meeting|eval_card)\|([^}]+)\}\}/g
-    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card'; data: string }> = []
+    const TAG_REGEX = /\{\{(score|spin|trend|metric|meeting|eval_card|teammate)\|([^}]+)\}\}/g
+    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card' | 'teammate'; data: string }> = []
     let lastIndex = 0
     let match
 
@@ -247,7 +247,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       if (match.index > lastIndex) {
         parts.push({ type: 'text', data: content.slice(lastIndex, match.index) })
       }
-      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card', data: match[2] })
+      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card' | 'teammate', data: match[2] })
       lastIndex = match.index + match[0].length
     }
 
@@ -481,6 +481,36 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     )
   }
 
+  // ─── Teammate Card (for sharing recipient selection) ────────────────
+  const TeammateCard = ({ userId, name, role }: { userId: string; name: string; role?: string }) => {
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    const colors = [
+      'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-amber-100 text-amber-700',
+      'bg-rose-100 text-rose-700', 'bg-teal-100 text-teal-700', 'bg-indigo-100 text-indigo-700',
+    ]
+    const colorIdx = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length
+
+    return (
+      <button
+        onClick={() => sendMessage(`Compartilha com ${name} (user_id: ${userId})`)}
+        disabled={isLoading}
+        className="flex items-center gap-3 w-full p-2.5 rounded-lg border border-gray-100 bg-white hover:bg-green-50 hover:border-green-200 transition-all duration-150 text-left group"
+        style={{ opacity: isLoading ? 0.4 : 1, cursor: isLoading ? 'not-allowed' : 'pointer' }}
+      >
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${colors[colorIdx]}`}>
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-gray-800 truncate">{name}</div>
+          {role && <div className="text-[11px] text-gray-400">{role}</div>}
+        </div>
+        <div className="text-green-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <Share2 size={14} />
+        </div>
+      </button>
+    )
+  }
+
   // ─── Rich Text Renderer ────────────────────────────────────────────
   const renderTextBlock = (text: string, keyPrefix: number) => {
     const lines = text.split('\n')
@@ -615,6 +645,10 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
             return isNaN(n) ? undefined : n
           }
           return <EvalCard key={`ec-${idx}`} id={segs[0] || ''} type={segs[1] || 'meet'} title={segs[2] || ''} date={segs[3] || ''} score={parseNum(segs[4]) ?? 0} spinS={parseNum(segs[5])} spinP={parseNum(segs[6])} spinI={parseNum(segs[7])} spinN={parseNum(segs[8])} />
+        }
+        case 'teammate': {
+          const segs = part.data.split('|')
+          return <TeammateCard key={`tm-${idx}`} userId={segs[0] || ''} name={segs[1] || ''} role={segs[2]} />
         }
         case 'text':
           return renderTextBlock(part.data, idx)
