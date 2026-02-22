@@ -88,7 +88,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { streak, loading: streakLoading } = useTrainingStreak(userId)
 
   // Notifications hook
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(userId)
+  const { notifications, allNotifications, unreadCount, markAsRead, markAllAsRead, fetchAllNotifications } = useNotifications(userId)
   const [showNotifications, setShowNotifications] = useState(false)
 
   // Count meet-specific notifications for sidebar badge
@@ -97,7 +97,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   ).length
 
   const handleNotificationClick = (notification: UserNotification) => {
-    markAsRead(notification.id)
+    if (!notification.is_read) {
+      markAsRead(notification.id)
+    }
     setShowNotifications(false)
     // Navigate based on notification type
     if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error' || notification.type === 'shared_meeting') {
@@ -485,10 +487,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 {showNotifications && (
                   <NotificationPanel
                     notifications={notifications}
+                    allNotifications={allNotifications}
                     onMarkAsRead={markAsRead}
                     onMarkAllAsRead={handleMarkAllAsRead}
                     onNotificationClick={handleNotificationClick}
                     onClose={() => setShowNotifications(false)}
+                    onFetchAll={fetchAllNotifications}
                     anchorRef={bellRef}
                   />
                 )}

@@ -6,23 +6,30 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// GET - Fetch unread notifications for authenticated user
+// GET - Fetch notifications for authenticated user
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
+    const all = searchParams.get('all') === 'true'
 
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('user_notifications')
       .select('*')
       .eq('user_id', userId)
-      .eq('is_read', false)
       .order('created_at', { ascending: false })
-      .limit(20)
+
+    if (!all) {
+      query = query.eq('is_read', false)
+    }
+
+    query = query.limit(all ? 50 : 20)
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching notifications:', error)
