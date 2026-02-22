@@ -21,6 +21,9 @@ interface MeetEvaluation {
   spin_n_score: number | null
   smart_notes: any | null
   created_at: string
+  calendar_event_title?: string | null
+  calendar_event_start?: string | null
+  calendar_meet_link?: string | null
 }
 
 // Icon map for dynamic smart notes sections
@@ -122,14 +125,36 @@ export default function MeetHistoryContent() {
         return
       }
 
-      setEvaluations(data || [])
+      // Enrich evaluations with calendar event data
+      let enrichedData = data || []
       if (data && data.length > 0) {
-        setSelectedEvaluation(data[0])
+        const evalIds = data.map((e: MeetEvaluation) => e.id)
+        const { data: calendarLinks } = await supabase
+          .from('calendar_scheduled_bots')
+          .select('evaluation_id, event_title, event_start, meet_link')
+          .in('evaluation_id', evalIds)
+
+        if (calendarLinks && calendarLinks.length > 0) {
+          enrichedData = data.map((ev: MeetEvaluation) => {
+            const calLink = calendarLinks.find((c: any) => c.evaluation_id === ev.id)
+            return {
+              ...ev,
+              calendar_event_title: calLink?.event_title || null,
+              calendar_event_start: calLink?.event_start || null,
+              calendar_meet_link: calLink?.meet_link || null,
+            }
+          })
+        }
+      }
+
+      setEvaluations(enrichedData)
+      if (enrichedData.length > 0) {
+        setSelectedEvaluation(enrichedData[0])
       }
 
       // Load saved simulations linked to evaluations
-      if (data && data.length > 0) {
-        const evalIds = data.map((e: MeetEvaluation) => e.id)
+      if (enrichedData.length > 0) {
+        const evalIds = enrichedData.map((e: MeetEvaluation) => e.id)
         const { data: sims } = await supabase
           .from('saved_simulations')
           .select('*')
@@ -338,6 +363,12 @@ export default function MeetHistoryContent() {
                       <div className="text-[11px] text-gray-400">
                         {formatDate(evaluation.created_at)}
                       </div>
+                      {evaluation.calendar_event_title && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Calendar className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                          <span className="text-[11px] text-blue-500 truncate">{evaluation.calendar_event_title}</span>
+                        </div>
+                      )}
                       {hasSim && (
                         <div className="flex items-center gap-1.5 mt-1">
                           <Target className="w-3 h-3 text-purple-500 flex-shrink-0" />
@@ -379,11 +410,30 @@ export default function MeetHistoryContent() {
                       <p className="text-sm text-gray-500">{getPerformanceLabel(selectedEvaluation.performance_level)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       {formatDate(selectedEvaluation.created_at)} às {formatTime(selectedEvaluation.created_at)}
                     </span>
+                    {selectedEvaluation.calendar_event_title && (
+                      selectedEvaluation.calendar_meet_link ? (
+                        <a
+                          href={selectedEvaluation.calendar_meet_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-blue-500 hover:text-blue-600 transition-colors"
+                        >
+                          <Video className="w-4 h-4" />
+                          {selectedEvaluation.calendar_event_title}
+                          <ArrowUpRight className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <span className="flex items-center gap-1 text-blue-500">
+                          <Video className="w-4 h-4" />
+                          {selectedEvaluation.calendar_event_title}
+                        </span>
+                      )
+                    )}
                   </div>
                 </div>
                 <button
