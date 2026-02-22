@@ -59,6 +59,19 @@ AÇÕES NO CALENDÁRIO:
 - Ao criar reunião, SEMPRE adicione link do Meet por padrão (add_meet_link=true)
 - Após criar/atualizar/cancelar, use {{meeting}} para mostrar o resultado visual
 
+CONVIDADOS:
+- Quando o vendedor mencionar NOMES sem email (ex: "adiciona o Gabriel"), use search_contacts ANTES para buscar o email
+- search_contacts busca na equipe da empresa E em contatos recentes de reuniões anteriores
+- Se não encontrar, peça o email ao vendedor
+- Para adicionar convidados a uma reunião existente: get_calendar_events → search_contacts → update_calendar_event com add_attendees
+
+ALTERAÇÃO DE HORÁRIO:
+- Para mudar só o horário de início: update com start_time (end mantém mesma duração)
+- Para aumentar duração: update com end_time mais tarde (ex: de 16h-17h para 16h-18h → mude end_time para 18:00)
+- Para diminuir: update com end_time mais cedo
+- Para mover de dia: update com date (horários se mantêm)
+- Para mover dia E horário: update com date + start_time + end_time
+
 FORMATAÇÃO VISUAL:
 Use tags especiais para dados numéricos — elas são renderizadas como gráficos bonitos no chat:
 
@@ -288,24 +301,39 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
       }
     }
   },
+  // ─── Contact Lookup ──────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'search_contacts',
+      description: 'Busca funcionários/colegas da empresa pelo nome para obter o email. Use antes de criar/atualizar eventos quando o vendedor mencionar nomes sem email.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nome (ou parte do nome) para buscar' }
+        },
+        required: ['name']
+      }
+    }
+  },
   // ─── Calendar Write Tools ─────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'create_calendar_event',
-      description: 'Cria um novo evento no Google Calendar do vendedor. Pode incluir link do Google Meet e convidar participantes.',
+      description: 'Cria um novo evento no Google Calendar do vendedor. Pode incluir link do Google Meet e convidar participantes. IMPORTANTE: se o vendedor mencionar nomes sem email, use search_contacts ANTES para buscar os emails.',
       parameters: {
         type: 'object',
         properties: {
           title: { type: 'string', description: 'Título do evento' },
           date: { type: 'string', description: 'Data do evento (YYYY-MM-DD, ex: 2026-02-25)' },
           start_time: { type: 'string', description: 'Hora início (HH:MM, ex: 14:00)' },
-          end_time: { type: 'string', description: 'Hora fim (HH:MM, ex: 15:00)' },
+          end_time: { type: 'string', description: 'Hora fim (HH:MM, ex: 15:00). Se não informado, assume 1h após start_time' },
           description: { type: 'string', description: 'Descrição do evento (opcional)' },
-          attendees: { type: 'array', items: { type: 'string' }, description: 'Emails dos participantes (opcional)' },
+          attendees: { type: 'array', items: { type: 'string' }, description: 'Emails dos participantes (opcional). Use search_contacts para converter nomes em emails.' },
           add_meet_link: { type: 'boolean', description: 'Criar link do Google Meet (padrão: true)' }
         },
-        required: ['title', 'date', 'start_time', 'end_time']
+        required: ['title', 'date', 'start_time']
       }
     }
   },
@@ -313,18 +341,18 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'update_calendar_event',
-      description: 'Atualiza um evento existente no Google Calendar: reagendar, mudar título, adicionar participantes, adicionar link Meet.',
+      description: 'Atualiza um evento existente: reagendar (mudar data/hora), alterar duração (mudar start ou end), mudar título, adicionar participantes, adicionar link Meet. Para achar o event_id, use get_calendar_events antes.',
       parameters: {
         type: 'object',
         properties: {
-          event_id: { type: 'string', description: 'ID do evento do Google Calendar' },
+          event_id: { type: 'string', description: 'ID do evento do Google Calendar (obrigatório, obtido via get_calendar_events)' },
           title: { type: 'string', description: 'Novo título (opcional)' },
-          date: { type: 'string', description: 'Nova data (YYYY-MM-DD, opcional)' },
+          date: { type: 'string', description: 'Nova data (YYYY-MM-DD, opcional — se omitido mantém a data atual)' },
           start_time: { type: 'string', description: 'Nova hora início (HH:MM, opcional)' },
-          end_time: { type: 'string', description: 'Nova hora fim (HH:MM, opcional)' },
+          end_time: { type: 'string', description: 'Nova hora fim (HH:MM, opcional). Ex: para aumentar de 1h para 1h30, mude apenas o end_time' },
           description: { type: 'string', description: 'Nova descrição (opcional)' },
-          add_attendees: { type: 'array', items: { type: 'string' }, description: 'Emails de participantes a adicionar (opcional)' },
-          add_meet_link: { type: 'boolean', description: 'Adicionar link do Google Meet (opcional)' }
+          add_attendees: { type: 'array', items: { type: 'string' }, description: 'Emails de participantes a ADICIONAR (opcional). Use search_contacts para converter nomes.' },
+          add_meet_link: { type: 'boolean', description: 'Adicionar link do Google Meet se não tiver (opcional)' }
         },
         required: ['event_id']
       }
@@ -950,13 +978,64 @@ async function executeFunction(
         return { total: data?.length || 0, bots: data || [] }
       }
 
+      // ─── Contact Lookup ──────────────────────────────────────────────
+      case 'search_contacts': {
+        const searchName = params.name?.toLowerCase().trim()
+        if (!searchName) return { error: 'Nome é obrigatório' }
+
+        // Search employees in the same company
+        const { data: employees } = await supabaseAdmin
+          .from('employees')
+          .select('name, email, role')
+          .eq('company_id', companyId)
+          .ilike('name', `%${searchName}%`)
+
+        // Also search Google Calendar attendees from recent events for external contacts
+        const { data: recentBots } = await supabaseAdmin
+          .from('calendar_scheduled_bots')
+          .select('attendees')
+          .eq('user_id', userId)
+          .not('attendees', 'is', null)
+          .order('event_start', { ascending: false })
+          .limit(20)
+
+        const externalContacts = new Map<string, string>()
+        for (const bot of (recentBots || [])) {
+          const attendees = bot.attendees as Array<{ email?: string; displayName?: string }> | null
+          if (!Array.isArray(attendees)) continue
+          for (const a of attendees) {
+            if (a.email && (a.displayName?.toLowerCase().includes(searchName) || a.email.toLowerCase().includes(searchName))) {
+              externalContacts.set(a.email, a.displayName || a.email)
+            }
+          }
+        }
+
+        const results = [
+          ...(employees || []).map(e => ({ name: e.name, email: e.email, source: 'equipe' })),
+          ...Array.from(externalContacts.entries()).map(([email, name]) => ({ name, email, source: 'contato recente' })),
+        ]
+
+        return {
+          total: results.length,
+          contacts: results,
+          hint: results.length === 0 ? 'Nenhum contato encontrado. Peça o email ao vendedor.' : null,
+        }
+      }
+
       // ─── Calendar Write Operations ──────────────────────────────────
       case 'create_calendar_event': {
         const calClient = await getCalendarClient(userId)
         if (!calClient) return { error: 'Google Calendar não conectado. O vendedor precisa conectar na página de Análise Meet.' }
 
+        // Default end_time: 1h after start_time
+        let endTime = params.end_time
+        if (!endTime && params.start_time) {
+          const [h, m] = params.start_time.split(':').map(Number)
+          endTime = `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        }
+
         const startDateTime = `${params.date}T${params.start_time}:00-03:00`
-        const endDateTime = `${params.date}T${params.end_time}:00-03:00`
+        const endDateTime = `${params.date}T${endTime}:00-03:00`
 
         const event = await createCalendarEvent(userId, {
           title: params.title,
@@ -964,7 +1043,7 @@ async function executeFunction(
           endDateTime,
           description: params.description,
           attendees: params.attendees,
-          addMeetLink: params.add_meet_link !== false, // default true
+          addMeetLink: params.add_meet_link !== false,
         })
 
         if (!event) return { error: 'Erro ao criar evento no Google Calendar' }
@@ -987,16 +1066,48 @@ async function executeFunction(
         const calClient = await getCalendarClient(userId)
         if (!calClient) return { error: 'Google Calendar não conectado.' }
 
+        // First fetch the current event to support partial time updates
+        const currentEvents = await fetchAllEvents(userId, 30)
+        const currentEvent = currentEvents?.find(e => e.id === params.event_id)
+
         const updateData: Record<string, any> = {}
         if (params.title) updateData.title = params.title
         if (params.description) updateData.description = params.description
         if (params.add_meet_link) updateData.addMeetLink = true
-        if (params.date && params.start_time) {
-          updateData.startDateTime = `${params.date}T${params.start_time}:00-03:00`
+
+        // Handle partial time updates: if only start_time or only end_time is given,
+        // use the current event's values for the missing one
+        const currentStart = currentEvent ? new Date(currentEvent.start) : null
+        const currentEnd = currentEvent?.end ? new Date(currentEvent.end) : null
+
+        const newDate = params.date || (currentStart ? `${currentStart.getFullYear()}-${String(currentStart.getMonth() + 1).padStart(2, '0')}-${String(currentStart.getDate()).padStart(2, '0')}` : null)
+
+        if (params.start_time && newDate) {
+          updateData.startDateTime = `${newDate}T${params.start_time}:00-03:00`
+          // If no new end_time, keep same duration
+          if (!params.end_time && currentStart && currentEnd) {
+            const durationMs = currentEnd.getTime() - currentStart.getTime()
+            const newStart = new Date(`${newDate}T${params.start_time}:00-03:00`)
+            const newEnd = new Date(newStart.getTime() + durationMs)
+            updateData.endDateTime = newEnd.toISOString()
+          }
         }
-        if (params.date && params.end_time) {
-          updateData.endDateTime = `${params.date}T${params.end_time}:00-03:00`
+        if (params.end_time && newDate) {
+          updateData.endDateTime = `${newDate}T${params.end_time}:00-03:00`
+          // If no new start_time but new date, keep original start time on new date
+          if (!params.start_time && currentStart) {
+            const origTime = `${String(currentStart.getHours()).padStart(2, '0')}:${String(currentStart.getMinutes()).padStart(2, '0')}`
+            updateData.startDateTime = `${newDate}T${origTime}:00-03:00`
+          }
         }
+        // If only date changed (no time params), move to same times on new date
+        if (params.date && !params.start_time && !params.end_time && currentStart && currentEnd) {
+          const origStartTime = `${String(currentStart.getHours()).padStart(2, '0')}:${String(currentStart.getMinutes()).padStart(2, '0')}`
+          const origEndTime = `${String(currentEnd.getHours()).padStart(2, '0')}:${String(currentEnd.getMinutes()).padStart(2, '0')}`
+          updateData.startDateTime = `${params.date}T${origStartTime}:00-03:00`
+          updateData.endDateTime = `${params.date}T${origEndTime}:00-03:00`
+        }
+
         if (params.add_attendees?.length) {
           updateData.attendees = params.add_attendees.map((e: string) => ({ email: e }))
         }
