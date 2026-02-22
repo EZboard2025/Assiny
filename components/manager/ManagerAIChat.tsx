@@ -47,12 +47,12 @@ function ProgressBar({ label, value, max }: { label: string; value: number; max:
   return (
     <div className="my-2 w-full">
       <div className="flex items-center justify-between text-xs mb-1">
-        <span className="text-[#8696a0]">{label}</span>
+        <span className="text-gray-400">{label}</span>
         <span className="font-bold" style={{ color: max === 100 ? getScoreColor(value / 10) : getScoreColor(value) }}>
           {max === 100 ? `${value.toFixed(0)}%` : `${value.toFixed(1)}/${max}`}
         </span>
       </div>
-      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${pct}%`, backgroundColor: max === 100 ? getScoreColor(value / 10) : getScoreColor(value) }}
@@ -69,15 +69,15 @@ function SpinBars({ data }: { data: string }) {
   })
 
   return (
-    <div className="my-2 p-2.5 bg-white/5 rounded-lg w-full">
-      <div className="text-[10px] text-[#00a884] font-semibold uppercase tracking-wider mb-2">SPIN Selling</div>
+    <div className="my-2 p-2.5 bg-gray-100 rounded-lg w-full">
+      <div className="text-[10px] text-green-600 font-semibold uppercase tracking-wider mb-2">SPIN Selling</div>
       <div className="space-y-1.5">
         {entries.map(({ key, value }) => {
           const pct = Math.min((value / 10) * 100, 100)
           return (
             <div key={key} className="flex items-center gap-2">
-              <span className="w-4 text-xs font-bold text-[#00a884] text-center">{key}</span>
-              <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
+              <span className="w-4 text-xs font-bold text-green-600 text-center">{key}</span>
+              <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct}%`, backgroundColor: getScoreColor(value) }}
@@ -101,17 +101,17 @@ function Ranking({ data }: { data: string }) {
   const maxVal = Math.max(...items.map(i => i.value), 10)
 
   return (
-    <div className="my-2 p-2.5 bg-white/5 rounded-lg w-full">
+    <div className="my-2 p-2.5 bg-gray-100 rounded-lg w-full">
       <div className="space-y-1.5">
         {items.map((item, i) => {
           const pct = Math.min((item.value / maxVal) * 100, 100)
           return (
             <div key={i} className="flex items-center gap-2">
-              <span className={`w-5 text-xs font-bold text-center ${i === 0 ? 'text-yellow-400' : 'text-[#8696a0]'}`}>
+              <span className={`w-5 text-xs font-bold text-center ${i === 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
                 {i + 1}.
               </span>
-              <span className="w-20 text-xs text-[#e9edef] truncate">{item.name}</span>
-              <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
+              <span className="w-20 text-xs text-gray-900 truncate">{item.name}</span>
+              <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct}%`, backgroundColor: getScoreColor(item.value) }}
@@ -132,20 +132,20 @@ function TrendBadge({ trend }: { trend: string }) {
   const t = trend.trim().toLowerCase()
   if (t === 'melhorando') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-400 mx-1">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-600 mx-1">
         <TrendingUp className="w-3 h-3" /> Melhorando
       </span>
     )
   }
   if (t === 'piorando') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 mx-1">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 mx-1">
         <TrendingDown className="w-3 h-3" /> Piorando
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/15 text-yellow-400 mx-1">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-600 mx-1">
       <Minus className="w-3 h-3" /> Estável
     </span>
   )
@@ -160,17 +160,17 @@ function ComparisonBars({ data }: { data: string }) {
   const maxVal = Math.max(...items.map(i => i.value), 10)
 
   return (
-    <div className="my-2 p-2.5 bg-white/5 rounded-lg w-full">
+    <div className="my-2 p-2.5 bg-gray-100 rounded-lg w-full">
       <div className="space-y-2">
         {items.map((item, i) => {
           const pct = Math.min((item.value / maxVal) * 100, 100)
           return (
             <div key={i}>
               <div className="flex items-center justify-between text-xs mb-0.5">
-                <span className="text-[#e9edef]">{item.name}</span>
+                <span className="text-gray-900">{item.name}</span>
                 <span className="font-bold" style={{ color: getScoreColor(item.value) }}>{item.value.toFixed(1)}</span>
               </div>
-              <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct}%`, backgroundColor: getScoreColor(item.value) }}
@@ -197,8 +197,8 @@ function StyledText({ text }: { text: string }) {
       <div key={key} className="my-1.5 space-y-1 pl-1">
         {bulletBuffer.map((item, i) => (
           <div key={i} className="flex items-start gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00a884] mt-[7px] shrink-0" />
-            <span className="text-[#d1d7db] text-sm leading-relaxed">{item}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-600 mt-[7px] shrink-0" />
+            <span className="text-gray-600 text-sm leading-relaxed">{item}</span>
           </div>
         ))}
       </div>
@@ -212,10 +212,10 @@ function StyledText({ text }: { text: string }) {
       <div key={key} className="my-1.5 space-y-1.5 pl-1">
         {numberedBuffer.map((item, i) => (
           <div key={i} className="flex items-start gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-[#00a884]/20 text-[#00a884] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+            <span className="w-5 h-5 rounded-full bg-green-100 text-green-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
               {item.num}
             </span>
-            <span className="text-[#d1d7db] text-sm leading-relaxed">{item.text}</span>
+            <span className="text-gray-600 text-sm leading-relaxed">{item.text}</span>
           </div>
         ))}
       </div>
@@ -252,15 +252,15 @@ function StyledText({ text }: { text: string }) {
     if (trimmed.endsWith(':') && trimmed.length < 100 && !trimmed.startsWith('Erro')) {
       elements.push(
         <div key={`hdr_${li}`} className="flex items-center gap-2 mt-3 mb-1">
-          <div className="w-1 h-4 bg-[#00a884] rounded-full shrink-0" />
-          <span className="text-[#00a884] text-[13px] font-semibold">{trimmed}</span>
+          <div className="w-1 h-4 bg-green-600 rounded-full shrink-0" />
+          <span className="text-green-600 text-[13px] font-semibold">{trimmed}</span>
         </div>
       )
       continue
     }
 
     elements.push(
-      <p key={`p_${li}`} className="text-[#d1d7db] text-sm leading-relaxed">{trimmed}</p>
+      <p key={`p_${li}`} className="text-gray-600 text-sm leading-relaxed">{trimmed}</p>
     )
   }
 
@@ -731,7 +731,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
       {!isOpen && (
         <button
           onClick={() => toggleOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-[#00a884] to-[#00d4aa] rounded-full shadow-lg hover:shadow-xl flex items-center justify-center z-[60] transition-all hover:scale-110"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center z-[60] transition-all hover:scale-110"
           title="Assistente da Equipe"
         >
           <Sparkles className="w-7 h-7 text-white" />
@@ -740,18 +740,14 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
 
       {/* Side panel */}
       {isOpen && (
-        <div className="fixed top-0 right-0 h-screen w-full sm:w-[400px] bg-[#111b21] z-[65] flex flex-col shadow-2xl animate-slide-in-right">
-          {/* Neon glow line */}
-          <div className="absolute left-0 top-0 h-[60px] w-px bg-[#222d34]" />
-          <div className="absolute left-0 top-[60px] bottom-0 w-px bg-[#00a884]/30 z-10 pointer-events-none" style={{ boxShadow: '-4px 0 20px 2px rgba(0, 200, 150, 0.25), -2px 0 8px rgba(0, 255, 180, 0.15)' }} />
-
+        <div className="fixed top-0 right-0 h-screen w-full sm:w-[400px] bg-white z-[65] flex flex-col shadow-xl border-l border-gray-200 animate-slide-in-right">
           {/* Header */}
-          <div className="h-[60px] bg-[#202c33] px-4 flex items-center shrink-0 relative">
+          <div className="h-[60px] bg-white border-b border-gray-200 px-4 flex items-center shrink-0 relative">
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#00a884]" />
-                <span className="text-[#e9edef] text-sm font-medium">Assistente da Equipe</span>
-                <span className="text-[9px] bg-[#00a884]/20 text-[#00a884] px-1.5 py-0.5 rounded-full">IA</span>
+                <Sparkles className="w-4 h-4 text-green-600" />
+                <span className="text-gray-900 text-sm font-medium">Assistente da Equipe</span>
+                <span className="text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">IA</span>
               </div>
             </div>
             <div className="ml-auto flex items-center gap-1 relative z-10">
@@ -762,13 +758,13 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                     setInput('')
                     setRevealingMsgId(null)
                   }}
-                  className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors"
+                  className="p-1.5 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                   title="Voltar"
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
               )}
-              <button onClick={() => toggleOpen(false)} className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors" title="Fechar">
+              <button onClick={() => toggleOpen(false)} className="p-1.5 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors" title="Fechar">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -779,22 +775,22 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
             <div className="flex-1 flex flex-col">
               <div className="flex-1 flex flex-col items-center justify-center px-6">
                 <div className="copilot-hero-icon mb-4">
-                  <Sparkles className="w-12 h-12 text-[#00a884]" />
+                  <Sparkles className="w-12 h-12 text-green-600" />
                 </div>
-                <h2 className="text-[#e9edef] text-xl font-semibold mb-1">Como posso ajudar?</h2>
-                <p className="text-[#8696a0] text-xs text-center mb-6">
+                <h2 className="text-gray-900 text-xl font-semibold mb-1">Como posso ajudar?</h2>
+                <p className="text-gray-400 text-xs text-center mb-6">
                   Analiso vendedores, comparo desempenhos e sugiro coaching.
                 </p>
 
                 {/* Input field */}
-                <div className="w-full bg-[#202c33] rounded-xl border border-[#2a3942] px-3 py-2 mb-6">
+                <div className="w-full bg-gray-50 rounded-xl border border-gray-200 px-3 py-2 mb-6">
                   {isRecording ? (
                     <div className="flex items-center gap-2 min-h-[36px]">
                       <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
                       <span className="text-red-400 text-xs font-mono">
                         {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
                       </span>
-                      <span className="text-[#8696a0] text-xs">Gravando...</span>
+                      <span className="text-gray-400 text-xs">Gravando...</span>
                     </div>
                   ) : (
                     <textarea
@@ -803,7 +799,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                       onChange={e => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
                       placeholder={isTranscribing ? 'Transcrevendo...' : 'Pergunte sobre a equipe...'}
-                      className="w-full bg-transparent text-[#e9edef] text-sm resize-none outline-none placeholder-[#8696a0] max-h-[80px] min-h-[36px]"
+                      className="w-full bg-transparent text-gray-900 text-sm resize-none outline-none placeholder-gray-400 max-h-[80px] min-h-[36px]"
                       rows={1}
                       disabled={isLoading || isTranscribing}
                     />
@@ -811,19 +807,19 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                   <div className="flex items-center justify-end gap-2 mt-1">
                     {isRecording ? (
                       <>
-                        <button onClick={cancelRecording} className="p-1.5 rounded-full text-red-400 hover:bg-[#2a3942] transition-colors" title="Cancelar">
+                        <button onClick={cancelRecording} className="p-1.5 rounded-full text-red-400 hover:bg-gray-100 transition-colors" title="Cancelar">
                           <X className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={stopAndTranscribe} className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] transition-colors" title="Enviar">
+                        <button onClick={stopAndTranscribe} className="p-1.5 rounded-full bg-green-600 hover:bg-green-700 transition-colors" title="Enviar">
                           <Send className="w-3.5 h-3.5 text-white" />
                         </button>
                       </>
                     ) : (
                       <>
-                        <button onClick={startRecording} disabled={isLoading || isTranscribing} className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="Gravar mensagem de voz">
+                        <button onClick={startRecording} disabled={isLoading || isTranscribing} className="p-1.5 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="Gravar mensagem de voz">
                           <Mic className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                        <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="p-1.5 rounded-full bg-green-600 hover:bg-green-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                           {isLoading || isTranscribing ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" /> : <Send className="w-3.5 h-3.5 text-white" />}
                         </button>
                       </>
@@ -839,7 +835,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                       key={suggestion}
                       onClick={() => handleSend(suggestion)}
                       disabled={isLoading}
-                      className="w-full text-left px-4 py-3 bg-[#202c33] text-[#e9edef] text-sm rounded-xl border border-[#2a3942] hover:border-[#00a884]/40 hover:bg-[#182229] transition-all disabled:opacity-50"
+                      className="w-full text-left px-4 py-3 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 hover:border-green-300 hover:bg-gray-50 transition-all disabled:opacity-50"
                     >
                       {suggestion}
                     </button>
@@ -853,7 +849,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
           {hasMessages && (
             <>
               {/* Messages area */}
-              <div className="flex-1 overflow-y-auto whatsapp-scrollbar">
+              <div className="flex-1 overflow-y-auto overflow-y-auto">
                 <div className="px-5 py-4 space-y-6 flex flex-col" style={{ minHeight: '100%' }}>
                 {(() => {
                   const lastUserIdx = messages.reduce((last, m, i) => m.role === 'user' ? i : last, -1)
@@ -862,7 +858,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                     {/* User message */}
                     {msg.role === 'user' && (
                       <div ref={msgIdx === lastUserIdx ? lastUserMsgRef : undefined} className="flex justify-end">
-                        <div className="max-w-[85%] bg-[#2a3942] text-[#e9edef] rounded-2xl rounded-br-md px-4 py-2.5">
+                        <div className="max-w-[85%] bg-gray-100 text-gray-900 rounded-2xl rounded-br-md px-4 py-2.5">
                           <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                         </div>
                       </div>
@@ -876,8 +872,8 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
 
                       return (
                       <div className="flex gap-3 items-start">
-                        <div className={`w-7 h-7 rounded-full bg-gradient-to-br from-[#00a884] to-[#00d4aa] flex items-center justify-center flex-shrink-0 mt-0.5 ${(isStreaming || isRevealing) ? 'copilot-thinking-ring' : ''}`}>
-                          <Sparkles className={`w-3.5 h-3.5 text-white ${(isStreaming || isRevealing) ? 'copilot-sparkle-thinking' : ''}`} />
+                        <div className={`w-7 h-7 rounded-full bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0 mt-0.5 ${(isStreaming || isRevealing) ? 'copilot-thinking-ring' : ''}`}>
+                          <Sparkles className={`w-3.5 h-3.5 text-green-600 ${(isStreaming || isRevealing) ? 'copilot-sparkle-thinking' : ''}`} />
                         </div>
 
                         <div className="flex-1 min-w-0">
@@ -890,7 +886,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                             const chunks = splitIntoChunks(msg.content)
                             const visibleCount = revealedChunks
                             return (
-                              <div className="text-[#e9edef] text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
                                 {chunks.map((chunk, i) => (
                                   <span
                                     key={i}
@@ -906,7 +902,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                             <div className="flex items-center gap-0.5 mt-3">
                               <button
                                 onClick={() => handleRegenerate(msg.id)}
-                                className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors"
+                                className="p-1.5 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                                 title="Gerar outra resposta"
                                 disabled={isLoading}
                               >
@@ -915,7 +911,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                               <button
                                 onClick={() => handleCopy(msg.content, msg.id)}
                                 className={`p-1.5 rounded-full transition-colors ${
-                                  copiedId === msg.id ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
+                                  copiedId === msg.id ? 'text-green-600' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'
                                 }`}
                                 title="Copiar"
                               >
@@ -933,11 +929,11 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                 {/* Loading */}
                 {(isLoading || isTranscribing) && (
                   <div className="flex gap-3 items-start copilot-msg-fade-in">
-                    <div className="copilot-thinking-ring w-7 h-7 rounded-full bg-gradient-to-br from-[#00a884] to-[#00d4aa] flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-3.5 h-3.5 text-white copilot-sparkle-thinking" />
+                    <div className="copilot-thinking-ring w-7 h-7 rounded-full bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-3.5 h-3.5 text-green-600 copilot-sparkle-thinking" />
                     </div>
                     {isTranscribing && (
-                      <span className="text-[#8696a0] text-xs self-center">Transcrevendo...</span>
+                      <span className="text-gray-400 text-xs self-center">Transcrevendo...</span>
                     )}
                   </div>
                 )}
@@ -949,12 +945,12 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
 
               {/* Quick suggestions - compact pills */}
               {!isLoading && (
-                <div className="px-4 py-2 flex flex-wrap gap-1.5 shrink-0 border-t border-[#222d34]">
+                <div className="px-4 py-2 flex flex-wrap gap-1.5 shrink-0 border-t border-gray-200">
                   {QUICK_SUGGESTIONS.map(suggestion => (
                     <button
                       key={suggestion}
                       onClick={() => handleSend(suggestion)}
-                      className="text-xs text-[#8696a0] px-3 py-1.5 rounded-full hover:text-[#e9edef] hover:bg-[#2a3942] transition-colors border border-[#2a3942]"
+                      className="text-xs text-gray-400 px-3 py-1.5 rounded-full hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
                     >
                       {suggestion}
                     </button>
@@ -964,7 +960,7 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
 
               {/* Input bar */}
               <div className="px-4 py-3 shrink-0">
-                <div className="flex items-end gap-2 bg-[#202c33] rounded-2xl border border-[#2a3942] px-3 py-2">
+                <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 px-3 py-2">
                   {isRecording ? (
                     <>
                       <div className="flex items-center gap-2 flex-1 min-h-[36px]">
@@ -972,12 +968,12 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                         <span className="text-red-400 text-xs font-mono">
                           {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
                         </span>
-                        <span className="text-[#8696a0] text-xs">Gravando...</span>
+                        <span className="text-gray-400 text-xs">Gravando...</span>
                       </div>
-                      <button onClick={cancelRecording} className="p-1.5 rounded-full text-red-400 hover:bg-[#2a3942] transition-colors shrink-0" title="Cancelar">
+                      <button onClick={cancelRecording} className="p-1.5 rounded-full text-red-400 hover:bg-gray-100 transition-colors shrink-0" title="Cancelar">
                         <X className="w-4 h-4" />
                       </button>
-                      <button onClick={stopAndTranscribe} className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] transition-colors shrink-0" title="Enviar">
+                      <button onClick={stopAndTranscribe} className="p-1.5 rounded-full bg-green-600 hover:bg-green-700 transition-colors shrink-0" title="Enviar">
                         <Send className="w-4 h-4 text-white" />
                       </button>
                     </>
@@ -989,14 +985,14 @@ export default function ManagerAIChat({ onToggle }: { onToggle?: (open: boolean)
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={isTranscribing ? 'Transcrevendo...' : 'Pergunte sobre a equipe...'}
-                        className="flex-1 bg-transparent text-[#e9edef] text-sm resize-none outline-none placeholder-[#8696a0] max-h-[100px] min-h-[36px]"
+                        className="flex-1 bg-transparent text-gray-900 text-sm resize-none outline-none placeholder-gray-400 max-h-[100px] min-h-[36px]"
                         rows={1}
                         disabled={isLoading || isTranscribing}
                       />
-                      <button onClick={startRecording} disabled={isLoading || isTranscribing} className="p-1.5 rounded-full text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942] disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0" title="Gravar mensagem de voz">
+                      <button onClick={startRecording} disabled={isLoading || isTranscribing} className="p-1.5 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0" title="Gravar mensagem de voz">
                         <Mic className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="p-1.5 rounded-full bg-[#00a884] hover:bg-[#00917a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0">
+                      <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="p-1.5 rounded-full bg-green-600 hover:bg-green-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0">
                         {isLoading || isTranscribing ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Send className="w-4 h-4 text-white" />}
                       </button>
                     </>

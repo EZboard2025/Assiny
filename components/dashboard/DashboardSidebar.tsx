@@ -34,7 +34,7 @@ export default function DashboardSidebar({
     { icon: User, href: '/profile', label: 'Meu Perfil', show: true },
     { icon: Target, href: '/pdi-page', label: 'PDI', show: hasPDI },
     { icon: TrendingUp, href: '/manager', label: 'Gestão', show: isAdmin || isGestor },
-    { icon: Link2, href: '/roleplay-links', label: 'Links Públicos', show: isAdmin || isGestor },
+    { icon: Link2, href: '/roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
   ]
 
   const isActive = (href: string) => {

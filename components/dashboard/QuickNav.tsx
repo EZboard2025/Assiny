@@ -13,7 +13,7 @@ const ITEMS = [
   { key: 'followup', icon: MessageSquareMore, label: 'WhatsApp IA', always: true },
   { key: 'meet-analysis', icon: Video, label: 'Análise Meet', always: true },
   { key: 'pdi', icon: Target, label: 'PDI', needsPDI: true },
-  { key: 'roleplay-links', icon: Link2, label: 'Links Públicos', adminOnly: true },
+  { key: 'roleplay-links', icon: Link2, label: 'Processo Seletivo', adminOnly: true },
   { key: 'manager', icon: BarChart3, label: 'Gestão', adminOnly: true },
 ]
 

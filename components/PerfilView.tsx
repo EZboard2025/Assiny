@@ -460,7 +460,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
   // ===== RENDER =====
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6">
+    <div className="min-h-screen py-8 px-4 sm:px-6 sm:pl-40">
       <div className="max-w-6xl">
         <PerfilHeader
           userName={userName}
