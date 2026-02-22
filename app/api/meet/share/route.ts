@@ -245,7 +245,7 @@ function buildShareEmailHtml(
   <div style="max-width:640px;margin:0 auto;padding:32px 16px">
     <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
       <div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px">
-        <h1 style="color:#fff;font-size:20px;margin:0;font-weight:700">Assiny</h1>
+        <img src="${appUrl}/images/logotipo-nome.png" alt="Ramppy" style="height:32px;display:block" />
       </div>
       <div style="padding:32px">
         <h2 style="color:#111827;font-size:18px;margin:0 0 8px">${escHtml(senderName)} compartilhou uma reunião</h2>
@@ -268,7 +268,7 @@ function buildShareEmailHtml(
         </div>
       </div>
       <div style="padding:16px 32px;border-top:1px solid #f3f4f6">
-        <p style="color:#9ca3af;font-size:11px;margin:0">Enviado automaticamente pela plataforma Assiny</p>
+        <p style="color:#9ca3af;font-size:11px;margin:0">Enviado automaticamente pela Ramppy</p>
       </div>
     </div>
   </div>
