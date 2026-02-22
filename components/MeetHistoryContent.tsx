@@ -742,22 +742,22 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-cyan-600" />
+                      <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-emerald-600" />
                       </div>
                       <div className="text-left">
                         <h3 className="text-sm font-semibold text-gray-900">Notas Inteligentes</h3>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex items-center gap-1.5 mt-0.5">
                           {selectedEvaluation.smart_notes.lead_name && (
-                            <span className="text-[11px] text-gray-500">{selectedEvaluation.smart_notes.lead_name}</span>
+                            <span className="text-xs text-gray-500">{selectedEvaluation.smart_notes.lead_name}</span>
                           )}
                           {selectedEvaluation.smart_notes.lead_company && (
-                            <span className="text-[11px] text-gray-400">- {selectedEvaluation.smart_notes.lead_company}</span>
+                            <span className="text-xs text-gray-400">· {selectedEvaluation.smart_notes.lead_company}</span>
                           )}
                           {selectedEvaluation.smart_notes.deal_status?.temperature && (
-                            <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded ml-1 ${
+                            <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full ml-1 ${
                               selectedEvaluation.smart_notes.deal_status.temperature === 'hot' ? 'bg-green-100 text-green-700' :
-                              selectedEvaluation.smart_notes.deal_status.temperature === 'warm' ? 'bg-yellow-100 text-yellow-700' :
+                              selectedEvaluation.smart_notes.deal_status.temperature === 'warm' ? 'bg-amber-100 text-amber-700' :
                               'bg-blue-100 text-blue-700'
                             }`}>
                               {selectedEvaluation.smart_notes.deal_status.temperature === 'hot' ? 'Quente' :
@@ -775,228 +775,217 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                   </button>
 
                   {expandedSection === 'smart_notes' && (
-                    <div className="px-4 pb-4 border-t border-gray-100 space-y-4">
-                      {/* Copy button */}
-                      <div className="flex justify-end mt-2">
-                        <button
-                          onClick={() => handleCopySection('smart_notes', () => formatSmartNotesForCopy(selectedEvaluation.smart_notes))}
-                          className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100"
-                        >
-                          {copiedSection === 'smart_notes' ? <><Check className="w-3 h-3 text-green-500" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar notas</>}
-                        </button>
-                      </div>
-                      {/* Lead Profile Card */}
-                      {(selectedEvaluation.smart_notes.lead_name || selectedEvaluation.smart_notes.lead_company || selectedEvaluation.smart_notes.lead_role) && (
-                        <div className="mt-4 bg-cyan-50/50 border border-cyan-100 rounded-xl p-4">
+                    <div className="border-t border-gray-100">
+                      {/* Lead header + copy button */}
+                      <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+                        {(selectedEvaluation.smart_notes.lead_name || selectedEvaluation.smart_notes.lead_company || selectedEvaluation.smart_notes.lead_role) ? (
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-cyan-700" />
+                            <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center">
+                              <User className="w-4 h-4 text-gray-500" />
                             </div>
                             <div>
                               {selectedEvaluation.smart_notes.lead_name && (
                                 <p className="text-sm font-semibold text-gray-900">{selectedEvaluation.smart_notes.lead_name}</p>
                               )}
-                              <div className="flex items-center gap-2 mt-0.5">
-                                {selectedEvaluation.smart_notes.lead_role && (
-                                  <span className="text-xs text-gray-600">{selectedEvaluation.smart_notes.lead_role}</span>
-                                )}
-                                {selectedEvaluation.smart_notes.lead_role && selectedEvaluation.smart_notes.lead_company && (
-                                  <span className="text-xs text-gray-400">|</span>
-                                )}
-                                {selectedEvaluation.smart_notes.lead_company && (
-                                  <span className="text-xs text-gray-600">{selectedEvaluation.smart_notes.lead_company}</span>
-                                )}
-                              </div>
+                              <p className="text-xs text-gray-500">
+                                {[selectedEvaluation.smart_notes.lead_role, selectedEvaluation.smart_notes.lead_company].filter(Boolean).join(' · ')}
+                              </p>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        ) : <div />}
+                        <button
+                          onClick={() => handleCopySection('smart_notes', () => formatSmartNotesForCopy(selectedEvaluation.smart_notes))}
+                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-gray-50"
+                        >
+                          {copiedSection === 'smart_notes' ? <><Check className="w-3.5 h-3.5 text-green-500" /> Copiado</> : <><Copy className="w-3.5 h-3.5" /> Copiar notas</>}
+                        </button>
+                      </div>
 
-                      {/* Dynamic Sections */}
-                      {selectedEvaluation.smart_notes.sections?.map((section: any) => {
-                        const IconComp = getSmartNoteIcon(section.icon)
-                        return (
-                          <div key={section.id} className="bg-gray-50 rounded-xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <IconComp className="w-4 h-4 text-gray-500" />
-                              <h4 className="text-sm font-semibold text-gray-800">{section.title}</h4>
-                              {section.priority === 'high' && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700">Importante</span>
+                      {/* All sections in a clean list */}
+                      <div className="px-5 pb-5 space-y-0">
+                        {/* Dynamic Sections */}
+                        {selectedEvaluation.smart_notes.sections?.map((section: any, sIdx: number) => {
+                          const IconComp = getSmartNoteIcon(section.icon)
+                          return (
+                            <div key={section.id} className={`py-4 ${sIdx > 0 ? 'border-t border-gray-100' : ''}`}>
+                              <div className="flex items-center gap-2 mb-3">
+                                <IconComp className="w-4 h-4 text-emerald-600" />
+                                <h4 className="text-[13px] font-semibold text-gray-900">{section.title}</h4>
+                                {section.priority === 'high' && (
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Importante</span>
+                                )}
+                              </div>
+                              {section.insight && (
+                                <p className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 mb-3 leading-relaxed">
+                                  {section.insight}
+                                </p>
                               )}
-                            </div>
-                            {section.insight && (
-                              <p className="text-xs text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-1.5 mb-3 leading-relaxed">
-                                {section.insight}
-                              </p>
-                            )}
-                            <div className="space-y-2">
-                              {section.items?.map((item: any, idx: number) => (
-                                <div key={idx}>
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <span className="text-xs text-gray-500">{item.label}</span>
-                                      <p className="text-sm text-gray-900 font-medium">{item.value}</p>
-                                      {item.transcript_ref && (
-                                        <p className="text-[11px] text-gray-400 italic mt-0.5">&ldquo;{item.transcript_ref}&rdquo;</p>
-                                      )}
+                              <div className="space-y-2.5">
+                                {section.items?.map((item: any, idx: number) => (
+                                  <div key={idx}>
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-gray-400 mb-0.5">{item.label}</p>
+                                        <p className="text-[13px] text-gray-800 leading-relaxed">{item.value}</p>
+                                        {item.transcript_ref && (
+                                          <p className="text-xs text-gray-400 italic mt-1 pl-2 border-l-2 border-gray-200">&ldquo;{item.transcript_ref}&rdquo;</p>
+                                        )}
+                                      </div>
+                                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5 ${
+                                        item.source === 'explicit' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                                      }`}>
+                                        {item.source === 'explicit' ? 'citado' : 'inferido'}
+                                      </span>
                                     </div>
-                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${
-                                      item.source === 'explicit' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                    }`}>
-                                      {item.source === 'explicit' ? 'citado' : 'inferido'}
-                                    </span>
+                                    {item.sub_items?.length > 0 && (
+                                      <div className="ml-0 mt-1.5 pl-3 border-l-2 border-gray-100 space-y-1">
+                                        {item.sub_items.map((sub: string, si: number) => (
+                                          <p key={si} className="text-xs text-gray-500">{sub}</p>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
-                                  {item.sub_items?.length > 0 && (
-                                    <div className="ml-3 mt-1 space-y-0.5">
-                                      {item.sub_items.map((sub: string, si: number) => (
-                                        <div key={si} className="flex items-start gap-1.5">
-                                          <div className="w-1 h-1 bg-gray-400 rounded-full mt-1.5 flex-shrink-0" />
-                                          <p className="text-xs text-gray-600">{sub}</p>
-                                        </div>
-                                      ))}
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {/* Next Steps */}
+                        {selectedEvaluation.smart_notes.next_steps?.length > 0 && (
+                          <div className={`py-4 border-t border-gray-100`}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <CheckCircle className="w-4 h-4 text-emerald-600" />
+                              <h4 className="text-[13px] font-semibold text-gray-900">Próximos Passos</h4>
+                            </div>
+                            <div className="space-y-2.5">
+                              {selectedEvaluation.smart_notes.next_steps.map((step: any, idx: number) => (
+                                <div key={idx} className="flex items-start gap-2.5">
+                                  <span className="w-5 h-5 bg-emerald-50 text-emerald-700 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
+                                    {idx + 1}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[13px] text-gray-800 leading-relaxed">{step.action}</p>
+                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                                        step.owner === 'seller' ? 'bg-blue-50 text-blue-600' :
+                                        step.owner === 'client' ? 'bg-purple-50 text-purple-600' :
+                                        'bg-gray-100 text-gray-500'
+                                      }`}>
+                                        {step.owner === 'seller' ? 'Vendedor' : step.owner === 'client' ? 'Cliente' : 'Ambos'}
+                                      </span>
+                                      {step.deadline && (
+                                        <span className="text-[10px] text-gray-400">{step.deadline}</span>
+                                      )}
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                        step.status === 'agreed' ? 'bg-emerald-50 text-emerald-600' :
+                                        step.status === 'suggested' ? 'bg-amber-50 text-amber-600' :
+                                        'bg-gray-100 text-gray-400'
+                                      }`}>
+                                        {step.status === 'agreed' ? 'Acordado' : step.status === 'suggested' ? 'Sugerido' : 'Pendente'}
+                                      </span>
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
                               ))}
                             </div>
                           </div>
-                        )
-                      })}
+                        )}
 
-                      {/* Next Steps */}
-                      {selectedEvaluation.smart_notes.next_steps?.length > 0 && (
-                        <div className="bg-green-50/50 border border-green-100 rounded-xl p-4">
-                          <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                            Proximos Passos
-                          </h4>
-                          <div className="space-y-2">
-                            {selectedEvaluation.smart_notes.next_steps.map((step: any, idx: number) => (
-                              <div key={idx} className="flex items-start gap-2">
-                                <span className="w-5 h-5 bg-green-100 text-green-700 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
-                                  {idx + 1}
-                                </span>
-                                <div className="flex-1">
-                                  <p className="text-sm text-gray-800">{step.action}</p>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                                      step.owner === 'seller' ? 'bg-blue-100 text-blue-700' :
-                                      step.owner === 'client' ? 'bg-purple-100 text-purple-700' :
-                                      'bg-gray-100 text-gray-600'
-                                    }`}>
-                                      {step.owner === 'seller' ? 'Vendedor' : step.owner === 'client' ? 'Cliente' : 'Ambos'}
-                                    </span>
-                                    {step.deadline && (
-                                      <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
-                                        <Clock className="w-3 h-3" /> {step.deadline}
-                                      </span>
+                        {/* Deal Status */}
+                        {selectedEvaluation.smart_notes.deal_status && (
+                          <div className="py-4 border-t border-gray-100">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Target className="w-4 h-4 text-emerald-600" />
+                              <h4 className="text-[13px] font-semibold text-gray-900">Status da Oportunidade</h4>
+                            </div>
+                            {selectedEvaluation.smart_notes.deal_status.summary && (
+                              <p className="text-xs text-gray-600 leading-relaxed mb-3">
+                                {selectedEvaluation.smart_notes.deal_status.summary}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 mb-3">
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Temperatura</p>
+                                <p className={`text-sm font-semibold ${
+                                  selectedEvaluation.smart_notes.deal_status.temperature === 'hot' ? 'text-green-600' :
+                                  selectedEvaluation.smart_notes.deal_status.temperature === 'warm' ? 'text-amber-600' :
+                                  'text-blue-600'
+                                }`}>
+                                  {selectedEvaluation.smart_notes.deal_status.temperature === 'hot' ? 'Quente' :
+                                   selectedEvaluation.smart_notes.deal_status.temperature === 'warm' ? 'Morno' : 'Frio'}
+                                </p>
+                              </div>
+                              {selectedEvaluation.smart_notes.deal_status.probability && (
+                                <div>
+                                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Probabilidade</p>
+                                  <p className="text-sm font-semibold text-gray-800">{selectedEvaluation.smart_notes.deal_status.probability}</p>
+                                </div>
+                              )}
+                            </div>
+                            {selectedEvaluation.smart_notes.deal_status.buying_signals?.length > 0 && (
+                              <div className="mb-2.5">
+                                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Sinais de compra</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {selectedEvaluation.smart_notes.deal_status.buying_signals.map((s: string, i: number) => (
+                                    <span key={i} className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">{s}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {selectedEvaluation.smart_notes.deal_status.risk_factors?.length > 0 && (
+                              <div className="mb-2.5">
+                                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Riscos</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {selectedEvaluation.smart_notes.deal_status.risk_factors.map((r: string, i: number) => (
+                                    <span key={i} className="text-[11px] text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{r}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {selectedEvaluation.smart_notes.deal_status.blockers?.length > 0 && (
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Bloqueios</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {selectedEvaluation.smart_notes.deal_status.blockers.map((b: string, i: number) => (
+                                    <span key={i} className="text-[11px] text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">{b}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Custom Observations */}
+                        {selectedEvaluation.smart_notes.custom_observations?.length > 0 && (
+                          <div className="py-4 border-t border-gray-100">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Eye className="w-4 h-4 text-emerald-600" />
+                              <h4 className="text-[13px] font-semibold text-gray-900">Observações Personalizadas</h4>
+                            </div>
+                            <div className="space-y-2.5">
+                              {selectedEvaluation.smart_notes.custom_observations.map((obs: any, idx: number) => (
+                                <div key={idx} className="flex items-start gap-2.5">
+                                  {obs.found ? (
+                                    <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />
+                                  )}
+                                  <div>
+                                    <p className="text-xs text-gray-400">{obs.observation}</p>
+                                    {obs.details && (
+                                      <p className={`text-[13px] mt-0.5 leading-relaxed ${obs.found ? 'text-gray-800' : 'text-gray-400 italic'}`}>{obs.details}</p>
                                     )}
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                      step.status === 'agreed' ? 'bg-green-100 text-green-700' :
-                                      step.status === 'suggested' ? 'bg-yellow-100 text-yellow-700' :
-                                      'bg-gray-100 text-gray-500'
-                                    }`}>
-                                      {step.status === 'agreed' ? 'Acordado' : step.status === 'suggested' ? 'Sugerido' : 'Pendente'}
-                                    </span>
+                                    {!obs.found && !obs.details && (
+                                      <p className="text-xs text-gray-400 italic mt-0.5">Não mencionado na reunião</p>
+                                    )}
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Deal Status */}
-                      {selectedEvaluation.smart_notes.deal_status && (
-                        <div className="bg-gray-50 rounded-xl p-4">
-                          <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <Target className="w-4 h-4 text-gray-600" />
-                            Status da Oportunidade
-                          </h4>
-                          {selectedEvaluation.smart_notes.deal_status.summary && (
-                            <p className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 mb-3 leading-relaxed">
-                              {selectedEvaluation.smart_notes.deal_status.summary}
-                            </p>
-                          )}
-                          <div className="grid grid-cols-2 gap-3 mb-3">
-                            <div>
-                              <span className="text-[11px] text-gray-500">Temperatura</span>
-                              <p className={`text-sm font-semibold ${
-                                selectedEvaluation.smart_notes.deal_status.temperature === 'hot' ? 'text-green-600' :
-                                selectedEvaluation.smart_notes.deal_status.temperature === 'warm' ? 'text-yellow-600' :
-                                'text-blue-600'
-                              }`}>
-                                {selectedEvaluation.smart_notes.deal_status.temperature === 'hot' ? 'Quente' :
-                                 selectedEvaluation.smart_notes.deal_status.temperature === 'warm' ? 'Morno' : 'Frio'}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-[11px] text-gray-500">Probabilidade</span>
-                              <p className="text-sm font-semibold text-gray-900">{selectedEvaluation.smart_notes.deal_status.probability || '-'}</p>
+                              ))}
                             </div>
                           </div>
-                          {selectedEvaluation.smart_notes.deal_status.buying_signals?.length > 0 && (
-                            <div className="mb-2">
-                              <span className="text-[11px] font-medium text-green-700">Sinais de compra</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {selectedEvaluation.smart_notes.deal_status.buying_signals.map((s: string, i: number) => (
-                                  <span key={i} className="text-[11px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full border border-green-200">{s}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {selectedEvaluation.smart_notes.deal_status.risk_factors?.length > 0 && (
-                            <div className="mb-2">
-                              <span className="text-[11px] font-medium text-red-700">Riscos</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {selectedEvaluation.smart_notes.deal_status.risk_factors.map((r: string, i: number) => (
-                                  <span key={i} className="text-[11px] bg-red-50 text-red-700 px-2 py-0.5 rounded-full border border-red-200">{r}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {selectedEvaluation.smart_notes.deal_status.blockers?.length > 0 && (
-                            <div>
-                              <span className="text-[11px] font-medium text-orange-700">Bloqueios</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {selectedEvaluation.smart_notes.deal_status.blockers.map((b: string, i: number) => (
-                                  <span key={i} className="text-[11px] bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full border border-orange-200">{b}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Custom Observations Results */}
-                      {selectedEvaluation.smart_notes.custom_observations?.length > 0 && (
-                        <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-4">
-                          <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <Eye className="w-4 h-4 text-purple-600" />
-                            Observacoes Personalizadas
-                          </h4>
-                          <div className="space-y-2">
-                            {selectedEvaluation.smart_notes.custom_observations.map((obs: any, idx: number) => (
-                              <div key={idx} className="flex items-start gap-2">
-                                {obs.found ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                ) : (
-                                  <XCircle className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />
-                                )}
-                                <div>
-                                  <p className="text-xs text-gray-500">{obs.observation}</p>
-                                  {obs.details && (
-                                    <p className={`text-sm mt-0.5 ${obs.found ? 'text-gray-800 font-medium' : 'text-gray-400 italic'}`}>{obs.details}</p>
-                                  )}
-                                  {!obs.found && !obs.details && (
-                                    <p className="text-xs text-gray-400 italic mt-0.5">Nao mencionado na reuniao</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

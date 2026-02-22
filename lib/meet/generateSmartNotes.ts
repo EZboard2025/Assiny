@@ -292,7 +292,7 @@ export async function generateSmartNotes(params: GenerateSmartNotesParams): Prom
     .limit(10)
 
   if (observations && observations.length > 0) {
-    observationsSection = `\n\nOBSERVACOES PERSONALIZADAS DO GESTOR:\nO gestor configurou as seguintes observacoes especificas. Para CADA uma, identifique se a informacao foi mencionada na reuniao e extraia os detalhes. Se NAO foi mencionada, explique brevemente. Inclua os resultados em "custom_observations" no JSON.\n\n${observations.map((obs, i) => `${i + 1}. "${obs.text}"`).join('\n')}`
+    observationsSection = `\n\nOBSERVACOES PERSONALIZADAS DO GESTOR (OBRIGATORIO RESPONDER TODAS):\nO gestor configurou ${observations.length} observacoes especificas. Voce DEVE retornar EXATAMENTE ${observations.length} itens em "custom_observations", um para CADA observacao abaixo, na mesma ordem. Para cada uma:\n- Se encontrou na reuniao: found=true + details com o que foi dito\n- Se NAO encontrou: found=false + details explicando que nao foi mencionado/discutido na reuniao\n\nNUNCA omita uma observacao. O array custom_observations DEVE ter ${observations.length} itens.\n\n${observations.map((obs, i) => `${i + 1}. "${obs.text}"`).join('\n')}`
   }
 
   // 4. Build user prompt
@@ -356,6 +356,27 @@ Gere notas inteligentes no formato JSON especificado. Lembre-se:
       buying_signals: [],
       risk_factors: []
     }
+  }
+
+  // Ensure ALL custom observations are present (AI sometimes omits not-found ones)
+  if (observations && observations.length > 0) {
+    const existingObs = notes.custom_observations || []
+    const completeObs = observations.map((obs, i) => {
+      // Try to find matching observation in AI response (by index or text match)
+      const match = existingObs[i] ||
+        existingObs.find((e: any) => e.observation?.toLowerCase().includes(obs.text.toLowerCase().slice(0, 30))) ||
+        existingObs.find((e: any) => obs.text.toLowerCase().includes(e.observation?.toLowerCase().slice(0, 30)))
+
+      if (match) return match
+
+      // AI omitted this observation — add it as not found
+      return {
+        observation: obs.text,
+        found: false,
+        details: 'Não mencionado na reunião'
+      }
+    })
+    notes.custom_observations = completeObs
   }
 
   // Add metadata
