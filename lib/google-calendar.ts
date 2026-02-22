@@ -15,6 +15,7 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/gmail.send',
 ]
 
 // Check if connection has write scopes
@@ -202,6 +203,7 @@ export async function getCalendarClient(userId: string) {
 
   return {
     calendar: google.calendar({ version: 'v3', auth: oauth2Client }),
+    auth: oauth2Client,
     connection,
   }
 }
@@ -217,6 +219,39 @@ export async function revokeGoogleToken(accessToken: string) {
     // Token might already be revoked — that's fine
     console.warn('[Google Calendar] Token revocation warning:', err)
   }
+}
+
+/**
+ * Send an email via Gmail API using the user's OAuth credentials.
+ * Returns true if sent, false if user has no Google connection.
+ */
+export async function sendGmail(userId: string, options: {
+  to: string
+  subject: string
+  htmlBody: string
+}): Promise<boolean> {
+  const client = await getCalendarClient(userId)
+  if (!client) return false
+
+  const gmail = google.gmail({ version: 'v1', auth: client.auth })
+
+  const message = [
+    `To: ${options.to}`,
+    `Subject: =?UTF-8?B?${Buffer.from(options.subject).toString('base64')}?=`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    '',
+    options.htmlBody,
+  ].join('\r\n')
+
+  const encodedMessage = Buffer.from(message).toString('base64url')
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw: encodedMessage },
+  })
+
+  return true
 }
 
 export interface CalendarEvent {

@@ -166,6 +166,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
   const [selectedTeammates, setSelectedTeammates] = useState<Set<string>>(new Set())
   const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set(['smart_notes', 'spin', 'evaluation', 'transcript']))
   const [shareMessage, setShareMessage] = useState('')
+  const [sendEmail, setSendEmail] = useState(true)
   const [shareSuccess, setShareSuccess] = useState(false)
 
   // Shared evaluations tab
@@ -370,6 +371,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
           sharedWithUserIds: Array.from(selectedTeammates),
           sections: Array.from(selectedSections),
           message: shareMessage || undefined,
+          sendEmail,
         }),
       })
 
@@ -2315,6 +2317,18 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                       className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                     />
                   </div>
+
+                  {/* Send email option */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={sendEmail}
+                      onChange={(e) => setSendEmail(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-green-500 focus:ring-green-500"
+                    />
+                    <Mail className="w-4 h-4 text-gray-400 group-hover:text-green-500 transition-colors" />
+                    <span className="text-sm text-gray-600 group-hover:text-gray-800 transition-colors">Enviar também por email</span>
+                  </label>
                 </div>
 
                 {/* Footer */}
