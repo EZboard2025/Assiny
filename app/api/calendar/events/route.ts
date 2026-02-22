@@ -36,15 +36,13 @@ export async function GET(request: NextRequest) {
     // Check calendar connection
     const { data: connection } = await supabaseAdmin
       .from('google_calendar_connections')
-      .select('id, status, auto_record_enabled')
+      .select('id, status')
       .eq('user_id', user.id)
       .single()
 
     if (!connection || connection.status !== 'active') {
       return NextResponse.json({ error: 'Calendar not connected', events: [] }, { status: 200 })
     }
-
-    const autoRecordOn = connection.auto_record_enabled !== false
 
     // Check view param: ?view=all fetches ALL events, default fetches only Meet events
     const { searchParams } = new URL(request.url)
@@ -78,7 +76,7 @@ export async function GET(request: NextRequest) {
           .single()
 
         if (!existing) {
-          // New event — respect auto_record_enabled setting
+          // New event — always enabled (bot enters all meetings automatically)
           const { data: inserted } = await supabaseAdmin
             .from('calendar_scheduled_bots')
             .insert({
@@ -91,16 +89,16 @@ export async function GET(request: NextRequest) {
               event_end: event.end,
               meet_link: event.meetLink,
               attendees: event.attendees,
-              bot_enabled: autoRecordOn,
-              bot_status: autoRecordOn ? 'pending' : 'skipped',
+              bot_enabled: true,
+              bot_status: 'pending',
             })
             .select()
             .single()
 
           enrichedEvents.push({
             ...event,
-            botEnabled: autoRecordOn,
-            botStatus: autoRecordOn ? 'pending' : 'skipped',
+            botEnabled: true,
+            botStatus: 'pending',
             botId: null,
             evaluationId: null,
             scheduledBotId: inserted?.id || null,

@@ -197,8 +197,6 @@ export default function MeetAnalysisView() {
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null)
   const [calendarNoticeType, setCalendarNoticeType] = useState<'success' | 'error' | 'warning'>('success')
   const [hasWriteAccess, setHasWriteAccess] = useState(false)
-  const [autoRecordEnabled, setAutoRecordEnabled] = useState(true)
-  const [togglingAutoRecord, setTogglingAutoRecord] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
   const [showCreateEventModal, setShowCreateEventModal] = useState(false)
   const [createEventDate, setCreateEventDate] = useState<Date | undefined>(undefined)
@@ -1004,7 +1002,6 @@ export default function MeetAnalysisView() {
         setCalendarConnected(data.connected)
         setCalendarEmail(data.email || '')
         setHasWriteAccess(data.hasWriteAccess || false)
-        setAutoRecordEnabled(data.autoRecordEnabled !== false)
         if (data.connected) {
           loadCalendarEvents(authSession.access_token)
         }
@@ -1489,76 +1486,6 @@ export default function MeetAnalysisView() {
                         <span className="text-xs text-gray-400">{calendarEmail}</span>
                       </div>
                     )}
-
-                    {/* Auto-record toggle */}
-                    <button
-                      onClick={async () => {
-                        setTogglingAutoRecord(true)
-                        try {
-                          // Try getSession first, fallback to getUser for subdomain compatibility
-                          let token: string | undefined
-                          const { data: { session: authSession } } = await supabase.auth.getSession()
-                          token = authSession?.access_token
-                          if (!token) {
-                            const { data: { user } } = await supabase.auth.getUser()
-                            const { data: { session: retrySession } } = await supabase.auth.getSession()
-                            token = retrySession?.access_token
-                            if (!token) {
-                              console.error('Toggle auto-record: no auth token available')
-                              return
-                            }
-                          }
-                          const res = await fetch('/api/calendar/toggle-auto-record', {
-                            method: 'POST',
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ enabled: !autoRecordEnabled }),
-                          })
-                          if (res.ok) {
-                            const newEnabled = !autoRecordEnabled
-                            setAutoRecordEnabled(newEnabled)
-                            // Update all events locally to reflect the global toggle
-                            setCalendarEvents(prev => prev.map(e => {
-                              const isFuture = new Date(e.start) >= new Date()
-                              if (!isFuture) return e
-                              return {
-                                ...e,
-                                botEnabled: newEnabled,
-                                botStatus: newEnabled ? 'pending' : 'skipped',
-                              }
-                            }))
-                            // Close popover so user sees fresh data on next click
-                            setPopoverEvent(null)
-                            setPopoverAnchor(null)
-                          } else {
-                            const err = await res.json().catch(() => ({}))
-                            console.error('Toggle auto-record API error:', res.status, err)
-                          }
-                        } catch (e) {
-                          console.error('Toggle auto-record failed:', e)
-                        } finally {
-                          setTogglingAutoRecord(false)
-                        }
-                      }}
-                      disabled={togglingAutoRecord}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        autoRecordEnabled
-                          ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      } disabled:opacity-50`}
-                      title={autoRecordEnabled ? 'Gravação automática ativada' : 'Gravação automática desativada'}
-                    >
-                      {togglingAutoRecord ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <div className={`w-7 h-4 rounded-full relative transition-colors ${autoRecordEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
-                          <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-all shadow-sm ${autoRecordEnabled ? 'left-3.5' : 'left-0.5'}`} />
-                        </div>
-                      )}
-                      <span className="hidden sm:inline">Gravação auto</span>
-                    </button>
 
                     {hasWriteAccess && (
                       <button

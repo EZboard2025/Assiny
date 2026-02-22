@@ -162,7 +162,6 @@ async function handleSync() {
           .single()
 
         if (!existing) {
-          const autoOn = conn.auto_record_enabled !== false
           await supabaseAdmin
             .from('calendar_scheduled_bots')
             .insert({
@@ -175,8 +174,8 @@ async function handleSync() {
               event_end: event.end,
               meet_link: event.meetLink,
               attendees: event.attendees,
-              bot_enabled: autoOn,
-              bot_status: autoOn ? 'pending' : 'skipped',
+              bot_enabled: true,
+              bot_status: 'pending',
             })
         } else {
           await supabaseAdmin
