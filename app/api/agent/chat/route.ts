@@ -32,7 +32,44 @@ CONTEXTO:
 - Você tem acesso a TODOS os dados do vendedor via ferramentas — use-as sempre que precisar de dados reais
 
 FERRAMENTAS DISPONÍVEIS:
-Você tem 15 ferramentas para consultar qualquer dado do vendedor. Use quantas precisar para dar uma resposta completa e precisa. Não hesite em chamar múltiplas ferramentas na mesma resposta se precisar cruzar dados.`
+Você tem 15 ferramentas para consultar qualquer dado do vendedor. SEMPRE chame múltiplas ferramentas em paralelo para dar respostas ricas e completas.
+
+ESTRATÉGIA POR TIPO DE PERGUNTA:
+- "Como está minha performance?" → get_performance_summary + get_roleplay_sessions(limit:5) + get_daily_challenges(limit:3)
+- "O que devo melhorar?" → get_performance_summary + get_roleplay_sessions(limit:5) + get_pdi
+- "Como foi meu roleplay?" → get_roleplay_sessions(limit:3) + get_performance_summary
+- "Como estão minhas vendas?" → get_whatsapp_activity + get_seller_message_tracking + get_followup_analyses
+- "Qual meu ponto mais fraco?" → get_performance_summary + get_challenge_effectiveness + get_roleplay_sessions(limit:5)
+- "Analise minha última reunião" → get_meet_evaluations(limit:1) + get_meet_evaluation_detail
+- "O que tenho na agenda?" → get_calendar_events + get_scheduled_bots
+- Perguntas gerais sobre empresa → get_company_info
+
+IMPORTANTE: Chame 2-4 ferramentas por vez para cruzar dados e dar respostas completas. Nunca se limite a apenas 1 ferramenta.
+
+FORMATAÇÃO VISUAL:
+Use tags especiais para dados numéricos — elas são renderizadas como gráficos bonitos no chat:
+
+• {{score|valor|máximo|label}} — Card com barra de progresso para nota principal
+  Ex: {{score|6.34|10|Média Geral}}
+
+• {{spin|S|P|I|N}} — 4 barras coloridas com os scores SPIN
+  Ex: {{spin|6.64|6.89|5.20|4.80}}
+
+• {{trend|tipo|descrição}} — Badge de tendência
+  Tipos: improving, stable, declining
+  Ex: {{trend|declining|Tendência de queda nas últimas sessões}}
+
+• {{metric|valor|label}} — Card pequeno para métrica isolada
+  Ex: {{metric|15|Sessões Realizadas}}  {{metric|73%|Taxa de Sucesso}}
+
+REGRAS DAS TAGS VISUAIS:
+- Coloque tags visuais ANTES do texto explicativo (elas ficam no topo da resposta)
+- Ao falar de performance, use {{score}} + {{spin}} + {{trend}} juntos
+- Use {{metric}} para destacar números-chave isolados
+- NÃO repita nos parágrafos os mesmos números já exibidos nas tags
+- Cada tag deve estar em sua própria linha
+- Após as tags, escreva texto normal com markdown (negrito, listas, etc.)
+- Só use tags quando tiver dados reais das ferramentas — nunca invente valores`
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -233,6 +270,20 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
   }
 ]
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Parse evaluation from N8N format {output: "json_string"} or [{output: "json_string"}]
+function parseEvaluation(evaluation: any): any {
+  if (!evaluation) return null
+  if (evaluation.output && typeof evaluation.output === 'string') {
+    try { return JSON.parse(evaluation.output) } catch { return evaluation }
+  }
+  if (Array.isArray(evaluation) && evaluation[0]?.output && typeof evaluation[0].output === 'string') {
+    try { return JSON.parse(evaluation[0].output) } catch { return evaluation }
+  }
+  return evaluation
+}
+
 // ─── Function Executor ───────────────────────────────────────────────────────
 
 async function executeFunction(
@@ -244,15 +295,152 @@ async function executeFunction(
   const name = fn.function.name
   const params = JSON.parse(fn.function.arguments || '{}')
 
+  console.log(`[Agent] Executing tool: ${name}, userId: ${userId}, companyId: ${companyId}`)
+
   try {
     switch (name) {
       case 'get_performance_summary': {
-        const { data } = await supabaseAdmin
+        // Try summary table first
+        const { data, error } = await supabaseAdmin
           .from('user_performance_summaries')
           .select('*')
           .eq('user_id', userId)
           .single()
-        return data || { message: 'Nenhum resumo de performance encontrado. O vendedor ainda não completou avaliações.' }
+        if (error) console.log(`[Agent] get_performance_summary error:`, error.message, error.code)
+        console.log(`[Agent] get_performance_summary result:`, data ? 'found' : 'null')
+        if (data) return data
+
+        // Fallback: compute from roleplay_sessions + meet_evaluations directly
+        console.log(`[Agent] Falling back to compute from roleplay_sessions + meet_evaluations`)
+        const { data: sessions } = await supabaseAdmin
+          .from('roleplay_sessions')
+          .select('evaluation, created_at')
+          .eq('user_id', userId)
+          .not('evaluation', 'is', null)
+          .order('created_at', { ascending: false })
+
+        const { data: meetEvals } = await supabaseAdmin
+          .from('meet_evaluations')
+          .select('overall_score, spin_s_score, spin_p_score, spin_i_score, spin_n_score, executive_summary, top_strengths, critical_gaps, priority_improvements, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+
+        if (!sessions?.length && !meetEvals?.length) {
+          return { message: 'Nenhum dado de performance encontrado. O vendedor ainda não completou avaliações.' }
+        }
+
+        // Parse all evaluations
+        const allParsed: Array<{ ev: any; created_at: string; source: string }> = []
+        for (const session of (sessions || [])) {
+          const ev = parseEvaluation(session.evaluation)
+          if (ev) allParsed.push({ ev, created_at: session.created_at, source: 'roleplay' })
+        }
+        for (const me of (meetEvals || [])) {
+          allParsed.push({
+            ev: {
+              overall_score: me.overall_score,
+              spin_evaluation: {
+                S: { final_score: me.spin_s_score },
+                P: { final_score: me.spin_p_score },
+                I: { final_score: me.spin_i_score },
+                N: { final_score: me.spin_n_score },
+              },
+              executive_summary: me.executive_summary,
+              top_strengths: me.top_strengths,
+              critical_gaps: me.critical_gaps,
+              priority_improvements: me.priority_improvements,
+            },
+            created_at: me.created_at,
+            source: 'meet',
+          })
+        }
+
+        // Sort by date (newest first) for trend calculation
+        allParsed.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+        // Compute averages
+        const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
+        const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
+        let totalScore = 0, countScore = 0
+        const scores: number[] = []
+
+        // Collect strengths/gaps from last 5 sessions
+        const allStrengths: string[] = []
+        const allGaps: string[] = []
+        const allImprovements: Array<{ area: string; action_plan: string; priority: string }> = []
+
+        for (const { ev } of allParsed) {
+          if (ev.overall_score !== undefined) {
+            let score = parseFloat(ev.overall_score)
+            if (score > 10) score = score / 10
+            totalScore += score
+            countScore++
+            scores.push(score)
+          }
+          if (ev.spin_evaluation) {
+            const spin = ev.spin_evaluation
+            if (spin.S?.final_score !== undefined) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
+            if (spin.P?.final_score !== undefined) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
+            if (spin.I?.final_score !== undefined) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
+            if (spin.N?.final_score !== undefined) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
+          }
+        }
+
+        // Extract strengths/gaps from last 5 evaluations
+        const last5 = allParsed.slice(0, 5)
+        for (const { ev } of last5) {
+          if (Array.isArray(ev.top_strengths)) allStrengths.push(...ev.top_strengths)
+          if (Array.isArray(ev.critical_gaps)) allGaps.push(...ev.critical_gaps)
+          if (Array.isArray(ev.priority_improvements)) {
+            for (const imp of ev.priority_improvements) {
+              if (typeof imp === 'string') allImprovements.push({ area: imp, action_plan: '', priority: '' })
+              else if (imp?.area) allImprovements.push(imp)
+            }
+          }
+        }
+
+        // Deduplicate by counting frequency
+        const countOccurrences = (arr: string[]) => {
+          const map = new Map<string, number>()
+          for (const item of arr) {
+            const key = item.toLowerCase().trim()
+            if (key) map.set(key, (map.get(key) || 0) + 1)
+          }
+          return Array.from(map.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([text, count]) => `${text} (${count}x nas últimas sessões)`)
+        }
+
+        // Compute trend from last 3 scores
+        let trend = 'stable'
+        if (scores.length >= 3) {
+          const recent = scores.slice(0, 3) // newest first
+          const avgRecent = (recent[0] + recent[1]) / 2
+          const avgOlder = recent[2]
+          if (avgRecent > avgOlder + 0.5) trend = 'improving'
+          else if (avgRecent < avgOlder - 0.5) trend = 'declining'
+        }
+
+        // Last session score
+        const lastSessionScore = scores.length > 0 ? scores[0] : null
+
+        return {
+          overall_average: countScore > 0 ? Number((totalScore / countScore).toFixed(1)) : null,
+          total_sessions: allParsed.length,
+          total_roleplay_sessions: sessions?.length || 0,
+          total_meet_evaluations: meetEvals?.length || 0,
+          last_session_score: lastSessionScore,
+          spin_s_average: spinCounts.S > 0 ? Number((spinTotals.S / spinCounts.S).toFixed(1)) : null,
+          spin_p_average: spinCounts.P > 0 ? Number((spinTotals.P / spinCounts.P).toFixed(1)) : null,
+          spin_i_average: spinCounts.I > 0 ? Number((spinTotals.I / spinCounts.I).toFixed(1)) : null,
+          spin_n_average: spinCounts.N > 0 ? Number((spinTotals.N / spinCounts.N).toFixed(1)) : null,
+          trend,
+          top_strengths_recurring: countOccurrences(allStrengths),
+          critical_gaps_recurring: countOccurrences(allGaps),
+          priority_improvements: allImprovements.slice(0, 5),
+          score_history: scores.slice(0, 10).map((s, i) => ({ session: i + 1, score: s })),
+        }
       }
 
       case 'get_roleplay_sessions': {
@@ -268,23 +456,28 @@ async function executeFunction(
 
         const { data } = await query
         // Return summary without full evaluation to save tokens
-        const sessions = (data || []).map(s => ({
-          id: s.id,
-          created_at: s.created_at,
-          status: s.status,
-          duration_seconds: s.duration_seconds,
-          persona: s.config?.selectedPersona?.cargo || s.config?.selectedPersona?.profession || 'N/A',
-          temperament: s.config?.temperament,
-          age: s.config?.age,
-          objections_count: s.config?.objections?.length || 0,
-          overall_score: s.evaluation?.overall_score,
-          performance_level: s.evaluation?.performance_level,
-          spin_s: s.evaluation?.spin_evaluation?.S?.final_score,
-          spin_p: s.evaluation?.spin_evaluation?.P?.final_score,
-          spin_i: s.evaluation?.spin_evaluation?.I?.final_score,
-          spin_n: s.evaluation?.spin_evaluation?.N?.final_score,
-          is_meet_correction: s.config?.is_meet_correction || false,
-        }))
+        const sessions = (data || []).map(s => {
+          const ev = parseEvaluation(s.evaluation)
+          let overallScore = ev?.overall_score
+          if (overallScore !== undefined && overallScore > 10) overallScore = overallScore / 10
+          return {
+            id: s.id,
+            created_at: s.created_at,
+            status: s.status,
+            duration_seconds: s.duration_seconds,
+            persona: s.config?.selectedPersona?.cargo || s.config?.selectedPersona?.profession || 'N/A',
+            temperament: s.config?.temperament,
+            age: s.config?.age,
+            objections_count: s.config?.objections?.length || 0,
+            overall_score: overallScore,
+            performance_level: ev?.performance_level,
+            spin_s: ev?.spin_evaluation?.S?.final_score,
+            spin_p: ev?.spin_evaluation?.P?.final_score,
+            spin_i: ev?.spin_evaluation?.I?.final_score,
+            spin_n: ev?.spin_evaluation?.N?.final_score,
+            is_meet_correction: s.config?.is_meet_correction || false,
+          }
+        })
         return { total: sessions.length, sessions }
       }
 
@@ -303,7 +496,7 @@ async function executeFunction(
           duration_seconds: data.duration_seconds,
           config: data.config,
           messages: data.messages,
-          evaluation: data.evaluation,
+          evaluation: parseEvaluation(data.evaluation),
         }
       }
 
@@ -706,17 +899,22 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token)
-    if (!user) {
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !user) {
+      console.error('[Agent] Auth failed:', authError?.message)
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 401 })
     }
 
+    console.log(`[Agent] Auth OK — user: ${user.id}, email: ${user.email}`)
+
     // Get company
-    const { data: employeeData } = await supabaseAdmin
+    const { data: employeeData, error: empError } = await supabaseAdmin
       .from('employees')
       .select('company_id, name')
       .eq('user_id', user.id)
       .single()
+
+    if (empError) console.error('[Agent] Employee lookup error:', empError.message)
 
     const companyId = employeeData?.company_id
     if (!companyId) {
@@ -744,6 +942,7 @@ export async function POST(req: NextRequest) {
 
     // Tool calling loop (max 5 rounds to prevent infinite loops)
     const toolsUsed: string[] = []
+    const toolResults_debug: Array<{ tool: string; result_preview: string }> = []
     const MAX_ROUNDS = 5
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -762,6 +961,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           response: choice.message.content || 'Desculpe, não consegui processar sua pergunta.',
           toolsUsed,
+          _debug: { userId: user.id, companyId, sellerName, toolResults: toolResults_debug },
         })
       }
 
@@ -771,10 +971,12 @@ export async function POST(req: NextRequest) {
           const tcFn = tc as { function: { name: string }; id: string }
           toolsUsed.push(tcFn.function.name)
           const result = await executeFunction(tc, user.id, companyId)
+          const resultStr = JSON.stringify(result)
+          toolResults_debug.push({ tool: tcFn.function.name, result_preview: resultStr.slice(0, 300) })
           return {
             role: 'tool' as const,
             tool_call_id: tc.id,
-            content: JSON.stringify(result),
+            content: resultStr,
           }
         })
       )
@@ -795,6 +997,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       response: finalResponse.choices[0].message.content || 'Desculpe, ocorreu um erro.',
       toolsUsed,
+      _debug: { userId: user.id, companyId, sellerName, toolResults: toolResults_debug },
     })
 
   } catch (error) {

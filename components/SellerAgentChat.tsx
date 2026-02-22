@@ -219,6 +219,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       }
 
       const data = await response.json()
+      if (data._debug) console.log('[SellerAgent] DEBUG:', JSON.stringify(data._debug, null, 2))
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
     } catch (error) {
       console.error('[SellerAgent] Error:', error)
@@ -235,24 +236,165 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
 
   const handleClose = () => {
     setIsOpen(false)
-    setMessages([])
-    setInput('')
+    // Messages persist in memory — only cleared on page close/navigation
   }
 
+  // ─── Visual Tag Parser ─────────────────────────────────────────────
+  const parseVisualTags = (content: string) => {
+    const TAG_REGEX = /\{\{(score|spin|trend|metric)\|([^}]+)\}\}/g
+    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric'; data: string }> = []
+    let lastIndex = 0
+    let match
+
+    while ((match = TAG_REGEX.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ type: 'text', data: content.slice(lastIndex, match.index) })
+      }
+      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric', data: match[2] })
+      lastIndex = match.index + match[0].length
+    }
+
+    if (lastIndex < content.length) {
+      parts.push({ type: 'text', data: content.slice(lastIndex) })
+    }
+
+    return parts
+  }
+
+  // ─── Visual Components (matched to app design system) ──────────────
+  const getScoreColor = (value: number, max: number = 10) => {
+    const pct = (value / max) * 100
+    if (pct >= 70) return { text: 'text-green-600', bar: 'bg-green-500', indicator: 'bg-green-500' }
+    if (pct >= 50) return { text: 'text-amber-600', bar: 'bg-amber-500', indicator: 'bg-amber-500' }
+    return { text: 'text-red-600', bar: 'bg-red-500', indicator: 'bg-red-500' }
+  }
+
+  const ScoreDisplay = ({ value, max, label }: { value: number; max: number; label: string }) => {
+    const pct = Math.min(100, (value / max) * 100)
+    const colors = getScoreColor(value, max)
+
+    return (
+      <div className="bg-gray-50 rounded-xl p-3 my-1.5">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
+          <div className="flex items-baseline gap-0.5">
+            <span className={`text-2xl font-bold ${colors.text}`}>{value.toFixed(1)}</span>
+            <span className="text-xs text-gray-400">/{max}</span>
+          </div>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div className={`${colors.bar} h-full rounded-full transition-all duration-700 ease-out`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    )
+  }
+
+  const SpinBars = ({ s, p, i: iVal, n }: { s: number; p: number; i: number; n: number }) => {
+    const bars = [
+      { key: 'S', value: s },
+      { key: 'P', value: p },
+      { key: 'I', value: iVal },
+      { key: 'N', value: n },
+    ]
+
+    return (
+      <div className="bg-gray-50 rounded-xl p-3 my-1.5">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Scores SPIN</div>
+        <div className="space-y-2">
+          {bars.map(bar => {
+            const colors = getScoreColor(bar.value)
+            return (
+              <div key={bar.key} className="flex items-center gap-2">
+                <div className={`w-2 h-6 rounded-full ${colors.indicator} flex-shrink-0`} />
+                <span className="text-xs text-gray-500 font-medium w-3">{bar.key}</span>
+                <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div className={`${colors.bar} h-full rounded-full transition-all duration-700 ease-out`} style={{ width: `${Math.min(100, (bar.value / 10) * 100)}%` }} />
+                </div>
+                <span className={`text-xs font-bold ${colors.text} w-7 text-right tabular-nums`}>{bar.value.toFixed(1)}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const TrendBadge = ({ direction, label }: { direction: string; label: string }) => {
+    const config = direction === 'improving'
+      ? { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', icon: '↗' }
+      : direction === 'declining'
+      ? { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: '↘' }
+      : { bg: 'bg-gray-100', border: 'border-gray-200', text: 'text-gray-600', icon: '→' }
+
+    return (
+      <div className={`inline-flex items-center gap-1.5 ${config.bg} border ${config.border} rounded-full px-3 py-1 my-1`}>
+        <span className="text-xs">{config.icon}</span>
+        <span className={`text-xs font-medium ${config.text}`}>{label}</span>
+      </div>
+    )
+  }
+
+  const MetricCard = ({ value, label }: { value: string; label: string }) => (
+    <div className="inline-flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 my-0.5 mr-1.5">
+      <span className="text-lg font-bold text-gray-800">{value}</span>
+      <span className="text-xs text-gray-500">{label}</span>
+    </div>
+  )
+
+  // ─── Text Renderer (markdown-like) ──────────────────────────────────
+  const renderTextBlock = (text: string, keyPrefix: number) => {
+    const lines = text.split('\n')
+    return (
+      <div key={`text-${keyPrefix}`}>
+        {lines.map((line, i) => {
+          let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>')
+          if (processed.match(/^[-•]\s/)) {
+            processed = `<span class="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-2 mt-2 flex-shrink-0"></span><span>${processed.slice(2)}</span>`
+            return <div key={`${keyPrefix}-${i}`} className="flex items-start ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
+          }
+          if (processed.match(/^\d+\.\s/)) {
+            return <div key={`${keyPrefix}-${i}`} className="ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
+          }
+          if (!processed.trim()) return <div key={`${keyPrefix}-${i}`} className="h-2" />
+          return <div key={`${keyPrefix}-${i}`} className="my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
+        })}
+      </div>
+    )
+  }
+
+  // ─── Main Content Renderer ──────────────────────────────────────────
   const renderContent = (content: string) => {
-    const lines = content.split('\n')
-    return lines.map((line, i) => {
-      let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>')
-      if (processed.match(/^[-•]\s/)) {
-        processed = `<span class="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-2 mt-2 flex-shrink-0"></span><span>${processed.slice(2)}</span>`
-        return <div key={i} className="flex items-start ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
+    const parts = parseVisualTags(content)
+
+    // If no visual tags found, fall back to simple text rendering
+    if (parts.length === 1 && parts[0].type === 'text') {
+      return renderTextBlock(content, 0)
+    }
+
+    return parts.map((part, idx) => {
+      switch (part.type) {
+        case 'score': {
+          const segs = part.data.split('|')
+          const val = parseFloat(segs[0])
+          const max = parseFloat(segs[1]) || 10
+          return <ScoreDisplay key={`s-${idx}`} value={isNaN(val) ? 0 : val} max={max} label={segs[2] || 'Score'} />
+        }
+        case 'spin': {
+          const vals = part.data.split('|').map(v => parseFloat(v))
+          return <SpinBars key={`sp-${idx}`} s={vals[0] || 0} p={vals[1] || 0} i={vals[2] || 0} n={vals[3] || 0} />
+        }
+        case 'trend': {
+          const [direction, ...rest] = part.data.split('|')
+          return <TrendBadge key={`t-${idx}`} direction={direction} label={rest.join('|') || direction} />
+        }
+        case 'metric': {
+          const [value, ...rest] = part.data.split('|')
+          return <MetricCard key={`m-${idx}`} value={value} label={rest.join('|')} />
+        }
+        case 'text':
+          return renderTextBlock(part.data, idx)
       }
-      if (processed.match(/^\d+\.\s/)) {
-        return <div key={i} className="ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
-      }
-      if (!processed.trim()) return <div key={i} className="h-2" />
-      return <div key={i} className="my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
     })
   }
 
@@ -358,10 +500,10 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm ${
+                      className={`rounded-2xl px-3.5 py-2.5 text-sm ${
                         msg.role === 'user'
-                          ? 'bg-[#0D4A3A] text-white rounded-br-md'
-                          : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                          ? 'max-w-[85%] bg-[#0D4A3A] text-white rounded-br-md'
+                          : 'max-w-[92%] bg-gray-100 text-gray-800 rounded-bl-md'
                       }`}
                     >
                       {msg.role === 'assistant' ? renderContent(msg.content) : msg.content}
