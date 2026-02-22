@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Video, AlertCircle, Share2, Bell, BellOff, CheckCheck } from 'lucide-react'
 import type { UserNotification } from '@/hooks/useNotifications'
 
@@ -10,6 +11,7 @@ interface NotificationPanelProps {
   onMarkAllAsRead: () => void
   onNotificationClick: (notification: UserNotification) => void
   onClose: () => void
+  anchorRef: React.RefObject<HTMLButtonElement | null>
 }
 
 function timeAgo(dateStr: string): string {
@@ -47,24 +49,34 @@ export default function NotificationPanel({
   onMarkAllAsRead,
   onNotificationClick,
   onClose,
+  anchorRef,
 }: NotificationPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (
+        panelRef.current && !panelRef.current.contains(e.target as Node) &&
+        anchorRef.current && !anchorRef.current.contains(e.target as Node)
+      ) {
         onClose()
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
+  }, [onClose, anchorRef])
 
-  return (
+  // Calculate position from anchor button
+  const rect = anchorRef.current?.getBoundingClientRect()
+  const top = rect ? rect.bottom + 8 : 0
+  const right = rect ? window.innerWidth - rect.right : 0
+
+  return createPortal(
     <div
       ref={panelRef}
-      className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+      style={{ position: 'fixed', top, right, zIndex: 9999 }}
+      className="w-96 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -115,6 +127,7 @@ export default function NotificationPanel({
           })
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

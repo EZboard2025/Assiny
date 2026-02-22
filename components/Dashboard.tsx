@@ -74,6 +74,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [activeChallenge, setActiveChallenge] = useState<any | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
   const chatRef = useRef<ChatInterfaceHandle>(null)
+  const bellRef = useRef<HTMLButtonElement>(null)
 
   // Performance data state
   const [performanceData, setPerformanceData] = useState<{
@@ -468,14 +469,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 </div>
               </div>
               {/* Notification bell */}
-              <div className="relative z-[100]">
+              <div className="relative">
                 <button
+                  ref={bellRef}
                   onClick={() => setShowNotifications(prev => !prev)}
                   className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
                 >
                   <Bell className="w-5 h-5 text-gray-500" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-4.5 h-4.5 min-w-[18px] bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse">
+                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -487,6 +489,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                     onMarkAllAsRead={handleMarkAllAsRead}
                     onNotificationClick={handleNotificationClick}
                     onClose={() => setShowNotifications(false)}
+                    anchorRef={bellRef}
                   />
                 )}
               </div>
