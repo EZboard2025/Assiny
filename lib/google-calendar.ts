@@ -288,7 +288,8 @@ export async function fetchUpcomingMeetEvents(
       timeMax: future.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
-      maxResults: 100,
+      showHiddenInvitations: true,
+      maxResults: 250,
     })
 
     const events = response.data.items || []
@@ -357,7 +358,8 @@ export async function fetchAllEvents(
       timeMax: future.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
-      maxResults: 250,
+      showHiddenInvitations: true,
+      maxResults: 500,
     })
 
     const events = response.data.items || []
