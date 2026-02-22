@@ -241,8 +241,8 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
 
   // ─── Visual Tag Parser ─────────────────────────────────────────────
   const parseVisualTags = (content: string) => {
-    const TAG_REGEX = /\{\{(score|spin|trend|metric)\|([^}]+)\}\}/g
-    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric'; data: string }> = []
+    const TAG_REGEX = /\{\{(score|spin|trend|metric|meeting)\|([^}]+)\}\}/g
+    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric' | 'meeting'; data: string }> = []
     let lastIndex = 0
     let match
 
@@ -250,7 +250,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       if (match.index > lastIndex) {
         parts.push({ type: 'text', data: content.slice(lastIndex, match.index) })
       }
-      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric', data: match[2] })
+      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric' | 'meeting', data: match[2] })
       lastIndex = match.index + match[0].length
     }
 
@@ -338,6 +338,51 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     <div className="inline-flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 my-0.5 mr-1.5">
       <span className="text-lg font-bold text-gray-800">{value}</span>
       <span className="text-xs text-gray-500">{label}</span>
+    </div>
+  )
+
+  const MeetingCard = ({ title, date, time, link, participants, botStatus }: {
+    title: string; date: string; time: string; link?: string; participants?: string; botStatus?: string
+  }) => (
+    <div className="bg-gray-50 rounded-xl p-3 my-1.5 border border-gray-100">
+      <div className="flex items-start gap-3">
+        {/* Calendar icon */}
+        <div className="w-10 h-10 bg-green-50 rounded-lg flex flex-col items-center justify-center flex-shrink-0 border border-green-100">
+          <span className="text-[9px] font-bold text-green-600 uppercase leading-none">{date.split('/')[1] ? ['', 'Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(date.split('/')[1])] || date.split('/')[1] : ''}</span>
+          <span className="text-sm font-bold text-green-700 leading-none">{date.split('/')[0]}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm text-gray-800 truncate">{title}</div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span className="text-xs text-gray-500">{time}</span>
+          </div>
+          {participants && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              <span className="text-xs text-gray-500 truncate">{participants}</span>
+            </div>
+          )}
+          {botStatus && (
+            <div className="mt-1">
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                botStatus === 'completed' ? 'bg-green-50 text-green-600' :
+                botStatus === 'scheduled' || botStatus === 'pending' ? 'bg-amber-50 text-amber-600' :
+                botStatus === 'error' ? 'bg-red-50 text-red-600' :
+                'bg-gray-100 text-gray-500'
+              }`}>
+                {botStatus === 'completed' ? 'Avaliado' : botStatus === 'scheduled' ? 'Bot agendado' : botStatus === 'pending' ? 'Pendente' : botStatus === 'error' ? 'Erro' : botStatus}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      {link && link !== 'none' && (
+        <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100 text-xs text-green-600 hover:text-green-700 font-medium transition-colors">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          Entrar na reunião
+        </a>
+      )}
     </div>
   )
 
@@ -462,6 +507,10 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
         case 'metric': {
           const [value, ...rest] = part.data.split('|')
           return <MetricCard key={`m-${idx}`} value={value} label={rest.join('|')} />
+        }
+        case 'meeting': {
+          const segs = part.data.split('|')
+          return <MeetingCard key={`mt-${idx}`} title={segs[0] || ''} date={segs[1] || ''} time={segs[2] || ''} link={segs[3]} participants={segs[4]} botStatus={segs[5]} />
         }
         case 'text':
           return renderTextBlock(part.data, idx)

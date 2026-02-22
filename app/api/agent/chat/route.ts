@@ -62,11 +62,18 @@ Use tags especiais para dados numéricos — elas são renderizadas como gráfic
 • {{metric|valor|label}} — Card pequeno para métrica isolada
   Ex: {{metric|15|Sessões Realizadas}}  {{metric|73%|Taxa de Sucesso}}
 
+• {{meeting|título|data|horário|link_meet|participantes|bot_status}} — Card de reunião
+  Ex: {{meeting|Weekly Ramppy|23/02|16h às 17h|https://meet.google.com/xxx|João, Maria|scheduled}}
+  - link_meet: URL do Meet ou "none" se não tiver
+  - participantes: nomes separados por vírgula (omitir se não tiver)
+  - bot_status: completed, scheduled, pending, error (omitir se não aplicável)
+
 REGRAS DAS TAGS VISUAIS:
 - Coloque tags visuais ANTES do texto explicativo (elas ficam no topo da resposta)
 - Ao falar de performance, use {{score}} + {{spin}} + {{trend}} juntos
+- Ao falar de reuniões/agenda, use {{meeting}} para CADA reunião (um card por reunião)
 - Use {{metric}} para destacar números-chave isolados
-- NÃO repita nos parágrafos os mesmos números já exibidos nas tags
+- NÃO repita nos parágrafos os mesmos dados já exibidos nas tags (nomes de reuniões, scores, etc.)
 - Cada tag deve estar em sua própria linha
 - Após as tags, escreva texto normal com markdown (negrito, listas, etc.)
 - Só use tags quando tiver dados reais das ferramentas — nunca invente valores`
