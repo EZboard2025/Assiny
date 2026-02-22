@@ -53,6 +53,23 @@ export function useNotifications(userId: string | null) {
     }
   }, [userId])
 
+  const markAllAsRead = useCallback(async () => {
+    if (!userId) return
+
+    try {
+      await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markAll: true, userId })
+      })
+
+      setNotifications([])
+      setUnreadCount(0)
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err)
+    }
+  }, [userId])
+
   // Supabase Realtime subscription for instant notifications
   useEffect(() => {
     if (!userId) return
@@ -96,5 +113,5 @@ export function useNotifications(userId: string | null) {
     return () => clearInterval(interval)
   }, [userId, fetchNotifications])
 
-  return { notifications, unreadCount, markAsRead, refetch: fetchNotifications }
+  return { notifications, unreadCount, markAsRead, markAllAsRead, refetch: fetchNotifications }
 }

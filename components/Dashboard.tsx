@@ -10,13 +10,15 @@ import FeatureCard from './dashboard/FeatureCard'
 import StreakIndicator from './dashboard/StreakIndicator'
 import DailyChallengeBanner from './dashboard/DailyChallengeBanner'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
-import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3 } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3, Bell } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
 import ConfigurationRequired from './ConfigurationRequired'
 import SavedSimulationCard from './dashboard/SavedSimulationCard'
 import { useNotifications } from '@/hooks/useNotifications'
+import type { UserNotification } from '@/hooks/useNotifications'
+import NotificationPanel from './dashboard/NotificationPanel'
 import SellerAgentChat from './SellerAgentChat'
 
 // Loading skeleton for lazy-loaded views
@@ -85,12 +87,26 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { streak, loading: streakLoading } = useTrainingStreak(userId)
 
   // Notifications hook
-  const { notifications, unreadCount, markAsRead } = useNotifications(userId)
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(userId)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   // Count meet-specific notifications for sidebar badge
   const meetNotificationCount = notifications.filter(n =>
     n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error'
   ).length
+
+  const handleNotificationClick = (notification: UserNotification) => {
+    markAsRead(notification.id)
+    setShowNotifications(false)
+    // Navigate based on notification type
+    if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error') {
+      handleViewChange('historico')
+    }
+  }
+
+  const handleMarkAllAsRead = () => {
+    markAllAsRead()
+  }
 
   // Hook para verificar limites do plano
   const {
@@ -440,7 +456,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
             {/* Greeting */}
             <div className="flex-1 flex items-center">
-              <div>
+              <div className="flex-1">
                 <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">
                   Plataforma de Rampagem
                 </p>
@@ -450,6 +466,29 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   </h1>
                   <StreakIndicator streak={streak} loading={streakLoading} />
                 </div>
+              </div>
+              {/* Notification bell */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(prev => !prev)}
+                  className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <Bell className="w-5 h-5 text-gray-500" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4.5 h-4.5 min-w-[18px] bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <NotificationPanel
+                    notifications={notifications}
+                    onMarkAsRead={markAsRead}
+                    onMarkAllAsRead={handleMarkAllAsRead}
+                    onNotificationClick={handleNotificationClick}
+                    onClose={() => setShowNotifications(false)}
+                  />
+                )}
               </div>
             </div>
           </div>

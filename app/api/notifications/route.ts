@@ -40,10 +40,30 @@ export async function GET(request: Request) {
 // PATCH - Mark notification as read
 export async function PATCH(request: Request) {
   try {
-    const { notificationId, userId } = await request.json()
+    const { notificationId, userId, markAll } = await request.json()
 
-    if (!notificationId || !userId) {
-      return NextResponse.json({ error: 'notificationId and userId are required' }, { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
+    }
+
+    // Mark all unread notifications as read
+    if (markAll) {
+      const { error } = await supabaseAdmin
+        .from('user_notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+
+      if (error) {
+        console.error('Error marking all notifications as read:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
+    if (!notificationId) {
+      return NextResponse.json({ error: 'notificationId is required' }, { status: 400 })
     }
 
     const { error } = await supabaseAdmin
