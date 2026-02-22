@@ -19,6 +19,7 @@ import SavedSimulationCard from './dashboard/SavedSimulationCard'
 import { useNotifications } from '@/hooks/useNotifications'
 import type { UserNotification } from '@/hooks/useNotifications'
 import NotificationPanel from './dashboard/NotificationPanel'
+import SharedEvaluationModal from './dashboard/SharedEvaluationModal'
 import SellerAgentChat from './SellerAgentChat'
 
 // Loading skeleton for lazy-loaded views
@@ -90,6 +91,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Notifications hook
   const { notifications, allNotifications, unreadCount, markAsRead, markAllAsRead, fetchAllNotifications } = useNotifications(userId)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [sharedModalShareId, setSharedModalShareId] = useState<string | null>(null)
 
   // Count meet-specific notifications for sidebar badge
   const meetNotificationCount = notifications.filter(n =>
@@ -101,8 +103,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       markAsRead(notification.id)
     }
     setShowNotifications(false)
-    // Navigate based on notification type
-    if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error' || notification.type === 'shared_meeting') {
+
+    if (notification.type === 'shared_meeting' && notification.data?.shareId) {
+      setSharedModalShareId(notification.data.shareId)
+    } else if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error') {
       handleViewChange('historico')
     }
   }
@@ -766,6 +770,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         )
       )}
 
+      {/* Shared Evaluation Modal */}
+      {sharedModalShareId && userId && (
+        <SharedEvaluationModal
+          shareId={sharedModalShareId}
+          userId={userId}
+          onClose={() => setSharedModalShareId(null)}
+        />
+      )}
     </div>
   )
 }
