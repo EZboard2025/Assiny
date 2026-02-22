@@ -562,6 +562,14 @@ export function updateHeartbeat(userId: string): boolean {
     }
   }
 
+  // Periodic profile pic refresh (~every 30th heartbeat ≈ every 10 min)
+  // Retries contacts that were previously unavailable (privacy changed, new pic added)
+  // Also fills in any remaining null pics (new conversations created since last sync)
+  if (state.status === 'connected' && state.syncStatus === 'synced' && state.connectionId && Math.random() < 0.033) {
+    fetchMissingProfilePics(state, state.connectionId).catch(() => {})
+    refreshProfilePics(state, state.connectionId).catch(() => {})
+  }
+
   return true
 }
 
@@ -1208,32 +1216,94 @@ async function syncChatHistory(state: ClientState): Promise<void> {
 }
 
 // Background task: fetch profile pics for conversations that don't have one yet
-// Runs after initial sync is complete so conversations appear immediately without waiting
+// Runs after initial sync and periodically via heartbeat to fill in missing pics
+// Uses empty string '' to mark contacts where pic is unavailable (privacy/no pic)
+// so they're not retried endlessly — null = never attempted, '' = attempted but unavailable
 async function fetchMissingProfilePics(state: ClientState, connectionId: string): Promise<void> {
   try {
+    // Fetch ALL conversations without profile pic (null = never attempted)
     const { data: convs } = await supabaseAdmin
       .from('whatsapp_conversations')
       .select('contact_phone')
       .eq('connection_id', connectionId)
       .is('profile_pic_url', null)
-      .limit(40)
 
     if (!convs || convs.length === 0) return
     console.log(`[WA] Fetching profile pics for ${convs.length} conversations...`)
 
     let fetched = 0
-    for (const conv of convs) {
+    let unavailable = 0
+    for (let i = 0; i < convs.length; i++) {
       if (state.destroyed) break
+      const conv = convs[i]
       try {
-        // For groups, use contact_phone directly (it's the @g.us ID)
-        // For LID contacts, try both @lid and @c.us JIDs
-        // For regular contacts, construct @c.us JID
         let picUrl: string | undefined
         if (conv.contact_phone.includes('@')) {
           picUrl = await state.client.getProfilePicUrl(conv.contact_phone)
         } else if (conv.contact_phone.startsWith('lid_')) {
           const lidNum = conv.contact_phone.replace(/^lid_/, '')
-          // Try @lid first, fallback to @c.us
+          try { picUrl = await state.client.getProfilePicUrl(`${lidNum}@lid`) } catch {}
+          if (!picUrl) {
+            try { picUrl = await state.client.getProfilePicUrl(`${lidNum}@c.us`) } catch {}
+          }
+        } else {
+          picUrl = await state.client.getProfilePicUrl(`${conv.contact_phone}@c.us`)
+        }
+
+        // Save pic URL or mark as '' (unavailable) to avoid re-fetching
+        await supabaseAdmin
+          .from('whatsapp_conversations')
+          .update({ profile_pic_url: picUrl || '' })
+          .eq('connection_id', connectionId)
+          .eq('contact_phone', conv.contact_phone)
+
+        if (picUrl) fetched++
+        else unavailable++
+      } catch {
+        // On error, mark as '' so we don't retry endlessly
+        try {
+          await supabaseAdmin
+            .from('whatsapp_conversations')
+            .update({ profile_pic_url: '' })
+            .eq('connection_id', connectionId)
+            .eq('contact_phone', conv.contact_phone)
+        } catch {}
+        unavailable++
+      }
+
+      // Small delay every 3 contacts to avoid WhatsApp rate limiting
+      if (i % 3 === 2) await new Promise(r => setTimeout(r, 200))
+    }
+    console.log(`[WA] Profile pics done: ${fetched} fetched, ${unavailable} unavailable, ${convs.length} total`)
+  } catch (err) {
+    console.error('[WA] Error fetching profile pics:', err)
+  }
+}
+
+// Periodic refresh: retry contacts marked as '' (unavailable) in case they updated their pic
+// Also refreshes stale URLs (WhatsApp CDN URLs expire). Runs every ~10 min via heartbeat.
+async function refreshProfilePics(state: ClientState, connectionId: string): Promise<void> {
+  try {
+    // Get conversations with empty string (previously unavailable) — retry them
+    const { data: convs } = await supabaseAdmin
+      .from('whatsapp_conversations')
+      .select('contact_phone')
+      .eq('connection_id', connectionId)
+      .eq('profile_pic_url', '')
+      .limit(20)
+
+    if (!convs || convs.length === 0) return
+    console.log(`[WA] Refreshing profile pics for ${convs.length} previously-unavailable contacts...`)
+
+    let updated = 0
+    for (const conv of convs) {
+      if (state.destroyed) break
+      try {
+        let picUrl: string | undefined
+        if (conv.contact_phone.includes('@')) {
+          picUrl = await state.client.getProfilePicUrl(conv.contact_phone)
+        } else if (conv.contact_phone.startsWith('lid_')) {
+          const lidNum = conv.contact_phone.replace(/^lid_/, '')
           try { picUrl = await state.client.getProfilePicUrl(`${lidNum}@lid`) } catch {}
           if (!picUrl) {
             try { picUrl = await state.client.getProfilePicUrl(`${lidNum}@c.us`) } catch {}
@@ -1247,13 +1317,14 @@ async function fetchMissingProfilePics(state: ClientState, connectionId: string)
             .update({ profile_pic_url: picUrl })
             .eq('connection_id', connectionId)
             .eq('contact_phone', conv.contact_phone)
-          fetched++
+          updated++
         }
       } catch {}
+      await new Promise(r => setTimeout(r, 200))
     }
-    if (fetched > 0) console.log(`[WA] Fetched ${fetched} profile pics`)
+    if (updated > 0) console.log(`[WA] Refreshed ${updated} profile pics`)
   } catch (err) {
-    console.error('[WA] Error fetching profile pics:', err)
+    console.error('[WA] Error refreshing profile pics:', err)
   }
 }
 
