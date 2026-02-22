@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Sparkles, X, Send, Loader2, TrendingUp, Target, Video, Dumbbell, CalendarDays, Clock } from 'lucide-react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -44,23 +44,27 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
   const resizeRef = useRef<{ startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; dir: string } | null>(null)
-  const supabase = createClientComponentClient()
 
-  // Load auth token on mount (same robust strategy as FollowUpView)
+  // Load auth token on mount using singleton supabase client (same as FollowUpView)
   useEffect(() => {
     const loadAuth = async () => {
       try {
+        // Strategy 1: getSession
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) { setAuthToken(session.access_token); return }
 
+        // Strategy 2: refreshSession
         const { data: { session: refreshed } } = await supabase.auth.refreshSession()
         if (refreshed?.access_token) { setAuthToken(refreshed.access_token); return }
 
+        // Strategy 3: getUser + retry getSession
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           const { data: { session: retried } } = await supabase.auth.getSession()
           if (retried?.access_token) { setAuthToken(retried.access_token); return }
         }
+
+        console.warn('[SellerAgent] No auth token found after all strategies')
       } catch (e) {
         console.error('[SellerAgent] Auth error:', e)
       }
@@ -71,7 +75,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       if (session?.access_token) setAuthToken(session.access_token)
     })
     return () => subscription.unsubscribe()
-  }, [supabase])
+  }, [])
 
   // Set initial position when opening
   useEffect(() => {
