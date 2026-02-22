@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
-import { getCalendarClient, fetchAllEvents, checkFreeBusy } from '@/lib/google-calendar'
+import { getCalendarClient, fetchAllEvents, checkFreeBusy, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, quickAddEvent } from '@/lib/google-calendar'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
@@ -42,9 +42,22 @@ ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Qual meu ponto mais fraco?" → get_performance_summary + get_challenge_effectiveness + get_roleplay_sessions(limit:5)
 - "Analise minha última reunião" → get_meet_evaluations(limit:1) + get_meet_evaluation_detail
 - "O que tenho na agenda?" → get_calendar_events + get_scheduled_bots
+- "Marca uma reunião..." → create_calendar_event (ou quick_add_event para texto livre)
+- "Move/reagenda a reunião..." → get_calendar_events (para achar o event_id) + update_calendar_event
+- "Cancela a reunião..." → get_calendar_events (para achar o event_id) + delete_calendar_event
+- "Ativa o bot na reunião..." → get_scheduled_bots (para achar o scheduled_bot_id) + toggle_meeting_bot
+- "Estou livre amanhã?" → get_calendar_freebusy
 - Perguntas gerais sobre empresa → get_company_info
 
 IMPORTANTE: Chame 2-4 ferramentas por vez para cruzar dados e dar respostas completas. Nunca se limite a apenas 1 ferramenta.
+
+AÇÕES NO CALENDÁRIO:
+- Você pode CRIAR, ATUALIZAR e DELETAR eventos — use isso quando o vendedor pedir
+- Para reagendar: primeiro busque os eventos (get_calendar_events) para achar o event_id, depois use update_calendar_event
+- Para cancelar: busque o event_id primeiro, depois delete
+- Para ativar bot: busque get_scheduled_bots para achar o scheduled_bot_id, depois toggle
+- Ao criar reunião, SEMPRE adicione link do Meet por padrão (add_meet_link=true)
+- Após criar/atualizar/cancelar, use {{meeting}} para mostrar o resultado visual
 
 FORMATAÇÃO VISUAL:
 Use tags especiais para dados numéricos — elas são renderizadas como gráficos bonitos no chat:
@@ -272,6 +285,91 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
           status: { type: 'string', description: 'Filtrar por status: pending, scheduled, joining, recording, completed, error' }
         },
         required: []
+      }
+    }
+  },
+  // ─── Calendar Write Tools ─────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'create_calendar_event',
+      description: 'Cria um novo evento no Google Calendar do vendedor. Pode incluir link do Google Meet e convidar participantes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Título do evento' },
+          date: { type: 'string', description: 'Data do evento (YYYY-MM-DD, ex: 2026-02-25)' },
+          start_time: { type: 'string', description: 'Hora início (HH:MM, ex: 14:00)' },
+          end_time: { type: 'string', description: 'Hora fim (HH:MM, ex: 15:00)' },
+          description: { type: 'string', description: 'Descrição do evento (opcional)' },
+          attendees: { type: 'array', items: { type: 'string' }, description: 'Emails dos participantes (opcional)' },
+          add_meet_link: { type: 'boolean', description: 'Criar link do Google Meet (padrão: true)' }
+        },
+        required: ['title', 'date', 'start_time', 'end_time']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_calendar_event',
+      description: 'Atualiza um evento existente no Google Calendar: reagendar, mudar título, adicionar participantes, adicionar link Meet.',
+      parameters: {
+        type: 'object',
+        properties: {
+          event_id: { type: 'string', description: 'ID do evento do Google Calendar' },
+          title: { type: 'string', description: 'Novo título (opcional)' },
+          date: { type: 'string', description: 'Nova data (YYYY-MM-DD, opcional)' },
+          start_time: { type: 'string', description: 'Nova hora início (HH:MM, opcional)' },
+          end_time: { type: 'string', description: 'Nova hora fim (HH:MM, opcional)' },
+          description: { type: 'string', description: 'Nova descrição (opcional)' },
+          add_attendees: { type: 'array', items: { type: 'string' }, description: 'Emails de participantes a adicionar (opcional)' },
+          add_meet_link: { type: 'boolean', description: 'Adicionar link do Google Meet (opcional)' }
+        },
+        required: ['event_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_calendar_event',
+      description: 'Remove/cancela um evento do Google Calendar do vendedor.',
+      parameters: {
+        type: 'object',
+        properties: {
+          event_id: { type: 'string', description: 'ID do evento do Google Calendar' }
+        },
+        required: ['event_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'toggle_meeting_bot',
+      description: 'Ativa ou desativa o bot de análise para uma reunião específica do Google Meet. O bot grava e avalia a reunião automaticamente.',
+      parameters: {
+        type: 'object',
+        properties: {
+          scheduled_bot_id: { type: 'string', description: 'ID do scheduled bot (da tabela calendar_scheduled_bots)' },
+          enabled: { type: 'boolean', description: 'true para ativar, false para desativar' }
+        },
+        required: ['scheduled_bot_id', 'enabled']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'quick_add_event',
+      description: 'Cria evento por texto em linguagem natural. Google interpreta a data/hora automaticamente. Ex: "Reunião com João amanhã às 14h", "Almoço sexta 12h30".',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Descrição do evento em linguagem natural' }
+        },
+        required: ['text']
       }
     }
   }
@@ -850,6 +948,127 @@ async function executeFunction(
 
         const { data } = await query
         return { total: data?.length || 0, bots: data || [] }
+      }
+
+      // ─── Calendar Write Operations ──────────────────────────────────
+      case 'create_calendar_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado. O vendedor precisa conectar na página de Análise Meet.' }
+
+        const startDateTime = `${params.date}T${params.start_time}:00-03:00`
+        const endDateTime = `${params.date}T${params.end_time}:00-03:00`
+
+        const event = await createCalendarEvent(userId, {
+          title: params.title,
+          startDateTime,
+          endDateTime,
+          description: params.description,
+          attendees: params.attendees,
+          addMeetLink: params.add_meet_link !== false, // default true
+        })
+
+        if (!event) return { error: 'Erro ao criar evento no Google Calendar' }
+
+        return {
+          success: true,
+          message: `Evento "${params.title}" criado com sucesso`,
+          event: {
+            id: event.id,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            meetLink: event.meetLink,
+            attendees: event.attendees,
+          }
+        }
+      }
+
+      case 'update_calendar_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado.' }
+
+        const updateData: Record<string, any> = {}
+        if (params.title) updateData.title = params.title
+        if (params.description) updateData.description = params.description
+        if (params.add_meet_link) updateData.addMeetLink = true
+        if (params.date && params.start_time) {
+          updateData.startDateTime = `${params.date}T${params.start_time}:00-03:00`
+        }
+        if (params.date && params.end_time) {
+          updateData.endDateTime = `${params.date}T${params.end_time}:00-03:00`
+        }
+        if (params.add_attendees?.length) {
+          updateData.attendees = params.add_attendees.map((e: string) => ({ email: e }))
+        }
+
+        const updated = await updateCalendarEvent(userId, params.event_id, updateData)
+        if (!updated) return { error: 'Erro ao atualizar evento' }
+
+        return {
+          success: true,
+          message: 'Evento atualizado com sucesso',
+          event: {
+            id: updated.id,
+            title: updated.title,
+            start: updated.start,
+            end: updated.end,
+            meetLink: updated.meetLink,
+            attendees: updated.attendees,
+          }
+        }
+      }
+
+      case 'delete_calendar_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado.' }
+
+        const deleted = await deleteCalendarEvent(userId, params.event_id)
+        if (!deleted) return { error: 'Erro ao deletar evento' }
+
+        return { success: true, message: 'Evento removido do Google Calendar com sucesso' }
+      }
+
+      case 'toggle_meeting_bot': {
+        const { data: bot, error: botError } = await supabaseAdmin
+          .from('calendar_scheduled_bots')
+          .select('id, bot_status, bot_enabled, event_title')
+          .eq('id', params.scheduled_bot_id)
+          .eq('user_id', userId)
+          .single()
+
+        if (botError || !bot) return { error: 'Bot agendado não encontrado' }
+        if (bot.bot_status === 'completed' || bot.bot_status === 'recording') {
+          return { error: `Não é possível alterar — a reunião já está ${bot.bot_status === 'completed' ? 'avaliada' : 'sendo gravada'}` }
+        }
+
+        await supabaseAdmin
+          .from('calendar_scheduled_bots')
+          .update({ bot_enabled: params.enabled })
+          .eq('id', params.scheduled_bot_id)
+
+        return {
+          success: true,
+          message: `Bot de análise ${params.enabled ? 'ativado' : 'desativado'} para "${bot.event_title}"`,
+        }
+      }
+
+      case 'quick_add_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado.' }
+
+        const event = await quickAddEvent(userId, params.text)
+        if (!event) return { error: 'Erro ao criar evento. Tente com create_calendar_event para mais controle.' }
+
+        return {
+          success: true,
+          message: `Evento criado: "${event.title}"`,
+          event: {
+            id: event.id,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+          }
+        }
       }
 
       default:
