@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, X, Send, Loader2 } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, TrendingUp, Target, Video, Dumbbell, CalendarDays, Clock } from 'lucide-react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface Message {
@@ -14,12 +14,12 @@ interface SellerAgentChatProps {
 }
 
 const QUICK_SUGGESTIONS = [
-  'Como está minha performance?',
-  'Qual meu ponto mais fraco?',
-  'Analise minha última reunião',
-  'O que devo treinar hoje?',
-  'Quais reuniões tenho essa semana?',
-  'Quando estou livre amanhã?',
+  { text: 'Como está minha performance?', icon: TrendingUp, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
+  { text: 'Qual meu ponto mais fraco?', icon: Target, color: 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' },
+  { text: 'Analise minha última reunião', icon: Video, color: 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100' },
+  { text: 'O que devo treinar hoje?', icon: Dumbbell, color: 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100' },
+  { text: 'Quais reuniões tenho essa semana?', icon: CalendarDays, color: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100' },
+  { text: 'Quando estou livre amanhã?', icon: Clock, color: 'text-teal-600 bg-teal-50 border-teal-200 hover:bg-teal-100' },
 ]
 
 const MIN_W = 340
@@ -310,21 +310,30 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
             {messages.length === 0 ? (
               <div className="space-y-4">
-                <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                <div className="text-center py-2">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-md">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
                   <p className="text-sm text-gray-700">
-                    Olá{userName ? `, ${userName.split(' ')[0]}` : ''}! Sou seu assistente pessoal de vendas. Tenho acesso a toda sua performance, reuniões, treinos e agenda. Como posso ajudar?
+                    Olá{userName ? <>, <span className="font-semibold">{userName.split(' ')[0]}</span></> : ''}! Sou seu assistente pessoal.
                   </p>
+                  <p className="text-xs text-gray-400 mt-0.5">Performance, reuniões, treinos e agenda</p>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_SUGGESTIONS.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => sendMessage(suggestion)}
-                      className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-green-50 hover:text-green-700 text-gray-600 rounded-full transition-colors border border-gray-200 hover:border-green-200"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+
+                <div className="grid grid-cols-2 gap-2">
+                  {QUICK_SUGGESTIONS.map((suggestion) => {
+                    const Icon = suggestion.icon
+                    return (
+                      <button
+                        key={suggestion.text}
+                        onClick={() => sendMessage(suggestion.text)}
+                        className={`flex items-start gap-2 text-left px-3 py-2.5 rounded-xl border transition-all duration-200 ${suggestion.color}`}
+                      >
+                        <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span className="text-xs leading-snug font-medium">{suggestion.text}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             ) : (
@@ -359,15 +368,19 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           {/* Quick suggestions after first message */}
           {messages.length > 0 && !isLoading && (
             <div className="px-4 pb-2 flex flex-wrap gap-1">
-              {QUICK_SUGGESTIONS.slice(0, 3).map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => sendMessage(suggestion)}
-                  className="text-[10px] px-2 py-1 bg-gray-50 hover:bg-green-50 text-gray-500 hover:text-green-700 rounded-full transition-colors border border-gray-100 hover:border-green-200"
-                >
-                  {suggestion}
-                </button>
-              ))}
+              {QUICK_SUGGESTIONS.slice(0, 3).map((suggestion) => {
+                const Icon = suggestion.icon
+                return (
+                  <button
+                    key={suggestion.text}
+                    onClick={() => sendMessage(suggestion.text)}
+                    className="flex items-center gap-1 text-[10px] px-2 py-1 bg-gray-50 hover:bg-green-50 text-gray-500 hover:text-green-700 rounded-full transition-colors border border-gray-100 hover:border-green-200"
+                  >
+                    <Icon className="w-3 h-3" />
+                    {suggestion.text}
+                  </button>
+                )
+              })}
             </div>
           )}
 
