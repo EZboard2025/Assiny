@@ -1495,18 +1495,32 @@ export default function MeetAnalysisView() {
                       onClick={async () => {
                         setTogglingAutoRecord(true)
                         try {
+                          // Try getSession first, fallback to getUser for subdomain compatibility
+                          let token: string | undefined
                           const { data: { session: authSession } } = await supabase.auth.getSession()
-                          if (!authSession?.access_token) return
+                          token = authSession?.access_token
+                          if (!token) {
+                            const { data: { user } } = await supabase.auth.getUser()
+                            const { data: { session: retrySession } } = await supabase.auth.getSession()
+                            token = retrySession?.access_token
+                            if (!token) {
+                              console.error('Toggle auto-record: no auth token available')
+                              return
+                            }
+                          }
                           const res = await fetch('/api/calendar/toggle-auto-record', {
                             method: 'POST',
                             headers: {
-                              Authorization: `Bearer ${authSession.access_token}`,
+                              Authorization: `Bearer ${token}`,
                               'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({ enabled: !autoRecordEnabled }),
                           })
                           if (res.ok) {
                             setAutoRecordEnabled(!autoRecordEnabled)
+                          } else {
+                            const err = await res.json().catch(() => ({}))
+                            console.error('Toggle auto-record API error:', res.status, err)
                           }
                         } catch (e) {
                           console.error('Toggle auto-record failed:', e)

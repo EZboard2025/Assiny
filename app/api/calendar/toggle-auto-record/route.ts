@@ -22,20 +22,24 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { enabled } = body
+    console.log(`[Toggle Auto-Record] User ${user.id}, enabled=${enabled}`)
 
     if (typeof enabled !== 'boolean') {
       return NextResponse.json({ error: 'enabled (boolean) is required' }, { status: 400 })
     }
 
-    // Update connection
-    const { error: updateError } = await supabaseAdmin
+    // Update connection — also match 'expired' status (token refresh is automatic)
+    const { data: updated, error: updateError } = await supabaseAdmin
       .from('google_calendar_connections')
       .update({
         auto_record_enabled: enabled,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', user.id)
-      .eq('status', 'active')
+      .in('status', ['active', 'expired'])
+      .select('id')
+
+    console.log(`[Toggle Auto-Record] Updated ${updated?.length || 0} connections, error=${updateError?.message || 'none'}`)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
@@ -43,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (!enabled) {
       // Disabling: mark all pending bots as skipped
-      await supabaseAdmin
+      const { data: skipped } = await supabaseAdmin
         .from('calendar_scheduled_bots')
         .update({
           bot_enabled: false,
@@ -52,9 +56,11 @@ export async function POST(request: NextRequest) {
         })
         .eq('user_id', user.id)
         .eq('bot_status', 'pending')
+        .select('id')
+      console.log(`[Toggle Auto-Record] Skipped ${skipped?.length || 0} pending bots`)
     } else {
       // Re-enabling: reactivate skipped bots that haven't started yet
-      await supabaseAdmin
+      const { data: reactivated } = await supabaseAdmin
         .from('calendar_scheduled_bots')
         .update({
           bot_enabled: true,
@@ -64,6 +70,8 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id)
         .eq('bot_status', 'skipped')
         .gte('event_start', new Date().toISOString())
+        .select('id')
+      console.log(`[Toggle Auto-Record] Reactivated ${reactivated?.length || 0} skipped bots`)
     }
 
     return NextResponse.json({
