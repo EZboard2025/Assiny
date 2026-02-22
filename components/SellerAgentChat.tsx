@@ -32,6 +32,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [authToken, setAuthToken] = useState<string | null>(null)
 
   // Position & size (top-left corner based)
   const [pos, setPos] = useState({ x: 0, y: 0 })
@@ -44,6 +45,33 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
   const resizeRef = useRef<{ startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; dir: string } | null>(null)
   const supabase = createClientComponentClient()
+
+  // Load auth token on mount (same robust strategy as FollowUpView)
+  useEffect(() => {
+    const loadAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) { setAuthToken(session.access_token); return }
+
+        const { data: { session: refreshed } } = await supabase.auth.refreshSession()
+        if (refreshed?.access_token) { setAuthToken(refreshed.access_token); return }
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: { session: retried } } = await supabase.auth.getSession()
+          if (retried?.access_token) { setAuthToken(retried.access_token); return }
+        }
+      } catch (e) {
+        console.error('[SellerAgent] Auth error:', e)
+      }
+    }
+    loadAuth()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.access_token) setAuthToken(session.access_token)
+    })
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   // Set initial position when opening
   useEffect(() => {
@@ -165,22 +193,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     setIsLoading(true)
 
     try {
-      // getSession() can return null on subdomains — use getUser() token fallback
-      let token: string | undefined
-      const { data: { session } } = await supabase.auth.getSession()
-      token = session?.access_token
-
-      if (!token) {
-        // Fallback: try to get token from the auth state
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          // Re-fetch session after getUser (can force refresh)
-          const { data: refreshed } = await supabase.auth.getSession()
-          token = refreshed.session?.access_token
-        }
-      }
-
-      if (!token) {
+      if (!authToken) {
         setMessages(prev => [...prev, { role: 'assistant', content: 'Sessão expirada. Por favor, recarregue a página.' }])
         return
       }
@@ -189,7 +202,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           message: text.trim(),
