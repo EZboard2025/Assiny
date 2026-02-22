@@ -42,6 +42,7 @@ ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Como estão minhas vendas?" → get_whatsapp_activity + get_seller_message_tracking + get_followup_analyses
 - "Qual meu ponto mais fraco?" → get_performance_summary + get_challenge_effectiveness + get_roleplay_sessions(limit:5)
 - "Analise minha última reunião" → get_meet_evaluations(limit:1) + get_meet_evaluation_detail
+- "Compartilhar dados com a equipe" → get_meet_evaluations(limit:5) + get_roleplay_sessions(limit:5) → use {{eval_card}} para cada item
 - "O que tenho na agenda?" → get_calendar_events + get_scheduled_bots
 - "Marca uma reunião..." → create_calendar_event (ou quick_add_event para texto livre)
 - "Move/reagenda a reunião..." → get_calendar_events (para achar o event_id) + update_calendar_event
@@ -95,6 +96,16 @@ Use tags especiais para dados numéricos — elas são renderizadas como gráfic
   - participantes: nomes separados por vírgula (omitir se não tiver)
   - bot_status: completed, scheduled, pending, error (omitir se não aplicável)
 
+• {{eval_card|id|tipo|titulo|data|score|spinS|spinP|spinI|spinN}} — Card de avaliação para compartilhamento
+  - id: ID da avaliação/sessão (obtido das ferramentas)
+  - tipo: meet, roleplay, ou desafio
+  - titulo: nome da reunião ou persona do roleplay
+  - data: DD/MM
+  - score: nota geral (0-10)
+  - spinS/P/I/N: scores SPIN (use _ se não disponível)
+  Ex: {{eval_card|abc-123|meet|Weekly Ramppy|20/02|7.5|8.0|7.2|6.5|5.8}}
+  Ex: {{eval_card|def-456|roleplay|Diretor Financeiro|18/02|6.3|_|_|_|_}}
+
 REGRAS DAS TAGS VISUAIS:
 - Coloque tags visuais ANTES do texto explicativo (elas ficam no topo da resposta)
 - Ao falar de performance, use {{score}} + {{spin}} + {{trend}} juntos
@@ -104,6 +115,9 @@ REGRAS DAS TAGS VISUAIS:
 - Cada tag deve estar em sua própria linha
 - Após as tags, escreva texto normal com markdown (negrito, listas, etc.)
 - Só use tags quando tiver dados reais das ferramentas — nunca invente valores
+- Ao listar avaliações para compartilhamento, use {{eval_card}} para CADA item (um card por avaliação/sessão)
+- NÃO peça ao vendedor o ID — mostre os cards com botão "Compartilhar" para ele clicar
+- Quando o vendedor clicar "Compartilhar" em um card, o ID será enviado automaticamente — chame list_teammates e share_meet_evaluation
 
 COMPARTILHAMENTO DE REUNIÕES:
 Você pode compartilhar avaliações de Meet com colegas da equipe. Fluxo:

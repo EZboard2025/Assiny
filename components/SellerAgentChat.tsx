@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, X, Send, Loader2, TrendingUp, Dumbbell, CalendarDays } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, TrendingUp, Dumbbell, CalendarDays, Share2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface Message {
@@ -17,6 +17,7 @@ const QUICK_SUGGESTIONS = [
   { text: 'Como está minha performance?', icon: TrendingUp, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
   { text: 'O que devo treinar hoje?', icon: Dumbbell, color: 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100' },
   { text: 'Gerenciar minha agenda', icon: CalendarDays, color: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100' },
+  { text: 'Compartilhar dados com a equipe', icon: Share2, color: 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' },
 ]
 
 const MIN_W = 340
@@ -237,8 +238,8 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
 
   // ─── Visual Tag Parser ─────────────────────────────────────────────
   const parseVisualTags = (content: string) => {
-    const TAG_REGEX = /\{\{(score|spin|trend|metric|meeting)\|([^}]+)\}\}/g
-    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric' | 'meeting'; data: string }> = []
+    const TAG_REGEX = /\{\{(score|spin|trend|metric|meeting|eval_card)\|([^}]+)\}\}/g
+    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card'; data: string }> = []
     let lastIndex = 0
     let match
 
@@ -246,7 +247,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       if (match.index > lastIndex) {
         parts.push({ type: 'text', data: content.slice(lastIndex, match.index) })
       }
-      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric' | 'meeting', data: match[2] })
+      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card', data: match[2] })
       lastIndex = match.index + match[0].length
     }
 
@@ -414,6 +415,72 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     )
   }
 
+  // ─── Eval Card (for sharing flow) ──────────────────────────────────
+  const EvalCard = ({ id, type, title, date, score, spinS, spinP, spinI, spinN }: {
+    id: string; type: string; title: string; date: string; score: number;
+    spinS?: number; spinP?: number; spinI?: number; spinN?: number
+  }) => {
+    const typeConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
+      meet: { label: 'Meet', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+      roleplay: { label: 'Roleplay', bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
+      desafio: { label: 'Desafio', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
+    }
+    const tc = typeConfig[type] || { label: type, bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' }
+    const scoreColors = getScoreColor(score)
+    const hasSpin = spinS !== undefined && spinP !== undefined && spinI !== undefined && spinN !== undefined
+
+    return (
+      <div className="bg-gray-50 rounded-xl p-3 my-1.5 border border-gray-100">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${tc.bg} ${tc.text} ${tc.border} border`}>
+                {tc.label}
+              </span>
+              <span className="text-xs text-gray-400">{date}</span>
+            </div>
+            <div className="font-semibold text-sm text-gray-800 truncate">{title}</div>
+          </div>
+          <div className="flex flex-col items-center ml-2 flex-shrink-0">
+            <span className={`text-xl font-bold ${scoreColors.text}`}>{score.toFixed(1)}</span>
+            <span className="text-[9px] text-gray-400">/10</span>
+          </div>
+        </div>
+        {hasSpin && (
+          <div className="flex items-center gap-3 mt-2">
+            {[
+              { key: 'S', value: spinS! },
+              { key: 'P', value: spinP! },
+              { key: 'I', value: spinI! },
+              { key: 'N', value: spinN! },
+            ].map(b => {
+              const c = getScoreColor(b.value)
+              return (
+                <div key={b.key} className="flex items-center gap-1 flex-1">
+                  <span className="text-[10px] text-gray-400 font-medium">{b.key}</span>
+                  <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                    <div className={`${c.bar} h-full rounded-full`} style={{ width: `${Math.min(100, (b.value / 10) * 100)}%` }} />
+                  </div>
+                  <span className={`text-[10px] font-bold ${c.text} tabular-nums`}>{b.value.toFixed(1)}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '6px', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+          <button
+            onClick={() => sendMessage(`Compartilha a avaliação "${title}" do dia ${date} (ID: ${id}, tipo: ${type}) com a equipe. Quem deve receber?`)}
+            disabled={isLoading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, background: '#10b981', color: '#fff', cursor: 'pointer', opacity: isLoading ? 0.4 : 1, border: 'none' }}
+          >
+            <Share2 size={13} />
+            Compartilhar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // ─── Rich Text Renderer ────────────────────────────────────────────
   const renderTextBlock = (text: string, keyPrefix: number) => {
     const lines = text.split('\n')
@@ -539,6 +606,15 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
         case 'meeting': {
           const segs = part.data.split('|')
           return <MeetingCard key={`mt-${idx}`} title={segs[0] || ''} date={segs[1] || ''} time={segs[2] || ''} link={segs[3]} participants={segs[4]} botStatus={segs[5]} />
+        }
+        case 'eval_card': {
+          const segs = part.data.split('|')
+          const parseNum = (s: string | undefined) => {
+            if (!s || s === '_') return undefined
+            const n = parseFloat(s)
+            return isNaN(n) ? undefined : n
+          }
+          return <EvalCard key={`ec-${idx}`} id={segs[0] || ''} type={segs[1] || 'meet'} title={segs[2] || ''} date={segs[3] || ''} score={parseNum(segs[4]) ?? 0} spinS={parseNum(segs[5])} spinP={parseNum(segs[6])} spinI={parseNum(segs[7])} spinN={parseNum(segs[8])} />
         }
         case 'text':
           return renderTextBlock(part.data, idx)
