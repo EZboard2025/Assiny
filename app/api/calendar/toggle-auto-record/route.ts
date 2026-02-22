@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
     }
 
-    // If disabling, mark all pending bots as skipped
     if (!enabled) {
+      // Disabling: mark all pending bots as skipped
       await supabaseAdmin
         .from('calendar_scheduled_bots')
         .update({
@@ -52,6 +52,18 @@ export async function POST(request: NextRequest) {
         })
         .eq('user_id', user.id)
         .eq('bot_status', 'pending')
+    } else {
+      // Re-enabling: reactivate skipped bots that haven't started yet
+      await supabaseAdmin
+        .from('calendar_scheduled_bots')
+        .update({
+          bot_enabled: true,
+          bot_status: 'pending',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+        .eq('bot_status', 'skipped')
+        .gte('event_start', new Date().toISOString())
     }
 
     return NextResponse.json({
