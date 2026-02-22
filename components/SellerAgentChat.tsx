@@ -22,14 +22,39 @@ const QUICK_SUGGESTIONS = [
   'Quando estou livre amanhã?',
 ]
 
+const MIN_W = 340
+const MIN_H = 380
+const DEFAULT_W = 400
+const DEFAULT_H = 600
+
 export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // Position & size (top-left corner based)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [size, setSize] = useState({ w: DEFAULT_W, h: DEFAULT_H })
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
+  const resizeRef = useRef<{ startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; dir: string } | null>(null)
   const supabase = createClientComponentClient()
+
+  // Set initial position when opening
+  useEffect(() => {
+    if (isOpen) {
+      setPos({
+        x: window.innerWidth - DEFAULT_W - 24,
+        y: window.innerHeight - DEFAULT_H - 24,
+      })
+      setSize({ w: DEFAULT_W, h: DEFAULT_H })
+    }
+  }, [isOpen])
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -44,6 +69,92 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  // --- Drag (move) ---
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    // Only drag from header area
+    if ((e.target as HTMLElement).closest('button')) return
+    e.preventDefault()
+    setIsDragging(true)
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y }
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return
+      const dx = ev.clientX - dragRef.current.startX
+      const dy = ev.clientY - dragRef.current.startY
+      const newX = Math.max(0, Math.min(window.innerWidth - size.w, dragRef.current.origX + dx))
+      const newY = Math.max(0, Math.min(window.innerHeight - size.h, dragRef.current.origY + dy))
+      setPos({ x: newX, y: newY })
+    }
+
+    const onUp = () => {
+      setIsDragging(false)
+      dragRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [pos, size])
+
+  // --- Resize ---
+  const onResizeStart = useCallback((e: React.MouseEvent, dir: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+    resizeRef.current = {
+      startX: e.clientX, startY: e.clientY,
+      origX: pos.x, origY: pos.y,
+      origW: size.w, origH: size.h,
+      dir,
+    }
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return
+      const r = resizeRef.current
+      const dx = ev.clientX - r.startX
+      const dy = ev.clientY - r.startY
+
+      let newX = r.origX, newY = r.origY, newW = r.origW, newH = r.origH
+
+      if (r.dir.includes('right')) {
+        newW = Math.max(MIN_W, r.origW + dx)
+      }
+      if (r.dir.includes('left')) {
+        const w = Math.max(MIN_W, r.origW - dx)
+        newX = r.origX + (r.origW - w)
+        newW = w
+      }
+      if (r.dir.includes('bottom')) {
+        newH = Math.max(MIN_H, r.origH + dy)
+      }
+      if (r.dir.includes('top')) {
+        const h = Math.max(MIN_H, r.origH - dy)
+        newY = r.origY + (r.origH - h)
+        newH = h
+      }
+
+      // Clamp to viewport
+      newX = Math.max(0, newX)
+      newY = Math.max(0, newY)
+      if (newX + newW > window.innerWidth) newW = window.innerWidth - newX
+      if (newY + newH > window.innerHeight) newH = window.innerHeight - newY
+
+      setPos({ x: newX, y: newY })
+      setSize({ w: newW, h: newH })
+    }
+
+    const onUp = () => {
+      setIsResizing(false)
+      resizeRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [pos, size])
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return
@@ -98,29 +209,24 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     setInput('')
   }
 
-  // Simple markdown-like rendering
   const renderContent = (content: string) => {
     const lines = content.split('\n')
     return lines.map((line, i) => {
-      // Bold
       let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // Italic
       processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // List items
       if (processed.match(/^[-•]\s/)) {
         processed = `<span class="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-2 mt-2 flex-shrink-0"></span><span>${processed.slice(2)}</span>`
         return <div key={i} className="flex items-start ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
       }
-      // Numbered lists
       if (processed.match(/^\d+\.\s/)) {
         return <div key={i} className="ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
       }
-      // Empty line
       if (!processed.trim()) return <div key={i} className="h-2" />
-      // Normal text
       return <div key={i} className="my-0.5" dangerouslySetInnerHTML={{ __html: processed }} />
     })
   }
+
+  const interacting = isDragging || isResizing
 
   return (
     <>
@@ -137,9 +243,39 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
 
       {/* Chat panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[400px] max-h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 animate-in slide-in-from-bottom-4 duration-300">
-          {/* Header */}
-          <div className="bg-[#0D4A3A] px-4 py-3 flex items-center justify-between flex-shrink-0">
+        <div
+          className="fixed z-50 bg-white rounded-2xl shadow-2xl flex flex-col overflow-visible border border-gray-200"
+          style={{
+            left: `${pos.x}px`,
+            top: `${pos.y}px`,
+            width: `${size.w}px`,
+            height: `${size.h}px`,
+            userSelect: interacting ? 'none' : 'auto',
+          }}
+        >
+          {/* ===== Resize handles (8 directions) ===== */}
+          {/* Top */}
+          <div onMouseDown={e => onResizeStart(e, 'top')} className="absolute -top-1 left-3 right-3 h-2 cursor-n-resize z-20" />
+          {/* Bottom */}
+          <div onMouseDown={e => onResizeStart(e, 'bottom')} className="absolute -bottom-1 left-3 right-3 h-2 cursor-s-resize z-20" />
+          {/* Left */}
+          <div onMouseDown={e => onResizeStart(e, 'left')} className="absolute top-3 -left-1 w-2 bottom-3 cursor-w-resize z-20" />
+          {/* Right */}
+          <div onMouseDown={e => onResizeStart(e, 'right')} className="absolute top-3 -right-1 w-2 bottom-3 cursor-e-resize z-20" />
+          {/* Top-left */}
+          <div onMouseDown={e => onResizeStart(e, 'top-left')} className="absolute -top-1 -left-1 w-4 h-4 cursor-nw-resize z-30" />
+          {/* Top-right */}
+          <div onMouseDown={e => onResizeStart(e, 'top-right')} className="absolute -top-1 -right-1 w-4 h-4 cursor-ne-resize z-30" />
+          {/* Bottom-left */}
+          <div onMouseDown={e => onResizeStart(e, 'bottom-left')} className="absolute -bottom-1 -left-1 w-4 h-4 cursor-sw-resize z-30" />
+          {/* Bottom-right */}
+          <div onMouseDown={e => onResizeStart(e, 'bottom-right')} className="absolute -bottom-1 -right-1 w-4 h-4 cursor-se-resize z-30" />
+
+          {/* Header (draggable) */}
+          <div
+            onMouseDown={onDragStart}
+            className="bg-[#0D4A3A] px-4 py-3 flex items-center justify-between flex-shrink-0 cursor-grab active:cursor-grabbing rounded-t-2xl"
+          >
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-green-300" />
@@ -158,17 +294,14 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0" style={{ maxHeight: '400px' }}>
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
             {messages.length === 0 ? (
               <div className="space-y-4">
-                {/* Welcome */}
                 <div className="bg-green-50 border border-green-100 rounded-xl p-3">
                   <p className="text-sm text-gray-700">
                     Olá{userName ? `, ${userName.split(' ')[0]}` : ''}! Sou seu assistente pessoal de vendas. Tenho acesso a toda sua performance, reuniões, treinos e agenda. Como posso ajudar?
                   </p>
                 </div>
-
-                {/* Quick suggestions */}
                 <div className="flex flex-wrap gap-1.5">
                   {QUICK_SUGGESTIONS.map((suggestion) => (
                     <button
@@ -226,7 +359,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           )}
 
           {/* Input */}
-          <form onSubmit={handleSubmit} className="px-3 py-2.5 border-t border-gray-100 flex items-center gap-2 flex-shrink-0">
+          <form onSubmit={handleSubmit} className="px-3 py-2.5 border-t border-gray-100 flex items-center gap-2 flex-shrink-0 rounded-b-2xl">
             <input
               ref={inputRef}
               type="text"
