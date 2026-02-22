@@ -100,7 +100,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     markAsRead(notification.id)
     setShowNotifications(false)
     // Navigate based on notification type
-    if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error') {
+    if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error' || notification.type === 'shared_meeting') {
       handleViewChange('historico')
     }
   }
