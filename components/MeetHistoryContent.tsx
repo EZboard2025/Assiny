@@ -89,9 +89,10 @@ function translateIndicator(key: string): string {
 
 interface MeetHistoryContentProps {
   newEvaluationIds?: string[]
+  initialEvaluationId?: string | null
 }
 
-export default function MeetHistoryContent({ newEvaluationIds = [] }: MeetHistoryContentProps) {
+export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId }: MeetHistoryContentProps) {
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
   const [loading, setLoading] = useState(true)
@@ -153,7 +154,11 @@ export default function MeetHistoryContent({ newEvaluationIds = [] }: MeetHistor
 
       setEvaluations(enrichedData)
       if (enrichedData.length > 0) {
-        setSelectedEvaluation(enrichedData[0])
+        // Auto-select specific evaluation if navigated from calendar
+        const target = initialEvaluationId
+          ? enrichedData.find((e: MeetEvaluation) => e.id === initialEvaluationId)
+          : null
+        setSelectedEvaluation(target || enrichedData[0])
       }
 
       // Load saved simulations linked to evaluations

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, lazy, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, History, CheckCircle, Video, Users, AlertCircle, ArrowLeft, FileText } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -24,12 +25,18 @@ interface HistoricoViewProps {
 }
 
 export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) {
+  const searchParams = useSearchParams()
+  const urlTab = searchParams.get('tab')
+  const urlEvaluationId = searchParams.get('evaluationId')
+
   const [sessions, setSessions] = useState<RoleplaySession[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
-  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | null>(null)
+  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | null>(
+    urlTab === 'meet' ? 'meet' : null
+  )
   const [userId, setUserId] = useState<string | null>(null)
 
   // Notifications for meet glow effect
@@ -437,7 +444,7 @@ export default function HistoricoView({ onStartChallenge }: HistoricoViewProps) 
 
         ) : historyType === 'meet' ? (
           <Suspense fallback={<LazySpinner />}>
-            <MeetHistoryContent newEvaluationIds={newEvaluationIds} />
+            <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={urlEvaluationId} />
           </Suspense>
         ) : historyType === 'correcoes' ? (
           <Suspense fallback={<LazySpinner />}>

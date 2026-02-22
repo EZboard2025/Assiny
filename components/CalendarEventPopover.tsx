@@ -361,12 +361,13 @@ export default function CalendarEventPopover({
               )}
 
               {/* View evaluation button */}
-              {botStatus === 'completed' && event.evaluation && onViewEvaluation && (
+              {botStatus === 'completed' && event.evaluationId && onViewEvaluation && (
                 <button
                   onClick={() => onViewEvaluation(event)}
-                  className="w-full text-xs text-green-600 hover:text-green-700 font-medium flex items-center justify-center gap-1 mt-2 py-1.5 hover:bg-green-50 rounded-lg transition-colors"
+                  className="w-full text-xs text-green-600 hover:text-green-700 font-medium flex items-center justify-center gap-1.5 mt-2 py-2 hover:bg-green-50 rounded-lg transition-colors border border-green-200"
                 >
-                  Ver avaliação completa
+                  <Clock className="w-3.5 h-3.5" />
+                  Ver avaliação no histórico
                   <ChevronRight className="w-3 h-3" />
                 </button>
               )}
