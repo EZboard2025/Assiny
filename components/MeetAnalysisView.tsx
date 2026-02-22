@@ -1517,7 +1517,21 @@ export default function MeetAnalysisView() {
                             body: JSON.stringify({ enabled: !autoRecordEnabled }),
                           })
                           if (res.ok) {
-                            setAutoRecordEnabled(!autoRecordEnabled)
+                            const newEnabled = !autoRecordEnabled
+                            setAutoRecordEnabled(newEnabled)
+                            // Update all events locally to reflect the global toggle
+                            setCalendarEvents(prev => prev.map(e => {
+                              const isFuture = new Date(e.start) >= new Date()
+                              if (!isFuture) return e
+                              return {
+                                ...e,
+                                botEnabled: newEnabled,
+                                botStatus: newEnabled ? 'pending' : 'skipped',
+                              }
+                            }))
+                            // Close popover so user sees fresh data on next click
+                            setPopoverEvent(null)
+                            setPopoverAnchor(null)
                           } else {
                             const err = await res.json().catch(() => ({}))
                             console.error('Toggle auto-record API error:', res.status, err)

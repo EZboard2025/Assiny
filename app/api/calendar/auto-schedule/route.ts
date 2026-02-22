@@ -125,12 +125,11 @@ async function handleSchedule() {
  * Sync calendar events for all active connections
  */
 async function handleSync() {
-  // Fetch all active connections
+  // Fetch all active connections (sync all, respect auto_record_enabled per-event)
   const { data: connections, error } = await supabaseAdmin
     .from('google_calendar_connections')
     .select('user_id, id, status, auto_record_enabled')
     .eq('status', 'active')
-    .neq('auto_record_enabled', false)
 
   if (error || !connections) {
     return NextResponse.json({ error: 'Failed to fetch connections' }, { status: 500 })
@@ -163,6 +162,7 @@ async function handleSync() {
           .single()
 
         if (!existing) {
+          const autoOn = conn.auto_record_enabled !== false
           await supabaseAdmin
             .from('calendar_scheduled_bots')
             .insert({
@@ -175,8 +175,8 @@ async function handleSync() {
               event_end: event.end,
               meet_link: event.meetLink,
               attendees: event.attendees,
-              bot_enabled: true,
-              bot_status: 'pending',
+              bot_enabled: autoOn,
+              bot_status: autoOn ? 'pending' : 'skipped',
             })
         } else {
           await supabaseAdmin

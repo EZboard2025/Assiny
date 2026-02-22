@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!enabled) {
-      // Disabling: mark all pending bots as skipped
-      const { data: skipped } = await supabaseAdmin
+      // Disabling: disable ALL future bots (regardless of current status)
+      const { data: disabled } = await supabaseAdmin
         .from('calendar_scheduled_bots')
         .update({
           bot_enabled: false,
@@ -55,12 +55,13 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', user.id)
-        .eq('bot_status', 'pending')
+        .in('bot_status', ['pending', 'scheduled'])
+        .gte('event_start', new Date().toISOString())
         .select('id')
-      console.log(`[Toggle Auto-Record] Skipped ${skipped?.length || 0} pending bots`)
+      console.log(`[Toggle Auto-Record] Disabled ${disabled?.length || 0} future bots`)
     } else {
-      // Re-enabling: reactivate skipped bots that haven't started yet
-      const { data: reactivated } = await supabaseAdmin
+      // Enabling: enable ALL future bots (regardless of current status)
+      const { data: activated } = await supabaseAdmin
         .from('calendar_scheduled_bots')
         .update({
           bot_enabled: true,
@@ -68,10 +69,10 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', user.id)
-        .eq('bot_status', 'skipped')
+        .in('bot_status', ['skipped', 'error'])
         .gte('event_start', new Date().toISOString())
         .select('id')
-      console.log(`[Toggle Auto-Record] Reactivated ${reactivated?.length || 0} skipped bots`)
+      console.log(`[Toggle Auto-Record] Activated ${activated?.length || 0} future bots`)
     }
 
     return NextResponse.json({
