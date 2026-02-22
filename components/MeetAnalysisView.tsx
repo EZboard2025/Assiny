@@ -29,7 +29,8 @@ import {
   Plus,
   Mic,
   Sparkles,
-  Globe
+  Globe,
+  LogOut
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -198,6 +199,7 @@ export default function MeetAnalysisView() {
   const [hasWriteAccess, setHasWriteAccess] = useState(false)
   const [autoRecordEnabled, setAutoRecordEnabled] = useState(true)
   const [togglingAutoRecord, setTogglingAutoRecord] = useState(false)
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
   const [showCreateEventModal, setShowCreateEventModal] = useState(false)
   const [createEventDate, setCreateEventDate] = useState<Date | undefined>(undefined)
   const [createEventHour, setCreateEventHour] = useState<number | undefined>(undefined)
@@ -1523,10 +1525,11 @@ export default function MeetAnalysisView() {
                     {hasWriteAccess && (
                       <button
                         onClick={() => { setCreateEventDate(undefined); setCreateEventHour(undefined); setShowCreateEventModal(true) }}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-2xl shadow-md hover:shadow-lg transition-all"
                         title="Criar evento"
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-6 h-6 text-blue-600" />
+                        <span className="text-sm font-medium text-gray-700 hidden sm:inline">Criar</span>
                       </button>
                     )}
                     <button
@@ -1536,13 +1539,38 @@ export default function MeetAnalysisView() {
                     >
                       <RefreshCw className={`w-4 h-4 ${calendarEventsLoading ? 'animate-spin' : ''}`} />
                     </button>
-                    <button
-                      onClick={disconnectCalendar}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Desconectar Google Calendar"
-                    >
-                      <Power className="w-4 h-4" />
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowDisconnectConfirm(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors text-xs"
+                        title="Sair do Google Calendar"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span className="hidden sm:inline">Sair</span>
+                      </button>
+
+                      {/* Disconnect confirmation popover */}
+                      {showDisconnectConfirm && (
+                        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 p-4 z-50">
+                          <p className="text-sm font-medium text-gray-900 mb-1">Desconectar Google Calendar?</p>
+                          <p className="text-xs text-gray-500 mb-3">A gravação automática das reuniões será desativada.</p>
+                          <div className="flex items-center gap-2 justify-end">
+                            <button
+                              onClick={() => setShowDisconnectConfirm(false)}
+                              className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => { setShowDisconnectConfirm(false); disconnectCalendar() }}
+                              className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                            >
+                              Sim, desconectar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
