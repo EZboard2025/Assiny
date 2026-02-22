@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { hasWriteScopes } from '@/lib/google-calendar'
+import { GOOGLE_SCOPES } from '@/lib/google-calendar'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch connection
+    // Fetch connection (include 'expired' — it can be recovered automatically)
     const { data: connection } = await supabaseAdmin
       .from('google_calendar_connections')
-      .select('id, google_email, status, auto_record_enabled, scopes, created_at, updated_at')
+      .select('id, google_email, status, auto_record_enabled, created_at, updated_at')
       .eq('user_id', user.id)
       .single()
 
@@ -37,12 +37,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Treat both 'active' and 'expired' as connected — token refresh is automatic
     return NextResponse.json({
-      connected: connection.status === 'active',
+      connected: true,
       email: connection.google_email,
       status: connection.status,
       autoRecordEnabled: connection.auto_record_enabled,
-      hasWriteAccess: hasWriteScopes(connection.scopes),
+      hasWriteAccess: GOOGLE_SCOPES.includes('https://www.googleapis.com/auth/calendar.events'),
       connectedAt: connection.created_at,
     })
   } catch (error: any) {

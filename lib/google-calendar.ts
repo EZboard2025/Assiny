@@ -15,6 +15,7 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/gmail.send',
 ]
 
 // Check if connection has write scopes
@@ -111,44 +112,86 @@ export async function refreshGoogleToken(connectionId: string, refreshToken: str
 
 /**
  * Get an authenticated Google Calendar client for a user.
- * Auto-refreshes token if expired.
+ * Auto-refreshes token if expired. Recovers from 'expired' status automatically.
+ * Only returns null if connection doesn't exist or was manually disconnected.
  */
 export async function getCalendarClient(userId: string) {
-  // Fetch connection from DB
+  // Fetch connection — include 'expired' so we can attempt recovery
   const { data: connection, error } = await supabaseAdmin
     .from('google_calendar_connections')
     .select('*')
     .eq('user_id', userId)
-    .eq('status', 'active')
+    .in('status', ['active', 'expired'])
     .single()
 
   if (error || !connection) {
     return null
   }
 
+  if (!connection.refresh_token) {
+    console.error('[Google Calendar] No refresh_token stored for user', userId)
+    return null
+  }
+
   const oauth2Client = createOAuth2Client()
+
+  // Listen for automatic token refreshes by googleapis and persist to DB
+  oauth2Client.on('tokens', async (tokens) => {
+    try {
+      const updates: Record<string, string> = { updated_at: new Date().toISOString() }
+      if (tokens.access_token) updates.access_token = tokens.access_token
+      if (tokens.expiry_date) updates.token_expires_at = new Date(tokens.expiry_date).toISOString()
+      updates.status = 'active'
+
+      await supabaseAdmin
+        .from('google_calendar_connections')
+        .update(updates)
+        .eq('id', connection.id)
+
+      console.log('[Google Calendar] Auto-refreshed token persisted to DB for user', userId)
+    } catch (err) {
+      console.warn('[Google Calendar] Failed to persist auto-refreshed token:', err)
+    }
+  })
 
   // Check if token is expired (with 5min buffer)
   const expiresAt = new Date(connection.token_expires_at).getTime()
   const now = Date.now()
+  const needsRefresh = now > expiresAt - 5 * 60 * 1000 || connection.status === 'expired'
 
-  if (now > expiresAt - 5 * 60 * 1000) {
-    // Token expired or about to expire — refresh
-    try {
-      const newCredentials = await refreshGoogleToken(connection.id, connection.refresh_token)
-      oauth2Client.setCredentials({
-        access_token: newCredentials.access_token,
-        refresh_token: connection.refresh_token,
-        expiry_date: newCredentials.expiry_date,
-      })
-    } catch (refreshError) {
-      console.error('[Google Calendar] Token refresh failed:', refreshError)
-      // Mark connection as expired
+  if (needsRefresh) {
+    // Token expired or connection was marked expired — attempt refresh with retry
+    let lastError: any = null
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const newCredentials = await refreshGoogleToken(connection.id, connection.refresh_token)
+        oauth2Client.setCredentials({
+          access_token: newCredentials.access_token,
+          refresh_token: connection.refresh_token,
+          expiry_date: newCredentials.expiry_date,
+        })
+        console.log(`[Google Calendar] Token refreshed on attempt ${attempt} for user ${userId}`)
+        lastError = null
+        break
+      } catch (refreshError) {
+        lastError = refreshError
+        console.warn(`[Google Calendar] Token refresh attempt ${attempt} failed:`, refreshError)
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000))
+      }
+    }
+
+    if (lastError) {
+      console.error('[Google Calendar] All refresh attempts failed for user', userId)
+      // Mark as expired but DON'T return null — let googleapis try with refresh_token
       await supabaseAdmin
         .from('google_calendar_connections')
         .update({ status: 'expired', updated_at: new Date().toISOString() })
         .eq('id', connection.id)
-      return null
+
+      // Still set credentials with refresh_token — googleapis may auto-refresh
+      oauth2Client.setCredentials({
+        refresh_token: connection.refresh_token,
+      })
     }
   } else {
     oauth2Client.setCredentials({
@@ -160,6 +203,7 @@ export async function getCalendarClient(userId: string) {
 
   return {
     calendar: google.calendar({ version: 'v3', auth: oauth2Client }),
+    auth: oauth2Client,
     connection,
   }
 }
@@ -175,6 +219,39 @@ export async function revokeGoogleToken(accessToken: string) {
     // Token might already be revoked — that's fine
     console.warn('[Google Calendar] Token revocation warning:', err)
   }
+}
+
+/**
+ * Send an email via Gmail API using the user's OAuth credentials.
+ * Returns true if sent, false if user has no Google connection.
+ */
+export async function sendGmail(userId: string, options: {
+  to: string
+  subject: string
+  htmlBody: string
+}): Promise<boolean> {
+  const client = await getCalendarClient(userId)
+  if (!client) return false
+
+  const gmail = google.gmail({ version: 'v1', auth: client.auth })
+
+  const message = [
+    `To: ${options.to}`,
+    `Subject: =?UTF-8?B?${Buffer.from(options.subject).toString('base64')}?=`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    '',
+    options.htmlBody,
+  ].join('\r\n')
+
+  const encodedMessage = Buffer.from(message).toString('base64url')
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw: encodedMessage },
+  })
+
+  return true
 }
 
 export interface CalendarEvent {
@@ -211,7 +288,8 @@ export async function fetchUpcomingMeetEvents(
       timeMax: future.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
-      maxResults: 100,
+      showHiddenInvitations: true,
+      maxResults: 250,
     })
 
     const events = response.data.items || []
@@ -249,12 +327,10 @@ export async function fetchUpcomingMeetEvents(
   } catch (err: any) {
     console.error('[Google Calendar] Failed to fetch events:', err.message)
 
-    // If 401/403, mark as expired
-    if (err.code === 401 || err.code === 403) {
-      await supabaseAdmin
-        .from('google_calendar_connections')
-        .update({ status: 'expired', updated_at: new Date().toISOString() })
-        .eq('id', client.connection.id)
+    // On auth errors, attempt one more refresh before giving up
+    if (err.code === 401 || err.code === 403 || err.status === 401 || err.status === 403) {
+      console.warn('[Google Calendar] Auth error on fetchUpcomingMeetEvents, will recover on next call')
+      // Don't mark as expired — getCalendarClient will handle refresh on next call
     }
 
     return null
@@ -282,7 +358,8 @@ export async function fetchAllEvents(
       timeMax: future.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
-      maxResults: 250,
+      showHiddenInvitations: true,
+      maxResults: 500,
     })
 
     const events = response.data.items || []
@@ -315,12 +392,11 @@ export async function fetchAllEvents(
       })
   } catch (err: any) {
     console.error('[Google Calendar] Failed to fetch all events:', err.message)
-    if (err.code === 401 || err.code === 403) {
-      await supabaseAdmin
-        .from('google_calendar_connections')
-        .update({ status: 'expired', updated_at: new Date().toISOString() })
-        .eq('id', client.connection.id)
+
+    if (err.code === 401 || err.code === 403 || err.status === 401 || err.status === 403) {
+      console.warn('[Google Calendar] Auth error on fetchAllEvents, will recover on next call')
     }
+
     return null
   }
 }

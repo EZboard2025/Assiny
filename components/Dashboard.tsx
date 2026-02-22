@@ -13,13 +13,16 @@ import AgendaWidget from './dashboard/AgendaWidget'
 import SpinBars from './dashboard/SpinBars'
 import QuickNav from './dashboard/QuickNav'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
-import { BarChart3, Target, TrendingUp, Activity, Lock } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3, Bell } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
 import ConfigurationRequired from './ConfigurationRequired'
 import SavedSimulationCard from './dashboard/SavedSimulationCard'
 import { useNotifications } from '@/hooks/useNotifications'
+import type { UserNotification } from '@/hooks/useNotifications'
+import NotificationPanel from './dashboard/NotificationPanel'
+import SharedEvaluationModal from './dashboard/SharedEvaluationModal'
 import SellerAgentChat from './SellerAgentChat'
 
 function getTimeGreeting(): string {
@@ -82,6 +85,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [activeChallenge, setActiveChallenge] = useState<any | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
   const chatRef = useRef<ChatInterfaceHandle>(null)
+  const bellRef = useRef<HTMLButtonElement>(null)
 
   // Performance data state
   const [performanceData, setPerformanceData] = useState<{
@@ -104,12 +108,36 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { streak, loading: streakLoading } = useTrainingStreak(userId)
 
   // Notifications hook
-  const { notifications, unreadCount, markAsRead } = useNotifications(userId)
+  const { notifications, allNotifications, unreadCount, markAsRead, markAllAsRead, fetchAllNotifications } = useNotifications(userId)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [sharedModalShareId, setSharedModalShareId] = useState<string | null>(null)
+  const [pendingEvaluationId, setPendingEvaluationId] = useState<string | null>(null)
+  const [pendingHistoryTab, setPendingHistoryTab] = useState<string | null>(null)
 
   // Count meet-specific notifications for sidebar badge
   const meetNotificationCount = notifications.filter(n =>
     n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error'
   ).length
+
+  const handleNotificationClick = (notification: UserNotification) => {
+    if (!notification.is_read) {
+      markAsRead(notification.id)
+    }
+    setShowNotifications(false)
+
+    if (notification.type === 'shared_meeting' && notification.data?.shareId) {
+      setSharedModalShareId(notification.data.shareId)
+    } else if (notification.type === 'meet_evaluation_ready' || notification.type === 'meet_evaluation_error') {
+      console.log('[Notification Click] evaluationId:', notification.data?.evaluationId, 'data:', notification.data)
+      setPendingEvaluationId(notification.data?.evaluationId || null)
+      setPendingHistoryTab('meet')
+      handleViewChange('historico')
+    }
+  }
+
+  const handleMarkAllAsRead = () => {
+    markAllAsRead()
+  }
 
   // Hook para verificar limites do plano
   const {
@@ -442,7 +470,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (currentView === 'roleplay') {
       return (
         <RoleplayView
-          onNavigateToHistory={() => handleViewChange('historico')}
+          onNavigateToHistory={(historyTab) => {
+            if (historyTab) setPendingHistoryTab(historyTab)
+            handleViewChange('historico')
+          }}
           challengeConfig={activeChallenge?.challenge_config}
           challengeId={activeChallenge?.id}
           onChallengeComplete={() => setActiveChallenge(null)}
@@ -471,7 +502,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'historico') {
-      return <HistoricoView onStartChallenge={handleStartChallenge} />
+      return <HistoricoView onStartChallenge={handleStartChallenge} initialMeetEvaluationId={pendingEvaluationId} initialHistoryTab={pendingHistoryTab} onMeetEvaluationLoaded={() => { setPendingEvaluationId(null); setPendingHistoryTab(null) }} />
     }
 
     if (currentView === 'perfil') {
@@ -512,14 +543,71 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     return (
       <div className="py-8 px-6 relative z-10">
-        <div className="max-w-[1400px]">
-          {/* Header: Greeting + Streak */}
-          <div className={`mb-14 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                {getTimeGreeting()}, {userName || 'Vendedor'}
-              </h1>
-              <StreakIndicator streak={streak} loading={streakLoading} />
+        <div className="max-w-[1200px]">
+          {/* Header with banner and greeting */}
+          <div className={`mb-8 flex flex-col lg:flex-row gap-4 items-stretch ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+            {/* Banner CTA with image */}
+            <button
+              onClick={() => handleViewChange('roleplay')}
+              className="group relative overflow-hidden rounded-2xl bg-green-800 p-5 text-left transition-all hover:shadow-xl hover:scale-[1.01] lg:w-[280px] flex-shrink-0 min-h-[100px]"
+            >
+              {/* Background Image */}
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{
+                  backgroundImage: 'url(/images/banner-training.jpg)',
+                }}
+              />
+              {/* Green Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-r from-green-700/80 to-green-500/60" />
+              {/* Content */}
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <h2 className="text-lg font-bold text-white leading-tight">
+                  Acelere sua rampagem
+                </h2>
+              </div>
+            </button>
+
+            {/* Greeting */}
+            <div className="flex-1 flex items-center">
+              <div className="flex-1">
+                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">
+                  Plataforma de Rampagem
+                </p>
+                <div className="flex items-center gap-4">
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                    Olá, {userName || 'Vendedor'}
+                  </h1>
+                  <StreakIndicator streak={streak} loading={streakLoading} />
+                </div>
+              </div>
+              {/* Notification bell */}
+              <div className="relative">
+                <button
+                  ref={bellRef}
+                  onClick={() => setShowNotifications(prev => !prev)}
+                  className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <Bell className="w-5 h-5 text-gray-500" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <NotificationPanel
+                    notifications={notifications}
+                    allNotifications={allNotifications}
+                    onMarkAsRead={markAsRead}
+                    onMarkAllAsRead={handleMarkAllAsRead}
+                    onNotificationClick={handleNotificationClick}
+                    onClose={() => setShowNotifications(false)}
+                    onFetchAll={fetchAllNotifications}
+                    anchorRef={bellRef}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -593,20 +681,27 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 loading={performanceLoading}
               />
 
-              <KPICard
-                icon={TrendingUp}
-                iconBg={trend === 'improving' ? 'bg-green-50' : trend === 'declining' ? 'bg-red-50' : 'bg-gray-50'}
-                iconColor={trend === 'improving' ? 'text-green-600' : trend === 'declining' ? 'text-red-500' : 'text-gray-500'}
-                label="Tendência"
-                value={trend === 'improving' ? 'Melhorando' : trend === 'declining' ? 'Caindo' : totalSessions > 0 ? 'Estável' : '—'}
-                subtitle={scoreImprovement != null && totalSessions > 0 ? `${scoreImprovement > 0 ? '+' : ''}${scoreImprovement.toFixed(1)} vs anterior` : 'Treine para ver tendência'}
-                delta={scoreImprovement != null && totalSessions > 1 ? {
-                  value: `${scoreImprovement > 0 ? '+' : ''}${scoreImprovement.toFixed(1)}`,
-                  positive: scoreImprovement >= 0
-                } : undefined}
-                onClick={() => handleViewChange('perfil')}
-                loading={performanceLoading}
-              />
+            <FeatureCard
+              icon={Clock}
+              title="Histórico"
+              subtitle="Todas as sessões"
+              description="Simulações, Follow-ups e análises de Meet."
+              onClick={() => {
+                if (meetNotificationCount > 0) {
+                  // Mark all meet notifications as read
+                  notifications
+                    .filter(n => n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error')
+                    .forEach(n => markAsRead(n.id))
+                  // Navigate and open Meet tab
+                  setPendingHistoryTab('meet')
+                  handleViewChange('historico')
+                } else {
+                  handleViewChange('historico')
+                }
+              }}
+              notificationCount={meetNotificationCount}
+              onMouseEnter={() => prefetchMap.historico()}
+            />
 
               <KPICard
                 icon={BarChart3}
@@ -680,6 +775,30 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         {renderContent()}
       </main>
 
+      {/* Stats Panel - only on home */}
+      {currentView === 'home' && (
+        <StatsPanel
+          overallAverage={performanceData?.overallAverage || 0}
+          totalSessions={performanceData?.totalSessions || 0}
+          spinScores={performanceData?.spinScores || { S: 0, P: 0, I: 0, N: 0 }}
+          streak={streak}
+          onViewProfile={() => handleViewChange('perfil')}
+          onViewHistory={() => handleViewChange('historico')}
+          loading={performanceLoading}
+          challengeComponent={userId && companyId ? (
+            <DailyChallengeBanner
+              userId={userId}
+              companyId={companyId}
+              onStartChallenge={handleStartChallenge}
+              onViewHistory={() => {
+                setPendingHistoryTab('desafios')
+                setCurrentView('historico')
+              }}
+            />
+          ) : undefined}
+        />
+      )}
+
       {/* Config Hub Modal */}
       {showConfigHub && (
         <ConfigHub onClose={() => {
@@ -740,6 +859,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         )
       )}
 
+      {/* Shared Evaluation Modal */}
+      {sharedModalShareId && userId && (
+        <SharedEvaluationModal
+          shareId={sharedModalShareId}
+          userId={userId}
+          onClose={() => setSharedModalShareId(null)}
+        />
+      )}
     </div>
   )
 }

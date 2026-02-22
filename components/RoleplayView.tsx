@@ -72,7 +72,7 @@ interface MeetSimulationConfig {
 }
 
 interface RoleplayViewProps {
-  onNavigateToHistory?: () => void
+  onNavigateToHistory?: (historyType?: string) => void
   challengeConfig?: ChallengeConfig
   challengeId?: string
   onChallengeComplete?: () => void
@@ -2988,8 +2988,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                 <button
                   onClick={() => {
                     setShowEvaluationSummary(false);
+                    const historyTab = challengeConfig ? 'desafios' : isMeetSimulation ? 'correcoes' : 'simulacoes'
                     if (onNavigateToHistory) {
-                      onNavigateToHistory();
+                      onNavigateToHistory(historyTab);
                     } else {
                       window.location.href = '/?view=historico';
                     }

@@ -17,6 +17,7 @@ export interface UserNotification {
 
 export function useNotifications(userId: string | null) {
   const [notifications, setNotifications] = useState<UserNotification[]>([])
+  const [allNotifications, setAllNotifications] = useState<UserNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
@@ -36,6 +37,20 @@ export function useNotifications(userId: string | null) {
     }
   }, [userId])
 
+  const fetchAllNotifications = useCallback(async () => {
+    if (!userId) return
+
+    try {
+      const res = await fetch(`/api/notifications?userId=${userId}&all=true`)
+      if (!res.ok) return
+
+      const data = await res.json()
+      setAllNotifications(data.notifications || [])
+    } catch (err) {
+      console.error('Error fetching all notifications:', err)
+    }
+  }, [userId])
+
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!userId) return
 
@@ -46,10 +61,36 @@ export function useNotifications(userId: string | null) {
         body: JSON.stringify({ notificationId, userId })
       })
 
-      setNotifications(prev => prev.filter(n => n.id !== notificationId))
+      // Move from unread to read state (don't remove)
+      setNotifications(prev => prev.map(n =>
+        n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+      ))
       setUnreadCount(prev => Math.max(0, prev - 1))
+      // Update allNotifications too
+      setAllNotifications(prev => prev.map(n =>
+        n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+      ))
     } catch (err) {
       console.error('Error marking notification as read:', err)
+    }
+  }, [userId])
+
+  const markAllAsRead = useCallback(async () => {
+    if (!userId) return
+
+    try {
+      await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markAll: true, userId })
+      })
+
+      const now = new Date().toISOString()
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: now })))
+      setUnreadCount(0)
+      setAllNotifications(prev => prev.map(n => n.is_read ? n : { ...n, is_read: true, read_at: now }))
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err)
     }
   }, [userId])
 
@@ -71,6 +112,7 @@ export function useNotifications(userId: string | null) {
           const newNotif = payload.new as UserNotification
           if (newNotif && !newNotif.is_read) {
             setNotifications(prev => [newNotif, ...prev])
+            setAllNotifications(prev => [newNotif, ...prev])
             setUnreadCount(prev => prev + 1)
           }
         }
@@ -96,5 +138,13 @@ export function useNotifications(userId: string | null) {
     return () => clearInterval(interval)
   }, [userId, fetchNotifications])
 
-  return { notifications, unreadCount, markAsRead, refetch: fetchNotifications }
+  return {
+    notifications,
+    allNotifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    fetchAllNotifications,
+    refetch: fetchNotifications
+  }
 }

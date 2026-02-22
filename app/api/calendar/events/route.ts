@@ -48,14 +48,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const viewAll = searchParams.get('view') === 'all'
 
-    // Fetch events from Google Calendar
+    // Fetch events from Google Calendar (30 days to support week navigation)
+    const daysAhead = parseInt(searchParams.get('days') || '30')
     const calendarEvents = viewAll
-      ? await fetchAllEvents(user.id, 7)
-      : await fetchUpcomingMeetEvents(user.id, 7)
+      ? await fetchAllEvents(user.id, daysAhead)
+      : await fetchUpcomingMeetEvents(user.id, daysAhead)
 
     if (!calendarEvents) {
       return NextResponse.json({ error: 'Failed to fetch calendar events', events: [] }, { status: 200 })
     }
+
+    console.log(`[Calendar Events] Fetched ${calendarEvents.length} events for user ${user.id} (${daysAhead} days ahead)`)
 
     // Upsert events into calendar_scheduled_bots (only for events with Meet links)
     const enrichedEvents = []

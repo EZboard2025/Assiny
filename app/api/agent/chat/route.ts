@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
-import { getCalendarClient, fetchAllEvents, checkFreeBusy } from '@/lib/google-calendar'
+import { getCalendarClient, fetchAllEvents, checkFreeBusy, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, quickAddEvent, sendGmail } from '@/lib/google-calendar'
+import { buildShareEmailHtml } from '@/lib/meet/shareEmailBuilder'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
@@ -32,7 +33,88 @@ CONTEXTO:
 - Você tem acesso a TODOS os dados do vendedor via ferramentas — use-as sempre que precisar de dados reais
 
 FERRAMENTAS DISPONÍVEIS:
-Você tem 15 ferramentas para consultar qualquer dado do vendedor. Use quantas precisar para dar uma resposta completa e precisa. Não hesite em chamar múltiplas ferramentas na mesma resposta se precisar cruzar dados.`
+Você tem 15 ferramentas para consultar qualquer dado do vendedor. SEMPRE chame múltiplas ferramentas em paralelo para dar respostas ricas e completas.
+
+ESTRATÉGIA POR TIPO DE PERGUNTA:
+- "Como está minha performance?" → get_performance_summary + get_roleplay_sessions(limit:5) + get_daily_challenges(limit:3)
+- "O que devo melhorar?" → get_performance_summary + get_roleplay_sessions(limit:5) + get_pdi
+- "Como foi meu roleplay?" → get_roleplay_sessions(limit:3) + get_performance_summary
+- "Como estão minhas vendas?" → get_whatsapp_activity + get_seller_message_tracking + get_followup_analyses
+- "Qual meu ponto mais fraco?" → get_performance_summary + get_challenge_effectiveness + get_roleplay_sessions(limit:5)
+- "Analise minha última reunião" → get_meet_evaluations(limit:1) + get_meet_evaluation_detail
+- "O que tenho na agenda?" → get_calendar_events + get_scheduled_bots
+- "Marca uma reunião..." → create_calendar_event (ou quick_add_event para texto livre)
+- "Move/reagenda a reunião..." → get_calendar_events (para achar o event_id) + update_calendar_event
+- "Cancela a reunião..." → get_calendar_events (para achar o event_id) + delete_calendar_event
+- "Ativa o bot na reunião..." → get_scheduled_bots (para achar o scheduled_bot_id) + toggle_meeting_bot
+- "Estou livre amanhã?" → get_calendar_freebusy
+- Perguntas gerais sobre empresa → get_company_info
+
+IMPORTANTE: Chame 2-4 ferramentas por vez para cruzar dados e dar respostas completas. Nunca se limite a apenas 1 ferramenta.
+
+AÇÕES NO CALENDÁRIO:
+- Você pode CRIAR, ATUALIZAR e DELETAR eventos — use isso quando o vendedor pedir
+- Para reagendar: primeiro busque os eventos (get_calendar_events) para achar o event_id, depois use update_calendar_event
+- Para cancelar: busque o event_id primeiro, depois delete
+- Para ativar bot: busque get_scheduled_bots para achar o scheduled_bot_id, depois toggle
+- Ao criar reunião, SEMPRE adicione link do Meet por padrão (add_meet_link=true)
+- Após criar/atualizar/cancelar, use {{meeting}} para mostrar o resultado visual
+
+CONVIDADOS:
+- Quando o vendedor mencionar NOMES sem email (ex: "adiciona o Gabriel"), use search_contacts ANTES para buscar o email
+- search_contacts busca na equipe da empresa E em contatos recentes de reuniões anteriores
+- Se não encontrar, peça o email ao vendedor
+- Para adicionar convidados a uma reunião existente: get_calendar_events → search_contacts → update_calendar_event com add_attendees
+
+ALTERAÇÃO DE HORÁRIO:
+- Para mudar só o horário de início: update com start_time (end mantém mesma duração)
+- Para aumentar duração: update com end_time mais tarde (ex: de 16h-17h para 16h-18h → mude end_time para 18:00)
+- Para diminuir: update com end_time mais cedo
+- Para mover de dia: update com date (horários se mantêm)
+- Para mover dia E horário: update com date + start_time + end_time
+
+FORMATAÇÃO VISUAL:
+Use tags especiais para dados numéricos — elas são renderizadas como gráficos bonitos no chat:
+
+• {{score|valor|máximo|label}} — Card com barra de progresso para nota principal
+  Ex: {{score|6.34|10|Média Geral}}
+
+• {{spin|S|P|I|N}} — 4 barras coloridas com os scores SPIN
+  Ex: {{spin|6.64|6.89|5.20|4.80}}
+
+• {{trend|tipo|descrição}} — Badge de tendência
+  Tipos: improving, stable, declining
+  Ex: {{trend|declining|Tendência de queda nas últimas sessões}}
+
+• {{metric|valor|label}} — Card pequeno para métrica isolada
+  Ex: {{metric|15|Sessões Realizadas}}  {{metric|73%|Taxa de Sucesso}}
+
+• {{meeting|título|data|horário|link_meet|participantes|bot_status}} — Card de reunião
+  Ex: {{meeting|Weekly Ramppy|23/02|16h às 17h|https://meet.google.com/xxx|João, Maria|scheduled}}
+  - link_meet: URL do Meet ou "none" se não tiver
+  - participantes: nomes separados por vírgula (omitir se não tiver)
+  - bot_status: completed, scheduled, pending, error (omitir se não aplicável)
+
+REGRAS DAS TAGS VISUAIS:
+- Coloque tags visuais ANTES do texto explicativo (elas ficam no topo da resposta)
+- Ao falar de performance, use {{score}} + {{spin}} + {{trend}} juntos
+- Ao falar de reuniões/agenda, use {{meeting}} para CADA reunião (um card por reunião)
+- Use {{metric}} para destacar números-chave isolados
+- NÃO repita nos parágrafos os mesmos dados já exibidos nas tags (nomes de reuniões, scores, etc.)
+- Cada tag deve estar em sua própria linha
+- Após as tags, escreva texto normal com markdown (negrito, listas, etc.)
+- Só use tags quando tiver dados reais das ferramentas — nunca invente valores
+
+COMPARTILHAMENTO DE REUNIÕES:
+Você pode compartilhar avaliações de Meet com colegas da equipe. Fluxo:
+1. Busque a avaliação: get_meet_evaluations → encontrar evaluation_id
+2. Busque o destinatário: list_teammates → encontrar user_id pelo nome
+3. Compartilhe: share_meet_evaluation → cria notificação + envia email
+
+- Se o vendedor disser "compartilha minha última reunião com [nome]", siga o fluxo acima
+- Se o vendedor não especificar seções, compartilhe TODAS (smart_notes, spin, evaluation, transcript)
+- Se o email falhar (Google não conectado), o compartilhamento + notificação ainda funcionam — informe que o email não foi enviado
+- Após compartilhar, confirme: quem recebeu, quais seções, se email foi enviado`
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -230,8 +312,149 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
         required: []
       }
     }
+  },
+  // ─── Contact Lookup ──────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'search_contacts',
+      description: 'Busca funcionários/colegas da empresa pelo nome para obter o email. Use antes de criar/atualizar eventos quando o vendedor mencionar nomes sem email.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nome (ou parte do nome) para buscar' }
+        },
+        required: ['name']
+      }
+    }
+  },
+  // ─── Calendar Write Tools ─────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'create_calendar_event',
+      description: 'Cria um novo evento no Google Calendar do vendedor. Pode incluir link do Google Meet e convidar participantes. IMPORTANTE: se o vendedor mencionar nomes sem email, use search_contacts ANTES para buscar os emails.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Título do evento' },
+          date: { type: 'string', description: 'Data do evento (YYYY-MM-DD, ex: 2026-02-25)' },
+          start_time: { type: 'string', description: 'Hora início (HH:MM, ex: 14:00)' },
+          end_time: { type: 'string', description: 'Hora fim (HH:MM, ex: 15:00). Se não informado, assume 1h após start_time' },
+          description: { type: 'string', description: 'Descrição do evento (opcional)' },
+          attendees: { type: 'array', items: { type: 'string' }, description: 'Emails dos participantes (opcional). Use search_contacts para converter nomes em emails.' },
+          add_meet_link: { type: 'boolean', description: 'Criar link do Google Meet (padrão: true)' }
+        },
+        required: ['title', 'date', 'start_time']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_calendar_event',
+      description: 'Atualiza um evento existente: reagendar (mudar data/hora), alterar duração (mudar start ou end), mudar título, adicionar participantes, adicionar link Meet. Para achar o event_id, use get_calendar_events antes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          event_id: { type: 'string', description: 'ID do evento do Google Calendar (obrigatório, obtido via get_calendar_events)' },
+          title: { type: 'string', description: 'Novo título (opcional)' },
+          date: { type: 'string', description: 'Nova data (YYYY-MM-DD, opcional — se omitido mantém a data atual)' },
+          start_time: { type: 'string', description: 'Nova hora início (HH:MM, opcional)' },
+          end_time: { type: 'string', description: 'Nova hora fim (HH:MM, opcional). Ex: para aumentar de 1h para 1h30, mude apenas o end_time' },
+          description: { type: 'string', description: 'Nova descrição (opcional)' },
+          add_attendees: { type: 'array', items: { type: 'string' }, description: 'Emails de participantes a ADICIONAR (opcional). Use search_contacts para converter nomes.' },
+          add_meet_link: { type: 'boolean', description: 'Adicionar link do Google Meet se não tiver (opcional)' }
+        },
+        required: ['event_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_calendar_event',
+      description: 'Remove/cancela um evento do Google Calendar do vendedor.',
+      parameters: {
+        type: 'object',
+        properties: {
+          event_id: { type: 'string', description: 'ID do evento do Google Calendar' }
+        },
+        required: ['event_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'toggle_meeting_bot',
+      description: 'Ativa ou desativa o bot de análise para uma reunião específica do Google Meet. O bot grava e avalia a reunião automaticamente.',
+      parameters: {
+        type: 'object',
+        properties: {
+          scheduled_bot_id: { type: 'string', description: 'ID do scheduled bot (da tabela calendar_scheduled_bots)' },
+          enabled: { type: 'boolean', description: 'true para ativar, false para desativar' }
+        },
+        required: ['scheduled_bot_id', 'enabled']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'quick_add_event',
+      description: 'Cria evento por texto em linguagem natural. Google interpreta a data/hora automaticamente. Ex: "Reunião com João amanhã às 14h", "Almoço sexta 12h30".',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Descrição do evento em linguagem natural' }
+        },
+        required: ['text']
+      }
+    }
+  },
+  // ─── Meeting Sharing Tools ──────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'list_teammates',
+      description: 'Lista todos os colegas da mesma empresa (excluindo o próprio vendedor). Retorna user_id, nome, email e cargo. Use antes de compartilhar avaliações para encontrar o destinatário pelo nome.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'share_meet_evaluation',
+      description: 'Compartilha uma avaliação de reunião do Google Meet com colegas da equipe. Cria notificação na plataforma e opcionalmente envia email com os dados completos. Use list_teammates antes para obter os user_ids.',
+      parameters: {
+        type: 'object',
+        properties: {
+          evaluation_id: { type: 'string', description: 'ID da avaliação Meet (obtido via get_meet_evaluations)' },
+          teammate_user_ids: { type: 'array', items: { type: 'string' }, description: 'Array de user_ids dos destinatários (obtidos via list_teammates)' },
+          sections: { type: 'array', items: { type: 'string' }, description: 'Seções para compartilhar: smart_notes, spin, evaluation, transcript. Se omitido, compartilha todas.' },
+          message: { type: 'string', description: 'Mensagem pessoal opcional do vendedor para os destinatários' },
+          send_email: { type: 'boolean', description: 'Enviar email com os dados (padrão: true). Requer Google Calendar conectado.' }
+        },
+        required: ['evaluation_id', 'teammate_user_ids']
+      }
+    }
   }
 ]
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Parse evaluation from N8N format {output: "json_string"} or [{output: "json_string"}]
+function parseEvaluation(evaluation: any): any {
+  if (!evaluation) return null
+  if (evaluation.output && typeof evaluation.output === 'string') {
+    try { return JSON.parse(evaluation.output) } catch { return evaluation }
+  }
+  if (Array.isArray(evaluation) && evaluation[0]?.output && typeof evaluation[0].output === 'string') {
+    try { return JSON.parse(evaluation[0].output) } catch { return evaluation }
+  }
+  return evaluation
+}
 
 // ─── Function Executor ───────────────────────────────────────────────────────
 
@@ -244,15 +467,152 @@ async function executeFunction(
   const name = fn.function.name
   const params = JSON.parse(fn.function.arguments || '{}')
 
+  console.log(`[Agent] Executing tool: ${name}, userId: ${userId}, companyId: ${companyId}`)
+
   try {
     switch (name) {
       case 'get_performance_summary': {
-        const { data } = await supabaseAdmin
+        // Try summary table first
+        const { data, error } = await supabaseAdmin
           .from('user_performance_summaries')
           .select('*')
           .eq('user_id', userId)
           .single()
-        return data || { message: 'Nenhum resumo de performance encontrado. O vendedor ainda não completou avaliações.' }
+        if (error) console.log(`[Agent] get_performance_summary error:`, error.message, error.code)
+        console.log(`[Agent] get_performance_summary result:`, data ? 'found' : 'null')
+        if (data) return data
+
+        // Fallback: compute from roleplay_sessions + meet_evaluations directly
+        console.log(`[Agent] Falling back to compute from roleplay_sessions + meet_evaluations`)
+        const { data: sessions } = await supabaseAdmin
+          .from('roleplay_sessions')
+          .select('evaluation, created_at')
+          .eq('user_id', userId)
+          .not('evaluation', 'is', null)
+          .order('created_at', { ascending: false })
+
+        const { data: meetEvals } = await supabaseAdmin
+          .from('meet_evaluations')
+          .select('overall_score, spin_s_score, spin_p_score, spin_i_score, spin_n_score, executive_summary, top_strengths, critical_gaps, priority_improvements, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+
+        if (!sessions?.length && !meetEvals?.length) {
+          return { message: 'Nenhum dado de performance encontrado. O vendedor ainda não completou avaliações.' }
+        }
+
+        // Parse all evaluations
+        const allParsed: Array<{ ev: any; created_at: string; source: string }> = []
+        for (const session of (sessions || [])) {
+          const ev = parseEvaluation(session.evaluation)
+          if (ev) allParsed.push({ ev, created_at: session.created_at, source: 'roleplay' })
+        }
+        for (const me of (meetEvals || [])) {
+          allParsed.push({
+            ev: {
+              overall_score: me.overall_score,
+              spin_evaluation: {
+                S: { final_score: me.spin_s_score },
+                P: { final_score: me.spin_p_score },
+                I: { final_score: me.spin_i_score },
+                N: { final_score: me.spin_n_score },
+              },
+              executive_summary: me.executive_summary,
+              top_strengths: me.top_strengths,
+              critical_gaps: me.critical_gaps,
+              priority_improvements: me.priority_improvements,
+            },
+            created_at: me.created_at,
+            source: 'meet',
+          })
+        }
+
+        // Sort by date (newest first) for trend calculation
+        allParsed.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+        // Compute averages
+        const spinTotals = { S: 0, P: 0, I: 0, N: 0 }
+        const spinCounts = { S: 0, P: 0, I: 0, N: 0 }
+        let totalScore = 0, countScore = 0
+        const scores: number[] = []
+
+        // Collect strengths/gaps from last 5 sessions
+        const allStrengths: string[] = []
+        const allGaps: string[] = []
+        const allImprovements: Array<{ area: string; action_plan: string; priority: string }> = []
+
+        for (const { ev } of allParsed) {
+          if (ev.overall_score !== undefined) {
+            let score = parseFloat(ev.overall_score)
+            if (score > 10) score = score / 10
+            totalScore += score
+            countScore++
+            scores.push(score)
+          }
+          if (ev.spin_evaluation) {
+            const spin = ev.spin_evaluation
+            if (spin.S?.final_score !== undefined) { spinTotals.S += spin.S.final_score; spinCounts.S++ }
+            if (spin.P?.final_score !== undefined) { spinTotals.P += spin.P.final_score; spinCounts.P++ }
+            if (spin.I?.final_score !== undefined) { spinTotals.I += spin.I.final_score; spinCounts.I++ }
+            if (spin.N?.final_score !== undefined) { spinTotals.N += spin.N.final_score; spinCounts.N++ }
+          }
+        }
+
+        // Extract strengths/gaps from last 5 evaluations
+        const last5 = allParsed.slice(0, 5)
+        for (const { ev } of last5) {
+          if (Array.isArray(ev.top_strengths)) allStrengths.push(...ev.top_strengths)
+          if (Array.isArray(ev.critical_gaps)) allGaps.push(...ev.critical_gaps)
+          if (Array.isArray(ev.priority_improvements)) {
+            for (const imp of ev.priority_improvements) {
+              if (typeof imp === 'string') allImprovements.push({ area: imp, action_plan: '', priority: '' })
+              else if (imp?.area) allImprovements.push(imp)
+            }
+          }
+        }
+
+        // Deduplicate by counting frequency
+        const countOccurrences = (arr: string[]) => {
+          const map = new Map<string, number>()
+          for (const item of arr) {
+            const key = item.toLowerCase().trim()
+            if (key) map.set(key, (map.get(key) || 0) + 1)
+          }
+          return Array.from(map.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([text, count]) => `${text} (${count}x nas últimas sessões)`)
+        }
+
+        // Compute trend from last 3 scores
+        let trend = 'stable'
+        if (scores.length >= 3) {
+          const recent = scores.slice(0, 3) // newest first
+          const avgRecent = (recent[0] + recent[1]) / 2
+          const avgOlder = recent[2]
+          if (avgRecent > avgOlder + 0.5) trend = 'improving'
+          else if (avgRecent < avgOlder - 0.5) trend = 'declining'
+        }
+
+        // Last session score
+        const lastSessionScore = scores.length > 0 ? scores[0] : null
+
+        return {
+          overall_average: countScore > 0 ? Number((totalScore / countScore).toFixed(1)) : null,
+          total_sessions: allParsed.length,
+          total_roleplay_sessions: sessions?.length || 0,
+          total_meet_evaluations: meetEvals?.length || 0,
+          last_session_score: lastSessionScore,
+          spin_s_average: spinCounts.S > 0 ? Number((spinTotals.S / spinCounts.S).toFixed(1)) : null,
+          spin_p_average: spinCounts.P > 0 ? Number((spinTotals.P / spinCounts.P).toFixed(1)) : null,
+          spin_i_average: spinCounts.I > 0 ? Number((spinTotals.I / spinCounts.I).toFixed(1)) : null,
+          spin_n_average: spinCounts.N > 0 ? Number((spinTotals.N / spinCounts.N).toFixed(1)) : null,
+          trend,
+          top_strengths_recurring: countOccurrences(allStrengths),
+          critical_gaps_recurring: countOccurrences(allGaps),
+          priority_improvements: allImprovements.slice(0, 5),
+          score_history: scores.slice(0, 10).map((s, i) => ({ session: i + 1, score: s })),
+        }
       }
 
       case 'get_roleplay_sessions': {
@@ -268,23 +628,28 @@ async function executeFunction(
 
         const { data } = await query
         // Return summary without full evaluation to save tokens
-        const sessions = (data || []).map(s => ({
-          id: s.id,
-          created_at: s.created_at,
-          status: s.status,
-          duration_seconds: s.duration_seconds,
-          persona: s.config?.selectedPersona?.cargo || s.config?.selectedPersona?.profession || 'N/A',
-          temperament: s.config?.temperament,
-          age: s.config?.age,
-          objections_count: s.config?.objections?.length || 0,
-          overall_score: s.evaluation?.overall_score,
-          performance_level: s.evaluation?.performance_level,
-          spin_s: s.evaluation?.spin_evaluation?.S?.final_score,
-          spin_p: s.evaluation?.spin_evaluation?.P?.final_score,
-          spin_i: s.evaluation?.spin_evaluation?.I?.final_score,
-          spin_n: s.evaluation?.spin_evaluation?.N?.final_score,
-          is_meet_correction: s.config?.is_meet_correction || false,
-        }))
+        const sessions = (data || []).map(s => {
+          const ev = parseEvaluation(s.evaluation)
+          let overallScore = ev?.overall_score
+          if (overallScore !== undefined && overallScore > 10) overallScore = overallScore / 10
+          return {
+            id: s.id,
+            created_at: s.created_at,
+            status: s.status,
+            duration_seconds: s.duration_seconds,
+            persona: s.config?.selectedPersona?.cargo || s.config?.selectedPersona?.profession || 'N/A',
+            temperament: s.config?.temperament,
+            age: s.config?.age,
+            objections_count: s.config?.objections?.length || 0,
+            overall_score: overallScore,
+            performance_level: ev?.performance_level,
+            spin_s: ev?.spin_evaluation?.S?.final_score,
+            spin_p: ev?.spin_evaluation?.P?.final_score,
+            spin_i: ev?.spin_evaluation?.I?.final_score,
+            spin_n: ev?.spin_evaluation?.N?.final_score,
+            is_meet_correction: s.config?.is_meet_correction || false,
+          }
+        })
         return { total: sessions.length, sessions }
       }
 
@@ -303,7 +668,7 @@ async function executeFunction(
           duration_seconds: data.duration_seconds,
           config: data.config,
           messages: data.messages,
-          evaluation: data.evaluation,
+          evaluation: parseEvaluation(data.evaluation),
         }
       }
 
@@ -652,6 +1017,365 @@ async function executeFunction(
         return { total: data?.length || 0, bots: data || [] }
       }
 
+      // ─── Contact Lookup ──────────────────────────────────────────────
+      case 'search_contacts': {
+        const searchName = params.name?.toLowerCase().trim()
+        if (!searchName) return { error: 'Nome é obrigatório' }
+
+        // Search employees in the same company
+        const { data: employees } = await supabaseAdmin
+          .from('employees')
+          .select('name, email, role')
+          .eq('company_id', companyId)
+          .ilike('name', `%${searchName}%`)
+
+        // Also search Google Calendar attendees from recent events for external contacts
+        const { data: recentBots } = await supabaseAdmin
+          .from('calendar_scheduled_bots')
+          .select('attendees')
+          .eq('user_id', userId)
+          .not('attendees', 'is', null)
+          .order('event_start', { ascending: false })
+          .limit(20)
+
+        const externalContacts = new Map<string, string>()
+        for (const bot of (recentBots || [])) {
+          const attendees = bot.attendees as Array<{ email?: string; displayName?: string }> | null
+          if (!Array.isArray(attendees)) continue
+          for (const a of attendees) {
+            if (a.email && (a.displayName?.toLowerCase().includes(searchName) || a.email.toLowerCase().includes(searchName))) {
+              externalContacts.set(a.email, a.displayName || a.email)
+            }
+          }
+        }
+
+        const results = [
+          ...(employees || []).map(e => ({ name: e.name, email: e.email, source: 'equipe' })),
+          ...Array.from(externalContacts.entries()).map(([email, name]) => ({ name, email, source: 'contato recente' })),
+        ]
+
+        return {
+          total: results.length,
+          contacts: results,
+          hint: results.length === 0 ? 'Nenhum contato encontrado. Peça o email ao vendedor.' : null,
+        }
+      }
+
+      // ─── Calendar Write Operations ──────────────────────────────────
+      case 'create_calendar_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado. O vendedor precisa conectar na página de Análise Meet.' }
+
+        // Default end_time: 1h after start_time
+        let endTime = params.end_time
+        if (!endTime && params.start_time) {
+          const [h, m] = params.start_time.split(':').map(Number)
+          endTime = `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        }
+
+        const startDateTime = `${params.date}T${params.start_time}:00-03:00`
+        const endDateTime = `${params.date}T${endTime}:00-03:00`
+
+        const event = await createCalendarEvent(userId, {
+          title: params.title,
+          startDateTime,
+          endDateTime,
+          description: params.description,
+          attendees: params.attendees,
+          addMeetLink: params.add_meet_link !== false,
+        })
+
+        if (!event) return { error: 'Erro ao criar evento no Google Calendar' }
+
+        return {
+          success: true,
+          message: `Evento "${params.title}" criado com sucesso`,
+          event: {
+            id: event.id,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            meetLink: event.meetLink,
+            attendees: event.attendees,
+          }
+        }
+      }
+
+      case 'update_calendar_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado.' }
+
+        // First fetch the current event to support partial time updates
+        const currentEvents = await fetchAllEvents(userId, 30)
+        const currentEvent = currentEvents?.find(e => e.id === params.event_id)
+
+        const updateData: Record<string, any> = {}
+        if (params.title) updateData.title = params.title
+        if (params.description) updateData.description = params.description
+        if (params.add_meet_link) updateData.addMeetLink = true
+
+        // Handle partial time updates: if only start_time or only end_time is given,
+        // use the current event's values for the missing one
+        const currentStart = currentEvent ? new Date(currentEvent.start) : null
+        const currentEnd = currentEvent?.end ? new Date(currentEvent.end) : null
+
+        const newDate = params.date || (currentStart ? `${currentStart.getFullYear()}-${String(currentStart.getMonth() + 1).padStart(2, '0')}-${String(currentStart.getDate()).padStart(2, '0')}` : null)
+
+        if (params.start_time && newDate) {
+          updateData.startDateTime = `${newDate}T${params.start_time}:00-03:00`
+          // If no new end_time, keep same duration
+          if (!params.end_time && currentStart && currentEnd) {
+            const durationMs = currentEnd.getTime() - currentStart.getTime()
+            const newStart = new Date(`${newDate}T${params.start_time}:00-03:00`)
+            const newEnd = new Date(newStart.getTime() + durationMs)
+            updateData.endDateTime = newEnd.toISOString()
+          }
+        }
+        if (params.end_time && newDate) {
+          updateData.endDateTime = `${newDate}T${params.end_time}:00-03:00`
+          // If no new start_time but new date, keep original start time on new date
+          if (!params.start_time && currentStart) {
+            const origTime = `${String(currentStart.getHours()).padStart(2, '0')}:${String(currentStart.getMinutes()).padStart(2, '0')}`
+            updateData.startDateTime = `${newDate}T${origTime}:00-03:00`
+          }
+        }
+        // If only date changed (no time params), move to same times on new date
+        if (params.date && !params.start_time && !params.end_time && currentStart && currentEnd) {
+          const origStartTime = `${String(currentStart.getHours()).padStart(2, '0')}:${String(currentStart.getMinutes()).padStart(2, '0')}`
+          const origEndTime = `${String(currentEnd.getHours()).padStart(2, '0')}:${String(currentEnd.getMinutes()).padStart(2, '0')}`
+          updateData.startDateTime = `${params.date}T${origStartTime}:00-03:00`
+          updateData.endDateTime = `${params.date}T${origEndTime}:00-03:00`
+        }
+
+        if (params.add_attendees?.length) {
+          updateData.attendees = params.add_attendees.map((e: string) => ({ email: e }))
+        }
+
+        const updated = await updateCalendarEvent(userId, params.event_id, updateData)
+        if (!updated) return { error: 'Erro ao atualizar evento' }
+
+        return {
+          success: true,
+          message: 'Evento atualizado com sucesso',
+          event: {
+            id: updated.id,
+            title: updated.title,
+            start: updated.start,
+            end: updated.end,
+            meetLink: updated.meetLink,
+            attendees: updated.attendees,
+          }
+        }
+      }
+
+      case 'delete_calendar_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado.' }
+
+        const deleted = await deleteCalendarEvent(userId, params.event_id)
+        if (!deleted) return { error: 'Erro ao deletar evento' }
+
+        return { success: true, message: 'Evento removido do Google Calendar com sucesso' }
+      }
+
+      case 'toggle_meeting_bot': {
+        const { data: bot, error: botError } = await supabaseAdmin
+          .from('calendar_scheduled_bots')
+          .select('id, bot_status, bot_enabled, event_title')
+          .eq('id', params.scheduled_bot_id)
+          .eq('user_id', userId)
+          .single()
+
+        if (botError || !bot) return { error: 'Bot agendado não encontrado' }
+        if (bot.bot_status === 'completed' || bot.bot_status === 'recording') {
+          return { error: `Não é possível alterar — a reunião já está ${bot.bot_status === 'completed' ? 'avaliada' : 'sendo gravada'}` }
+        }
+
+        await supabaseAdmin
+          .from('calendar_scheduled_bots')
+          .update({ bot_enabled: params.enabled })
+          .eq('id', params.scheduled_bot_id)
+
+        return {
+          success: true,
+          message: `Bot de análise ${params.enabled ? 'ativado' : 'desativado'} para "${bot.event_title}"`,
+        }
+      }
+
+      case 'quick_add_event': {
+        const calClient = await getCalendarClient(userId)
+        if (!calClient) return { error: 'Google Calendar não conectado.' }
+
+        const event = await quickAddEvent(userId, params.text)
+        if (!event) return { error: 'Erro ao criar evento. Tente com create_calendar_event para mais controle.' }
+
+        return {
+          success: true,
+          message: `Evento criado: "${event.title}"`,
+          event: {
+            id: event.id,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+          }
+        }
+      }
+
+      // ─── Meeting Sharing Operations ──────────────────────────────────
+      case 'list_teammates': {
+        const { data: employees } = await supabaseAdmin
+          .from('employees')
+          .select('user_id, name, email, role')
+          .eq('company_id', companyId)
+          .neq('user_id', userId)
+
+        return {
+          total: employees?.length || 0,
+          teammates: (employees || []).map(e => ({
+            user_id: e.user_id,
+            name: e.name,
+            email: e.email,
+            role: e.role,
+          })),
+        }
+      }
+
+      case 'share_meet_evaluation': {
+        if (!params.evaluation_id || !params.teammate_user_ids?.length) {
+          return { error: 'evaluation_id e teammate_user_ids são obrigatórios' }
+        }
+
+        const sections = params.sections || ['smart_notes', 'spin', 'evaluation', 'transcript']
+        const sendEmail = params.send_email !== false
+
+        // Get sender info
+        const { data: sender } = await supabaseAdmin
+          .from('employees')
+          .select('company_id, name')
+          .eq('user_id', userId)
+          .single()
+
+        if (!sender?.company_id) return { error: 'Empresa não encontrada' }
+
+        // Fetch evaluation with full data for email
+        const { data: evaluation } = await supabaseAdmin
+          .from('meet_evaluations')
+          .select('id, seller_name, overall_score, performance_level, spin_s_score, spin_p_score, spin_i_score, spin_n_score, smart_notes, transcript, evaluation')
+          .eq('id', params.evaluation_id)
+          .eq('user_id', userId)
+          .single()
+
+        if (!evaluation) return { error: 'Avaliação não encontrada ou não pertence ao vendedor' }
+
+        // Verify recipients are from same company
+        const { data: recipients } = await supabaseAdmin
+          .from('employees')
+          .select('user_id, name')
+          .eq('company_id', sender.company_id)
+          .in('user_id', params.teammate_user_ids)
+
+        if (!recipients?.length) return { error: 'Nenhum destinatário válido encontrado na equipe' }
+
+        // Section labels for notification
+        const sectionLabels: Record<string, string> = {
+          smart_notes: 'Notas Inteligentes',
+          spin: 'Análise SPIN',
+          evaluation: 'Avaliação Detalhada',
+          transcript: 'Transcrição',
+        }
+        const sectionNames = sections.map((s: string) => sectionLabels[s] || s).join(', ')
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+
+        // Create shares and notifications
+        const results = await Promise.allSettled(
+          recipients.map(async (recipient) => {
+            const { data: share, error: shareError } = await supabaseAdmin
+              .from('shared_meet_evaluations')
+              .upsert({
+                evaluation_id: params.evaluation_id,
+                shared_by: userId,
+                shared_with: recipient.user_id,
+                shared_sections: sections,
+                message: params.message || null,
+                company_id: sender.company_id,
+                is_viewed: false,
+                viewed_at: null,
+              }, {
+                onConflict: 'evaluation_id,shared_by,shared_with',
+              })
+              .select('id')
+              .single()
+
+            if (shareError) throw shareError
+
+            await supabaseAdmin
+              .from('user_notifications')
+              .insert({
+                user_id: recipient.user_id,
+                type: 'shared_meeting',
+                title: `${sender.name} compartilhou uma reunião`,
+                message: params.message || `Compartilhou: ${sectionNames}`,
+                data: {
+                  shareId: share.id,
+                  evaluationId: params.evaluation_id,
+                  sharedBy: userId,
+                  senderName: sender.name,
+                  sections,
+                },
+              })
+
+            return { userId: recipient.user_id, name: recipient.name, success: true }
+          })
+        )
+
+        const successful = results.filter(r => r.status === 'fulfilled').length
+        const failed = results.filter(r => r.status === 'rejected').length
+        const sharedWith = results
+          .filter((r): r is PromiseFulfilledResult<{ userId: string; name: string; success: boolean }> => r.status === 'fulfilled')
+          .map(r => r.value.name)
+
+        // Send emails (non-blocking)
+        let emailsSent = 0
+        if (sendEmail) {
+          for (const recipient of recipients) {
+            try {
+              const { data: recipientData } = await supabaseAdmin.auth.admin.getUserById(recipient.user_id)
+              const recipientEmail = recipientData?.user?.email
+              if (!recipientEmail) continue
+
+              await sendGmail(userId, {
+                to: recipientEmail,
+                subject: `${sender.name} compartilhou uma reunião com você`,
+                htmlBody: buildShareEmailHtml(
+                  sender.name,
+                  evaluation.seller_name,
+                  sectionNames,
+                  params.message || null,
+                  appUrl,
+                  sections,
+                  evaluation
+                ),
+              })
+              emailsSent++
+            } catch (emailErr) {
+              console.warn(`[Agent Share] Failed to email recipient ${recipient.user_id}:`, emailErr)
+            }
+          }
+        }
+
+        return {
+          success: true,
+          shared_with: sharedWith,
+          shared_count: successful,
+          failed_count: failed,
+          emails_sent: emailsSent,
+          sections_shared: sectionNames,
+          evaluation_name: evaluation.seller_name,
+          message: `Avaliação "${evaluation.seller_name}" compartilhada com ${sharedWith.join(', ')}. ${emailsSent > 0 ? `${emailsSent} email(s) enviado(s).` : 'Nenhum email enviado (Google não conectado ou erro).'}`,
+        }
+      }
+
       default:
         return { error: `Função desconhecida: ${name}` }
     }
@@ -706,17 +1430,22 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token)
-    if (!user) {
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !user) {
+      console.error('[Agent] Auth failed:', authError?.message)
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 401 })
     }
 
+    console.log(`[Agent] Auth OK — user: ${user.id}, email: ${user.email}`)
+
     // Get company
-    const { data: employeeData } = await supabaseAdmin
+    const { data: employeeData, error: empError } = await supabaseAdmin
       .from('employees')
       .select('company_id, name')
       .eq('user_id', user.id)
       .single()
+
+    if (empError) console.error('[Agent] Employee lookup error:', empError.message)
 
     const companyId = employeeData?.company_id
     if (!companyId) {
@@ -771,10 +1500,11 @@ export async function POST(req: NextRequest) {
           const tcFn = tc as { function: { name: string }; id: string }
           toolsUsed.push(tcFn.function.name)
           const result = await executeFunction(tc, user.id, companyId)
+          const resultStr = JSON.stringify(result)
           return {
             role: 'tool' as const,
             tool_call_id: tc.id,
-            content: JSON.stringify(result),
+            content: resultStr,
           }
         })
       )
