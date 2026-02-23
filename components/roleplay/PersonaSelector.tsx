@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Lock, Loader2, UserCircle2, CheckCircle, ChevronDown, ChevronUp, Search, X } from 'lucide-react'
+import { Users, Lock, Loader2, UserCircle2, CheckCircle, Search, X } from 'lucide-react'
 import type { Persona, PersonaB2B, PersonaB2C, Tag } from '@/lib/config'
 
 interface PersonaSelectorProps {
@@ -28,14 +28,6 @@ function getPersonaSubtitle(persona: Persona): string {
     return (persona as any).tipo_empresa_faturamento || (persona as PersonaB2B).company_type || ''
   }
   return (persona as any).busca || (persona as PersonaB2C).what_seeks || ''
-}
-
-function getPersonaContextPreview(persona: Persona, maxLen = 60): string {
-  const text = persona.context || ''
-  if (text.length <= maxLen) return text
-  const truncated = text.substring(0, maxLen)
-  const lastSpace = truncated.lastIndexOf(' ')
-  return (lastSpace > maxLen * 0.7 ? truncated.substring(0, lastSpace) : truncated) + '...'
 }
 
 function getPersonaDetails(persona: Persona): Array<{ label: string; value: string }> {
@@ -117,8 +109,12 @@ export default function PersonaSelector({
   const handleSelect = (personaId: string) => {
     if (isConfigLocked) return
     if (selectedPersona !== personaId) {
-      setExpandedPersonaId(null)
+      setExpandedPersonaId(personaId)
       setExpandedFields(new Set())
+    } else {
+      // Toggle details if clicking same persona
+      setExpandedPersonaId(expandedPersonaId ? null : personaId)
+      if (expandedPersonaId) setExpandedFields(new Set())
     }
     onSelect(personaId)
   }
@@ -268,105 +264,58 @@ export default function PersonaSelector({
             )}
           </div>
 
-          {/* Compact summary strip + optional accordion */}
-          {!hiddenMode && selectedPersona && selectedPersonaObj && (
-            <div className="space-y-2 animate-[fadeIn_200ms_ease-out]">
-              {/* Compact summary strip */}
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${
-                isConfigLocked
-                  ? 'bg-purple-50/40 border-purple-100'
-                  : 'bg-green-50/40 border-green-100'
-              }`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  isConfigLocked ? 'bg-purple-100' : 'bg-green-100'
-                }`}>
-                  <UserCircle2 className={`w-3.5 h-3.5 ${isConfigLocked ? 'text-purple-600' : 'text-green-600'}`} />
-                </div>
-
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <span className="text-xs font-semibold text-gray-900 flex-shrink-0">
-                    {getPersonaTitle(selectedPersonaObj)}
-                  </span>
-                  {selectedPersonaObj.context && (
-                    <>
-                      <span className="text-gray-300 flex-shrink-0">•</span>
-                      <span className="text-xs text-gray-500 truncate">
-                        {getPersonaContextPreview(selectedPersonaObj)}
-                      </span>
-                    </>
+          {/* Detail panel - auto shown on selection */}
+          {!hiddenMode && selectedPersona && selectedPersonaObj && expandedPersonaId === selectedPersona && selectedDetails.length > 0 && (
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 animate-[fadeIn_200ms_ease-out]">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex-1">
+                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                    isConfigLocked ? 'text-purple-600' : 'text-green-600'
+                  }`}>Persona selecionada</p>
+                  <p className="text-xs font-medium text-gray-900">{getPersonaTitle(selectedPersonaObj)}</p>
+                  {getPersonaSubtitle(selectedPersonaObj) && (
+                    <p className="text-[10px] text-gray-500 mt-0.5">{getPersonaSubtitle(selectedPersonaObj)}</p>
                   )}
                 </div>
-
-                {selectedDetails.length > 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const isOpen = expandedPersonaId === selectedPersona
-                      setExpandedPersonaId(isOpen ? null : selectedPersona)
-                      if (isOpen) setExpandedFields(new Set())
-                    }}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors flex-shrink-0 ${
-                      isConfigLocked
-                        ? 'text-purple-600 hover:bg-purple-100'
-                        : 'text-green-600 hover:bg-green-100'
-                    }`}
-                  >
-                    {expandedPersonaId === selectedPersona ? (
-                      <><ChevronUp className="w-3 h-3" /> Ocultar</>
-                    ) : (
-                      <><ChevronDown className="w-3 h-3" /> Ver detalhes</>
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={() => { setExpandedPersonaId(null); setExpandedFields(new Set()) }}
+                  className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                >
+                  <X className="w-3.5 h-3.5 text-gray-400" />
+                </button>
               </div>
-
-              {/* Accordion detail panel */}
-              {expandedPersonaId === selectedPersona && selectedDetails.length > 0 && (
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 animate-[fadeIn_200ms_ease-out]">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className={`text-[10px] font-bold uppercase tracking-wider ${
-                      isConfigLocked ? 'text-purple-600' : 'text-green-600'
-                    }`}>Detalhes da Persona</p>
-                    <button
-                      onClick={() => { setExpandedPersonaId(null); setExpandedFields(new Set()) }}
-                      className="p-1 hover:bg-gray-200 rounded transition-colors"
-                    >
-                      <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {selectedDetails.map((detail, idx) => {
-                      const isFieldExpanded = expandedFields.has(idx)
-                      const needsClamping = detail.value.length > 120
-                      return (
-                        <div key={idx}>
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{detail.label}</p>
-                          <p className={`text-xs text-gray-700 leading-relaxed ${
-                            !isFieldExpanded && needsClamping ? 'line-clamp-2' : ''
-                          }`}>
-                            {detail.value}
-                          </p>
-                          {needsClamping && (
-                            <button
-                              onClick={() => setExpandedFields(prev => {
-                                const next = new Set(prev)
-                                isFieldExpanded ? next.delete(idx) : next.add(idx)
-                                return next
-                              })}
-                              className={`text-[10px] mt-0.5 font-medium ${
-                                isConfigLocked ? 'text-purple-600 hover:text-purple-700' : 'text-green-600 hover:text-green-700'
-                              }`}
-                            >
-                              {isFieldExpanded ? 'Ver menos' : 'Ver mais'}
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+              <div className="mt-2 pt-2 border-t border-gray-200 space-y-2.5">
+                {selectedDetails.map((detail, idx) => {
+                  const isFieldExpanded = expandedFields.has(idx)
+                  const needsClamping = detail.value.length > 120
+                  return (
+                    <div key={idx}>
+                      <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${
+                        isConfigLocked ? 'text-purple-600' : 'text-green-600'
+                      }`}>{detail.label}</p>
+                      <p className={`text-[10px] text-gray-600 leading-relaxed ${
+                        !isFieldExpanded && needsClamping ? 'line-clamp-3' : ''
+                      }`}>
+                        {detail.value}
+                      </p>
+                      {needsClamping && (
+                        <button
+                          onClick={() => setExpandedFields(prev => {
+                            const next = new Set(prev)
+                            isFieldExpanded ? next.delete(idx) : next.add(idx)
+                            return next
+                          })}
+                          className={`text-[10px] mt-0.5 font-medium ${
+                            isConfigLocked ? 'text-purple-600 hover:text-purple-700' : 'text-green-600 hover:text-green-700'
+                          }`}
+                        >
+                          {isFieldExpanded ? 'Ver menos' : 'Ver mais'}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
