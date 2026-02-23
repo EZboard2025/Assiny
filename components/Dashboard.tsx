@@ -617,14 +617,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div className={`grid grid-cols-1 lg:grid-cols-12 gap-4 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
             {/* Left Column (5/12) */}
             <div className="lg:col-span-5 space-y-4">
-              {userId && companyId && (
-                <DailyChallengeBanner
-                  userId={userId}
-                  companyId={companyId}
-                  onStartChallenge={handleStartChallenge}
-                  onViewHistory={() => handleViewChange('challenge-history')}
-                />
-              )}
+              {/* DailyChallengeBanner hidden — feature temporarily disabled */}
 
               <EvolutionChart
                 data={evolutionData}
@@ -672,16 +665,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                 loading={performanceLoading}
               />
 
-              <KPICard
-                icon={Target}
-                iconBg="bg-amber-50"
-                iconColor="text-amber-600"
-                label="Desafio do Dia"
-                value={challengeStatus?.pending ? 'Pendente' : 'Concluído'}
-                subtitle={challengeStatus?.title || 'Nenhum desafio hoje'}
-                onClick={() => handleViewChange('challenge-history')}
-                loading={performanceLoading}
-              />
+              {/* KPI Desafio do Dia hidden — feature temporarily disabled */}
 
             <FeatureCard
               icon={Clock}
@@ -787,17 +771,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           onViewProfile={() => handleViewChange('perfil')}
           onViewHistory={() => handleViewChange('historico')}
           loading={performanceLoading}
-          challengeComponent={userId && companyId ? (
-            <DailyChallengeBanner
-              userId={userId}
-              companyId={companyId}
-              onStartChallenge={handleStartChallenge}
-              onViewHistory={() => {
-                setPendingHistoryTab('desafios')
-                setCurrentView('historico')
-              }}
-            />
-          ) : undefined}
+          challengeComponent={undefined /* feature temporarily disabled */}
         />
       )}
 

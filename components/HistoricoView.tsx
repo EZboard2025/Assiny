@@ -350,18 +350,19 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
       hoverBg: 'hover:bg-amber-50',
       hoverBorder: 'hover:border-amber-300',
     },
-    {
-      key: 'desafios' as const,
-      label: 'Desafios',
-      description: 'Desafios diários personalizados para suas fraquezas',
-      icon: Target,
-      color: 'purple',
-      bgColor: 'bg-purple-50',
-      iconColor: 'text-purple-600',
-      borderColor: 'border-purple-200',
-      hoverBg: 'hover:bg-purple-50',
-      hoverBorder: 'hover:border-purple-300',
-    },
+    // Desafios tab hidden — feature temporarily disabled
+    // {
+    //   key: 'desafios' as const,
+    //   label: 'Desafios',
+    //   description: 'Desafios diários personalizados para suas fraquezas',
+    //   icon: Target,
+    //   color: 'purple',
+    //   bgColor: 'bg-purple-50',
+    //   iconColor: 'text-purple-600',
+    //   borderColor: 'border-purple-200',
+    //   hoverBg: 'hover:bg-purple-50',
+    //   hoverBorder: 'hover:border-purple-300',
+    // },
   ]
 
   const currentOption = historyOptions.find(o => o.key === historyType)
