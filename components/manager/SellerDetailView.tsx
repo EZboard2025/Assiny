@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Loader2, CalendarDays, Clock } from 'lucide-react'
+import { Loader2, CalendarDays, Clock, ChevronDown, Video } from 'lucide-react'
 import CalendarWeekView from '../CalendarWeekView'
 import MiniCalendar from '../MiniCalendar'
 import MeetHistoryContent from '../MeetHistoryContent'
@@ -73,6 +73,10 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   const [connection, setConnection] = useState<CalendarConnection>({ connected: false, googleEmail: null })
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventRaw[]>([])
   const [upcomingMeetings, setUpcomingMeetings] = useState<CalendarEventRaw[]>([])
+
+  // Collapsible sections
+  const [meetingsOpen, setMeetingsOpen] = useState(true)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   // Calendar navigation
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()))
@@ -187,71 +191,79 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           />
         </div>
 
-        {/* Upcoming Meetings */}
-        <div className="bg-white rounded-xl border border-blue-100 p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#E3F2FD' }}>
+        {/* Upcoming Meetings (collapsible) */}
+        <div className="bg-white rounded-xl border border-blue-100">
+          <button
+            onClick={() => setMeetingsOpen(!meetingsOpen)}
+            className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors rounded-xl"
+          >
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#E3F2FD' }}>
               <CalendarDays className="w-4.5 h-4.5" style={{ color: MEET_BLUE }} />
             </div>
-            <div>
+            <div className="flex-1 text-left">
               <h2 className="text-sm font-bold text-gray-900">Proximas Reunioes</h2>
               <p className="text-[10px] text-gray-500">
                 {upcomingMeetings.length} {upcomingMeetings.length === 1 ? 'agendada' : 'agendadas'}
               </p>
             </div>
-          </div>
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${meetingsOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-          {upcomingMeetings.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-4">Nenhuma reuniao agendada</p>
-          ) : (
-            <div className="relative pl-6">
-              <div className="absolute left-[7px] top-2 bottom-2 w-0.5 rounded-full" style={{ backgroundColor: '#90CAF9' }} />
-              <div className="space-y-3">
-                {upcomingMeetings.map((meeting) => {
-                  const status = botStatusConfig[meeting.botStatus] || botStatusConfig.pending
-                  const attendeeCount = meeting.attendees?.length || 0
-                  return (
-                    <div key={meeting.id} className="relative">
-                      <div
-                        className="absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-white"
-                        style={{ backgroundColor: MEET_BLUE }}
-                      />
-                      <div className="bg-gray-50 rounded-lg border border-gray-100 p-3">
-                        <p className="text-sm font-medium text-gray-900 mb-1">{meeting.eventTitle}</p>
-                        <div className="flex items-center gap-2 text-[11px] text-gray-500 mb-2">
-                          <Clock className="w-3 h-3" />
-                          <span>
-                            {formatDateShort(meeting.eventStart)}, {formatTime(meeting.eventStart)}
-                            {meeting.eventEnd && ` – ${formatTime(meeting.eventEnd)}`}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex -space-x-1">
-                            {meeting.attendees.slice(0, 4).map((a, i) => (
-                              <div
-                                key={i}
-                                className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center"
-                                title={a.displayName || a.email}
-                              >
-                                <span className="text-[8px] font-bold" style={{ color: MEET_BLUE }}>
-                                  {(a.displayName || a.email).charAt(0).toUpperCase()}
-                                </span>
+          {meetingsOpen && (
+            <div className="px-5 pb-5">
+              {upcomingMeetings.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">Nenhuma reuniao agendada</p>
+              ) : (
+                <div className="relative pl-6">
+                  <div className="absolute left-[7px] top-2 bottom-2 w-0.5 rounded-full" style={{ backgroundColor: '#90CAF9' }} />
+                  <div className="space-y-3">
+                    {upcomingMeetings.map((meeting) => {
+                      const status = botStatusConfig[meeting.botStatus] || botStatusConfig.pending
+                      const attendeeCount = meeting.attendees?.length || 0
+                      return (
+                        <div key={meeting.id} className="relative">
+                          <div
+                            className="absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-white"
+                            style={{ backgroundColor: MEET_BLUE }}
+                          />
+                          <div className="bg-gray-50 rounded-lg border border-gray-100 p-3">
+                            <p className="text-sm font-medium text-gray-900 mb-1">{meeting.eventTitle}</p>
+                            <div className="flex items-center gap-2 text-[11px] text-gray-500 mb-2">
+                              <Clock className="w-3 h-3" />
+                              <span>
+                                {formatDateShort(meeting.eventStart)}, {formatTime(meeting.eventStart)}
+                                {meeting.eventEnd && ` – ${formatTime(meeting.eventEnd)}`}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex -space-x-1">
+                                {meeting.attendees.slice(0, 4).map((a, i) => (
+                                  <div
+                                    key={i}
+                                    className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center"
+                                    title={a.displayName || a.email}
+                                  >
+                                    <span className="text-[8px] font-bold" style={{ color: MEET_BLUE }}>
+                                      {(a.displayName || a.email).charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                ))}
+                                {attendeeCount > 4 && (
+                                  <span className="text-[9px] text-gray-400 ml-1.5 self-center">+{attendeeCount - 4}</span>
+                                )}
                               </div>
-                            ))}
-                            {attendeeCount > 4 && (
-                              <span className="text-[9px] text-gray-400 ml-1.5 self-center">+{attendeeCount - 4}</span>
-                            )}
+                              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${status.color} ${status.bg}`}>
+                                {status.dot && <span className={`w-1.5 h-1.5 rounded-full ${status.dot} animate-pulse`} />}
+                                {status.label}
+                              </span>
+                            </div>
                           </div>
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${status.color} ${status.bg}`}>
-                            {status.dot && <span className={`w-1.5 h-1.5 rounded-full ${status.dot} animate-pulse`} />}
-                            {status.label}
-                          </span>
                         </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -271,9 +283,27 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         </div>
       </div>
 
-      {/* ── Full Width: Meet History ─────────────────────────────────────── */}
-      <div className="lg:col-span-12">
-        <MeetHistoryContent sellerId={seller.user_id} />
+      {/* ── Full Width: Meet History (collapsible) ────────────────────────── */}
+      <div className="lg:col-span-12 bg-white rounded-xl border border-gray-200">
+        <button
+          onClick={() => setHistoryOpen(!historyOpen)}
+          className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors rounded-xl"
+        >
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-50">
+            <Video className="w-4.5 h-4.5 text-green-600" />
+          </div>
+          <div className="flex-1 text-left">
+            <h2 className="text-sm font-bold text-gray-900">Historico de Reunioes</h2>
+            <p className="text-[10px] text-gray-500">Avaliacoes de Meet gravadas</p>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {historyOpen && (
+          <div className="border-t border-gray-100">
+            <MeetHistoryContent sellerId={seller.user_id} />
+          </div>
+        )}
       </div>
     </div>
   )
