@@ -152,59 +152,43 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   }
 
   return (
-    <div className="space-y-4">
-      {/* ── Section A: Google Calendar Connection ─────────────────────────── */}
-      <div className={`bg-white rounded-xl border p-4 flex items-center gap-3 ${
-        connection.connected ? 'border-green-200' : 'border-gray-200'
-      }`}>
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
-          connection.connected ? 'bg-white ring-2 ring-green-200' : 'bg-gray-100'
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      {/* ── Left Column ──────────────────────────────────────────────────── */}
+      <div className="lg:col-span-4 space-y-4">
+        {/* Google Calendar Connection */}
+        <div className={`bg-white rounded-xl border p-4 flex items-center gap-3 ${
+          connection.connected ? 'border-green-200' : 'border-gray-200'
         }`}>
-          <GoogleIcon className={connection.connected ? 'w-4 h-4' : 'w-4 h-4 opacity-30'} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium ${connection.connected ? 'text-gray-900' : 'text-gray-500'}`}>
-            Google Calendar
-          </p>
-          <p className="text-xs text-gray-400 truncate">
-            {connection.connected ? connection.googleEmail : 'Nao conectado'}
-          </p>
-        </div>
-        <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
-          connection.connected ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'
-        }`}>
-          {connection.connected ? 'Conectado' : 'Desconectado'}
-        </span>
-      </div>
-
-      {/* ── Section B: Calendar Week View ────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-blue-100 overflow-hidden">
-        <div className="flex">
-          {/* Mini calendar sidebar */}
-          <div className="p-3 border-r border-gray-100 flex-shrink-0">
-            <MiniCalendar
-              currentWeekStart={currentWeekStart}
-              onDateClick={handleDateClick}
-            />
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+            connection.connected ? 'bg-white ring-2 ring-green-200' : 'bg-gray-100'
+          }`}>
+            <GoogleIcon className={connection.connected ? 'w-4 h-4' : 'w-4 h-4 opacity-30'} />
           </div>
-
-          {/* Week view */}
           <div className="flex-1 min-w-0">
-            <CalendarWeekView
-              events={weekViewEvents}
-              loading={false}
-              currentWeekStart={currentWeekStart}
-              onPrevWeek={handlePrevWeek}
-              onNextWeek={handleNextWeek}
-              onToday={handleToday}
-            />
+            <p className={`text-sm font-medium ${connection.connected ? 'text-gray-900' : 'text-gray-500'}`}>
+              Google Calendar
+            </p>
+            <p className="text-xs text-gray-400 truncate">
+              {connection.connected ? connection.googleEmail : 'Nao conectado'}
+            </p>
           </div>
+          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
+            connection.connected ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'
+          }`}>
+            {connection.connected ? 'Conectado' : 'Desconectado'}
+          </span>
         </div>
-      </div>
 
-      {/* ── Section C: Upcoming Meetings ─────────────────────────────────── */}
-      {upcomingMeetings.length > 0 && (
-        <div className="bg-white rounded-xl border border-blue-100 p-6">
+        {/* Mini Calendar */}
+        <div className="bg-white rounded-xl border border-gray-200 p-3">
+          <MiniCalendar
+            currentWeekStart={currentWeekStart}
+            onDateClick={handleDateClick}
+          />
+        </div>
+
+        {/* Upcoming Meetings */}
+        <div className="bg-white rounded-xl border border-blue-100 p-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#E3F2FD' }}>
               <CalendarDays className="w-4.5 h-4.5" style={{ color: MEET_BLUE }} />
@@ -217,62 +201,80 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
             </div>
           </div>
 
-          <div className="relative pl-6">
-            <div className="absolute left-[7px] top-2 bottom-2 w-0.5 rounded-full" style={{ backgroundColor: '#90CAF9' }} />
-
-            <div className="space-y-3">
-              {upcomingMeetings.map((meeting) => {
-                const status = botStatusConfig[meeting.botStatus] || botStatusConfig.pending
-                const attendeeCount = meeting.attendees?.length || 0
-
-                return (
-                  <div key={meeting.id} className="relative">
-                    <div
-                      className="absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-white"
-                      style={{ backgroundColor: MEET_BLUE }}
-                    />
-                    <div className="bg-gray-50 rounded-lg border border-gray-100 p-3">
-                      <p className="text-sm font-medium text-gray-900 mb-1">{meeting.eventTitle}</p>
-                      <div className="flex items-center gap-2 text-[11px] text-gray-500 mb-2">
-                        <Clock className="w-3 h-3" />
-                        <span>
-                          {formatDateShort(meeting.eventStart)}, {formatTime(meeting.eventStart)}
-                          {meeting.eventEnd && ` – ${formatTime(meeting.eventEnd)}`}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex -space-x-1">
-                          {meeting.attendees.slice(0, 4).map((a, i) => (
-                            <div
-                              key={i}
-                              className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center"
-                              title={a.displayName || a.email}
-                            >
-                              <span className="text-[8px] font-bold" style={{ color: MEET_BLUE }}>
-                                {(a.displayName || a.email).charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          ))}
-                          {attendeeCount > 4 && (
-                            <span className="text-[9px] text-gray-400 ml-1.5 self-center">+{attendeeCount - 4}</span>
-                          )}
+          {upcomingMeetings.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-4">Nenhuma reuniao agendada</p>
+          ) : (
+            <div className="relative pl-6">
+              <div className="absolute left-[7px] top-2 bottom-2 w-0.5 rounded-full" style={{ backgroundColor: '#90CAF9' }} />
+              <div className="space-y-3">
+                {upcomingMeetings.map((meeting) => {
+                  const status = botStatusConfig[meeting.botStatus] || botStatusConfig.pending
+                  const attendeeCount = meeting.attendees?.length || 0
+                  return (
+                    <div key={meeting.id} className="relative">
+                      <div
+                        className="absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-white"
+                        style={{ backgroundColor: MEET_BLUE }}
+                      />
+                      <div className="bg-gray-50 rounded-lg border border-gray-100 p-3">
+                        <p className="text-sm font-medium text-gray-900 mb-1">{meeting.eventTitle}</p>
+                        <div className="flex items-center gap-2 text-[11px] text-gray-500 mb-2">
+                          <Clock className="w-3 h-3" />
+                          <span>
+                            {formatDateShort(meeting.eventStart)}, {formatTime(meeting.eventStart)}
+                            {meeting.eventEnd && ` – ${formatTime(meeting.eventEnd)}`}
+                          </span>
                         </div>
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${status.color} ${status.bg}`}>
-                          {status.dot && <span className={`w-1.5 h-1.5 rounded-full ${status.dot} animate-pulse`} />}
-                          {status.label}
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex -space-x-1">
+                            {meeting.attendees.slice(0, 4).map((a, i) => (
+                              <div
+                                key={i}
+                                className="w-5 h-5 rounded-full bg-blue-100 border border-white flex items-center justify-center"
+                                title={a.displayName || a.email}
+                              >
+                                <span className="text-[8px] font-bold" style={{ color: MEET_BLUE }}>
+                                  {(a.displayName || a.email).charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            ))}
+                            {attendeeCount > 4 && (
+                              <span className="text-[9px] text-gray-400 ml-1.5 self-center">+{attendeeCount - 4}</span>
+                            )}
+                          </div>
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${status.color} ${status.bg}`}>
+                            {status.dot && <span className={`w-1.5 h-1.5 rounded-full ${status.dot} animate-pulse`} />}
+                            {status.label}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* ── Section D: Meet History (reuses standard MeetHistoryContent) ── */}
-      <MeetHistoryContent sellerId={seller.user_id} />
+      {/* ── Right Column: Calendar Week View ─────────────────────────────── */}
+      <div className="lg:col-span-8">
+        <div className="bg-white rounded-xl border border-blue-100 overflow-hidden">
+          <CalendarWeekView
+            events={weekViewEvents}
+            loading={false}
+            currentWeekStart={currentWeekStart}
+            onPrevWeek={handlePrevWeek}
+            onNextWeek={handleNextWeek}
+            onToday={handleToday}
+          />
+        </div>
+      </div>
+
+      {/* ── Full Width: Meet History ─────────────────────────────────────── */}
+      <div className="lg:col-span-12">
+        <MeetHistoryContent sellerId={seller.user_id} />
+      </div>
     </div>
   )
 }
