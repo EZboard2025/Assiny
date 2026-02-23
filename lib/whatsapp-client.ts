@@ -697,20 +697,16 @@ async function upsertConnection(state: ClientState): Promise<void> {
     state.connectionId = existing.id
     console.log(`[WA] Connection updated: ${state.connectionId}`)
   } else {
-    // Check if phone_number_id is already used by another user (and delete if so)
+    // Allow same phone number on multiple accounts (simultaneous connections)
     if (state.phoneNumber) {
       const { data: existingByPhone } = await supabaseAdmin
         .from('whatsapp_connections')
         .select('id, user_id')
         .eq('phone_number_id', state.phoneNumber)
-        .single()
+        .neq('user_id', state.userId)
 
-      if (existingByPhone && existingByPhone.user_id !== state.userId) {
-        console.log(`[WA] Phone ${state.phoneNumber} was connected to another user, cleaning up...`)
-        // Delete old connection and related data
-        await supabaseAdmin.from('whatsapp_messages').delete().eq('connection_id', existingByPhone.id)
-        await supabaseAdmin.from('whatsapp_conversations').delete().eq('connection_id', existingByPhone.id)
-        await supabaseAdmin.from('whatsapp_connections').delete().eq('id', existingByPhone.id)
+      if (existingByPhone && existingByPhone.length > 0) {
+        console.log(`[WA] Phone ${state.phoneNumber} also connected to ${existingByPhone.length} other user(s) — keeping all`)
       }
     }
 
