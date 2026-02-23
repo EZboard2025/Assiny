@@ -37,7 +37,7 @@ interface CalendarEventPopoverProps {
   event: CalendarEvent
   anchorRect: { top: number; left: number; width: number; height: number } | null
   onClose: () => void
-  onToggleBot: (scheduledBotId: string, enabled: boolean) => void
+  onToggleBot?: (scheduledBotId: string, enabled: boolean) => void
   onViewEvaluation?: (event: CalendarEvent) => void
   onResetStatus?: (scheduledBotId: string) => void
   onDeleteEvent?: (eventId: string) => Promise<void>
@@ -333,20 +333,6 @@ export default function CalendarEventPopover({
                   </span>
                 </div>
 
-                {/* Toggle switch - hidden for past events */}
-                {!isPast && (
-                  <button
-                    onClick={() => event.scheduledBotId && onToggleBot(event.scheduledBotId, !botEnabled)}
-                    disabled={isToggling || !event.scheduledBotId || botStatus === 'recording' || botStatus === 'completed'}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                      botEnabled ? 'bg-green-500' : 'bg-gray-300'
-                    } ${isToggling ? 'opacity-50' : ''} disabled:cursor-not-allowed`}
-                  >
-                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm ${
-                      botEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                    }`} />
-                  </button>
-                )}
               </div>
 
               {/* Evaluation score */}
