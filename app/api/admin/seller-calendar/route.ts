@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { fetchAllEvents } from '@/lib/google-calendar'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,14 +32,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Seller not found in company' }, { status: 404 })
     }
 
-    // Date range for calendar view (3 months back, 3 months ahead)
-    const rangeStart = new Date()
-    rangeStart.setMonth(rangeStart.getMonth() - 3)
-    const rangeEnd = new Date()
-    rangeEnd.setMonth(rangeEnd.getMonth() + 3)
-
-    // Fetch all calendar data in parallel
-    const [connectionRes, allEventsRes, completedRes] = await Promise.all([
+    // Fetch connection status + Google Calendar events + bot data in parallel
+    const [connectionRes, googleEvents, botsRes, completedRes] = await Promise.all([
       // 1. Google Calendar connection status
       supabaseAdmin
         .from('google_calendar_connections')
@@ -46,17 +41,16 @@ export async function GET(request: Request) {
         .eq('user_id', sellerId)
         .single(),
 
-      // 2. All calendar events (for week view + upcoming list)
+      // 2. ALL events from Google Calendar API (not just Meet)
+      fetchAllEvents(sellerId, 90),
+
+      // 3. Bot data from DB (for bot status enrichment)
       supabaseAdmin
         .from('calendar_scheduled_bots')
-        .select('id, event_title, event_start, event_end, meet_link, attendees, bot_enabled, bot_status, evaluation_id')
-        .eq('user_id', sellerId)
-        .gte('event_start', rangeStart.toISOString())
-        .lte('event_start', rangeEnd.toISOString())
-        .order('event_start', { ascending: true })
-        .limit(200),
+        .select('google_event_id, bot_enabled, bot_status, evaluation_id')
+        .eq('user_id', sellerId),
 
-      // 3. Completed meetings with evaluation (for title enrichment of meet_evaluations)
+      // 4. Completed meetings with evaluation (for meet_evaluations title enrichment)
       supabaseAdmin
         .from('calendar_scheduled_bots')
         .select('evaluation_id, event_title, event_start, meet_link')
@@ -73,23 +67,36 @@ export async function GET(request: Request) {
       googleEmail: conn?.google_email || null,
     }
 
-    // Build all calendar events (for week view)
-    const now = new Date().toISOString()
-    const allEvents = (allEventsRes.data || []).map((m: any) => ({
-      id: m.id,
-      eventTitle: m.event_title || 'Reuniao sem titulo',
-      eventStart: m.event_start,
-      eventEnd: m.event_end,
-      meetLink: m.meet_link,
-      attendees: m.attendees || [],
-      botEnabled: m.bot_enabled,
-      botStatus: m.bot_status,
-      evaluationId: m.evaluation_id,
-    }))
+    // Build bot status map (google_event_id -> bot info)
+    const botMap = new Map<string, { botEnabled: boolean; botStatus: string; evaluationId: string | null }>()
+    for (const bot of botsRes.data || []) {
+      botMap.set(bot.google_event_id, {
+        botEnabled: bot.bot_enabled,
+        botStatus: bot.bot_status,
+        evaluationId: bot.evaluation_id,
+      })
+    }
 
-    // Derive upcoming meetings (future + active status)
-    const upcomingMeetings = allEvents.filter((m: any) =>
-      m.eventStart >= now && ['pending', 'scheduled', 'joining', 'recording'].includes(m.botStatus)
+    // Map Google Calendar events, enriching with bot data where available
+    const now = new Date().toISOString()
+    const allEvents = (googleEvents || []).map((e) => {
+      const bot = botMap.get(e.id)
+      return {
+        id: e.id,
+        eventTitle: e.title,
+        eventStart: e.start,
+        eventEnd: e.end,
+        meetLink: e.meetLink || '',
+        attendees: e.attendees || [],
+        botEnabled: bot?.botEnabled ?? false,
+        botStatus: bot?.botStatus ?? (e.meetLink ? 'pending' : null),
+        evaluationId: bot?.evaluationId ?? null,
+      }
+    })
+
+    // Derive upcoming meetings (future events with Meet links + active bot status)
+    const upcomingMeetings = allEvents.filter((m) =>
+      m.eventStart >= now && m.meetLink && ['pending', 'scheduled', 'joining', 'recording'].includes(m.botStatus || '')
     )
 
     // Build completed meetings map (evaluationId -> calendar info)
