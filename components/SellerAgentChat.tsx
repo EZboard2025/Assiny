@@ -66,7 +66,7 @@ const MAX_PANEL_W = 700
 const DEFAULT_PANEL_W = 380
 
 export default function SellerAgentChat({ userName, userRole, currentView = 'home' }: SellerAgentChatProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
