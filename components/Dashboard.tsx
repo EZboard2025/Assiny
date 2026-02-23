@@ -802,7 +802,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Seller Agent Chat - home, profile and roleplay */}
       {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay') && (
-        <SellerAgentChat userName={userName || undefined} />
+        <SellerAgentChat userName={userName || undefined} currentView={currentView} />
       )}
 
       {/* Configuration Required Overlay */}

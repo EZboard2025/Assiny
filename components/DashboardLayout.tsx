@@ -122,7 +122,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <main
-        className={`absolute top-0 bottom-0 right-0 overflow-clip transition-all duration-300 ${
+        className={`absolute top-0 bottom-0 right-0 overflow-y-auto overflow-x-hidden transition-all duration-300 ${
           isSidebarExpanded ? 'left-56' : 'left-16'
         }`}
       >

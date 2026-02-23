@@ -17,7 +17,7 @@ export default function UnifiedManagerPage() {
   const [view, setView] = useState<ViewState>({ type: 'grid' })
 
   return (
-    <div className="min-h-screen py-8 px-6">
+    <div className="min-h-screen py-8 px-6 pr-[400px]">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6 shadow-sm">
@@ -61,7 +61,7 @@ export default function UnifiedManagerPage() {
       </div>
 
       {/* Unified AI Assistant - auto-detects role and userName */}
-      <SellerAgentChat />
+      <SellerAgentChat currentView="manager" />
     </div>
   )
 }
