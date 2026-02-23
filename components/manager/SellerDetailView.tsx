@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Loader2, CalendarDays, Clock, ChevronDown, Video } from 'lucide-react'
+import { Loader2, CalendarDays, Clock, ChevronDown, Video, X, ChevronRight } from 'lucide-react'
 import CalendarWeekView from '../CalendarWeekView'
 import MiniCalendar from '../MiniCalendar'
 import MeetHistoryContent from '../MeetHistoryContent'
@@ -267,6 +267,21 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
             </div>
           )}
         </div>
+
+        {/* Meet History Card (opens overlay panel) */}
+        <button
+          onClick={() => setHistoryOpen(true)}
+          className="w-full bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3 hover:border-green-300 hover:shadow-sm transition-all text-left"
+        >
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-50">
+            <Video className="w-4.5 h-4.5 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-semibold text-gray-900">Historico de Reunioes</h2>
+            <p className="text-[10px] text-gray-500">Avaliacoes de Meet gravadas</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        </button>
       </div>
 
       {/* ── Right Column: Calendar Week View ─────────────────────────────── */}
@@ -283,28 +298,38 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         </div>
       </div>
 
-      {/* ── Full Width: Meet History (collapsible) ────────────────────────── */}
-      <div className="lg:col-span-12 bg-white rounded-xl border border-gray-200">
-        <button
-          onClick={() => setHistoryOpen(!historyOpen)}
-          className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors rounded-xl"
-        >
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-50">
-            <Video className="w-4.5 h-4.5 text-green-600" />
-          </div>
-          <div className="flex-1 text-left">
-            <h2 className="text-sm font-bold text-gray-900">Historico de Reunioes</h2>
-            <p className="text-[10px] text-gray-500">Avaliacoes de Meet gravadas</p>
-          </div>
-          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
-        </button>
+      {/* ── Meet History Overlay Panel ────────────────────────────────────── */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/30" onClick={() => setHistoryOpen(false)} />
 
-        {historyOpen && (
-          <div className="border-t border-gray-100">
-            <MeetHistoryContent sellerId={seller.user_id} />
+          {/* Panel */}
+          <div className="relative ml-auto w-full max-w-5xl h-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 flex-shrink-0">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-green-50">
+                <Video className="w-4.5 h-4.5 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-base font-bold text-gray-900">Historico de Reunioes</h2>
+                <p className="text-xs text-gray-500">{seller.user_name}</p>
+              </div>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              <MeetHistoryContent sellerId={seller.user_id} />
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
