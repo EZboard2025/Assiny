@@ -663,25 +663,30 @@ if (!globalForWA.waReaperStarted) {
   }
 }
 
-// Clean up orphaned DB connections on server restart
-;(async () => {
-  try {
-    const { count } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'active')
-
-    if (count && count > 0) {
-      console.log(`[WA Startup] Found ${count} orphaned active connections, marking as disconnected`)
-      await supabaseAdmin
+// Clean up orphaned DB connections on server restart (production only)
+// In dev mode, this would clobber VPS connections in the shared DB
+if (process.env.NODE_ENV === 'production') {
+  ;(async () => {
+    try {
+      const { count } = await supabaseAdmin
         .from('whatsapp_connections')
-        .update({ status: 'disconnected' })
+        .select('id', { count: 'exact', head: true })
         .eq('status', 'active')
+
+      if (count && count > 0) {
+        console.log(`[WA Startup] Found ${count} orphaned active connections, marking as disconnected`)
+        await supabaseAdmin
+          .from('whatsapp_connections')
+          .update({ status: 'disconnected' })
+          .eq('status', 'active')
+      }
+    } catch (err) {
+      console.error('[WA Startup] Error cleaning orphaned connections:', err)
     }
-  } catch (err) {
-    console.error('[WA Startup] Error cleaning orphaned connections:', err)
-  }
-})()
+  })()
+} else {
+  console.log('[WA Startup] Skipping orphan cleanup in dev mode (shared DB)')
+}
 
 // ============================================
 // Internal helpers
