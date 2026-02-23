@@ -221,7 +221,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
             <div className="absolute left-[7px] top-2 bottom-2 w-0.5 rounded-full" style={{ backgroundColor: '#90CAF9' }} />
 
             <div className="space-y-3">
-              {upcomingMeetings.slice(0, 5).map((meeting) => {
+              {upcomingMeetings.map((meeting) => {
                 const status = botStatusConfig[meeting.botStatus] || botStatusConfig.pending
                 const attendeeCount = meeting.attendees?.length || 0
 
