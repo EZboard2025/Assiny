@@ -48,14 +48,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: sessionsError.message }, { status: 500 })
     }
 
-    if (!sessions || sessions.length === 0) {
-      return NextResponse.json({ data: [] })
-    }
-
     // Agrupar sessões por usuário e calcular métricas (igual ao PerfilView)
     const userMetrics = new Map<string, any>()
 
-    sessions.forEach(session => {
+    ;(sessions || []).forEach(session => {
       const userId = session.user_id
 
       if (!userMetrics.has(userId)) {
@@ -138,16 +134,36 @@ export async function GET(request: Request) {
       }
     })
 
-    // Buscar informações dos usuários
-    const userIdsFromMetrics = Array.from(userMetrics.keys())
+    // Buscar informações de TODOS os employees da empresa
     const { data: usersData } = await supabaseAdmin
       .from('employees')
       .select('user_id, name, email')
-      .in('user_id', userIdsFromMetrics)
+      .eq('company_id', companyId)
 
-    // Formatar dados finais
-    const sellersData = Array.from(userMetrics.values()).map(metrics => {
-      const user = usersData?.find(u => u.user_id === metrics.user_id)
+    // Formatar dados finais - incluir TODOS os employees
+    const allEmployeeIds = (usersData || []).map(u => u.user_id)
+    const sellersData = allEmployeeIds.map(employeeId => {
+      const user = usersData?.find(u => u.user_id === employeeId)
+      const metrics = userMetrics.get(employeeId)
+
+      // Employee sem sessões - retornar dados vazios
+      if (!metrics) {
+        return {
+          user_id: employeeId,
+          user_name: user?.name || 'Usuário Desconhecido',
+          user_email: user?.email || 'N/A',
+          total_sessions: 0,
+          overall_average: 0,
+          spin_s_average: 0,
+          spin_p_average: 0,
+          spin_i_average: 0,
+          spin_n_average: 0,
+          top_strengths: [],
+          critical_gaps: [],
+          trend: 'stable',
+          timeline: []
+        }
+      }
 
       // Calcular médias
       const overall_average = metrics.countOverallScore > 0

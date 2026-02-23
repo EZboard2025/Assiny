@@ -33,15 +33,15 @@ export async function GET(request: Request) {
         .in('user_id', userIds),
       supabaseAdmin
         .from('whatsapp_connections')
-        .select('user_id, status')
+        .select('user_id, status, display_phone_number')
         .in('user_id', userIds),
     ])
 
-    // Build map: { user_id: { google: boolean, whatsapp: boolean } }
-    const connections: Record<string, { google: boolean; whatsapp: boolean }> = {}
+    // Build map: { user_id: { google: boolean, whatsapp: boolean, whatsappPhone: string | null } }
+    const connections: Record<string, { google: boolean; whatsapp: boolean; whatsappPhone: string | null }> = {}
 
     for (const uid of userIds) {
-      connections[uid] = { google: false, whatsapp: false }
+      connections[uid] = { google: false, whatsapp: false, whatsappPhone: null }
     }
 
     for (const gc of googleRes.data || []) {
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
     for (const wc of whatsappRes.data || []) {
       if (wc.status === 'active') {
-        connections[wc.user_id] = { ...connections[wc.user_id], whatsapp: true }
+        connections[wc.user_id] = { ...connections[wc.user_id], whatsapp: true, whatsappPhone: wc.display_phone_number || null }
       }
     }
 

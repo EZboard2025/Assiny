@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Users, TrendingUp, Award, Target, Search, X, Loader2 } from 'lucide-react'
+import { Users, TrendingUp, Award, Search, X, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 // Types (from SalesDashboard)
@@ -160,11 +160,12 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
 
   const totalSellers = sellers.length
 
-  const avgGeneralPerformance = sellers.length > 0
-    ? sellers.reduce((sum, s) => sum + (s.overall_average || 0), 0) / sellers.length
+  const sellersWithData = sellers.filter(s => s.total_sessions > 0)
+  const avgGeneralPerformance = sellersWithData.length > 0
+    ? sellersWithData.reduce((sum, s) => sum + (s.overall_average || 0), 0) / sellersWithData.length
     : 0
 
-  const topPerformer = sellers.length > 0 ? sellers[0] : null
+  const topPerformer = sellersWithData.length > 0 ? sellersWithData[0] : null
 
   // Loading state
   if (loading) {
@@ -202,7 +203,7 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
             <div>
               <p className="text-xs text-gray-500 font-medium">Media Geral</p>
               <p className={`text-xl font-bold ${getScoreColor(avgGeneralPerformance)}`}>
-                {avgGeneralPerformance > 0 ? avgGeneralPerformance.toFixed(1) : 'N/A'}
+                {sellersWithData.length > 0 ? avgGeneralPerformance.toFixed(1) : 'N/A'}
               </p>
             </div>
           </div>
@@ -271,11 +272,17 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0 ml-3">
-                    <span className={`text-xl font-bold ${getScoreColor(seller.overall_average)}`}>
-                      {seller.overall_average ? seller.overall_average.toFixed(1) : 'N/A'}
-                    </span>
-                    {seller.overall_average > 0 && (
-                      <span className="text-gray-400 text-sm">/10</span>
+                    {seller.total_sessions > 0 ? (
+                      <>
+                        <span className={`text-xl font-bold ${getScoreColor(seller.overall_average)}`}>
+                          {seller.overall_average ? seller.overall_average.toFixed(1) : 'N/A'}
+                        </span>
+                        {seller.overall_average > 0 && (
+                          <span className="text-gray-400 text-sm">/10</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400 font-medium">Sem treinos</span>
                     )}
                   </div>
                 </div>
@@ -317,10 +324,11 @@ export default function SellerGrid({ onSelectSeller }: SellerGridProps) {
           })}
         </div>
       ) : sellers.length === 0 ? (
-        /* No sellers at all */
+        /* No employees in this company */
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Target className="w-12 h-12 text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">Nenhum vendedor com dados de performance ainda</p>
+          <Users className="w-12 h-12 text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm">Nenhum vendedor cadastrado nesta empresa</p>
+          <p className="text-gray-400 text-xs mt-1">Adicione vendedores no ConfigHub para começar</p>
         </div>
       ) : (
         /* Search returned no results */
