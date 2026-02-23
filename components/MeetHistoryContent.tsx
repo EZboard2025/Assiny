@@ -548,11 +548,21 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
     )
   }
 
+  // Manager view uses compact styling
+  const sectionBtnClass = isManagerView
+    ? 'w-full flex items-center justify-between p-2.5 hover:bg-gray-50 transition-colors'
+    : 'w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors'
+  const sectionIconBoxClass = isManagerView
+    ? 'w-7 h-7 rounded-lg flex items-center justify-center'
+    : 'w-10 h-10 rounded-xl flex items-center justify-center'
+  const sectionIconClass = isManagerView ? 'w-3.5 h-3.5' : 'w-5 h-5'
+  const sectionTitleClass = isManagerView ? 'text-xs font-semibold text-gray-900' : 'text-sm font-semibold text-gray-900'
+
   return (
-    <div className={`grid grid-cols-1 ${isManagerView ? 'gap-4' : 'lg:grid-cols-12 gap-6'}`}>
+    <div className={`grid grid-cols-1 ${isManagerView ? 'gap-3' : 'lg:grid-cols-12 gap-6'}`}>
       {/* Lista de avaliações */}
       <div className={isManagerView ? '' : 'lg:col-span-4 xl:col-span-3'}>
-        <div className={`bg-white overflow-hidden ${isManagerView ? 'border-b border-gray-100' : 'rounded-2xl border border-gray-200 shadow-sm'}`}>
+        <div className={`bg-white overflow-hidden ${isManagerView ? 'pb-1' : 'rounded-2xl border border-gray-200 shadow-sm'}`}>
           {/* Tab: Minhas / Compartilhados (hidden in manager view) */}
           {!isManagerView && <div className="flex border-b border-gray-100">
             <button
@@ -572,7 +582,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
               Compartilhados
             </button>
           </div>}
-          <div className={isManagerView ? 'flex overflow-x-auto gap-0' : 'max-h-[calc(100vh-320px)] overflow-y-auto'}>
+          <div className={isManagerView ? 'flex overflow-x-auto gap-2 p-2' : 'max-h-[calc(100vh-320px)] overflow-y-auto'}>
             {viewMode === 'shared' ? (
               // Shared evaluations list
               sharedLoading ? (
@@ -640,10 +650,10 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     onClick={() => { setSelectedEvaluation(evaluation); setExpandedSection(null) }}
                     className={`relative text-left transition-all ${
                       isManagerView
-                        ? `flex-shrink-0 w-40 p-3 border-r border-gray-100 ${
+                        ? `flex-shrink-0 rounded-lg border p-2.5 ${
                             selectedEvaluation?.id === evaluation.id
-                              ? 'bg-green-50 border-b-2 border-b-green-500'
-                              : 'hover:bg-gray-50'
+                              ? 'bg-green-50 border-green-300 ring-1 ring-green-200'
+                              : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                           }`
                         : `w-full p-4 border-b border-gray-100 ${
                             selectedEvaluation?.id === evaluation.id
@@ -654,6 +664,30 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                           }`
                     }`}
                   >
+                    {isManagerView ? (
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${getScoreBg(evaluation.overall_score)}`}>
+                          <span className={`text-sm font-bold ${getScoreColor(evaluation.overall_score)}`}>
+                            {evaluation.overall_score !== null ? Math.round(evaluation.overall_score / 10) : '--'}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-gray-900 truncate max-w-[120px]">{evaluation.seller_name}</p>
+                          <p className="text-[10px] text-gray-400">{formatDate(evaluation.created_at)}</p>
+                          {evaluation.calendar_event_title && (
+                            <p className="text-[10px] text-blue-500 truncate max-w-[120px]">{evaluation.calendar_event_title}</p>
+                          )}
+                          {hasSim && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Target className="w-2.5 h-2.5 text-purple-500" />
+                              <span className={`text-[10px] font-medium ${isCompleted ? 'text-green-600' : 'text-purple-500'}`}>
+                                {isCompleted ? `Corrigido${correctionScore != null ? ` (${correctionScore.toFixed(1)})` : ''}` : 'Pendente'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
                     <div className="flex items-center gap-3">
                       {/* Score */}
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isNew ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${getScoreBg(evaluation.overall_score)}`}>
@@ -698,6 +732,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                         )}
                       </div>
                     </div>
+                    )}
                   </button>
                 </div>
               )
@@ -710,23 +745,23 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
       {/* Detalhes da avaliação */}
       <div className={isManagerView ? '' : 'lg:col-span-8 xl:col-span-9'}>
         {selectedEvaluation ? (
-          <div className={`bg-white overflow-hidden ${isManagerView ? '' : 'rounded-2xl border border-gray-200 shadow-sm'}`}>
+          <div className={`bg-white overflow-hidden ${isManagerView ? 'max-h-[calc(100vh-280px)] overflow-y-auto' : 'rounded-2xl border border-gray-200 shadow-sm'}`}>
             {/* Header */}
-            <div className={`border-b border-gray-100 ${isManagerView ? 'p-4' : 'p-6'}`}>
+            <div className={`border-b border-gray-100 ${isManagerView ? 'px-4 py-3' : 'p-6'}`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${getScoreBg(selectedEvaluation.overall_score)}`}>
-                      <span className={`text-2xl font-bold ${getScoreColor(selectedEvaluation.overall_score)}`}>
+                  <div className="flex items-center gap-3 mb-1.5">
+                    <div className={`${isManagerView ? 'w-10 h-10 rounded-lg' : 'w-14 h-14 rounded-xl'} flex items-center justify-center ${getScoreBg(selectedEvaluation.overall_score)}`}>
+                      <span className={`${isManagerView ? 'text-lg' : 'text-2xl'} font-bold ${getScoreColor(selectedEvaluation.overall_score)}`}>
                         {selectedEvaluation.overall_score !== null ? Math.round(selectedEvaluation.overall_score / 10) : '--'}
                       </span>
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">{selectedEvaluation.seller_name}</h2>
-                      <p className="text-sm text-gray-500">{getPerformanceLabel(selectedEvaluation.performance_level)}</p>
+                      <h2 className={`${isManagerView ? 'text-sm' : 'text-xl'} font-bold text-gray-900`}>{selectedEvaluation.seller_name}</h2>
+                      <p className={`${isManagerView ? 'text-[11px]' : 'text-sm'} text-gray-500`}>{getPerformanceLabel(selectedEvaluation.performance_level)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
+                  <div className={`flex items-center gap-4 ${isManagerView ? 'text-[11px]' : 'text-sm'} text-gray-500 flex-wrap`}>
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       {formatDate(selectedEvaluation.created_at)} às {formatTime(selectedEvaluation.created_at)}
@@ -774,8 +809,8 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
 
             {/* Seller Identification */}
             {selectedEvaluation.evaluation?.seller_identification && (
-              <div className="px-6 pt-4 pb-2 border-b border-gray-100">
-                <div className="flex items-center gap-3 text-sm text-gray-600">
+              <div className={`${isManagerView ? 'px-4 py-2' : 'px-6 pt-4 pb-2'} border-b border-gray-100`}>
+                <div className={`flex items-center gap-3 ${isManagerView ? 'text-xs' : 'text-sm'} text-gray-600`}>
                   <User className="w-4 h-4 text-gray-400" />
                   <span>Vendedor: <strong>{selectedEvaluation.evaluation.seller_identification.name}</strong></span>
                   {selectedEvaluation.evaluation.seller_identification.speaking_time_percentage !== undefined && (
@@ -788,21 +823,21 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
             )}
 
             {/* Collapsible Section Cards */}
-            <div className="p-4 space-y-2">
+            <div className={`${isManagerView ? 'p-3 space-y-1.5' : 'p-4 space-y-2'}`}>
 
               {/* 0. Notas Inteligentes */}
               {selectedEvaluation.smart_notes ? (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setExpandedSection(expandedSection === 'smart_notes' ? null : 'smart_notes')}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    className={sectionBtnClass}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-emerald-600" />
+                      <div className={`${sectionIconBoxClass} bg-emerald-50`}>
+                        <FileText className={`${sectionIconClass} text-emerald-600`} />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-sm font-semibold text-gray-900">Notas Inteligentes</h3>
+                        <h3 className={sectionTitleClass}>Notas Inteligentes</h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {selectedEvaluation.smart_notes.lead_name && (
                             <span className="text-xs text-gray-500">{selectedEvaluation.smart_notes.lead_name}</span>
@@ -1051,14 +1086,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
               <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setExpandedSection(expandedSection === 'spin' ? null : 'spin')}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                  className={sectionBtnClass}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    <div className={`${sectionIconBoxClass} bg-green-50`}>
+                      <TrendingUp className={`${sectionIconClass} text-green-600`} />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-sm font-semibold text-gray-900">Análise SPIN</h3>
+                      <h3 className={sectionTitleClass}>Análise SPIN</h3>
                       <div className="flex items-center gap-1.5 mt-1">
                         {[
                           { letter: 'S', score: selectedEvaluation.spin_s_score },
@@ -1177,14 +1212,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setExpandedSection(expandedSection === 'objections' ? null : 'objections')}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    className={sectionBtnClass}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-red-600" />
+                      <div className={`${sectionIconBoxClass} bg-red-50`}>
+                        <Shield className={`${sectionIconClass} text-red-600`} />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-sm font-semibold text-gray-900">Análise de Objeções</h3>
+                        <h3 className={sectionTitleClass}>Análise de Objeções</h3>
                         <p className="text-xs text-gray-500">{selectedEvaluation.evaluation.objections_analysis.length} objeções identificadas</p>
                       </div>
                     </div>
@@ -1237,14 +1272,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setExpandedSection(expandedSection === 'evaluation' ? null : 'evaluation')}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    className={sectionBtnClass}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-blue-600" />
+                      <div className={`${sectionIconBoxClass} bg-blue-50`}>
+                        <FileText className={`${sectionIconClass} text-blue-600`} />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-sm font-semibold text-gray-900">Avaliação Detalhada</h3>
+                        <h3 className={sectionTitleClass}>Avaliação Detalhada</h3>
                         <p className="text-xs text-gray-500">Resumo, pontos fortes, gaps e melhorias</p>
                       </div>
                     </div>
@@ -1353,14 +1388,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setExpandedSection(expandedSection === 'transcript' ? null : 'transcript')}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    className={sectionBtnClass}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-cyan-50 rounded-xl flex items-center justify-center">
-                        <MessageCircle className="w-5 h-5 text-cyan-600" />
+                      <div className={`${sectionIconBoxClass} bg-cyan-50`}>
+                        <MessageCircle className={`${sectionIconClass} text-cyan-600`} />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-sm font-semibold text-gray-900">Transcrição da Reunião</h3>
+                        <h3 className={sectionTitleClass}>Transcrição da Reunião</h3>
                         <p className="text-xs text-gray-500">{selectedEvaluation.transcript.length} segmentos</p>
                       </div>
                     </div>
@@ -1427,18 +1462,18 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                       <>
                         <button
                           onClick={() => setExpandedSection(expandedSection === 'practice' ? null : 'practice')}
-                          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                          className={sectionBtnClass}
                         >
                           <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isCompleted ? 'bg-green-50' : 'bg-purple-50'}`}>
+                            <div className={`${sectionIconBoxClass} ${isCompleted ? 'bg-green-50' : 'bg-purple-50'}`}>
                               {isCompleted ? (
-                                <CheckCircle className="w-5 h-5 text-green-600" />
+                                <CheckCircle className={`${sectionIconClass} text-green-600`} />
                               ) : (
-                                <Target className="w-5 h-5 text-purple-600" />
+                                <Target className={`${sectionIconClass} text-purple-600`} />
                               )}
                             </div>
                             <div className="text-left">
-                              <h3 className="text-sm font-semibold text-gray-900">
+                              <h3 className={sectionTitleClass}>
                                 {isCompleted ? 'Prática Concluída' : 'Prática Direcionada'}
                               </h3>
                               <p className="text-xs text-gray-500">
