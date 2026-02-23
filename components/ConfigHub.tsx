@@ -3557,15 +3557,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                         {multiSelectMode ? 'Cancelar' : 'Selecionar'}
                       </button>
                     )}
-                    {/* Botão Gerar com IA */}
-                    <button
-                      onClick={() => setShowAIGenerateModal('personas')}
-                      className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
-                    >
-                      <Sparkles className="w-4 h-4 animate-pulse" />
-                      Gerar com IA
-                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
-                    </button>
                     {/* Filtro por Tipo B2B/B2C */}
                     <select
                       value={filterBusinessType}
@@ -4479,14 +4470,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       {multiSelectMode ? 'Cancelar' : 'Selecionar'}
                     </button>
                   )}
-                  <button
-                    onClick={() => setShowAIGenerateModal('objections')}
-                    className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
-                  >
-                    <Sparkles className="w-4 h-4 animate-pulse" />
-                    Gerar com IA
-                    <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
-                  </button>
                   </div>
                 </div>
                 <p className="text-gray-500 mt-2 text-xs">
@@ -4790,14 +4773,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-900 tracking-wider">Objetivos de Roleplay</h3>
-                <button
-                  onClick={() => setShowAIGenerateModal('objectives')}
-                  className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
-                >
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  Gerar com IA
-                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
-                </button>
               </div>
 
               {/* Formulário de novo objetivo */}
@@ -5254,117 +5229,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
               </div>
 
               <div className="p-4">
-                {/* Toggle Desafios Diários */}
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50/50 to-emerald-50/50 rounded-xl border border-green-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Target className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">Desafios Diários</h4>
-                      <p className="text-xs text-gray-500">
-                        IA analisa dados e gera desafios personalizados
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      if (!userCompanyId) return
-                      try {
-                        const { supabase } = await import('@/lib/supabase')
-                        const { data: company } = await supabase
-                          .from('companies')
-                          .select('daily_challenges_enabled')
-                          .eq('id', userCompanyId)
-                          .single()
-
-                        const newValue = !(company?.daily_challenges_enabled ?? true)
-
-                        await supabase
-                          .from('companies')
-                          .update({ daily_challenges_enabled: newValue })
-                          .eq('id', userCompanyId)
-
-                        // Force re-render
-                        loadUsageData()
-                      } catch (error) {
-                        console.error('Erro ao atualizar configuração:', error)
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      usageData?.challengesEnabled !== false ? 'bg-green-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        usageData?.challengesEnabled !== false ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Input URL do Site da Empresa */}
-                {usageData?.challengesEnabled !== false && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Link2 className="w-4 h-4 text-gray-500" />
-                      <label className="text-sm font-medium text-gray-700">
-                        URL do Site da Empresa
-                      </label>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">
-                      A IA usará o site para gerar personas e objeções mais realistas nos desafios avançados (4+ estrelas).
-                    </p>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={usageData?.websiteUrl || ''}
-                        onChange={(e) => {
-                          if (usageData) {
-                            setUsageData({ ...usageData, websiteUrl: e.target.value })
-                          }
-                        }}
-                        placeholder="https://www.suaempresa.com.br"
-                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                      />
-                      <button
-                        onClick={async () => {
-                          if (!userCompanyId || !usageData?.websiteUrl) return
-                          try {
-                            // Normalize URL - add https:// if missing
-                            let normalizedUrl = usageData.websiteUrl.trim()
-                            if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
-                              normalizedUrl = `https://${normalizedUrl}`
-                            }
-
-                            const { supabase } = await import('@/lib/supabase')
-                            await supabase
-                              .from('companies')
-                              .update({ website_url: normalizedUrl })
-                              .eq('id', userCompanyId)
-
-                            // Update local state with normalized URL
-                            setUsageData({ ...usageData, websiteUrl: normalizedUrl })
-                            showToast('success', 'URL salva', 'O site da empresa foi salvo com sucesso.')
-                          } catch (error) {
-                            console.error('Erro ao salvar URL:', error)
-                            showToast('error', 'Erro', 'Não foi possível salvar a URL.')
-                          }
-                        }}
-                        disabled={!usageData?.websiteUrl}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Salvar
-                      </button>
-                    </div>
-                    {usageData?.websiteUrl && (
-                      <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        URL configurada - será usada nos desafios avançados
-                      </p>
-                    )}
-                  </div>
-                )}
+                <p className="text-sm text-gray-500 text-center py-4">Nenhuma configuração adicional disponível no momento.</p>
               </div>
             </div>
           </div>
