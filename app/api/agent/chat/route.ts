@@ -464,6 +464,101 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
   }
 ]
 
+// ─── Team Management Tool Definitions (only for admin/gestor) ─────────────────
+
+const teamToolDefinitions: OpenAI.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_team_overview',
+      description: 'Busca visão geral da equipe: média geral, total de vendedores, ranking por nota, totais de sessões/reuniões/follow-ups, vendedores que precisam de atenção (nota baixa ou tendência declinante).',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_seller_performance',
+      description: 'Busca dados detalhados de um vendedor específico: médias (geral, roleplay, meet, follow-up, whatsapp), SPIN scores, pontos fortes, gaps críticos, tendência, histórico de sessões recentes, PDI ativo.',
+      parameters: {
+        type: 'object',
+        properties: {
+          seller_name: { type: 'string', description: 'Nome (ou parte do nome) do vendedor para buscar' },
+          seller_user_id: { type: 'string', description: 'ID do vendedor (opcional, mais preciso que nome)' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_team_ranking',
+      description: 'Busca rankings da equipe: por nota geral (overall), por dimensão SPIN (spin_s, spin_p, spin_i, spin_n), ou por tipo (roleplay, meet, followup, whatsapp).',
+      parameters: {
+        type: 'object',
+        properties: {
+          dimension: { type: 'string', description: 'Dimensão: overall, spin_s, spin_p, spin_i, spin_n, roleplay, meet, followup, whatsapp. Default: overall' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'compare_sellers',
+      description: 'Compara 2 ou mais vendedores lado a lado: notas gerais, médias SPIN, tendências, pontos fortes, gaps, totais de sessões.',
+      parameters: {
+        type: 'object',
+        properties: {
+          seller_names: { type: 'array', items: { type: 'string' }, description: 'Nomes dos vendedores para comparar (busca parcial por ilike)' }
+        },
+        required: ['seller_names']
+      }
+    }
+  }
+]
+
+// ─── Manager System Prompt Extension ──────────────────────────────────────────
+
+const MANAGER_PROMPT_EXTENSION = `
+
+VOCÊ ESTÁ CONVERSANDO COM UM GESTOR/ADMIN.
+Além de ser coach pessoal, você também é o Assistente de Gestão da equipe.
+Você pode consultar dados de QUALQUER vendedor da empresa, rankings, comparações e sugerir coaching.
+
+FERRAMENTAS DE GESTÃO ADICIONAIS:
+- get_team_overview — Visão geral da equipe (ranking, médias, totais, quem precisa de atenção)
+- get_seller_performance — Dados detalhados de um vendedor específico
+- get_team_ranking — Rankings por nota geral ou dimensão SPIN
+- compare_sellers — Comparação lado a lado de vendedores
+
+ESTRATÉGIA POR TIPO DE PERGUNTA DO GESTOR:
+- "Quem precisa de atenção?" → get_team_overview (priorize por tendência declinante, nota <5, gaps críticos)
+- "Compare os vendedores" / "Compare X e Y" → compare_sellers
+- "Como está o [nome]?" → get_seller_performance
+- "Média da equipe" → get_team_overview
+- "Quem mais evoluiu?" → get_team_ranking(overall)
+- "Ranking de SPIN" → get_team_ranking(spin_s/p/i/n)
+
+FORMATAÇÃO VISUAL PARA GESTÃO:
+Use as mesmas tags pessoais ({{score}}, {{spin}}, {{trend}}, {{metric}}) MAIS estas tags exclusivas de gestão:
+
+• {{ranking|Nome1|7.5,Nome2|6.3,Nome3|5.1}} — Ranking visual com barras ordenadas
+  Ex: {{ranking|João|7.8,Maria|6.3,Pedro|5.1}}
+
+• {{comparison|Nome1|7.5,Nome2|6.3}} — Barras de comparação lado a lado
+  Ex: {{comparison|João Roleplay|7.5,João Meet|6.8,João WA|5.2}}
+
+REGRAS DE TAGS DE GESTÃO:
+- Use {{ranking}} quando listar posições da equipe inteira
+- Use {{comparison}} quando comparar 2-3 vendedores em uma métrica
+- Cada tag deve estar em sua própria linha
+- Só use com dados reais das ferramentas — NUNCA invente valores
+- Ao falar de um vendedor específico, use {{score}} + {{spin}} + {{trend}} para os dados pessoais dele
+- Ao comparar vendedores, use {{comparison}} ou {{ranking}} para dados lado a lado`
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // Parse evaluation from N8N format {output: "json_string"} or [{output: "json_string"}]
@@ -1398,6 +1493,300 @@ async function executeFunction(
         }
       }
 
+      // ─── Team Management Tools (admin/gestor only) ────────────────────
+      case 'get_team_overview': {
+        const { data: employees } = await supabaseAdmin
+          .from('employees')
+          .select('user_id, name, email, role')
+          .eq('company_id', companyId)
+
+        const sellers = (employees || []).filter(e => (e.role || '').toLowerCase() !== 'admin')
+        const sellerIds = sellers.map(e => e.user_id)
+
+        if (sellerIds.length === 0) return { total_sellers: 0, message: 'Nenhum vendedor cadastrado na empresa.' }
+
+        const { data: summaries } = await supabaseAdmin
+          .from('user_performance_summaries')
+          .select('user_id, overall_average, total_sessions, spin_s_average, spin_p_average, spin_i_average, spin_n_average, trend')
+          .in('user_id', sellerIds)
+
+        // Count totals
+        const [roleplayCount, meetCount, followupCount] = await Promise.all([
+          supabaseAdmin.from('roleplay_sessions').select('*', { count: 'exact', head: true }).in('user_id', sellerIds).eq('status', 'completed'),
+          supabaseAdmin.from('meet_evaluations').select('*', { count: 'exact', head: true }).in('user_id', sellerIds),
+          supabaseAdmin.from('followup_analyses').select('*', { count: 'exact', head: true }).in('user_id', sellerIds),
+        ])
+
+        const withData = (summaries || []).filter(s => s.overall_average !== null && s.overall_average !== undefined)
+        const teamAvg = withData.length > 0
+          ? withData.reduce((sum, s) => sum + (s.overall_average || 0), 0) / withData.length : 0
+
+        const ranking = sellers.map(e => {
+          const s = withData.find(s => s.user_id === e.user_id)
+          return {
+            name: e.name,
+            score: s?.overall_average || 0,
+            trend: s?.trend || 'stable',
+            sessions: s?.total_sessions || 0,
+            spin_s: s?.spin_s_average ? parseFloat(String(s.spin_s_average)) : null,
+            spin_p: s?.spin_p_average ? parseFloat(String(s.spin_p_average)) : null,
+            spin_i: s?.spin_i_average ? parseFloat(String(s.spin_i_average)) : null,
+            spin_n: s?.spin_n_average ? parseFloat(String(s.spin_n_average)) : null,
+          }
+        }).sort((a, b) => b.score - a.score)
+
+        return {
+          total_sellers: sellers.length,
+          team_average: Number(teamAvg.toFixed(1)),
+          total_roleplays: roleplayCount.count || 0,
+          total_meets: meetCount.count || 0,
+          total_followups: followupCount.count || 0,
+          ranking,
+          sellers_needing_attention: ranking.filter(r => r.score > 0 && (r.score < 5 || r.trend === 'declining')),
+        }
+      }
+
+      case 'get_seller_performance': {
+        // Find the seller by name or user_id
+        let targetUserId = params.seller_user_id
+        let targetName = params.seller_name
+
+        if (!targetUserId && targetName) {
+          const { data: matches } = await supabaseAdmin
+            .from('employees')
+            .select('user_id, name, email, role')
+            .eq('company_id', companyId)
+            .ilike('name', `%${targetName}%`)
+
+          if (!matches?.length) return { error: `Vendedor "${targetName}" não encontrado na empresa.` }
+          targetUserId = matches[0].user_id
+          targetName = matches[0].name
+        }
+
+        if (!targetUserId) return { error: 'Informe o nome ou ID do vendedor.' }
+
+        // Fetch all data in parallel
+        const [summaryRes, roleplaysRes, meetsRes, followupsRes, challengesRes, pdiRes, waEvalsRes] = await Promise.all([
+          supabaseAdmin.from('user_performance_summaries').select('*').eq('user_id', targetUserId).single(),
+          supabaseAdmin.from('roleplay_sessions').select('id, config, status, duration_seconds, created_at, evaluation')
+            .eq('user_id', targetUserId).eq('status', 'completed').not('evaluation', 'is', null)
+            .order('created_at', { ascending: false }).limit(10),
+          supabaseAdmin.from('meet_evaluations').select('id, seller_name, overall_score, performance_level, spin_s_score, spin_p_score, spin_i_score, spin_n_score, created_at')
+            .eq('user_id', targetUserId).order('created_at', { ascending: false }).limit(10),
+          supabaseAdmin.from('followup_analyses').select('id, nota_final, classificacao, tipo_venda, fase_funil, created_at')
+            .eq('user_id', targetUserId).order('created_at', { ascending: false }).limit(10),
+          supabaseAdmin.from('daily_challenges').select('id, challenge_date, status, score, created_at')
+            .eq('user_id', targetUserId).order('challenge_date', { ascending: false }).limit(10),
+          supabaseAdmin.from('pdis').select('meta_objetivo, resumo, nota_situacao, nota_problema, nota_implicacao, nota_necessidade, created_at, status')
+            .eq('user_id', targetUserId).eq('status', 'ativo').order('created_at', { ascending: false }).limit(1).single(),
+          supabaseAdmin.from('conversation_round_evaluations').select('nota_final, contact_name, created_at')
+            .eq('user_id', targetUserId).order('created_at', { ascending: false }).limit(10),
+        ])
+
+        const summary = summaryRes.data
+        const roleplays = (roleplaysRes.data || []).map(s => {
+          const ev = parseEvaluation(s.evaluation)
+          let score = ev?.overall_score
+          if (score !== undefined && score > 10) score = score / 10
+          return {
+            id: s.id,
+            date: new Date(s.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+            score,
+            performance_level: ev?.performance_level,
+            persona: s.config?.selectedPersona?.cargo || 'N/A',
+            spin_s: ev?.spin_evaluation?.S?.final_score,
+            spin_p: ev?.spin_evaluation?.P?.final_score,
+            spin_i: ev?.spin_evaluation?.I?.final_score,
+            spin_n: ev?.spin_evaluation?.N?.final_score,
+            executive_summary: ev?.executive_summary?.substring(0, 120),
+          }
+        })
+        const meets = (meetsRes.data || []).map(m => ({
+          id: m.id,
+          date: new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          score: m.overall_score && m.overall_score > 10 ? m.overall_score / 10 : m.overall_score,
+          performance_level: m.performance_level,
+          spin_s: m.spin_s_score, spin_p: m.spin_p_score, spin_i: m.spin_i_score, spin_n: m.spin_n_score,
+        }))
+        const followups = (followupsRes.data || []).map(f => ({
+          date: new Date(f.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          score: f.nota_final, classificacao: f.classificacao,
+        }))
+        const challenges = challengesRes.data || []
+        const completedChallenges = challenges.filter(c => c.status === 'completed' || (c.score && c.score > 0))
+        const waEvals = (waEvalsRes.data || []).map(e => ({
+          date: new Date(e.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          score: e.nota_final, contact: e.contact_name,
+        }))
+
+        // Compute averages if no summary
+        const rpAvg = roleplays.length > 0
+          ? roleplays.reduce((sum, r) => sum + (r.score || 0), 0) / roleplays.filter(r => r.score).length : null
+        const meetAvg = meets.length > 0
+          ? meets.reduce((sum, m) => sum + (m.score || 0), 0) / meets.filter(m => m.score).length : null
+        const fuAvg = followups.length > 0
+          ? followups.reduce((sum, f) => sum + (f.score || 0), 0) / followups.filter(f => f.score).length : null
+
+        return {
+          seller_name: targetName,
+          user_id: targetUserId,
+          overall_average: summary?.overall_average || (rpAvg ? Number(rpAvg.toFixed(1)) : null),
+          trend: summary?.trend || 'stable',
+          total_sessions: summary?.total_sessions || roleplays.length,
+          spin_averages: {
+            S: summary?.spin_s_average ? parseFloat(String(summary.spin_s_average)) : null,
+            P: summary?.spin_p_average ? parseFloat(String(summary.spin_p_average)) : null,
+            I: summary?.spin_i_average ? parseFloat(String(summary.spin_i_average)) : null,
+            N: summary?.spin_n_average ? parseFloat(String(summary.spin_n_average)) : null,
+          },
+          top_strengths: summary?.top_strengths_recurring || [],
+          critical_gaps: summary?.critical_gaps_recurring || [],
+          averages: {
+            roleplay: rpAvg ? Number(rpAvg.toFixed(1)) : null,
+            meet: meetAvg ? Number(meetAvg.toFixed(1)) : null,
+            followup: fuAvg ? Number(fuAvg.toFixed(1)) : null,
+            challenges_completed: `${completedChallenges.length}/${challenges.length}`,
+          },
+          recent_roleplays: roleplays.slice(0, 5),
+          recent_meets: meets.slice(0, 5),
+          recent_followups: followups.slice(0, 5),
+          recent_wa_evals: waEvals.slice(0, 5),
+          active_pdi: pdiRes.data || null,
+        }
+      }
+
+      case 'get_team_ranking': {
+        const dimension = params.dimension || 'overall'
+
+        const { data: employees } = await supabaseAdmin
+          .from('employees')
+          .select('user_id, name, role')
+          .eq('company_id', companyId)
+
+        const sellers = (employees || []).filter(e => (e.role || '').toLowerCase() !== 'admin')
+        const sellerIds = sellers.map(e => e.user_id)
+
+        if (sellerIds.length === 0) return { ranking: [], message: 'Nenhum vendedor.' }
+
+        const { data: summaries } = await supabaseAdmin
+          .from('user_performance_summaries')
+          .select('user_id, overall_average, spin_s_average, spin_p_average, spin_i_average, spin_n_average, total_sessions, trend')
+          .in('user_id', sellerIds)
+
+        const dimensionMap: Record<string, string> = {
+          overall: 'overall_average',
+          spin_s: 'spin_s_average',
+          spin_p: 'spin_p_average',
+          spin_i: 'spin_i_average',
+          spin_n: 'spin_n_average',
+        }
+
+        const field = dimensionMap[dimension]
+
+        if (field) {
+          const ranking = sellers.map(e => {
+            const s = (summaries || []).find(s => s.user_id === e.user_id)
+            const val = s ? parseFloat(String((s as any)[field])) : 0
+            return { name: e.name, score: isNaN(val) ? 0 : val, trend: s?.trend || 'stable', sessions: s?.total_sessions || 0 }
+          }).filter(r => r.score > 0).sort((a, b) => b.score - a.score)
+
+          return { dimension, ranking }
+        }
+
+        // For type-specific rankings (roleplay, meet, followup, whatsapp) compute from raw data
+        if (dimension === 'roleplay') {
+          const { data: sessions } = await supabaseAdmin
+            .from('roleplay_sessions').select('user_id, evaluation')
+            .in('user_id', sellerIds).eq('status', 'completed').not('evaluation', 'is', null)
+          const avgMap = new Map<string, { total: number; count: number }>()
+          for (const s of (sessions || [])) {
+            const ev = parseEvaluation(s.evaluation)
+            let score = ev?.overall_score
+            if (score !== undefined && score > 10) score = score / 10
+            if (score) {
+              const curr = avgMap.get(s.user_id) || { total: 0, count: 0 }
+              curr.total += score; curr.count++
+              avgMap.set(s.user_id, curr)
+            }
+          }
+          const ranking = sellers.map(e => {
+            const d = avgMap.get(e.user_id)
+            return { name: e.name, score: d ? Number((d.total / d.count).toFixed(1)) : 0, sessions: d?.count || 0 }
+          }).filter(r => r.score > 0).sort((a, b) => b.score - a.score)
+          return { dimension, ranking }
+        }
+
+        if (dimension === 'meet') {
+          const { data: evals } = await supabaseAdmin
+            .from('meet_evaluations').select('user_id, overall_score')
+            .in('user_id', sellerIds)
+          const avgMap = new Map<string, { total: number; count: number }>()
+          for (const e of (evals || [])) {
+            let score = e.overall_score
+            if (score && score > 10) score = score / 10
+            if (score) {
+              const curr = avgMap.get(e.user_id) || { total: 0, count: 0 }
+              curr.total += score; curr.count++
+              avgMap.set(e.user_id, curr)
+            }
+          }
+          const ranking = sellers.map(e => {
+            const d = avgMap.get(e.user_id)
+            return { name: e.name, score: d ? Number((d.total / d.count).toFixed(1)) : 0, count: d?.count || 0 }
+          }).filter(r => r.score > 0).sort((a, b) => b.score - a.score)
+          return { dimension, ranking }
+        }
+
+        return { dimension, ranking: [], message: `Dimensão "${dimension}" não reconhecida. Use: overall, spin_s, spin_p, spin_i, spin_n, roleplay, meet.` }
+      }
+
+      case 'compare_sellers': {
+        const names: string[] = params.seller_names || []
+        if (names.length < 2) return { error: 'Informe pelo menos 2 nomes de vendedores para comparar.' }
+
+        const { data: employees } = await supabaseAdmin
+          .from('employees')
+          .select('user_id, name, role')
+          .eq('company_id', companyId)
+
+        const sellers = (employees || []).filter(e => (e.role || '').toLowerCase() !== 'admin')
+
+        // Match sellers by name (partial, case-insensitive)
+        const matched = names.map(searchName => {
+          const found = sellers.find(e => e.name.toLowerCase().includes(searchName.toLowerCase()))
+          return found || null
+        }).filter(Boolean) as Array<{ user_id: string; name: string }>
+
+        if (matched.length < 2) return { error: `Encontrei menos de 2 vendedores. Nomes encontrados: ${matched.map(m => m.name).join(', ') || 'nenhum'}. Vendedores disponíveis: ${sellers.map(s => s.name).join(', ')}` }
+
+        const matchedIds = matched.map(m => m.user_id)
+
+        const { data: summaries } = await supabaseAdmin
+          .from('user_performance_summaries')
+          .select('user_id, overall_average, total_sessions, spin_s_average, spin_p_average, spin_i_average, spin_n_average, trend, top_strengths_recurring, critical_gaps_recurring')
+          .in('user_id', matchedIds)
+
+        const comparison = matched.map(seller => {
+          const s = (summaries || []).find(s => s.user_id === seller.user_id)
+          return {
+            name: seller.name,
+            overall_average: s?.overall_average || 0,
+            total_sessions: s?.total_sessions || 0,
+            trend: s?.trend || 'stable',
+            spin: {
+              S: s?.spin_s_average ? parseFloat(String(s.spin_s_average)) : null,
+              P: s?.spin_p_average ? parseFloat(String(s.spin_p_average)) : null,
+              I: s?.spin_i_average ? parseFloat(String(s.spin_i_average)) : null,
+              N: s?.spin_n_average ? parseFloat(String(s.spin_n_average)) : null,
+            },
+            top_strengths: s?.top_strengths_recurring || [],
+            critical_gaps: s?.critical_gaps_recurring || [],
+          }
+        })
+
+        return { sellers_compared: comparison }
+      }
+
       default:
         return { error: `Função desconhecida: ${name}` }
     }
@@ -1463,7 +1852,7 @@ export async function POST(req: NextRequest) {
     // Get company
     const { data: employeeData, error: empError } = await supabaseAdmin
       .from('employees')
-      .select('company_id, name')
+      .select('company_id, name, role')
       .eq('user_id', user.id)
       .single()
 
@@ -1474,6 +1863,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 400 })
     }
 
+    const userRole = (employeeData?.role || 'vendedor').toLowerCase()
+    const isManager = userRole === 'admin' || userRole === 'gestor'
+
     // Parse body
     const { message, conversationHistory = [] } = await req.json()
     if (!message) {
@@ -1482,7 +1874,13 @@ export async function POST(req: NextRequest) {
 
     // Build messages
     const sellerName = employeeData?.name || user.email || 'Vendedor'
-    const systemMessage = `${SYSTEM_PROMPT}\n\nVocê está conversando com: ${sellerName}\nData/hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
+    let systemMessage = `${SYSTEM_PROMPT}\n\nVocê está conversando com: ${sellerName}\nData/hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
+
+    if (isManager) {
+      systemMessage += MANAGER_PROMPT_EXTENSION
+    }
+
+    const activeTools = isManager ? [...toolDefinitions, ...teamToolDefinitions] : toolDefinitions
 
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemMessage },
@@ -1501,7 +1899,7 @@ export async function POST(req: NextRequest) {
       const response = await openai.chat.completions.create({
         model: 'gpt-4.1',
         messages,
-        tools: toolDefinitions,
+        tools: activeTools,
         temperature: 0.7,
         max_tokens: 2000,
       })
@@ -1513,6 +1911,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           response: choice.message.content || 'Desculpe, não consegui processar sua pergunta.',
           toolsUsed,
+          isManager,
         })
       }
 
@@ -1547,6 +1946,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       response: finalResponse.choices[0].message.content || 'Desculpe, ocorreu um erro.',
       toolsUsed,
+      isManager,
     })
 
   } catch (error) {

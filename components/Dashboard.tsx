@@ -783,9 +783,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         }} />
       )}
 
-      {/* Seller Agent Chat - only on home */}
-      {currentView === 'home' && (
-        <SellerAgentChat userName={userName || undefined} />
+      {/* Seller Agent Chat - all views except followup (which has SalesCopilot) */}
+      {currentView !== 'followup' && currentView !== 'followup-history' && (
+        <SellerAgentChat userName={userName || undefined} userRole={userRole || undefined} />
       )}
 
       {/* Configuration Required Overlay */}

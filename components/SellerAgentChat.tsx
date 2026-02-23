@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, X, Send, Loader2, TrendingUp, Dumbbell, CalendarDays, Share2 } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, TrendingUp, Dumbbell, CalendarDays, Share2, Users, BarChart3, Trophy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface Message {
@@ -11,13 +11,21 @@ interface Message {
 
 interface SellerAgentChatProps {
   userName?: string
+  userRole?: string
 }
 
-const QUICK_SUGGESTIONS = [
+const SELLER_SUGGESTIONS = [
   { text: 'Como está minha performance?', icon: TrendingUp, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
   { text: 'O que devo treinar hoje?', icon: Dumbbell, color: 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100' },
   { text: 'Gerenciar minha agenda', icon: CalendarDays, color: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100' },
   { text: 'Compartilhar dados com a equipe', icon: Share2, color: 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' },
+]
+
+const MANAGER_SUGGESTIONS = [
+  { text: 'Quem precisa de atenção?', icon: Users, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
+  { text: 'Compare os vendedores', icon: BarChart3, color: 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100' },
+  { text: 'Média da equipe', icon: TrendingUp, color: 'text-teal-600 bg-teal-50 border-teal-200 hover:bg-teal-100' },
+  { text: 'Quem mais evoluiu?', icon: Trophy, color: 'text-amber-600 bg-amber-50 border-amber-200 hover:bg-amber-100' },
 ]
 
 const MIN_W = 340
@@ -25,12 +33,19 @@ const MIN_H = 380
 const DEFAULT_W = 400
 const DEFAULT_H = 600
 
-export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
+export default function SellerAgentChat({ userName, userRole }: SellerAgentChatProps) {
   const [isOpen, setIsOpen] = useState(true)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [authToken, setAuthToken] = useState<string | null>(null)
+  const [detectedRole, setDetectedRole] = useState<string | null>(null)
+  const [detectedUserName, setDetectedUserName] = useState<string | null>(null)
+
+  const effectiveRole = userRole || detectedRole
+  const isManager = effectiveRole?.toLowerCase() === 'admin' || effectiveRole?.toLowerCase() === 'gestor'
+  const displayName = userName || detectedUserName
+  const activeSuggestions = isManager ? [...SELLER_SUGGESTIONS, ...MANAGER_SUGGESTIONS] : SELLER_SUGGESTIONS
 
   // Position & size (top-left corner based)
   const [pos, setPos] = useState({ x: 0, y: 0 })
@@ -49,22 +64,39 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       try {
         // Strategy 1: getSession
         const { data: { session } } = await supabase.auth.getSession()
-        if (session?.access_token) { setAuthToken(session.access_token); return }
-
-        // Strategy 2: refreshSession
-        const { data: { session: refreshed } } = await supabase.auth.refreshSession()
-        if (refreshed?.access_token) { setAuthToken(refreshed.access_token); return }
-
-        // Strategy 3: getUser + retry getSession
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: { session: retried } } = await supabase.auth.getSession()
-          if (retried?.access_token) { setAuthToken(retried.access_token); return }
+        if (session?.access_token) { setAuthToken(session.access_token) }
+        else {
+          // Strategy 2: refreshSession
+          const { data: { session: refreshed } } = await supabase.auth.refreshSession()
+          if (refreshed?.access_token) { setAuthToken(refreshed.access_token) }
+          else {
+            // Strategy 3: getUser + retry getSession
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+              const { data: { session: retried } } = await supabase.auth.getSession()
+              if (retried?.access_token) { setAuthToken(retried.access_token) }
+            }
+            if (!session && !refreshed) console.warn('[SellerAgent] No auth token found after all strategies')
+          }
         }
-
-        console.warn('[SellerAgent] No auth token found after all strategies')
       } catch (e) {
         console.error('[SellerAgent] Auth error:', e)
+      }
+
+      // Auto-detect role and name if not provided via props
+      if (!userRole || !userName) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            const { data: emp } = await supabase
+              .from('employees')
+              .select('role, name')
+              .eq('user_id', user.id)
+              .single()
+            if (emp?.role && !userRole) setDetectedRole(emp.role)
+            if (emp?.name && !userName) setDetectedUserName(emp.name)
+          }
+        } catch {}
       }
     }
     loadAuth()
@@ -238,8 +270,8 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
 
   // ─── Visual Tag Parser ─────────────────────────────────────────────
   const parseVisualTags = (content: string) => {
-    const TAG_REGEX = /\{\{(score|spin|trend|metric|meeting|eval_card|teammate)\|([^}]+)\}\}/g
-    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card' | 'teammate'; data: string }> = []
+    const TAG_REGEX = /\{\{(score|spin|trend|metric|meeting|eval_card|teammate|ranking|comparison)\|([^}]+)\}\}/g
+    const parts: Array<{ type: 'text' | 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card' | 'teammate' | 'ranking' | 'comparison'; data: string }> = []
     let lastIndex = 0
     let match
 
@@ -247,7 +279,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
       if (match.index > lastIndex) {
         parts.push({ type: 'text', data: content.slice(lastIndex, match.index) })
       }
-      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card' | 'teammate', data: match[2] })
+      parts.push({ type: match[1] as 'score' | 'spin' | 'trend' | 'metric' | 'meeting' | 'eval_card' | 'teammate' | 'ranking' | 'comparison', data: match[2] })
       lastIndex = match.index + match[0].length
     }
 
@@ -511,6 +543,61 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
     )
   }
 
+  // ─── Team Visual Components (ranking & comparison) ─────────────────
+  const RankingBars = ({ items }: { items: Array<{ name: string; value: number }> }) => {
+    const sorted = [...items].sort((a, b) => b.value - a.value)
+    const maxVal = Math.max(...sorted.map(i => i.value), 10)
+
+    return (
+      <div className="bg-gray-50 rounded-xl p-3 my-1.5">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Ranking</div>
+        <div className="space-y-2">
+          {sorted.map((item, i) => {
+            const colors = getScoreColor(item.value)
+            const pct = Math.min((item.value / maxVal) * 100, 100)
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <span className={`text-xs font-bold w-5 text-center ${i === 0 ? 'text-amber-500' : 'text-gray-400'}`}>{i + 1}.</span>
+                <span className="text-xs text-gray-600 font-medium w-20 truncate">{item.name}</span>
+                <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div className={`${colors.bar} h-full rounded-full transition-all duration-700 ease-out`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className={`text-xs font-bold ${colors.text} w-7 text-right tabular-nums`}>{item.value.toFixed(1)}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const ComparisonBars = ({ items }: { items: Array<{ name: string; value: number }> }) => {
+    const maxVal = Math.max(...items.map(i => i.value), 10)
+
+    return (
+      <div className="bg-gray-50 rounded-xl p-3 my-1.5">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Comparação</div>
+        <div className="space-y-2.5">
+          {items.map((item, i) => {
+            const colors = getScoreColor(item.value)
+            const pct = Math.min((item.value / maxVal) * 100, 100)
+            return (
+              <div key={i}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-gray-600 font-medium">{item.name}</span>
+                  <span className={`font-bold ${colors.text}`}>{item.value.toFixed(1)}</span>
+                </div>
+                <div className="bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                  <div className={`${colors.bar} h-full rounded-full transition-all duration-700 ease-out`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   // ─── Rich Text Renderer ────────────────────────────────────────────
   const renderTextBlock = (text: string, keyPrefix: number) => {
     const lines = text.split('\n')
@@ -650,6 +737,20 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           const segs = part.data.split('|')
           return <TeammateCard key={`tm-${idx}`} userId={segs[0] || ''} name={segs[1] || ''} role={segs[2]} />
         }
+        case 'ranking': {
+          const items = part.data.split(',').map(entry => {
+            const [name, val] = entry.split('|')
+            return { name: name?.trim() || '', value: parseFloat(val) || 0 }
+          })
+          return <RankingBars key={`rk-${idx}`} items={items} />
+        }
+        case 'comparison': {
+          const items = part.data.split(',').map(entry => {
+            const [name, val] = entry.split('|')
+            return { name: name?.trim() || '', value: parseFloat(val) || 0 }
+          })
+          return <ComparisonBars key={`cp-${idx}`} items={items} />
+        }
         case 'text':
           return renderTextBlock(part.data, idx)
       }
@@ -712,7 +813,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
               </div>
               <div>
                 <h3 className="text-white text-sm font-semibold">Assistente Ramppy</h3>
-                <p className="text-green-300/70 text-[10px]">Coach pessoal de vendas</p>
+                <p className="text-green-300/70 text-[10px]">{isManager ? 'Coach pessoal e assistente de gestão' : 'Coach pessoal de vendas'}</p>
               </div>
             </div>
             <button
@@ -732,13 +833,13 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
                     <Sparkles className="w-6 h-6 text-white" />
                   </div>
                   <p className="text-sm text-gray-700">
-                    Olá{userName ? <>, <span className="font-semibold">{userName.split(' ')[0]}</span></> : ''}! Sou seu assistente pessoal.
+                    Olá{displayName ? <>, <span className="font-semibold">{displayName.split(' ')[0]}</span></> : ''}! Sou seu assistente pessoal.
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">Performance, reuniões, treinos e agenda</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{isManager ? 'Performance, reuniões, treinos, agenda e gestão da equipe' : 'Performance, reuniões, treinos e agenda'}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  {QUICK_SUGGESTIONS.map((suggestion) => {
+                  {SELLER_SUGGESTIONS.map((suggestion) => {
                     const Icon = suggestion.icon
                     return (
                       <button
@@ -752,6 +853,31 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
                     )
                   })}
                 </div>
+
+                {isManager && (
+                  <>
+                    <div className="flex items-center gap-3 pt-1">
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Gestão da equipe</span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {MANAGER_SUGGESTIONS.map((suggestion) => {
+                        const Icon = suggestion.icon
+                        return (
+                          <button
+                            key={suggestion.text}
+                            onClick={() => sendMessage(suggestion.text)}
+                            className={`flex items-start gap-2 text-left px-3 py-2.5 rounded-xl border transition-all duration-200 ${suggestion.color}`}
+                          >
+                            <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span className="text-xs leading-snug font-medium">{suggestion.text}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <>
@@ -785,7 +911,7 @@ export default function SellerAgentChat({ userName }: SellerAgentChatProps) {
           {/* Quick suggestions after first message */}
           {messages.length > 0 && !isLoading && (
             <div className="px-4 pb-2 flex flex-wrap gap-1">
-              {QUICK_SUGGESTIONS.slice(0, 3).map((suggestion) => {
+              {activeSuggestions.slice(0, isManager ? 5 : 3).map((suggestion) => {
                 const Icon = suggestion.icon
                 return (
                   <button
