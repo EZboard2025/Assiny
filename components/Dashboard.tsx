@@ -116,7 +116,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     score_improvement: number | null
     latest_session_score: number | null
   } | null>(null)
-  const [evolutionData, setEvolutionData] = useState<Array<{ label: string; score: number }>>([])
+  const [evolutionData, setEvolutionData] = useState<Array<{ label: string; roleplay: number | null; meet: number | null }>>([])
   const [challengeStatus, setChallengeStatus] = useState<{ pending: boolean; title: string } | null>(null)
 
   // Training streak hook
@@ -235,7 +235,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       try {
         const { supabase } = await import('@/lib/supabase')
 
-        const [summaryResult, sessionsResult, challengeResult] = await Promise.allSettled([
+        const [summaryResult, sessionsResult, challengeResult, meetResult] = await Promise.allSettled([
           supabase
             .from('user_performance_summaries')
             .select('trend, latest_session_score, score_improvement')
@@ -248,7 +248,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             .eq('status', 'completed')
             .not('evaluation', 'is', null)
             .order('created_at', { ascending: true })
-            .limit(15),
+            .limit(30),
           supabase
             .from('daily_challenges')
             .select('id, status, challenge_config')
@@ -256,7 +256,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             .eq('challenge_date', new Date().toISOString().split('T')[0])
             .in('status', ['pending', 'in_progress'])
             .limit(1)
-            .single()
+            .single(),
+          supabase
+            .from('meet_evaluations')
+            .select('overall_score, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: true })
+            .limit(30)
         ])
 
         // Performance summary
@@ -264,7 +270,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           setPerformanceSummary(summaryResult.value.data)
         }
 
-        // Evolution chart data
+        // Evolution chart data — multi-series (roleplay + meet)
+        const multiSeries: Array<{ label: string; roleplay: number | null; meet: number | null; timestamp: number }> = []
+
         if (sessionsResult.status === 'fulfilled' && sessionsResult.value.data) {
           const getProcessedEval = (evaluation: any) => {
             if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
@@ -273,21 +281,37 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             return evaluation
           }
 
-          const chartData = sessionsResult.value.data
-            .map((s: any) => {
-              const ev = getProcessedEval(s.evaluation)
-              let score = ev?.overall_score !== undefined ? parseFloat(ev.overall_score) : null
-              if (score !== null && score > 10) score = score / 10
-              const d = new Date(s.created_at)
-              return score !== null ? {
-                label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
-                score
-              } : null
+          sessionsResult.value.data.forEach((s: any) => {
+            const ev = getProcessedEval(s.evaluation)
+            let score = ev?.overall_score !== undefined ? parseFloat(ev.overall_score) : null
+            if (score !== null && score > 10) score = score / 10
+            if (score === null) return
+            const d = new Date(s.created_at)
+            multiSeries.push({
+              label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
+              roleplay: score,
+              meet: null,
+              timestamp: d.getTime(),
             })
-            .filter(Boolean) as Array<{ label: string; score: number }>
-
-          setEvolutionData(chartData)
+          })
         }
+
+        if (meetResult.status === 'fulfilled' && meetResult.value.data) {
+          meetResult.value.data.forEach((me: any) => {
+            const meetScore = me.overall_score ? me.overall_score / 10 : null
+            if (!meetScore) return
+            const d = new Date(me.created_at)
+            multiSeries.push({
+              label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
+              roleplay: null,
+              meet: meetScore,
+              timestamp: d.getTime(),
+            })
+          })
+        }
+
+        multiSeries.sort((a, b) => a.timestamp - b.timestamp)
+        setEvolutionData(multiSeries.map(({ timestamp, ...rest }) => rest))
 
         // Challenge status
         if (challengeResult.status === 'fulfilled' && challengeResult.value.data) {
@@ -794,8 +818,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         }} />
       )}
 
-      {/* Seller Agent Chat - home and profile */}
-      {(currentView === 'home' || currentView === 'perfil') && (
+      {/* Seller Agent Chat - home, profile and roleplay */}
+      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay') && (
         <SellerAgentChat userName={userName || undefined} />
       )}
 
