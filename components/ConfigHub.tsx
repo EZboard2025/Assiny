@@ -992,13 +992,14 @@ function ConfigurationInterface({
   // Recarregar tags das personas quando as personas mudarem
   useEffect(() => {
     const loadPersonaTags = async () => {
+      const personasWithId = personas.filter(p => p.id)
+      if (personasWithId.length === 0) return
+
+      const results = await Promise.all(
+        personasWithId.map(p => getPersonaTags(p.id!).then(tags => ({ id: p.id!, tags })))
+      )
       const newPersonaTags = new Map<string, string[]>()
-      for (const persona of personas) {
-        if (persona.id) {
-          const tags = await getPersonaTags(persona.id)
-          newPersonaTags.set(persona.id, tags.map(t => t.id))
-        }
-      }
+      results.forEach(({ id, tags }) => newPersonaTags.set(id, tags.map(t => t.id)))
       setPersonaTags(newPersonaTags)
     }
 
@@ -1961,16 +1962,7 @@ function ConfigurationInterface({
     try {
       const tagsData = await getTags()
       setTags(tagsData)
-
-      // Carregar tags de cada persona
-      const newPersonaTags = new Map<string, string[]>()
-      for (const persona of personas) {
-        if (persona.id) {
-          const tags = await getPersonaTags(persona.id)
-          newPersonaTags.set(persona.id, tags.map(t => t.id))
-        }
-      }
-      setPersonaTags(newPersonaTags)
+      // Persona tags are loaded by the personas useEffect when personas state updates
     } catch (error) {
       console.error('Erro ao carregar tags:', error)
     }

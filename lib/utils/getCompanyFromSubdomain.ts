@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabase'
 
+// Cache to avoid redundant getCompanyId calls (each call = 2 Supabase queries)
+let _cachedCompanyId: string | null = null
+let _cacheTs = 0
+const CACHE_TTL = 60_000 // 60 seconds
+
+export function clearCompanyIdCache() {
+  _cachedCompanyId = null
+  _cacheTs = 0
+}
+
 /**
  * NOVA VERSÃO: Sistema unificado sem subdomínios
  * Obtém o company_id do usuário logado
@@ -127,9 +137,13 @@ export async function getCompanyIdFromSubdomain(): Promise<string | null> {
  * @returns company_id ou null se não encontrado
  */
 export async function getCompanyId(): Promise<string | null> {
+  // Return cached value if fresh
+  if (_cachedCompanyId && Date.now() - _cacheTs < CACHE_TTL) {
+    return _cachedCompanyId
+  }
+
   // Verificar se estamos em uma página pública
   if (typeof window !== 'undefined' && window.location.pathname.includes('roleplay-publico')) {
-    console.log('[getCompanyId] Chamada de página pública - retornando null')
     return null
   }
 
@@ -137,13 +151,12 @@ export async function getCompanyId(): Promise<string | null> {
   const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
 
   if (USE_UNIFIED_SYSTEM) {
-    // NOVO SISTEMA: Usar apenas company_id do usuário
     const companyId = await getUserCompanyId()
     if (companyId) {
-      console.log('[getCompanyId] ✅ Sistema Unificado - Company ID:', companyId)
+      _cachedCompanyId = companyId
+      _cacheTs = Date.now()
       return companyId
     }
-    console.error('[getCompanyId] Sistema Unificado - Falha ao obter company_id')
     return null
   }
 
@@ -151,7 +164,8 @@ export async function getCompanyId(): Promise<string | null> {
   const companyIdFromSubdomain = await getCompanyIdFromSubdomain()
 
   if (companyIdFromSubdomain) {
-    console.log('[getCompanyId] Sistema Legado - Usando company_id do subdomínio:', companyIdFromSubdomain)
+    _cachedCompanyId = companyIdFromSubdomain
+    _cacheTs = Date.now()
     return companyIdFromSubdomain
   }
 
@@ -160,10 +174,10 @@ export async function getCompanyId(): Promise<string | null> {
   const companyIdFromUser = await getCompanyIdFromUser()
 
   if (companyIdFromUser) {
-    console.log('[getCompanyId] Sistema Legado - Usando company_id do usuário (fallback):', companyIdFromUser)
+    _cachedCompanyId = companyIdFromUser
+    _cacheTs = Date.now()
     return companyIdFromUser
   }
 
-  console.error('[getCompanyId] Sistema Legado - Não foi possível obter company_id')
   return null
 }
