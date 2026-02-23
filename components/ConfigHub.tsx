@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare, Send, Bot, Mic } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare, Send, Bot, Mic, Search } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -70,6 +70,7 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import CompanyDataChat from '@/components/CompanyDataChat'
 import PersonaChat from '@/components/PersonaChat'
 import ObjectionChat from '@/components/ObjectionChat'
+import { getObjectionTitle } from '@/lib/utils/objectionTitle'
 
 interface ConfigHubProps {
   onClose: () => void
@@ -386,6 +387,8 @@ function ConfigurationInterface({
   const [personaTags, setPersonaTags] = useState<Map<string, string[]>>(new Map())
   const [filterTag, setFilterTag] = useState<string>('')
   const [filterBusinessType, setFilterBusinessType] = useState<'' | 'B2B' | 'B2C'>('')
+  const [searchPersona, setSearchPersona] = useState('')
+  const [searchObjection, setSearchObjection] = useState('')
   const [expandedPersonas, setExpandedPersonas] = useState<Set<string>>(new Set())
   const [multiSelectMode, setMultiSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -399,7 +402,7 @@ function ConfigurationInterface({
   // Estado para modal de confirmação de exclusão
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
     isOpen: boolean
-    type: 'tag' | 'employee' | 'persona' | 'objection' | 'objective' | 'stage' | null
+    type: 'tag' | 'employee' | 'persona' | 'objection' | 'objective' | 'stage' | 'playbook' | null
     id: string | null
     name: string
   }>({
@@ -1188,11 +1191,16 @@ function ConfigurationInterface({
   }
 
   // Excluir playbook
-  const handleDeletePlaybook = async () => {
-    const confirmed = window.confirm('Tem certeza que deseja excluir o playbook? As avaliações futuras não terão análise de aderência.')
+  const handleDeletePlaybook = () => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'playbook',
+      id: 'playbook',
+      name: 'o playbook'
+    })
+  }
 
-    if (!confirmed) return
-
+  const executeDeletePlaybook = async () => {
     if (!userCompanyId) {
       showToast('error', 'Erro', 'ID da empresa não encontrado')
       return
@@ -1229,7 +1237,7 @@ function ConfigurationInterface({
       // Buscar company_id (prioriza subdomínio, depois usuário)
       const companyId = await getCompanyId()
       if (!companyId) {
-        alert('❌ Erro: company_id não encontrado')
+        showToast('error', 'Erro', 'Company ID não encontrado')
         setSavingCompanyData(false)
         return
       }
@@ -1261,7 +1269,7 @@ function ConfigurationInterface({
 
         if (error) {
           console.error('Erro ao atualizar:', error)
-          alert('❌ Erro ao atualizar dados da empresa')
+          showToast('error', 'Erro', 'Erro ao atualizar dados da empresa')
           return
         }
         savedData = data
@@ -1288,7 +1296,7 @@ function ConfigurationInterface({
 
         if (error) {
           console.error('Erro ao criar:', error)
-          alert('❌ Erro ao criar dados da empresa')
+          showToast('error', 'Erro', 'Erro ao criar dados da empresa')
           return
         }
         savedData = data
@@ -2041,7 +2049,7 @@ function ConfigurationInterface({
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) {
-      alert('Digite o nome da etiqueta')
+      showToast('warning', 'Atenção', 'Digite o nome da etiqueta')
       return
     }
 
@@ -2055,13 +2063,13 @@ function ConfigurationInterface({
       }
     } catch (error) {
       console.error('Erro ao criar tag:', error)
-      alert('Erro ao criar etiqueta')
+      showToast('error', 'Erro', 'Erro ao criar etiqueta')
     }
   }
 
   const handleUpdateTag = async (tagId: string) => {
     if (!editingTagName.trim()) {
-      alert('Digite o nome da etiqueta')
+      showToast('warning', 'Atenção', 'Digite o nome da etiqueta')
       return
     }
 
@@ -2079,7 +2087,7 @@ function ConfigurationInterface({
       }
     } catch (error) {
       console.error('Erro ao atualizar tag:', error)
-      alert('Erro ao atualizar etiqueta')
+      showToast('error', 'Erro', 'Erro ao atualizar etiqueta')
     }
   }
 
@@ -2122,18 +2130,18 @@ function ConfigurationInterface({
       }
     } catch (error) {
       console.error('Erro ao atualizar tags da persona:', error)
-      alert('Erro ao atualizar etiquetas da persona')
+      showToast('error', 'Erro', 'Erro ao atualizar etiquetas da persona')
     }
   }
 
   const handleSaveEmployee = async () => {
     if (!newEmployeeName || !newEmployeeEmail || !newEmployeePassword) {
-      alert('Preencha todos os campos!')
+      showToast('warning', 'Atenção', 'Preencha todos os campos')
       return
     }
 
     if (!currentCompany?.id) {
-      alert('Erro: empresa não identificada')
+      showToast('error', 'Erro', 'Empresa não identificada')
       return
     }
 
@@ -2161,12 +2169,18 @@ function ConfigurationInterface({
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('❌ Erro completo:', errorText)
+        console.warn('⚠️ Erro ao criar funcionário:', errorText)
         let errorMsg = `Erro ${response.status}`
         let limitInfo = null
         try {
           const errorJson = JSON.parse(errorText)
-          errorMsg = errorJson.error || errorJson.message || errorText
+          const rawError = errorJson.error || errorJson.message || errorText
+          // Traduzir mensagens comuns do Supabase
+          if (rawError.includes('already been registered')) {
+            errorMsg = 'Este email já está cadastrado'
+          } else {
+            errorMsg = rawError
+          }
 
           // Verificar se é erro de limite
           if (response.status === 403 && errorJson.limit) {
@@ -2179,7 +2193,7 @@ function ConfigurationInterface({
         } catch {
           errorMsg = errorText
         }
-        alert(errorMsg)
+        showToast('error', 'Erro', errorMsg)
         return
       }
 
@@ -2195,10 +2209,10 @@ function ConfigurationInterface({
       setShowPassword(false)
       setAddingEmployee(false)
 
-      alert('Funcionário criado com sucesso!')
+      showToast('success', 'Sucesso', 'Funcionário criado com sucesso!')
     } catch (error) {
       console.error('Erro ao criar funcionário:', error)
-      alert('Erro ao criar funcionário!')
+      showToast('error', 'Erro', 'Erro ao criar funcionário')
     }
   }
 
@@ -2249,14 +2263,14 @@ function ConfigurationInterface({
         setEmployees(employees.map(emp =>
           emp.id === employeeId ? { ...emp, role: newRole } : emp
         ))
-        alert(`Role atualizado para ${newRole} com sucesso!`)
+        showToast('success', 'Sucesso', `Role atualizado para ${newRole}`)
       } else {
         const error = await response.json()
-        alert(`Erro ao atualizar role: ${error.error}`)
+        showToast('error', 'Erro', `Erro ao atualizar role: ${error.error}`)
       }
     } catch (error) {
       console.error('Erro ao atualizar role:', error)
-      alert('Erro ao atualizar role')
+      showToast('error', 'Erro', 'Erro ao atualizar role')
     }
   }
 
@@ -2450,11 +2464,11 @@ function ConfigurationInterface({
         } else {
           const error = await response.json()
           console.error(`❌ [${i + 1}/${files.length}] Erro ao enviar ${file.name}:`, error)
-          alert(`Erro ao enviar arquivo ${file.name}: ${error.details || error.error}`)
+          showToast('error', 'Erro', `Erro ao enviar ${file.name}: ${error.details || error.error}`)
         }
       } catch (error) {
         console.error(`💥 [${i + 1}/${files.length}] Erro ao processar ${file.name}:`, error)
-        alert(`Erro ao processar arquivo ${file.name}!`)
+        showToast('error', 'Erro', `Erro ao processar arquivo ${file.name}`)
       }
     }
   }
@@ -2470,10 +2484,10 @@ function ConfigurationInterface({
 
     try {
       await processUploadQueue(fileArray)
-      alert(`${fileArray.length} arquivo(s) processado(s) com sucesso! Os embeddings foram criados.`)
+      showToast('success', 'Upload Concluído', `${fileArray.length} arquivo(s) processado(s) com sucesso!`)
     } catch (error) {
       console.error('Erro ao fazer upload:', error)
-      alert('Erro ao fazer upload dos arquivos!')
+      showToast('error', 'Erro', 'Erro ao fazer upload dos arquivos')
     } finally {
       setUploadingFile(false)
       setCurrentUploadIndex(-1)
@@ -2497,7 +2511,7 @@ function ConfigurationInterface({
     if (personaType === 'B2B') {
       const persona = newPersona as PersonaB2B
       if (!persona.job_title) {
-        alert('Por favor, preencha o cargo')
+        showToast('warning', 'Atenção', 'Por favor, preencha o cargo')
         return
       }
 
@@ -2513,7 +2527,7 @@ function ConfigurationInterface({
 
         if (error) {
           console.error('Erro ao atualizar persona:', error)
-          alert('Erro ao atualizar persona!')
+          showToast('error', 'Erro', 'Erro ao atualizar persona')
           return
         }
 
@@ -2543,7 +2557,7 @@ function ConfigurationInterface({
     } else if (personaType === 'B2C') {
       const persona = newPersona as PersonaB2C
       if (!persona.profession) {
-        alert('Por favor, preencha a profissão')
+        showToast('warning', 'Atenção', 'Por favor, preencha a profissão')
         return
       }
 
@@ -2559,7 +2573,7 @@ function ConfigurationInterface({
 
         if (error) {
           console.error('Erro ao atualizar persona:', error)
-          alert('Erro ao atualizar persona!')
+          showToast('error', 'Erro', 'Erro ao atualizar persona')
           return
         }
 
@@ -2937,6 +2951,9 @@ function ConfigurationInterface({
       case 'stage':
         await executeDeleteFunnelStage(id)
         break
+      case 'playbook':
+        await executeDeletePlaybook()
+        break
     }
 
     setDeleteConfirmModal({ isOpen: false, type: null, id: null, name: '' })
@@ -2995,7 +3012,7 @@ function ConfigurationInterface({
 
       // Validar se há dados preenchidos
       if (!companyData.nome || !companyData.descricao) {
-        alert('Preencha pelo menos o nome e descrição da empresa antes de avaliar.')
+        showToast('warning', 'Atenção', 'Preencha pelo menos o nome e descrição da empresa antes de avaliar')
         setEvaluatingQuality(false)
         return
       }
@@ -3137,11 +3154,11 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
       } else {
         const errorText = await response.text()
         console.error('❌ Erro ao avaliar qualidade:', response.status, errorText)
-        alert(`Erro ao avaliar qualidade dos arquivos (${response.status})`)
+        showToast('error', 'Erro', `Erro ao avaliar qualidade dos arquivos (${response.status})`)
       }
     } catch (error) {
       console.error('💥 Erro ao avaliar qualidade:', error)
-      alert('Erro ao conectar com o serviço de avaliação')
+      showToast('error', 'Erro', 'Erro ao conectar com o serviço de avaliação')
     } finally {
       setEvaluatingQuality(false)
     }
@@ -3605,6 +3622,30 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               </div>
 
+              {/* Barra de Pesquisa de Personas */}
+              {personas.length > 3 && (
+                <div className="px-5 pt-3 pb-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchPersona}
+                      onChange={(e) => setSearchPersona(e.target.value)}
+                      placeholder="Buscar persona por cargo, profissão ou contexto..."
+                      className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-colors"
+                    />
+                    {searchPersona && (
+                      <button
+                        onClick={() => setSearchPersona('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Seção de Gerenciar Etiquetas (minimizada por padrão) */}
               <div className="p-5 border-t border-gray-100">
                 <button
@@ -3927,6 +3968,21 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       if (!personaTagIds.includes(filterTag)) return false
                     }
 
+                    // Filtrar por busca de texto
+                    if (searchPersona.trim()) {
+                      const q = searchPersona.toLowerCase()
+                      const b2b = p as PersonaB2B
+                      const b2c = p as PersonaB2C
+                      const searchFields = [
+                        p.business_type === 'B2B' ? b2b.job_title : b2c.profession,
+                        p.business_type === 'B2B' ? b2b.company_type : '',
+                        p.business_type === 'B2B' ? b2b.company_goals : b2c.what_seeks,
+                        p.business_type === 'B2B' ? b2b.business_challenges : b2c.main_pains,
+                        p.context,
+                      ].filter(Boolean).join(' ').toLowerCase()
+                      if (!searchFields.includes(q)) return false
+                    }
+
                     return true
                   }).map((persona) => {
                     const isExpanded = expandedPersonas.has(persona.id!)
@@ -3956,7 +4012,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           }
                         }}
                       >
-                        <div className="flex items-center gap-3 flex-1">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           {multiSelectMode ? (
                             <input
                               type="checkbox"
@@ -4510,6 +4566,30 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               )}
 
+              {/* Barra de Pesquisa de Objeções */}
+              {objections.length > 3 && (
+                <div className="px-5 pt-3 pb-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchObjection}
+                      onChange={(e) => setSearchObjection(e.target.value)}
+                      placeholder="Buscar objeção..."
+                      className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-colors"
+                    />
+                    {searchObjection && (
+                      <button
+                        onClick={() => setSearchObjection('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Lista de objeções */}
               {objections.length > 0 && (
                 <div className="p-5 space-y-3">
@@ -4541,7 +4621,13 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       </button>
                     </div>
                   )}
-                  {objections.map((objection) => (
+                  {objections.filter((objection) => {
+                    if (!searchObjection.trim()) return true
+                    const q = searchObjection.toLowerCase()
+                    const fullText = objection.name.toLowerCase()
+                    const rebuttalsText = (objection.rebuttals || []).join(' ').toLowerCase()
+                    return fullText.includes(q) || rebuttalsText.includes(q)
+                  }).map((objection) => (
                     <div
                       key={objection.id}
                       className={`bg-white border rounded-xl overflow-hidden transition-all ${
@@ -4550,121 +4636,143 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           : 'border-gray-200 hover:border-green-300'
                       }`}
                     >
-                      {/* Header da objeção */}
-                      <div className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-2 flex-1">
-                          {multiSelectMode ? (
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(objection.id)}
-                              onChange={() => toggleSelectItem(objection.id)}
-                              className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                            />
-                          ) : (
-                          <button
-                            onClick={() => toggleObjectionExpanded(objection.id)}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                      {/* Header compacto da objeção */}
+                      <div
+                        className="flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-gray-50/80 transition-colors"
+                        onClick={() => {
+                          if (multiSelectMode) {
+                            toggleSelectItem(objection.id)
+                          } else {
+                            toggleObjectionExpanded(objection.id)
+                          }
+                        }}
+                      >
+                        {multiSelectMode ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(objection.id)}
+                            onChange={() => toggleSelectItem(objection.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer flex-shrink-0"
+                          />
+                        ) : (
+                          <svg
+                            className={`w-3.5 h-3.5 text-gray-400 transform transition-transform flex-shrink-0 ${expandedObjections.has(objection.id) ? 'rotate-90' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <svg
-                              className={`w-4 h-4 transform transition-transform ${expandedObjections.has(objection.id) ? 'rotate-90' : ''}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        )}
+
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 truncate" title={objection.name}>
+                            {getObjectionTitle(objection.name)}
+                          </span>
+                          <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500">
+                            {objection.rebuttals?.length || 0}
+                          </span>
+                        </div>
+
+                        {!multiSelectMode && (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (!expandedObjections.has(objection.id)) {
+                                  toggleObjectionExpanded(objection.id)
+                                }
+                                setEditingObjectionName(objection.id)
+                                setTempObjectionName(objection.name)
+                              }}
+                              className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                              title="Editar objeção"
                             >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                          )}
-                          <div className="flex-1 flex items-center gap-2">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRemoveObjection(objection.id)
+                              }}
+                              className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                              title="Excluir objeção"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Conteúdo expandido */}
+                      {expandedObjections.has(objection.id) && (
+                        <div className="border-t border-gray-100 bg-gray-50/30 animate-[fadeIn_150ms_ease-out]">
+                          {/* Objeção Completa */}
+                          <div className="px-4 pt-3 pb-2">
+                            <h4 className="text-[10px] font-bold text-green-600 uppercase tracking-wider mb-1.5">
+                              Objeção Completa
+                            </h4>
                             {editingObjectionName === objection.id ? (
-                              <>
-                                <input
-                                  type="text"
+                              <div className="flex items-start gap-2">
+                                <textarea
                                   value={tempObjectionName}
                                   onChange={(e) => setTempObjectionName(e.target.value)}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault()
                                       handleUpdateObjectionName(objection.id)
                                     } else if (e.key === 'Escape') {
                                       setEditingObjectionName(null)
                                       setTempObjectionName('')
                                     }
                                   }}
-                                  className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                                  className="flex-1 px-3 py-2 bg-white border border-green-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 resize-none leading-relaxed"
+                                  rows={3}
                                   autoFocus
                                 />
-                                <button
-                                  onClick={() => handleUpdateObjectionName(objection.id)}
-                                  className="text-green-600 hover:text-green-700 transition-colors"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingObjectionName(null)
-                                    setTempObjectionName('')
-                                  }}
-                                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </>
+                                <div className="flex flex-col gap-1">
+                                  <button
+                                    onClick={() => handleUpdateObjectionName(objection.id)}
+                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingObjectionName(null); setTempObjectionName('') }}
+                                    className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
-                              <>
-                                <span className="text-sm text-gray-900">{objection.name}</span>
-                                <button
-                                  onClick={() => {
-                                    setEditingObjectionName(objection.id)
-                                    setTempObjectionName(objection.name)
-                                  }}
-                                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                                >
-                                  <Edit2 className="w-3 h-3" />
-                                </button>
-                                <span className="text-xs text-gray-500">
-                                  ({objection.rebuttals?.length || 0})
-                                </span>
-                              </>
+                              <p className="text-sm text-gray-700 leading-relaxed bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                {objection.name}
+                              </p>
                             )}
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!multiSelectMode && (
-                          <button
-                            onClick={() => handleRemoveObjection(objection.id)}
-                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          )}
-                        </div>
-                      </div>
 
-                      {/* Conteúdo expandido */}
-                      {expandedObjections.has(objection.id) && (
-                        <div className="border-t border-gray-100 px-3 py-3 space-y-3 bg-gray-50/50">
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Formas de Quebrar</h4>
-                              {/* Contador de formas de quebrar */}
-                              <div className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                          {/* Formas de Quebrar */}
+                          <div className="px-4 pt-2 pb-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Formas de Quebrar</h4>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
                                 {objection.rebuttals?.length || 0}
-                              </div>
+                              </span>
                             </div>
 
                             {/* Lista de rebuttals */}
                             {objection.rebuttals && objection.rebuttals.length > 0 ? (
                               <div className="space-y-2 mb-3">
                                 {objection.rebuttals.map((rebuttal, index) => {
-                                  // Garantir que rebuttal é string
                                   const rebuttalText = typeof rebuttal === 'string' ? rebuttal : String(rebuttal)
-
                                   return (
                                   <div
                                     key={index}
-                                    className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
+                                    className="flex items-start gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2"
                                   >
-                                    <span className="text-gray-500 font-medium text-xs mt-0.5">{index + 1}.</span>
+                                    <span className="text-gray-400 font-medium text-xs mt-0.5 flex-shrink-0">{index + 1}.</span>
                                     {editingRebuttalId?.objectionId === objection.id && editingRebuttalId?.index === index ? (
                                       <>
                                         <input
@@ -4679,12 +4787,12 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                               setTempRebuttalText('')
                                             }
                                           }}
-                                          className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded text-white text-xs focus:outline-none focus:border-green-500/50"
+                                          className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded text-gray-900 text-xs focus:outline-none focus:border-green-500/50"
                                           autoFocus
                                         />
                                         <button
                                           onClick={() => handleUpdateRebuttal(objection.id, index)}
-                                          className="text-green-600 hover:text-green-700 transition-colors"
+                                          className="text-green-600 hover:text-green-700 transition-colors flex-shrink-0"
                                         >
                                           <Check className="w-3 h-3" />
                                         </button>
@@ -4693,26 +4801,26 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                                             setEditingRebuttalId(null)
                                             setTempRebuttalText('')
                                           }}
-                                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                                          className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>
                                       </>
                                     ) : (
                                       <>
-                                        <span className="text-gray-600 text-xs flex-1">{rebuttalText}</span>
+                                        <span className="text-gray-600 text-xs flex-1 leading-relaxed">{rebuttalText}</span>
                                         <button
                                           onClick={() => {
                                             setEditingRebuttalId({ objectionId: objection.id, index })
                                             setTempRebuttalText(rebuttalText)
                                           }}
-                                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                                          className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
                                         >
                                           <Edit2 className="w-3 h-3" />
                                         </button>
                                         <button
                                           onClick={() => handleRemoveRebuttal(objection.id, index)}
-                                          className="text-gray-400 hover:text-red-500 transition-colors"
+                                          className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>

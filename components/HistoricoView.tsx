@@ -6,6 +6,7 @@ import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, Alert
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 import { useNotifications } from '@/hooks/useNotifications'
 import { supabase } from '@/lib/supabase'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 const FollowUpHistoryView = lazy(() => import('./FollowUpHistoryView'))
 const MeetHistoryContent = lazy(() => import('./MeetHistoryContent'))
@@ -41,6 +42,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
     (initialHistoryTab as any) || (urlTab === 'meet' ? 'meet' : null)
   )
   const [userId, setUserId] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; sessionId: string | null }>({ open: false, sessionId: null })
 
   // Notifications for meet glow effect
   const { notifications, markAsRead } = useNotifications(userId)
@@ -80,8 +82,14 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
     setLoading(false)
   }
 
-  const handleDelete = async (sessionId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta sessão?')) return
+  const handleDelete = (sessionId: string) => {
+    setDeleteConfirm({ open: true, sessionId })
+  }
+
+  const confirmDelete = async () => {
+    const sessionId = deleteConfirm.sessionId
+    setDeleteConfirm({ open: false, sessionId: null })
+    if (!sessionId) return
 
     const success = await deleteRoleplaySession(sessionId)
     if (success) {
@@ -1222,6 +1230,16 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, sessionId: null })}
+        onConfirm={confirmDelete}
+        title="Excluir sessão"
+        message="Tem certeza que deseja excluir esta sessão? Esta ação não pode ser desfeita."
+        confirmText="Excluir"
+        cancelText="Cancelar"
+      />
     </div>
   )
 }

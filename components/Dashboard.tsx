@@ -35,14 +35,14 @@ function getTimeGreeting(): string {
 }
 
 const DASHBOARD_CARDS: CardDef[] = [
-  { id: 'challenge', defaultColumn: 'left' },
+  // { id: 'challenge', defaultColumn: 'left' }, // temporarily disabled
   { id: 'evolution', defaultColumn: 'left' },
   { id: 'spin', defaultColumn: 'left' },
   { id: 'simulation', defaultColumn: 'center' },
   { id: 'agenda', defaultColumn: 'center' },
   { id: 'quicknav', defaultColumn: 'center' },
   { id: 'sessions', defaultColumn: 'right' },
-  { id: 'desafio', defaultColumn: 'right' },
+  // { id: 'desafio', defaultColumn: 'right' }, // temporarily disabled
   { id: 'historico', defaultColumn: 'right' },
   { id: 'nota', defaultColumn: 'right' },
 ]
@@ -235,20 +235,37 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       try {
         const { supabase } = await import('@/lib/supabase')
 
+        // Fetch challenge session IDs to exclude from chart/performance
+        const { data: challengeSessions } = await supabase
+          .from('daily_challenges')
+          .select('roleplay_session_id')
+          .eq('user_id', userId)
+          .not('roleplay_session_id', 'is', null)
+        const challengeSessionIds = (challengeSessions || [])
+          .map(c => c.roleplay_session_id)
+          .filter(Boolean) as string[]
+
+        // Build sessions query (excluding challenges + meet corrections)
+        let sessionsQuery = supabase
+          .from('roleplay_sessions')
+          .select('evaluation, created_at')
+          .eq('user_id', userId)
+          .eq('status', 'completed')
+          .not('evaluation', 'is', null)
+          .not('config', 'cs', '{"is_meet_correction":true}')
+          .order('created_at', { ascending: true })
+          .limit(30)
+        if (challengeSessionIds.length > 0) {
+          sessionsQuery = sessionsQuery.not('id', 'in', `(${challengeSessionIds.join(',')})`)
+        }
+
         const [summaryResult, sessionsResult, challengeResult, meetResult] = await Promise.allSettled([
           supabase
             .from('user_performance_summaries')
             .select('trend, latest_session_score, score_improvement')
             .eq('user_id', userId)
             .single(),
-          supabase
-            .from('roleplay_sessions')
-            .select('evaluation, created_at')
-            .eq('user_id', userId)
-            .eq('status', 'completed')
-            .not('evaluation', 'is', null)
-            .order('created_at', { ascending: true })
-            .limit(30),
+          sessionsQuery,
           supabase
             .from('daily_challenges')
             .select('id, status, challenge_config')
@@ -270,8 +287,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           setPerformanceSummary(summaryResult.value.data)
         }
 
-        // Evolution chart data — multi-series (roleplay + meet)
-        const multiSeries: Array<{ label: string; roleplay: number | null; meet: number | null; timestamp: number }> = []
+        // Evolution chart data — chronological, independent numbering per type
+        const allPoints: Array<{ roleplay: number | null; meet: number | null; timestamp: number; type: 'roleplay' | 'meet' }> = []
 
         if (sessionsResult.status === 'fulfilled' && sessionsResult.value.data) {
           const getProcessedEval = (evaluation: any) => {
@@ -286,13 +303,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             let score = ev?.overall_score !== undefined ? parseFloat(ev.overall_score) : null
             if (score !== null && score > 10) score = score / 10
             if (score === null) return
-            const d = new Date(s.created_at)
-            multiSeries.push({
-              label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
-              roleplay: score,
-              meet: null,
-              timestamp: d.getTime(),
-            })
+            allPoints.push({ roleplay: score, meet: null, timestamp: new Date(s.created_at).getTime(), type: 'roleplay' })
           })
         }
 
@@ -300,18 +311,18 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           meetResult.value.data.forEach((me: any) => {
             const meetScore = me.overall_score ? me.overall_score / 10 : null
             if (!meetScore) return
-            const d = new Date(me.created_at)
-            multiSeries.push({
-              label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
-              roleplay: null,
-              meet: meetScore,
-              timestamp: d.getTime(),
-            })
+            allPoints.push({ roleplay: null, meet: meetScore, timestamp: new Date(me.created_at).getTime(), type: 'meet' })
           })
         }
 
-        multiSeries.sort((a, b) => a.timestamp - b.timestamp)
-        setEvolutionData(multiSeries.map(({ timestamp, ...rest }) => rest))
+        // Sort chronologically, then assign per-type numbering
+        allPoints.sort((a, b) => a.timestamp - b.timestamp)
+        let rCount = 0, mCount = 0
+        const chronological = allPoints.map(p => {
+          if (p.type === 'roleplay') { rCount++; return { label: `R#${rCount}`, roleplay: p.roleplay, meet: null } }
+          else { mCount++; return { label: `M#${mCount}`, roleplay: null, meet: p.meet } }
+        })
+        setEvolutionData(chronological)
 
         // Challenge status
         if (challengeResult.status === 'fulfilled' && challengeResult.value.data) {
@@ -336,13 +347,28 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     try {
       const { supabase } = await import('@/lib/supabase')
 
+      // Fetch challenge session IDs to exclude
+      const { data: challengeSessions } = await supabase
+        .from('daily_challenges')
+        .select('roleplay_session_id')
+        .eq('user_id', uid)
+        .not('roleplay_session_id', 'is', null)
+      const challengeSessionIds = (challengeSessions || [])
+        .map(c => c.roleplay_session_id)
+        .filter(Boolean) as string[]
+
       // Calculate directly from roleplay_sessions (matching PerfilView logic)
-      const { data: sessions, error: sessionsError } = await supabase
+      let perfQuery = supabase
         .from('roleplay_sessions')
         .select('evaluation, status')
         .eq('user_id', uid)
         .eq('status', 'completed')
         .not('evaluation', 'is', null)
+        .not('config', 'cs', '{"is_meet_correction":true}')
+      if (challengeSessionIds.length > 0) {
+        perfQuery = perfQuery.not('id', 'in', `(${challengeSessionIds.join(',')})`)
+      }
+      const { data: sessions, error: sessionsError } = await perfQuery
 
       if (sessionsError) {
         console.error('Error fetching sessions:', sessionsError)
@@ -650,7 +676,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <DashboardGrid
             cards={DASHBOARD_CARDS}
             cardContent={{
-              challenge: null, /* DailyChallengeBanner hidden — feature temporarily disabled */
               evolution: (
                 <EvolutionChart
                   data={evolutionData}
@@ -684,7 +709,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   loading={performanceLoading}
                 />
               ),
-              desafio: null, /* KPI Desafio hidden — feature temporarily disabled */
               historico: (
                 <FeatureCard
                   icon={Clock}

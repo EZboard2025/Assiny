@@ -114,8 +114,11 @@ export default function CadastroEmpresaPage() {
   // Loading state
   if (pageState === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-green-500 animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Verificando empresa...</p>
+        </div>
       </div>
     )
   }
@@ -123,30 +126,31 @@ export default function CadastroEmpresaPage() {
   // Invalid state
   if (pageState === 'invalid') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.08]">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `
-              linear-gradient(rgba(239, 68, 68, 0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(239, 68, 68, 0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: '80px 80px'
-          }}></div>
+      <div className="min-h-screen bg-gray-50 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-red-100 rounded-full opacity-50 blur-3xl"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-red-50 rounded-full opacity-50 blur-3xl"></div>
         </div>
 
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-md animate-fade-in">
-            <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 border border-red-500/30 shadow-2xl text-center">
-              <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-white mb-4">Empresa Não Encontrada</h1>
-              <p className="text-gray-400 mb-6">{errorMessage}</p>
+            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-xl text-center">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <XCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-3">Empresa Não Encontrada</h1>
+              <p className="text-gray-500 mb-6">{errorMessage}</p>
               <a
                 href="/"
-                className="inline-block px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-white transition-colors"
+                className="inline-block px-6 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-700 font-medium transition-colors"
               >
                 Voltar ao início
               </a>
             </div>
+
+            <p className="text-center text-xs text-gray-400 mt-6">
+              © 2025 Ramppy. Todos os direitos reservados.
+            </p>
           </div>
         </div>
       </div>
@@ -156,41 +160,35 @@ export default function CadastroEmpresaPage() {
   // Success state
   if (pageState === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.08]">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `
-              linear-gradient(rgba(34, 197, 94, 0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(34, 197, 94, 0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: '80px 80px'
-          }}></div>
-        </div>
-
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-green-500/5 rounded-full blur-3xl"></div>
+      <div className="min-h-screen bg-gray-50 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-100 rounded-full opacity-50 blur-3xl"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green-50 rounded-full opacity-50 blur-3xl"></div>
         </div>
 
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-md animate-fade-in">
-            <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 border border-emerald-500/30 shadow-2xl text-center">
-              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Clock className="w-10 h-10 text-emerald-400" />
+            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-xl text-center">
+              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="w-8 h-8 text-green-600" />
               </div>
-              <h1 className="text-2xl font-bold text-white mb-4">Solicitação Enviada!</h1>
-              <p className="text-gray-400 mb-2">
-                Sua solicitação de cadastro foi enviada para <span className="text-emerald-400 font-semibold">{companyName}</span>.
+              <h1 className="text-2xl font-bold text-gray-900 mb-3">Solicitação Enviada!</h1>
+              <p className="text-gray-500 mb-2">
+                Sua solicitação de cadastro foi enviada para <span className="text-green-600 font-semibold">{companyName}</span>.
               </p>
-              <p className="text-gray-500 text-sm mb-6">
+              <p className="text-gray-400 text-sm mb-6">
                 Aguarde a aprovação do gestor. Você poderá fazer login assim que sua conta for aprovada.
               </p>
-              <div className="bg-gray-800/50 rounded-xl p-4 text-left">
-                <p className="text-sm text-gray-400">
-                  <span className="text-emerald-400">Dica:</span> Guarde suas credenciais. Ao ser aprovado, você poderá fazer login com o email e senha que cadastrou.
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-left">
+                <p className="text-sm text-gray-600">
+                  <span className="text-green-600 font-medium">Dica:</span> Guarde suas credenciais. Ao ser aprovado, você poderá fazer login com o email e senha que cadastrou.
                 </p>
               </div>
             </div>
+
+            <p className="text-center text-xs text-gray-400 mt-6">
+              © 2025 Ramppy. Todos os direitos reservados.
+            </p>
           </div>
         </div>
       </div>
@@ -199,49 +197,37 @@ export default function CadastroEmpresaPage() {
 
   // Form state
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black relative overflow-hidden">
-      {/* Subtle Grid Background */}
-      <div className="absolute inset-0 opacity-[0.08]">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `
-            linear-gradient(rgba(34, 197, 94, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(34, 197, 94, 0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '80px 80px'
-        }}></div>
-      </div>
-
-      {/* Subtle Gradient Orbs */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-green-500/5 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-gray-50 relative overflow-hidden">
+      {/* Subtle decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-100 rounded-full opacity-50 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green-50 rounded-full opacity-50 blur-3xl"></div>
       </div>
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
         <div className={`w-full max-w-md ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-          <div className="relative bg-gradient-to-br from-gray-900/60 to-gray-800/40 backdrop-blur-xl rounded-3xl p-8 border border-emerald-500/30 shadow-2xl">
+          {/* Card de Cadastro */}
+          <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-xl">
             {/* Logo e Título */}
             <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4">
-                <div className="relative w-[350px] h-[120px] overflow-hidden">
+              <div className="flex items-center justify-center mb-6">
+                <div className="relative w-[280px] h-[80px]">
                   <Image
-                    src="/images/ramppy-logo.png"
+                    src="/images/logo-preta.png"
                     alt="Ramppy Logo"
                     fill
-                    className="object-contain object-center scale-[2.2] drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+                    className="object-contain"
                     priority
                   />
                 </div>
               </div>
 
-              <h1 className="text-2xl font-bold mb-3">
-                <span className="bg-gradient-to-r from-emerald-400 via-green-300 to-emerald-500 bg-clip-text text-transparent">
-                  Cadastro - {companyName}
-                </span>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Cadastro - {companyName}
               </h1>
-              <p className="text-gray-400 flex items-center justify-center gap-2">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+              <p className="text-gray-500 flex items-center justify-center gap-2">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                 Preencha seus dados para solicitar acesso
               </p>
             </div>
@@ -249,16 +235,18 @@ export default function CadastroEmpresaPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Nome */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Nome completo
                 </label>
                 <div className="relative group">
-                  <User className="w-5 h-5 text-emerald-400 absolute left-4 top-3.5 group-focus-within:text-emerald-300 transition-colors z-10" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <User className="w-5 h-5 text-green-600" />
+                  </div>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="relative w-full pl-12 pr-4 py-3.5 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/60 focus:bg-gray-800/80 transition-all"
+                    className="w-full pl-16 pr-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                     placeholder="Seu nome"
                     autoFocus
                   />
@@ -267,16 +255,18 @@ export default function CadastroEmpresaPage() {
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email
                 </label>
                 <div className="relative group">
-                  <Mail className="w-5 h-5 text-emerald-400 absolute left-4 top-3.5 group-focus-within:text-emerald-300 transition-colors z-10" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-green-600" />
+                  </div>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="relative w-full pl-12 pr-4 py-3.5 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/60 focus:bg-gray-800/80 transition-all"
+                    className="w-full pl-16 pr-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                     placeholder="seu@email.com"
                   />
                 </div>
@@ -284,22 +274,24 @@ export default function CadastroEmpresaPage() {
 
               {/* Senha */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Senha
                 </label>
                 <div className="relative group">
-                  <Lock className="w-5 h-5 text-emerald-400 absolute left-4 top-3.5 group-focus-within:text-emerald-300 transition-colors z-10" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-green-600" />
+                  </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="relative w-full pl-12 pr-14 py-3.5 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/60 focus:bg-gray-800/80 transition-all"
+                    className="w-full pl-16 pr-14 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-3.5 text-gray-400 hover:text-emerald-400 transition-colors z-10"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-600 transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff className="w-5 h-5" />
@@ -312,23 +304,25 @@ export default function CadastroEmpresaPage() {
 
               {/* Confirmar Senha */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Confirmar senha
                 </label>
                 <div className="relative group">
-                  <Lock className="w-5 h-5 text-emerald-400 absolute left-4 top-3.5 group-focus-within:text-emerald-300 transition-colors z-10" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-green-600" />
+                  </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="relative w-full pl-12 pr-4 py-3.5 bg-gray-800/60 border border-emerald-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/60 focus:bg-gray-800/80 transition-all"
+                    className="w-full pl-16 pr-4 py-3.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all"
                     placeholder="••••••••"
                   />
                 </div>
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm backdrop-blur-sm">
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
                   {error}
                 </div>
               )}
@@ -336,7 +330,7 @@ export default function CadastroEmpresaPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 rounded-xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02]"
+                className="w-full py-4 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
               >
                 {loading ? (
                   <>
@@ -351,11 +345,16 @@ export default function CadastroEmpresaPage() {
 
             <p className="text-center text-gray-500 text-sm mt-6">
               Já tem uma conta?{' '}
-              <a href="/" className="text-emerald-400 hover:text-emerald-300 transition-colors">
+              <a href="/" className="text-green-600 hover:text-green-700 font-medium transition-colors">
                 Faça login
               </a>
             </p>
           </div>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-gray-400 mt-6">
+            © 2025 Ramppy. Todos os direitos reservados.
+          </p>
         </div>
       </div>
     </div>

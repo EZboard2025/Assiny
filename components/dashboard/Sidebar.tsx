@@ -32,12 +32,12 @@ export default function Sidebar({
 
   const navItems = [
     { icon: Home, view: 'home', label: 'Home', show: true },
+    { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
     { icon: Users, view: 'roleplay', label: 'Simulação', show: true },
     { icon: MessageSquare, view: 'followup', label: 'WhatsApp IA', show: true },
     { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
-    { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
-    { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI },
+    // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden
     { icon: TrendingUp, view: 'manager', label: 'Gestão', show: isAdmin || isGestor },
     { icon: Link2, view: 'roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
   ]

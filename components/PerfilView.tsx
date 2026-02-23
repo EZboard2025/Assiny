@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { getAllUserRoleplaySessions, getUserMeetEvaluations, type RoleplaySession } from '@/lib/roleplay'
+import { getUserRoleplaySessions, getUserMeetEvaluations, type RoleplaySession } from '@/lib/roleplay'
 import { supabase } from '@/lib/supabase'
 import { getFollowUpAnalyses, getFollowUpStats } from '@/lib/followup'
 
@@ -67,7 +67,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
       try {
         setLoading(true)
-        const allSessions = await getAllUserRoleplaySessions(1000)
+        const allSessions = await getUserRoleplaySessions(1000)
         if (!isMounted) return
 
         setSessions(allSessions)
@@ -108,7 +108,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
             const sessionDate = new Date(session.created_at)
             evolutionPoints.push({
-              label: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+              label: '',
               score: scoreValue,
               date: sessionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
               timestamp: sessionDate.getTime(),
@@ -131,7 +131,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
         const orderedData = evolutionPoints
           .sort((a, b) => a.timestamp - b.timestamp)
-          .map(({ timestamp, ...rest }) => rest)
+          .map(({ timestamp, ...rest }, idx) => ({ ...rest, label: `#${idx + 1}` }))
 
         setEvolutionData(orderedData)
 
@@ -145,8 +145,8 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           })
         }
 
-        // Build multi-series chart data (roleplay vs meet — 2 lines)
-        const multiSeries: (ChartDataPoint & { timestamp: number })[] = []
+        // Build multi-series chart data — chronological, independent numbering per type
+        const allPoints: Array<{ roleplay: number | null; meet: number | null; timestamp: number; type: 'roleplay' | 'meet' }> = []
 
         completedSessions.forEach((session) => {
           let eval2 = (session as any).evaluation
@@ -157,13 +157,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
           let overall = parseFloat(eval2.overall_score)
           if (overall > 10) overall = overall / 10
-
-          multiSeries.push({
-            label: new Date(session.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-            roleplay: overall,
-            meet: null,
-            timestamp: new Date(session.created_at).getTime(),
-          })
+          allPoints.push({ roleplay: overall, meet: null, timestamp: new Date(session.created_at).getTime(), type: 'roleplay' })
         })
 
         // Load meet evaluations
@@ -172,18 +166,18 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
           meetEvals.forEach((me) => {
             const meetScore = me.overall_score ? me.overall_score / 10 : null
             if (!meetScore) return
-
-            multiSeries.push({
-              label: new Date(me.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-              roleplay: null,
-              meet: meetScore,
-              timestamp: new Date(me.created_at).getTime(),
-            })
+            allPoints.push({ roleplay: null, meet: meetScore, timestamp: new Date(me.created_at).getTime(), type: 'meet' })
           })
         } catch {}
 
-        multiSeries.sort((a, b) => a.timestamp - b.timestamp)
-        if (isMounted) setMultiSeriesData(multiSeries.map(({ timestamp, ...rest }) => rest))
+        // Sort chronologically, then assign per-type numbering
+        allPoints.sort((a, b) => a.timestamp - b.timestamp)
+        let rCount = 0, mCount = 0
+        const chronological: ChartDataPoint[] = allPoints.map(p => {
+          if (p.type === 'roleplay') { rCount++; return { label: `R#${rCount}`, roleplay: p.roleplay, meet: null } }
+          else { mCount++; return { label: `M#${mCount}`, roleplay: null, meet: p.meet } }
+        })
+        if (isMounted) setMultiSeriesData(chronological)
 
         processPersonaStats(completedSessions)
         processObjectionStats(completedSessions)
