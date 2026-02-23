@@ -137,9 +137,12 @@ interface MeetHistoryContentProps {
   newEvaluationIds?: string[]
   initialEvaluationId?: string | null
   onInitialEvaluationLoaded?: () => void
+  /** When provided, fetches data via admin API (manager view, read-only) */
+  sellerId?: string
 }
 
-export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded }: MeetHistoryContentProps) {
+export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded, sellerId }: MeetHistoryContentProps) {
+  const isManagerView = !!sellerId
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
   const [loading, setLoading] = useState(true)
@@ -193,6 +196,32 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
 
   const loadHistory = async () => {
     try {
+      // Manager view: use admin API (bypasses RLS)
+      if (sellerId) {
+        const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+        const companyId = await getCompanyId()
+        const res = await fetch(`/api/admin/seller-meet-history?sellerId=${sellerId}`, {
+          headers: { 'x-company-id': companyId || '' },
+        })
+        if (!res.ok) {
+          console.error('Erro ao carregar histórico do vendedor')
+          setLoading(false)
+          return
+        }
+        const data = await res.json()
+        const enrichedData = data.evaluations || []
+        setEvaluations(enrichedData)
+        if (enrichedData.length > 0) {
+          setSelectedEvaluation(enrichedData[0])
+        }
+        setSimulations(data.simulations || {})
+        setCorrectionScores(data.correctionScores || {})
+        setCorrectionSessions(data.correctionSessions || {})
+        setLoading(false)
+        return
+      }
+
+      // Normal view: direct supabase queries (RLS-protected)
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -524,8 +553,8 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
       {/* Lista de avaliações - Coluna estreita */}
       <div className="lg:col-span-4 xl:col-span-3">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          {/* Tab: Minhas / Compartilhados */}
-          <div className="flex border-b border-gray-100">
+          {/* Tab: Minhas / Compartilhados (hidden in manager view) */}
+          {!isManagerView && <div className="flex border-b border-gray-100">
             <button
               onClick={() => { setViewMode('mine'); setSelectedShared(null) }}
               className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider transition-colors ${
@@ -542,7 +571,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
             >
               Compartilhados
             </button>
-          </div>
+          </div>}
           <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
             {viewMode === 'shared' ? (
               // Shared evaluations list
@@ -715,6 +744,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     )}
                   </div>
                 </div>
+                {!isManagerView && (
                 <div className="flex items-center gap-1">
                   <button
                     onClick={openShareModal}
@@ -730,6 +760,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
+                )}
               </div>
             </div>
 
@@ -1414,7 +1445,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                           <div className="px-4 pb-4 border-t border-gray-100 pt-4">
                             <div className="space-y-4">
                               <div className="flex items-center justify-end">
-                        {!isCompleted && (
+                        {!isCompleted && !isManagerView && (
                           <button
                             onClick={() => handleStartSimulation(sim)}
                             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
