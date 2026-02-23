@@ -13,9 +13,9 @@ import AgendaWidget from './dashboard/AgendaWidget'
 import SpinBars from './dashboard/SpinBars'
 import QuickNav from './dashboard/QuickNav'
 import FeatureCard from './dashboard/FeatureCard'
-import StatsPanel from './dashboard/StatsPanel'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
-import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3, Bell, Activity } from 'lucide-react'
+import DashboardGrid, { type CardDef } from './dashboard/DashboardGrid'
+import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3, Bell, Activity, LayoutGrid } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
@@ -33,6 +33,19 @@ function getTimeGreeting(): string {
   if (hour >= 12 && hour < 18) return 'Boa tarde'
   return 'Boa noite'
 }
+
+const DASHBOARD_CARDS: CardDef[] = [
+  { id: 'challenge', defaultColumn: 'left' },
+  { id: 'evolution', defaultColumn: 'left' },
+  { id: 'spin', defaultColumn: 'left' },
+  { id: 'simulation', defaultColumn: 'center' },
+  { id: 'agenda', defaultColumn: 'center' },
+  { id: 'quicknav', defaultColumn: 'center' },
+  { id: 'sessions', defaultColumn: 'right' },
+  { id: 'desafio', defaultColumn: 'right' },
+  { id: 'historico', defaultColumn: 'right' },
+  { id: 'nota', defaultColumn: 'right' },
+]
 
 // Loading skeleton for lazy-loaded views
 const ViewLoadingSkeleton = () => (
@@ -103,7 +116,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     score_improvement: number | null
     latest_session_score: number | null
   } | null>(null)
-  const [evolutionData, setEvolutionData] = useState<Array<{ label: string; score: number }>>([])
+  const [evolutionData, setEvolutionData] = useState<Array<{ label: string; roleplay: number | null; meet: number | null }>>([])
   const [challengeStatus, setChallengeStatus] = useState<{ pending: boolean; title: string } | null>(null)
 
   // Training streak hook
@@ -112,6 +125,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Notifications hook
   const { notifications, allNotifications, unreadCount, markAsRead, markAllAsRead, fetchAllNotifications } = useNotifications(userId)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [isEditingLayout, setIsEditingLayout] = useState(false)
   const [sharedModalShareId, setSharedModalShareId] = useState<string | null>(null)
   const [pendingEvaluationId, setPendingEvaluationId] = useState<string | null>(null)
   const [pendingHistoryTab, setPendingHistoryTab] = useState<string | null>(null)
@@ -221,7 +235,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       try {
         const { supabase } = await import('@/lib/supabase')
 
-        const [summaryResult, sessionsResult, challengeResult] = await Promise.allSettled([
+        const [summaryResult, sessionsResult, challengeResult, meetResult] = await Promise.allSettled([
           supabase
             .from('user_performance_summaries')
             .select('trend, latest_session_score, score_improvement')
@@ -234,7 +248,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             .eq('status', 'completed')
             .not('evaluation', 'is', null)
             .order('created_at', { ascending: true })
-            .limit(15),
+            .limit(30),
           supabase
             .from('daily_challenges')
             .select('id, status, challenge_config')
@@ -242,7 +256,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             .eq('challenge_date', new Date().toISOString().split('T')[0])
             .in('status', ['pending', 'in_progress'])
             .limit(1)
-            .single()
+            .single(),
+          supabase
+            .from('meet_evaluations')
+            .select('overall_score, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: true })
+            .limit(30)
         ])
 
         // Performance summary
@@ -250,7 +270,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           setPerformanceSummary(summaryResult.value.data)
         }
 
-        // Evolution chart data
+        // Evolution chart data — multi-series (roleplay + meet)
+        const multiSeries: Array<{ label: string; roleplay: number | null; meet: number | null; timestamp: number }> = []
+
         if (sessionsResult.status === 'fulfilled' && sessionsResult.value.data) {
           const getProcessedEval = (evaluation: any) => {
             if (evaluation && typeof evaluation === 'object' && 'output' in evaluation) {
@@ -259,21 +281,37 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             return evaluation
           }
 
-          const chartData = sessionsResult.value.data
-            .map((s: any) => {
-              const ev = getProcessedEval(s.evaluation)
-              let score = ev?.overall_score !== undefined ? parseFloat(ev.overall_score) : null
-              if (score !== null && score > 10) score = score / 10
-              const d = new Date(s.created_at)
-              return score !== null ? {
-                label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
-                score
-              } : null
+          sessionsResult.value.data.forEach((s: any) => {
+            const ev = getProcessedEval(s.evaluation)
+            let score = ev?.overall_score !== undefined ? parseFloat(ev.overall_score) : null
+            if (score !== null && score > 10) score = score / 10
+            if (score === null) return
+            const d = new Date(s.created_at)
+            multiSeries.push({
+              label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
+              roleplay: score,
+              meet: null,
+              timestamp: d.getTime(),
             })
-            .filter(Boolean) as Array<{ label: string; score: number }>
-
-          setEvolutionData(chartData)
+          })
         }
+
+        if (meetResult.status === 'fulfilled' && meetResult.value.data) {
+          meetResult.value.data.forEach((me: any) => {
+            const meetScore = me.overall_score ? me.overall_score / 10 : null
+            if (!meetScore) return
+            const d = new Date(me.created_at)
+            multiSeries.push({
+              label: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`,
+              roleplay: null,
+              meet: meetScore,
+              timestamp: d.getTime(),
+            })
+          })
+        }
+
+        multiSeries.sort((a, b) => a.timestamp - b.timestamp)
+        setEvolutionData(multiSeries.map(({ timestamp, ...rest }) => rest))
 
         // Challenge status
         if (challengeResult.status === 'fulfilled' && challengeResult.value.data) {
@@ -544,38 +582,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     const scoreImprovement = performanceSummary?.score_improvement
 
     return (
-      <div className="py-8 px-6 relative z-10">
-        <div className="max-w-[1200px]">
-          {/* Header with banner and greeting */}
-          <div className={`mb-8 flex flex-col lg:flex-row gap-4 items-stretch ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-            {/* Banner CTA with image */}
-            <button
-              onClick={() => handleViewChange('roleplay')}
-              className="group relative overflow-hidden rounded-2xl bg-green-800 p-5 text-left transition-all hover:shadow-xl hover:scale-[1.01] lg:w-[280px] flex-shrink-0 min-h-[100px]"
-            >
-              {/* Background Image */}
-              <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{
-                  backgroundImage: 'url(/images/banner-training.jpg)',
-                }}
-              />
-              {/* Green Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-green-700/80 to-green-500/60" />
-              {/* Content */}
-              <div className="relative z-10 h-full flex flex-col justify-end">
-                <h2 className="text-lg font-bold text-white leading-tight">
-                  Acelere sua rampagem
-                </h2>
-              </div>
-            </button>
-
-            {/* Greeting */}
+      <div className="py-8 pl-20 pr-6 relative z-10">
+        <div className="max-w-[1360px]">
+          {/* Header with greeting */}
+          <div className={`mb-8 flex items-center ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
             <div className="flex-1 flex items-center">
               <div className="flex-1">
-                <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">
-                  Plataforma de Rampagem
-                </p>
                 <div className="flex items-center gap-4">
                   <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
                     Olá, {userName || 'Vendedor'}
@@ -583,6 +595,19 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   <StreakIndicator streak={streak} loading={streakLoading} />
                 </div>
               </div>
+              {/* Edit layout button */}
+              <button
+                onClick={() => setIsEditingLayout(prev => !prev)}
+                className={`p-2.5 rounded-xl transition-colors ${
+                  isEditingLayout
+                    ? 'bg-green-100 text-green-600 ring-1 ring-green-300'
+                    : 'hover:bg-gray-100 text-gray-400'
+                }`}
+                title={isEditingLayout ? 'Salvar layout' : 'Personalizar layout'}
+              >
+                <LayoutGrid className="w-5 h-5" />
+              </button>
+
               {/* Notification bell */}
               <div className="relative">
                 <button
@@ -613,98 +638,102 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
           </div>
 
-          {/* 3-Column Layout: Left | Center | Right (KPIs) */}
-          <div className={`grid grid-cols-1 lg:grid-cols-12 gap-4 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-            {/* Left Column (5/12) */}
-            <div className="lg:col-span-5 space-y-4">
-              {/* DailyChallengeBanner hidden — feature temporarily disabled */}
-
-              <EvolutionChart
-                data={evolutionData}
-                loading={performanceLoading}
-                onClick={() => handleViewChange('perfil')}
-              />
-
-              <SpinBars
-                scores={performanceData?.spinScores || { S: 0, P: 0, I: 0, N: 0 }}
-                loading={performanceLoading}
-                onClick={() => handleViewChange('perfil')}
-              />
+          {/* Editing mode hint */}
+          {isEditingLayout && (
+            <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-sm text-green-700 animate-fade-in">
+              <LayoutGrid className="w-4 h-4" />
+              Arraste os cards para reorganizar seu dashboard
             </div>
+          )}
 
-            {/* Center Column (4/12) */}
-            <div className="lg:col-span-4 space-y-4">
-              {userId && (
-                <SavedSimulationCard userId={userId} />
-              )}
-
-              {userId && (
+          {/* 3-Column Sortable Layout */}
+          <DashboardGrid
+            cards={DASHBOARD_CARDS}
+            cardContent={{
+              challenge: null, /* DailyChallengeBanner hidden — feature temporarily disabled */
+              evolution: (
+                <EvolutionChart
+                  data={evolutionData}
+                  loading={performanceLoading}
+                  onClick={() => handleViewChange('perfil')}
+                />
+              ),
+              spin: (
+                <SpinBars
+                  scores={performanceData?.spinScores || { S: 0, P: 0, I: 0, N: 0 }}
+                  loading={performanceLoading}
+                  onClick={() => handleViewChange('perfil')}
+                />
+              ),
+              simulation: userId ? <SavedSimulationCard userId={userId} /> : null,
+              agenda: userId ? (
                 <AgendaWidget
                   userId={userId}
                   onNavigateToCalendar={() => handleViewChange('meet-analysis')}
                 />
-              )}
-
-              <QuickNav
-                onNavigate={handleViewChange}
-                userRole={userRole}
-                hasPDI={hasPDI}
-              />
-            </div>
-
-            {/* Right Column (3/12) - KPI Cards stacked */}
-            <div className="lg:col-span-3 space-y-4">
-              <KPICard
-                icon={Activity}
-                iconBg="bg-blue-50"
-                iconColor="text-blue-600"
-                label="Sessões"
-                value={totalSessions > 0 ? totalSessions.toString() : '0'}
-                subtitle="sessões avaliadas"
-                onClick={() => handleViewChange('historico')}
-                loading={performanceLoading}
-              />
-
-              {/* KPI Desafio do Dia hidden — feature temporarily disabled */}
-
-            <FeatureCard
-              icon={Clock}
-              title="Histórico"
-              subtitle="Todas as sessões"
-              description="Simulações, Follow-ups e análises de Meet."
-              onClick={() => {
-                if (meetNotificationCount > 0) {
-                  // Mark all meet notifications as read
-                  notifications
-                    .filter(n => n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error')
-                    .forEach(n => markAsRead(n.id))
-                  // Navigate and open Meet tab
-                  setPendingHistoryTab('meet')
-                  handleViewChange('historico')
-                } else {
-                  handleViewChange('historico')
-                }
-              }}
-              notificationCount={meetNotificationCount}
-              onMouseEnter={() => prefetchMap.historico()}
-            />
-
-              <KPICard
-                icon={BarChart3}
-                iconBg="bg-green-50"
-                iconColor="text-green-600"
-                label="Nota Média"
-                value={totalSessions > 0 ? overallAvg.toFixed(1) : '—'}
-                subtitle={totalSessions > 0 ? `de ${totalSessions} sessões` : 'Sem sessões ainda'}
-                delta={scoreImprovement != null && totalSessions > 0 ? {
-                  value: `${scoreImprovement > 0 ? '+' : ''}${scoreImprovement.toFixed(1)}`,
-                  positive: scoreImprovement >= 0
-                } : undefined}
-                onClick={() => handleViewChange('perfil')}
-                loading={performanceLoading}
-              />
-            </div>
-          </div>
+              ) : null,
+              sessions: (
+                <KPICard
+                  icon={Activity}
+                  iconBg="bg-blue-50"
+                  iconColor="text-blue-600"
+                  label="Sessões"
+                  value={totalSessions > 0 ? totalSessions.toString() : '0'}
+                  subtitle="sessões avaliadas"
+                  onClick={() => handleViewChange('historico')}
+                  loading={performanceLoading}
+                />
+              ),
+              desafio: null, /* KPI Desafio hidden — feature temporarily disabled */
+              historico: (
+                <FeatureCard
+                  icon={Clock}
+                  title="Histórico"
+                  subtitle="Todas as sessões"
+                  description="Simulações, Follow-ups e análises de Meet."
+                  onClick={() => {
+                    if (meetNotificationCount > 0) {
+                      notifications
+                        .filter(n => n.type === 'meet_evaluation_ready' || n.type === 'meet_evaluation_error')
+                        .forEach(n => markAsRead(n.id))
+                      setPendingHistoryTab('meet')
+                      handleViewChange('historico')
+                    } else {
+                      handleViewChange('historico')
+                    }
+                  }}
+                  notificationCount={meetNotificationCount}
+                  onMouseEnter={() => prefetchMap.historico()}
+                />
+              ),
+              nota: (
+                <KPICard
+                  icon={BarChart3}
+                  iconBg="bg-green-50"
+                  iconColor="text-green-600"
+                  label="Nota Média"
+                  value={totalSessions > 0 ? overallAvg.toFixed(1) : '—'}
+                  subtitle={totalSessions > 0 ? `de ${totalSessions} sessões` : 'Sem sessões ainda'}
+                  delta={scoreImprovement != null && totalSessions > 0 ? {
+                    value: `${scoreImprovement > 0 ? '+' : ''}${scoreImprovement.toFixed(1)}`,
+                    positive: scoreImprovement >= 0
+                  } : undefined}
+                  onClick={() => handleViewChange('perfil')}
+                  loading={performanceLoading}
+                />
+              ),
+              quicknav: (
+                <QuickNav
+                  onNavigate={handleViewChange}
+                  userRole={userRole}
+                  hasPDI={hasPDI}
+                />
+              ),
+            }}
+            isEditing={isEditingLayout}
+            userId={userId}
+            animClass={mounted ? 'animate-fade-in' : 'opacity-0'}
+          />
         </div>
       </div>
     )
@@ -755,25 +784,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         className={`flex-1 h-screen overflow-y-auto ${isSidebarExpanded ? 'ml-56' : 'ml-16'}`}
         style={{
           transition: 'margin 300ms ease-in-out, opacity 150ms ease-out',
-          opacity: isTransitioning ? 0 : 1
+          opacity: isTransitioning ? 0 : 1,
+          scrollbarWidth: 'none',
         }}
       >
         {renderContent()}
       </main>
 
-      {/* Stats Panel - only on home */}
-      {currentView === 'home' && (
-        <StatsPanel
-          overallAverage={performanceData?.overallAverage || 0}
-          totalSessions={performanceData?.totalSessions || 0}
-          spinScores={performanceData?.spinScores || { S: 0, P: 0, I: 0, N: 0 }}
-          streak={streak}
-          onViewProfile={() => handleViewChange('perfil')}
-          onViewHistory={() => handleViewChange('historico')}
-          loading={performanceLoading}
-          challengeComponent={undefined /* feature temporarily disabled */}
-        />
-      )}
 
       {/* Config Hub Modal */}
       {showConfigHub && (
@@ -783,9 +800,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         }} />
       )}
 
-      {/* Seller Agent Chat - all views except followup (which has SalesCopilot) */}
-      {currentView !== 'followup' && currentView !== 'followup-history' && (
-        <SellerAgentChat userName={userName || undefined} userRole={userRole || undefined} />
+      {/* Seller Agent Chat - home, profile and roleplay */}
+      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay') && (
+        <SellerAgentChat userName={userName || undefined} />
       )}
 
       {/* Configuration Required Overlay */}
