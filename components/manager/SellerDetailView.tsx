@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Loader2, CalendarDays, Clock, ChevronDown, Video, X, ChevronRight } from 'lucide-react'
+import { Loader2, CalendarDays, Clock, ChevronDown, Video, X } from 'lucide-react'
 import CalendarWeekView from '../CalendarWeekView'
 import MiniCalendar from '../MiniCalendar'
 import MeetHistoryContent from '../MeetHistoryContent'
@@ -183,12 +183,23 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           </span>
         </div>
 
-        {/* Mini Calendar */}
-        <div className="bg-white rounded-xl border border-gray-200 p-3">
-          <MiniCalendar
-            currentWeekStart={currentWeekStart}
-            onDateClick={handleDateClick}
-          />
+        {/* Mini Calendar + History button side by side */}
+        <div className="flex gap-3">
+          <div className="flex-1 bg-white rounded-xl border border-gray-200 p-3">
+            <MiniCalendar
+              currentWeekStart={currentWeekStart}
+              onDateClick={handleDateClick}
+            />
+          </div>
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="w-20 bg-white rounded-xl border border-gray-200 p-3 flex flex-col items-center justify-center gap-2 hover:border-green-300 hover:shadow-sm transition-all"
+          >
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-green-50">
+              <Video className="w-4 h-4 text-green-600" />
+            </div>
+            <span className="text-[10px] font-medium text-gray-600 leading-tight text-center">Historico</span>
+          </button>
         </div>
 
         {/* Upcoming Meetings (collapsible) */}
@@ -268,20 +279,6 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           )}
         </div>
 
-        {/* Meet History Card (opens overlay panel) */}
-        <button
-          onClick={() => setHistoryOpen(true)}
-          className="w-full bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3 hover:border-green-300 hover:shadow-sm transition-all text-left"
-        >
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-50">
-            <Video className="w-4.5 h-4.5 text-green-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-gray-900">Historico de Reunioes</h2>
-            <p className="text-[10px] text-gray-500">Avaliacoes de Meet gravadas</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        </button>
       </div>
 
       {/* ── Right Column: Calendar or Meet History ─────────────────────── */}
