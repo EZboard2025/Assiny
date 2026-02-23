@@ -183,22 +183,20 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           </span>
         </div>
 
-        {/* Mini Calendar + History button side by side */}
-        <div className="flex gap-3">
-          <div className="flex-1 bg-white rounded-xl border border-gray-200 p-3">
-            <MiniCalendar
-              currentWeekStart={currentWeekStart}
-              onDateClick={handleDateClick}
-            />
-          </div>
+        {/* Mini Calendar + History button */}
+        <div className="bg-white rounded-xl border border-gray-200 p-3">
+          <MiniCalendar
+            currentWeekStart={currentWeekStart}
+            onDateClick={handleDateClick}
+          />
           <button
             onClick={() => setHistoryOpen(true)}
-            className="w-20 bg-white rounded-xl border border-gray-200 p-3 flex flex-col items-center justify-center gap-2 hover:border-green-300 hover:shadow-sm transition-all"
+            className="w-full mt-3 pt-3 border-t border-gray-100 flex items-center gap-2.5 hover:bg-gray-50 rounded-lg px-1 py-1.5 transition-colors"
           >
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-green-50">
-              <Video className="w-4 h-4 text-green-600" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-green-50 flex-shrink-0">
+              <Video className="w-3.5 h-3.5 text-green-600" />
             </div>
-            <span className="text-[10px] font-medium text-gray-600 leading-tight text-center">Historico</span>
+            <span className="text-xs font-medium text-gray-700">Historico de Reunioes</span>
           </button>
         </div>
 
