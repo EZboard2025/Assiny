@@ -549,10 +549,10 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Lista de avaliações - Coluna estreita */}
-      <div className="lg:col-span-4 xl:col-span-3">
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className={`grid grid-cols-1 ${isManagerView ? 'gap-4' : 'lg:grid-cols-12 gap-6'}`}>
+      {/* Lista de avaliações */}
+      <div className={isManagerView ? '' : 'lg:col-span-4 xl:col-span-3'}>
+        <div className={`bg-white overflow-hidden ${isManagerView ? 'border-b border-gray-100' : 'rounded-2xl border border-gray-200 shadow-sm'}`}>
           {/* Tab: Minhas / Compartilhados (hidden in manager view) */}
           {!isManagerView && <div className="flex border-b border-gray-100">
             <button
@@ -572,7 +572,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
               Compartilhados
             </button>
           </div>}
-          <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
+          <div className={isManagerView ? 'flex overflow-x-auto gap-0' : 'max-h-[calc(100vh-320px)] overflow-y-auto'}>
             {viewMode === 'shared' ? (
               // Shared evaluations list
               sharedLoading ? (
@@ -638,12 +638,20 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                   )}
                   <button
                     onClick={() => { setSelectedEvaluation(evaluation); setExpandedSection(null) }}
-                    className={`relative w-full text-left p-4 border-b border-gray-100 transition-all ${
-                      selectedEvaluation?.id === evaluation.id
-                        ? 'bg-green-50 border-l-4 border-l-green-500'
-                        : isNew
-                          ? 'bg-blue-50/50 border-l-4 border-l-blue-400'
-                          : 'hover:bg-gray-50 border-l-4 border-l-transparent'
+                    className={`relative text-left transition-all ${
+                      isManagerView
+                        ? `flex-shrink-0 w-40 p-3 border-r border-gray-100 ${
+                            selectedEvaluation?.id === evaluation.id
+                              ? 'bg-green-50 border-b-2 border-b-green-500'
+                              : 'hover:bg-gray-50'
+                          }`
+                        : `w-full p-4 border-b border-gray-100 ${
+                            selectedEvaluation?.id === evaluation.id
+                              ? 'bg-green-50 border-l-4 border-l-green-500'
+                              : isNew
+                                ? 'bg-blue-50/50 border-l-4 border-l-blue-400'
+                                : 'hover:bg-gray-50 border-l-4 border-l-transparent'
+                          }`
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -700,11 +708,11 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
       </div>
 
       {/* Detalhes da avaliação */}
-      <div className="lg:col-span-8 xl:col-span-9">
+      <div className={isManagerView ? '' : 'lg:col-span-8 xl:col-span-9'}>
         {selectedEvaluation ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className={`bg-white overflow-hidden ${isManagerView ? '' : 'rounded-2xl border border-gray-200 shadow-sm'}`}>
             {/* Header */}
-            <div className="p-6 border-b border-gray-100">
+            <div className={`border-b border-gray-100 ${isManagerView ? 'p-4' : 'p-6'}`}>
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
@@ -2137,9 +2145,9 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
             </div>{/* end of p-4 space-y-2 collapsible cards container */}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
+          <div className={`bg-white text-center ${isManagerView ? 'p-8' : 'rounded-2xl border border-gray-200 shadow-sm p-12'}`}>
             <Video className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">Selecione uma avaliação para ver os detalhes</p>
+            <p className="text-gray-500 text-sm">Selecione uma avaliacao para ver os detalhes</p>
           </div>
         )}
       </div>
