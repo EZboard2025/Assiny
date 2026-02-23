@@ -69,6 +69,7 @@ import { useToast } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import CompanyDataChat from '@/components/CompanyDataChat'
 import PersonaChat from '@/components/PersonaChat'
+import ObjectionChat from '@/components/ObjectionChat'
 
 interface ConfigHubProps {
   onClose: () => void
@@ -359,6 +360,7 @@ function ConfigurationInterface({
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null)
   const [selectedPersonaType, setSelectedPersonaType] = useState<'B2B' | 'B2C'>('B2B')
   const [objections, setObjections] = useState<Objection[]>([])
+  const [showObjectionChat, setShowObjectionChat] = useState(false)
   const [newObjection, setNewObjection] = useState('')
   const [newRebuttal, setNewRebuttal] = useState('')
   const [editingObjectionId, setEditingObjectionId] = useState<string | null>(null)
@@ -385,6 +387,8 @@ function ConfigurationInterface({
   const [filterTag, setFilterTag] = useState<string>('')
   const [filterBusinessType, setFilterBusinessType] = useState<'' | 'B2B' | 'B2C'>('')
   const [expandedPersonas, setExpandedPersonas] = useState<Set<string>>(new Set())
+  const [multiSelectMode, setMultiSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showTagForm, setShowTagForm] = useState(false)
   const [tagsExpanded, setTagsExpanded] = useState(false)
 
@@ -2603,10 +2607,12 @@ function ConfigurationInterface({
   }
 
   const executeDeletePersona = async (id: string) => {
-    const success = await deletePersona(id)
-    if (success) {
-      setPersonas(personas.filter(p => p.id !== id))
+    const ids = id.split(',')
+    for (const personaId of ids) {
+      await deletePersona(personaId)
     }
+    setPersonas(prev => prev.filter(p => !ids.includes(p.id!)))
+    if (ids.length > 1) exitMultiSelect()
   }
 
   const handleAddObjection = async () => {
@@ -2699,15 +2705,51 @@ function ConfigurationInterface({
   }
 
   const executeDeleteObjection = async (id: string) => {
-    const success = await deleteObjection(id)
-    if (success) {
-      setObjections(objections.filter(o => o.id !== id))
-      setExpandedObjections(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(id)
-        return newSet
-      })
+    const ids = id.split(',')
+    for (const objId of ids) {
+      await deleteObjection(objId)
     }
+    setObjections(prev => prev.filter(o => !ids.includes(o.id)))
+    setExpandedObjections(prev => {
+      const newSet = new Set(prev)
+      ids.forEach(i => newSet.delete(i))
+      return newSet
+    })
+    if (ids.length > 1) exitMultiSelect()
+  }
+
+  const toggleSelectItem = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) newSet.delete(id)
+      else newSet.add(id)
+      return newSet
+    })
+  }
+
+  const exitMultiSelect = () => {
+    setMultiSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  const handleBulkDeletePersonas = async () => {
+    if (selectedIds.size === 0) return
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'persona',
+      id: Array.from(selectedIds).join(','),
+      name: `${selectedIds.size} persona${selectedIds.size > 1 ? 's' : ''}`
+    })
+  }
+
+  const handleBulkDeleteObjections = async () => {
+    if (selectedIds.size === 0) return
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'objection',
+      id: Array.from(selectedIds).join(','),
+      name: `${selectedIds.size} objeç${selectedIds.size > 1 ? 'ões' : 'ão'}`
+    })
   }
 
   const toggleObjectionExpanded = (id: string) => {
@@ -3144,7 +3186,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           </button>
         )}
         <button
-          onClick={() => setActiveTab('personas')}
+          onClick={() => { exitMultiSelect(); setActiveTab('personas') }}
           className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
             activeTab === 'personas'
               ? 'bg-gray-100 text-gray-900 font-medium'
@@ -3155,7 +3197,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           <span>Personas</span>
         </button>
         <button
-          onClick={() => setActiveTab('objections')}
+          onClick={() => { exitMultiSelect(); setActiveTab('objections') }}
           className={`w-full px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 ${
             activeTab === 'objections'
               ? 'bg-gray-100 text-gray-900 font-medium'
@@ -3502,6 +3544,19 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    {personas.length > 0 && (
+                      <button
+                        onClick={() => multiSelectMode ? exitMultiSelect() : setMultiSelectMode(true)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          multiSelectMode
+                            ? 'bg-red-50 text-red-600 border border-red-200'
+                            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {multiSelectMode ? 'Cancelar' : 'Selecionar'}
+                      </button>
+                    )}
                     {/* Botão Gerar com IA */}
                     <button
                       onClick={() => setShowAIGenerateModal('personas')}
@@ -3830,6 +3885,46 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 return true
               }).length > 0 && (
                 <div className="p-5 space-y-3">
+                  {/* Multi-select action bar */}
+                  {multiSelectMode && activeTab === 'personas' && (() => {
+                    const filteredPersonaIds = personas.filter(p => {
+                      if (filterBusinessType && p.business_type !== filterBusinessType) return false
+                      if (!filterBusinessType) {
+                        if (businessType === 'Ambos') { if (p.business_type !== 'B2B' && p.business_type !== 'B2C') return false }
+                        else { if (p.business_type !== businessType) return false }
+                      }
+                      if (filterTag && p.id) { if (!(personaTags.get(p.id) || []).includes(filterTag)) return false }
+                      return true
+                    }).map(p => p.id!)
+                    return (
+                    <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={filteredPersonaIds.length > 0 && filteredPersonaIds.every(id => selectedIds.has(id))}
+                            onChange={() => {
+                              const allSelected = filteredPersonaIds.every(id => selectedIds.has(id))
+                              if (allSelected) setSelectedIds(new Set())
+                              else setSelectedIds(new Set(filteredPersonaIds))
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                          />
+                          Selecionar tudo
+                        </label>
+                        <span className="text-xs text-gray-500">{selectedIds.size} selecionada{selectedIds.size !== 1 ? 's' : ''}</span>
+                      </div>
+                      <button
+                        onClick={handleBulkDeletePersonas}
+                        disabled={selectedIds.size === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Excluir ({selectedIds.size})
+                      </button>
+                    </div>
+                    )
+                  })()}
                   {personas.filter(p => {
                     // Filtrar pelo dropdown B2B/B2C
                     if (filterBusinessType && p.business_type !== filterBusinessType) return false
@@ -3855,25 +3950,43 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     return (
                     <div
                       key={persona.id}
-                      className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-green-300 hover:shadow-sm transition-all"
+                      className={`bg-white border rounded-xl overflow-hidden transition-all ${
+                        multiSelectMode && selectedIds.has(persona.id!)
+                          ? 'border-red-300 bg-red-50/30'
+                          : 'border-gray-200 hover:border-green-300 hover:shadow-sm'
+                      }`}
                     >
                       {/* Header clicável */}
                       <div
                         className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => {
-                          const newExpanded = new Set(expandedPersonas)
-                          if (isExpanded) {
-                            newExpanded.delete(persona.id!)
+                          if (multiSelectMode) {
+                            toggleSelectItem(persona.id!)
                           } else {
-                            newExpanded.add(persona.id!)
+                            const newExpanded = new Set(expandedPersonas)
+                            if (isExpanded) {
+                              newExpanded.delete(persona.id!)
+                            } else {
+                              newExpanded.add(persona.id!)
+                            }
+                            setExpandedPersonas(newExpanded)
                           }
-                          setExpandedPersonas(newExpanded)
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1">
+                          {multiSelectMode ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(persona.id!)}
+                              onChange={() => toggleSelectItem(persona.id!)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer flex-shrink-0"
+                            />
+                          ) : (
                           <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
                             <UserCircle2 className="w-5 h-5 text-green-600" />
                           </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-semibold text-gray-900 truncate">
                               {persona.business_type === 'B2B'
@@ -4006,6 +4119,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           </div>
 
                           {/* Botões de ação */}
+                          {!multiSelectMode && (
                           <div className="flex gap-2 flex-shrink-0 items-center mt-3 pt-3 border-t border-gray-200">
                             <button
                               onClick={(e) => {
@@ -4035,6 +4149,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -4346,11 +4461,24 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
                     <h3 className="text-sm font-semibold text-gray-900">Principais Objeções</h3>
-                    {/* Contador de Objeções */}
                     <div className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                       {objections.length}
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                  {objections.length > 0 && (
+                    <button
+                      onClick={() => multiSelectMode ? exitMultiSelect() : setMultiSelectMode(true)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        multiSelectMode
+                          ? 'bg-red-50 text-red-600 border border-red-200'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {multiSelectMode ? 'Cancelar' : 'Selecionar'}
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowAIGenerateModal('objections')}
                     className="group relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-[length:200%_100%] animate-gradient-x rounded-lg text-sm font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
@@ -4359,23 +4487,105 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                     Gerar com IA
                     <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity pointer-events-none" />
                   </button>
+                  </div>
                 </div>
                 <p className="text-gray-500 mt-2 text-xs">
                   Registre objeções comuns e adicione múltiplas formas de quebrá-las para cada uma.
                 </p>
               </div>
 
+              {/* Adicionar nova objeção - no topo */}
+              {showObjectionChat ? (
+                <div className="p-5 border-b border-gray-100">
+                  <ObjectionChat
+                    companyData={companyData}
+                    onObjectionSaved={async () => {
+                      const updated = await getObjections()
+                      setObjections(updated)
+                      setShowObjectionChat(false)
+                      showToast('success', 'Objeção criada', 'Objeção criada com sucesso via IA!')
+                    }}
+                    onCancel={() => setShowObjectionChat(false)}
+                  />
+                </div>
+              ) : (
+                <div className="p-4 border-b border-gray-100 space-y-2">
+                  {/* Indicador de limite */}
+                  {objectionLimitReached && (
+                    <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-2 flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-yellow-400" />
+                      <span className="text-xs text-yellow-300">
+                        Limite atingido ({planUsage?.training?.objections?.used || 0}/{planUsage?.training?.objections?.limit || 10})
+                      </span>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setShowObjectionChat(true)}
+                    disabled={objectionLimitReached}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      objectionLimitReached
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Nova Objeção com IA
+                  </button>
+                </div>
+              )}
+
               {/* Lista de objeções */}
               {objections.length > 0 && (
                 <div className="p-5 space-y-3">
+                  {/* Multi-select action bar */}
+                  {multiSelectMode && activeTab === 'objections' && (
+                    <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.size === objections.length && objections.length > 0}
+                            onChange={() => {
+                              if (selectedIds.size === objections.length) setSelectedIds(new Set())
+                              else setSelectedIds(new Set(objections.map(o => o.id)))
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                          />
+                          Selecionar tudo
+                        </label>
+                        <span className="text-xs text-gray-500">{selectedIds.size} selecionada{selectedIds.size !== 1 ? 's' : ''}</span>
+                      </div>
+                      <button
+                        onClick={handleBulkDeleteObjections}
+                        disabled={selectedIds.size === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Excluir ({selectedIds.size})
+                      </button>
+                    </div>
+                  )}
                   {objections.map((objection) => (
                     <div
                       key={objection.id}
-                      className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-green-300 transition-all"
+                      className={`bg-white border rounded-xl overflow-hidden transition-all ${
+                        multiSelectMode && selectedIds.has(objection.id)
+                          ? 'border-red-300 bg-red-50/30'
+                          : 'border-gray-200 hover:border-green-300'
+                      }`}
                     >
                       {/* Header da objeção */}
                       <div className="flex items-center justify-between px-4 py-3">
                         <div className="flex items-center gap-2 flex-1">
+                          {multiSelectMode ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(objection.id)}
+                              onChange={() => toggleSelectItem(objection.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                            />
+                          ) : (
                           <button
                             onClick={() => toggleObjectionExpanded(objection.id)}
                             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -4389,6 +4599,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                           </button>
+                          )}
                           <div className="flex-1 flex items-center gap-2">
                             {editingObjectionName === objection.id ? (
                               <>
@@ -4443,12 +4654,14 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {!multiSelectMode && (
                           <button
                             onClick={() => handleRemoveObjection(objection.id)}
                             className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                          )}
                         </div>
                       </div>
 
@@ -4567,54 +4780,6 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 </div>
               )}
 
-              {/* Adicionar nova objeção */}
-              <div className="p-4 border-t border-gray-100 space-y-2">
-                {/* Indicador de limite */}
-                {objectionLimitReached && (
-                  <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-2 flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-yellow-400" />
-                    <span className="text-xs text-yellow-300">
-                      Limite atingido ({planUsage?.training?.objections?.used || 0}/{planUsage?.training?.objections?.limit || 10})
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newObjection}
-                    onChange={(e) => setNewObjection(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !objectionLimitReached && handleAddObjection()}
-                    disabled={objectionLimitReached}
-                    className={`flex-1 px-3 py-2 bg-white border rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none ${
-                      objectionLimitReached
-                        ? 'border-gray-200 opacity-50 cursor-not-allowed'
-                        : 'border-gray-200 focus:border-green-500/50'
-                    }`}
-                    placeholder={
-                      objectionLimitReached
-                        ? "Limite atingido"
-                        : "Nova objeção..."
-                    }
-                  />
-                  <button
-                    onClick={handleAddObjection}
-                    disabled={objectionLimitReached}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      objectionLimitReached
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-green-100 text-green-700 hover:bg-green-200'
-                    }`}
-                    title={objectionLimitReached ? `Limite atingido` : ''}
-                  >
-                    {objectionLimitReached ? (
-                      <Lock className="w-4 h-4" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         )}
