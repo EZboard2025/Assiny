@@ -5,6 +5,7 @@ import { Loader2, CalendarDays, Clock, ChevronDown, Video, X, TrendingUp, Trendi
 import CalendarWeekView from '../CalendarWeekView'
 import MiniCalendar from '../MiniCalendar'
 import MeetHistoryContent from '../MeetHistoryContent'
+import SellerWhatsAppViewer from './SellerWhatsAppViewer'
 import type { SellerPerformance } from './SellerGrid'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -105,6 +106,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   const [meetingsOpen, setMeetingsOpen] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [allMeetingsOpen, setAllMeetingsOpen] = useState(false)
+  const [whatsappViewerOpen, setWhatsappViewerOpen] = useState(false)
 
   // Calendar navigation
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()))
@@ -298,9 +300,14 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           </div>
 
           {/* WhatsApp */}
-          <div className={`bg-white rounded-xl border p-3 flex items-center gap-2.5 ${
-            whatsappConn.connected ? 'border-green-200' : 'border-gray-200'
-          }`}>
+          <div
+            onClick={() => whatsappConn.connected && setWhatsappViewerOpen(true)}
+            className={`bg-white rounded-xl border p-3 flex items-center gap-2.5 transition-colors ${
+              whatsappConn.connected
+                ? 'border-green-200 cursor-pointer hover:bg-green-50/50'
+                : 'border-gray-200'
+            }`}
+          >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
               whatsappConn.connected ? 'bg-white ring-2 ring-green-200' : 'bg-gray-100'
             }`}>
@@ -399,9 +406,15 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
       </div>
 
-      {/* ── Right Column: Calendar / Meet History / All Meetings ────── */}
+      {/* ── Right Column: Calendar / Meet History / All Meetings / WhatsApp ── */}
       <div className="lg:col-span-8">
-        {historyOpen ? (
+        {whatsappViewerOpen ? (
+          <SellerWhatsAppViewer
+            sellerId={seller.user_id}
+            sellerName={seller.user_name}
+            onClose={() => setWhatsappViewerOpen(false)}
+          />
+        ) : historyOpen ? (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* History Header */}
             <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
