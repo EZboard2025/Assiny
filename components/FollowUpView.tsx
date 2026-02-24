@@ -902,19 +902,6 @@ export default function FollowUpView() {
       const data = await response.json()
 
       if (!response.ok) {
-        // Auth mismatch: user is logged in with wrong account for this subdomain
-        if (data.error === 'auth_mismatch') {
-          setError(`Conta incorreta: você está logado como ${data.loggedEmail || 'outra conta'}. Saindo para você entrar com a conta certa...`)
-          setConnectionStatus('disconnected')
-          setIsInitializing(false)
-          // Auto-logout after showing the message
-          setTimeout(async () => {
-            const { supabase } = await import('@/lib/supabase')
-            await supabase.auth.signOut()
-            window.location.reload()
-          }, 3000)
-          return
-        }
         throw new Error(data.error || 'Erro ao iniciar conexao')
       }
 

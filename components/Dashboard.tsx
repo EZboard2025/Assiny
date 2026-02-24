@@ -96,6 +96,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [activeChallenge, setActiveChallenge] = useState<any | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
@@ -438,6 +439,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       if (user) {
         setUserId(user.id)
+        setUserEmail(user.email || null)
 
         // Check user's role and name from employees table
         const { data: employee } = await supabase
@@ -589,9 +591,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <div className="flex-1 flex items-center">
               <div className="flex-1">
                 <div className="flex items-center gap-4">
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                    Olá, {userName || 'Vendedor'}
-                  </h1>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                      Olá, {userName || 'Vendedor'}
+                    </h1>
+                    {userEmail && (
+                      <p className="text-xs text-gray-400 mt-0.5">{userEmail}</p>
+                    )}
+                  </div>
                   <StreakIndicator streak={streak} loading={streakLoading} />
                 </div>
               </div>

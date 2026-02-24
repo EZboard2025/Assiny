@@ -22,23 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get company from subdomain (source of truth for which company we're on)
-    const host = request.headers.get('host') || ''
-    const hostParts = host.split('.')
-    let subdomainCompanyId: string | null = null
-    if (hostParts.length >= 3 || (hostParts.length >= 2 && hostParts[0] !== 'localhost' && hostParts[0] !== 'www')) {
-      const subdomain = hostParts[0]
-      if (subdomain && subdomain !== 'localhost' && subdomain !== 'www') {
-        const { data: company } = await supabaseAdmin
-          .from('companies')
-          .select('id')
-          .eq('subdomain', subdomain)
-          .single()
-        subdomainCompanyId = company?.id || null
-      }
-    }
-
-    // Get user's company_id from employee record
+    // Get user's company_id
     const { data: employee } = await supabaseAdmin
       .from('employees')
       .select('company_id')
@@ -46,16 +30,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     const companyId = employee?.company_id || null
-
-    // Detect auth/company mismatch: user is logged in with an account from a different company
-    if (subdomainCompanyId && companyId && subdomainCompanyId !== companyId) {
-      console.log(`[CONNECT] AUTH MISMATCH: User ${user.email} (company ${companyId}) on subdomain company ${subdomainCompanyId}`)
-      return NextResponse.json({
-        error: 'auth_mismatch',
-        message: `Você está logado como ${user.email}, mas essa conta pertence a outra empresa. Faça logout e entre com a conta correta para este subdomínio.`,
-        loggedEmail: user.email
-      }, { status: 403 })
-    }
 
     console.log(`[CONNECT] Initializing WhatsApp client for user ${user.id} (email: ${user.email}, company: ${companyId})`)
     const result = await initializeClient(user.id, companyId)
