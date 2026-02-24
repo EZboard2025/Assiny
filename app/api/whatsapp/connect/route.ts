@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const companyId = employee?.company_id || null
 
-    console.log(`[CONNECT] Initializing WhatsApp client for user ${user.id}`)
+    console.log(`[CONNECT] Initializing WhatsApp client for user ${user.id} (email: ${user.email})`)
     const result = await initializeClient(user.id, companyId)
 
     return NextResponse.json({
