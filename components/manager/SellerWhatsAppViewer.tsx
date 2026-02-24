@@ -115,6 +115,8 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
 
   useEffect(() => {
     loadConversations()
+    const interval = setInterval(() => loadConversations(false), 30000)
+    return () => clearInterval(interval)
   }, [sellerId])
 
   useEffect(() => {
@@ -123,9 +125,9 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
     }
   }, [messages])
 
-  const loadConversations = async () => {
+  const loadConversations = async (showSpinner = true) => {
     try {
-      setLoadingConvs(true)
+      if (showSpinner) setLoadingConvs(true)
       const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
       const companyId = await getCompanyId()
       const res = await fetch(`/api/admin/seller-whatsapp-conversations?sellerId=${sellerId}`, {
@@ -136,7 +138,7 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
     } catch (err) {
       console.error('Erro ao carregar conversas:', err)
     } finally {
-      setLoadingConvs(false)
+      if (showSpinner) setLoadingConvs(false)
     }
   }
 
@@ -436,8 +438,8 @@ function MessageBubble({ msg, getMediaSrc, onImageClick }: {
           </div>
         )}
 
-        {/* Text content (skip for document/sticker since they already show content) */}
-        {msg.content && !isDocument && !isSticker && (
+        {/* Text content (skip for media types that already render their own display) */}
+        {msg.content && !isDocument && !isSticker && !isAudio && !isVideo && !isImage && (
           <p className="text-[12px] text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
             {msg.content}
           </p>

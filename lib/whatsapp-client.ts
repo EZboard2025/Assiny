@@ -1404,8 +1404,9 @@ async function fetchMissingProfilePics(state: ClientState, connectionId: string)
         unavailable++
       }
 
-      // Small delay every 3 contacts to avoid WhatsApp rate limiting
-      if (i % 3 === 2) await new Promise(r => setTimeout(r, 200))
+      // Delay per contact with random jitter to avoid WhatsApp rate limiting
+      // Community reports 200ms/3 is too aggressive — causes undefined responses
+      await new Promise(r => setTimeout(r, 500 + Math.random() * 500))
     }
     console.log(`[WA] Profile pics done: ${fetched} fetched, ${unavailable} unavailable, ${convs.length} total`)
   } catch (err) {
@@ -1423,13 +1424,30 @@ async function refreshProfilePics(state: ClientState, connectionId: string): Pro
       .select('contact_phone')
       .eq('connection_id', connectionId)
       .eq('profile_pic_url', '')
-      .limit(20)
+      .limit(50)
 
-    if (!convs || convs.length === 0) return
-    console.log(`[WA] Refreshing profile pics for ${convs.length} previously-unavailable contacts...`)
+    // Also refresh stale CDN URLs (URLs expire after some time)
+    const { data: staleConvs } = await supabaseAdmin
+      .from('whatsapp_conversations')
+      .select('contact_phone, profile_pic_url')
+      .eq('connection_id', connectionId)
+      .neq('profile_pic_url', '')
+      .not('profile_pic_url', 'is', null)
+      .order('updated_at', { ascending: true })
+      .limit(10)
+
+    const unavailableCount = convs?.length || 0
+    const staleCount = staleConvs?.length || 0
+    if (unavailableCount === 0 && staleCount === 0) return
+    console.log(`[WA] Refreshing profile pics: ${unavailableCount} unavailable + ${staleCount} stale CDN URLs...`)
 
     let updated = 0
-    for (const conv of convs) {
+    const allConvs = [
+      ...(convs || []).map(c => ({ contact_phone: c.contact_phone, type: 'unavailable' as const })),
+      ...(staleConvs || []).map(c => ({ contact_phone: c.contact_phone, type: 'stale' as const }))
+    ]
+
+    for (const conv of allConvs) {
       if (state.destroyed) break
       try {
         let picUrl: string | undefined
@@ -1453,7 +1471,7 @@ async function refreshProfilePics(state: ClientState, connectionId: string): Pro
           updated++
         }
       } catch {}
-      await new Promise(r => setTimeout(r, 200))
+      await new Promise(r => setTimeout(r, 500 + Math.random() * 500))
     }
     if (updated > 0) console.log(`[WA] Refreshed ${updated} profile pics`)
   } catch (err) {
