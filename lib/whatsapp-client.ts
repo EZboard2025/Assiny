@@ -110,6 +110,16 @@ export function getClientState(userId: string): ClientState | null {
   return clients.get(userId) || null
 }
 
+export function getAllConnectedClients(): { userId: string; phone: string | null }[] {
+  const result: { userId: string; phone: string | null }[] = []
+  for (const [userId, state] of clients.entries()) {
+    if (state.status === 'connected') {
+      result.push({ userId, phone: state.phoneNumber })
+    }
+  }
+  return result
+}
+
 // Clean up orphaned Puppeteer lock files for a session directory
 // This prevents "browser is already running" errors after server restarts/HMR
 // NOTE: Only removes lock FILES. Does NOT kill Chrome processes (could kill active session).
