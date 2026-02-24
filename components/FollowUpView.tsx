@@ -818,9 +818,16 @@ export default function FollowUpView() {
       if (data.connected) {
         setConnectionStatus('connected')
         setPhoneNumber(data.phone_number || null)
+        const serverSyncStatus = data.syncStatus || 'synced'
+        setSyncStatus(serverSyncStatus)
         loadConversations(true)
-        // One retry in case sync is still in progress (silent — no spinner)
-        setTimeout(() => loadConversations(), 10000)
+        // If sync is still in progress, poll for updates
+        if (serverSyncStatus === 'pending' || serverSyncStatus === 'syncing') {
+          startPolling()
+        } else {
+          // One retry in case conversations are still being saved
+          setTimeout(() => loadConversations(), 10000)
+        }
       } else {
         setConnectionStatus('disconnected')
       }
@@ -848,16 +855,26 @@ export default function FollowUpView() {
         const data = await response.json()
 
         if (data.status === 'connected') {
-          stopPolling()
           setConnectionStatus('connected')
           setPhoneNumber(data.phoneNumber || null)
           setQrCode(null)
           setIsInitializing(false)
-          setSyncStatus(data.syncStatus || 'pending')
-          // Load conversations: initial + 2 retries while sync completes
-          loadConversations(true)
-          setTimeout(() => loadConversations(), 8000)
-          setTimeout(() => loadConversations(), 25000)
+          const serverSyncStatus = data.syncStatus || 'pending'
+          setSyncStatus(serverSyncStatus)
+
+          if (serverSyncStatus === 'synced') {
+            // Sync is done — stop polling and load conversations
+            stopPolling()
+            loadConversations(true)
+          } else if (serverSyncStatus === 'syncing' || serverSyncStatus === 'pending') {
+            // Sync still in progress or about to start — keep polling to track status
+            // Also load conversations in case some were already saved
+            loadConversations(true)
+          } else {
+            // Error or unknown — stop polling
+            stopPolling()
+            loadConversations(true)
+          }
         } else if (data.status === 'qr_ready' && data.qrcode) {
           setQrCode(data.qrcode)
           setConnectionStatus('qr_ready')
@@ -2306,9 +2323,9 @@ export default function FollowUpView() {
         <>
           {/* Header */}
           <div className="h-[60px] bg-[#202c33] px-5 flex items-center justify-between">
-            <div className="min-w-0">
+            <div className="min-w-0 overflow-hidden">
               <span className="text-[#e9edef] text-[22px] font-bold">WhatsApp</span>
-              {authEmail && <span className="text-[#8696a0] text-[11px] ml-2">{authEmail}</span>}
+              {authEmail && <span className="text-[#8696a0] text-[11px] ml-2 truncate">{authEmail}</span>}
             </div>
             <div className="flex items-center gap-1">
               <div className="relative group/tip">
@@ -2426,21 +2443,21 @@ export default function FollowUpView() {
                 <MessageSquare className="w-12 h-12 text-[#364147] mx-auto mb-3" />
                 <p className="text-[#8696a0] text-sm">
                   {conversations.length === 0
-                    ? (syncStatus === 'syncing' || isSyncing
+                    ? (syncStatus === 'syncing' || syncStatus === 'pending' || isSyncing
                         ? 'Sincronizando conversas...'
                         : syncStatus === 'error'
                         ? 'Erro ao sincronizar conversas'
-                        : 'Aguardando sincronizacao...')
+                        : 'Nenhuma conversa encontrada')
                     : 'Nenhuma conversa encontrada'}
                 </p>
                 {conversations.length === 0 && (
                   <>
-                    {(syncStatus === 'syncing' || isSyncing) ? (
+                    {(syncStatus === 'syncing' || syncStatus === 'pending' || isSyncing) ? (
                       <div className="flex items-center justify-center gap-2 mt-3">
                         <Loader2 className="w-4 h-4 animate-spin text-[#00a884]" />
                         <p className="text-[#8696a0] text-xs">Isso pode levar alguns segundos...</p>
                       </div>
-                    ) : (
+                    ) : syncStatus === 'error' ? (
                       <button
                         onClick={triggerManualSync}
                         className="mt-3 px-4 py-2 bg-[#00a884] text-white text-sm rounded-lg hover:bg-[#00967d] transition-colors flex items-center gap-2 mx-auto"
@@ -2448,7 +2465,7 @@ export default function FollowUpView() {
                         <RefreshCw className="w-4 h-4" />
                         Sincronizar Conversas
                       </button>
-                    )}
+                    ) : null}
                   </>
                 )}
               </div>

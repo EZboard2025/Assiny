@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           connected: true,
           status: 'active',
-          phone_number: clientState.phoneNumber
+          phone_number: clientState.phoneNumber,
+          syncStatus: clientState.syncStatus
         })
       }
 

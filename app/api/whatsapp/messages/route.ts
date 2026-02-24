@@ -56,40 +56,17 @@ export async function GET(request: NextRequest) {
     const normalizedRequestPhone = normalizePhone(contactPhone)
     const isGroup = contactPhone.includes('@g.us')
 
-    // Get user's active connection to filter messages by connected phone
-    const { data: activeConnection } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .limit(1)
-      .single()
-
-    let activeConnectionId = activeConnection?.id
-    if (!activeConnectionId) {
-      const { data: latestConnection } = await supabaseAdmin
-        .from('whatsapp_connections')
-        .select('id')
-        .eq('user_id', user.id)
-        .order('connected_at', { ascending: false })
-        .limit(1)
-        .single()
-      activeConnectionId = latestConnection?.id
-    }
-
     // For analysis format, use ascending order and higher limit (needs full history)
     const isAnalysis = format === 'analysis'
     const queryLimit = isAnalysis ? Math.min(limit, 500) : limit
 
     // Query messages filtered at DB level for efficiency
+    // Note: messages are filtered by user_id only (not connection_id) so that
+    // messages from previous connections remain visible after reconnecting
     let messages: any[] = []
     let error: any = null
 
     const buildQuery = (baseQuery: any) => {
-      // Filter by active connection to isolate per-phone conversations
-      if (activeConnectionId) {
-        baseQuery = baseQuery.eq('connection_id', activeConnectionId)
-      }
       // Apply cursor for pagination (only for non-analysis format)
       if (before && !isAnalysis) {
         baseQuery = baseQuery.lt('message_timestamp', before)
@@ -147,9 +124,6 @@ export async function GET(request: NextRequest) {
           .eq('user_id', user.id)
           .like('contact_phone', 'lid_%')
 
-        if (activeConnectionId) {
-          lidQuery = lidQuery.eq('connection_id', activeConnectionId)
-        }
         if (before && !isAnalysis) {
           lidQuery = lidQuery.lt('message_timestamp', before)
         }
