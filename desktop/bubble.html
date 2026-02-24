@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://*.ramppy.site; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self';">
   <title>Ramppy Assistant</title>
   <link rel="stylesheet" href="bubble.css">
 </head>
@@ -15,6 +15,15 @@
 
   <!-- Expanded: chat panel -->
   <div id="chat-panel" class="chat-panel" style="display:none;">
+    <!-- Resize handles -->
+    <div class="resize-handle resize-n" data-dir="n"></div>
+    <div class="resize-handle resize-s" data-dir="s"></div>
+    <div class="resize-handle resize-e" data-dir="e"></div>
+    <div class="resize-handle resize-w" data-dir="w"></div>
+    <div class="resize-handle resize-ne" data-dir="ne"></div>
+    <div class="resize-handle resize-nw" data-dir="nw"></div>
+    <div class="resize-handle resize-se" data-dir="se"></div>
+    <div class="resize-handle resize-sw" data-dir="sw"></div>
     <!-- Header (same as site) -->
     <div class="chat-header">
       <div class="chat-header-center">

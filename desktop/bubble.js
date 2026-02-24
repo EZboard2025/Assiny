@@ -204,6 +204,12 @@ async function sendMessage(text) {
 
   showTyping()
 
+  // Auto-capture screenshot for AI vision context
+  let screenshot = null
+  if (window.electronAPI && window.electronAPI.captureScreenshot) {
+    try { screenshot = await window.electronAPI.captureScreenshot() } catch (_) {}
+  }
+
   try {
     const res = await fetch(API_URL, {
       method: 'POST',
@@ -214,6 +220,7 @@ async function sendMessage(text) {
       body: JSON.stringify({
         message: text,
         conversationHistory: conversationHistory.slice(-20),
+        screenshot,
       }),
     })
 
@@ -333,6 +340,42 @@ function escapeHtml(text) {
   div.textContent = text
   return div.innerHTML
 }
+
+// --- Resize Logic (edge/corner drag) ---
+document.querySelectorAll('.resize-handle').forEach(handle => {
+  handle.addEventListener('mousedown', async (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const dir = handle.dataset.dir
+    const startX = e.screenX
+    const startY = e.screenY
+    const pos = await window.electronAPI.getBubblePos()
+    const startBounds = { x: pos.x, y: pos.y, w: window.outerWidth, h: window.outerHeight }
+
+    const onMove = (ev) => {
+      const dx = ev.screenX - startX
+      const dy = ev.screenY - startY
+      let { x, y, w, h } = startBounds
+
+      if (dir.includes('e')) w += dx
+      if (dir.includes('w')) { w -= dx; x += dx }
+      if (dir.includes('s')) h += dy
+      if (dir.includes('n')) { h -= dy; y += dy }
+
+      window.electronAPI.setBubbleBounds(x, y, w, h)
+    }
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  })
+})
 
 // --- Init ---
 // Auth token will be received via IPC from main window

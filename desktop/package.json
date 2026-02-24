@@ -4,6 +4,7 @@
   "description": "Ramppy — Plataforma de treinamento de vendas com IA",
   "main": "main.js",
   "scripts": {
+    "postinstall": "node patch-electron-cli.js",
     "start": "electron .",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac"
@@ -38,7 +39,7 @@
     }
   },
   "devDependencies": {
-    "electron": "^33.0.0",
+    "electron": "^30.5.1",
     "electron-builder": "^25.0.0"
   }
 }

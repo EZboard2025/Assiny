@@ -1867,9 +1867,30 @@ export async function POST(req: NextRequest) {
     const isManager = userRole === 'admin' || userRole === 'gestor'
 
     // Parse body
-    const { message, conversationHistory = [], viewingContext } = await req.json()
+    const { message, conversationHistory = [], viewingContext, screenshot } = await req.json()
     if (!message) {
       return NextResponse.json({ error: 'Mensagem é obrigatória' }, { status: 400 })
+    }
+
+    // Analyze screenshot with vision model if provided (desktop app auto-capture)
+    let screenContext = ''
+    if (screenshot && typeof screenshot === 'string' && screenshot.startsWith('data:image')) {
+      try {
+        const visionResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_tokens: 500,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Descreva brevemente o que está na tela do usuário. Foque em: qual app/site está aberto, que dados/conteúdo está visível, e o que o usuário parece estar fazendo. Seja conciso (2-3 frases).' },
+              { type: 'image_url', image_url: { url: screenshot } }
+            ]
+          }]
+        })
+        screenContext = visionResponse.choices[0]?.message?.content || ''
+      } catch (err) {
+        console.error('Vision analysis error:', err)
+      }
     }
 
     // Build messages
@@ -1891,6 +1912,11 @@ export async function POST(req: NextRequest) {
       systemMessage += `Tendência: ${vc.trend === 'improving' ? 'Melhorando' : vc.trend === 'declining' ? 'Piorando' : 'Estável'}\n`
       systemMessage += `SPIN Selling:\n- Situação (S): ${vc.spinS > 0 ? vc.spinS.toFixed(1) + ' — ' + spinLabel(vc.spinS) : 'Sem dados'}\n- Problema (P): ${vc.spinP > 0 ? vc.spinP.toFixed(1) + ' — ' + spinLabel(vc.spinP) : 'Sem dados'}\n- Implicação (I): ${vc.spinI > 0 ? vc.spinI.toFixed(1) + ' — ' + spinLabel(vc.spinI) : 'Sem dados'}\n- Necessidade (N): ${vc.spinN > 0 ? vc.spinN.toFixed(1) + ' — ' + spinLabel(vc.spinN) : 'Sem dados'}\n`
       systemMessage += `Use esses dados para contextualizar suas respostas. Quando o gestor perguntar sobre "este vendedor" ou "ele/ela", refira-se a ${vc.sellerName}.`
+    }
+
+    // Inject screen vision context from desktop app
+    if (screenContext) {
+      systemMessage += `\n\n--- TELA DO USUÁRIO (captura automática do app desktop) ---\nO vendedor está vendo na tela: ${screenContext}\nUse isso para contextualizar suas respostas quando relevante. Se o vendedor perguntar sobre o que está na tela, use essa descrição.`
     }
 
     const activeTools = isManager ? [...toolDefinitions, ...teamToolDefinitions] : toolDefinitions

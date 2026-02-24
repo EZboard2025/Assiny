@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen } = require('electron/main')
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu } = require('electron')
 const path = require('path')
 
 const PLATFORM_URL = 'https://assiny.ramppy.site'
@@ -7,6 +7,21 @@ const ALLOWED_DOMAIN = 'ramppy.site'
 let mainWindow = null
 let bubbleWindow = null
 let authTokenInterval = null
+let tray = null
+
+// Single instance lock — prevent duplicate app processes
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    // Focus existing main window when user tries to open a second instance
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+}
 
 // ============================================================
 // MAIN WINDOW (full platform)
@@ -49,7 +64,24 @@ function createMainWindow() {
     }
   })
 
-  mainWindow.on('closed', () => { mainWindow = null })
+  // "X" hides to tray instead of quitting
+  mainWindow.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault()
+      mainWindow.hide()
+    }
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+      bubbleWindow.close()
+    }
+    if (authTokenInterval) {
+      clearInterval(authTokenInterval)
+      authTokenInterval = null
+    }
+  })
 }
 
 // ============================================================
@@ -148,20 +180,50 @@ ipcMain.handle('resize-bubble', async (_event, width, height) => {
   if (!bubbleWindow) return
 
   const bounds = bubbleWindow.getBounds()
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
 
   // Expand: anchor to bottom-right of current bubble position
-  const x = bounds.x + bounds.width - width
-  const y = bounds.y + bounds.height - height
+  let x = bounds.x + bounds.width - width
+  let y = bounds.y + bounds.height - height
+
+  // Clamp to screen bounds so the panel is always fully visible
+  if (x < 0) x = 0
+  if (y < 0) y = 0
+  if (x + width > screenW) x = screenW - width
+  if (y + height > screenH) y = screenH - height
 
   bubbleWindow.setBounds({ x, y, width, height }, true)
   bubbleWindow.setResizable(width > 100)
 })
 
-// Move bubble to absolute screen position
+// Move bubble to absolute screen position (clamped to screen)
 ipcMain.on('move-bubble', (_event, x, y) => {
   if (!bubbleWindow) return
   const bounds = bubbleWindow.getBounds()
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
+
+  // Clamp so window stays fully visible
+  if (x < 0) x = 0
+  if (y < 0) y = 0
+  if (x + bounds.width > screenW) x = screenW - bounds.width
+  if (y + bounds.height > screenH) y = screenH - bounds.height
+
   bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
+})
+
+// Set bubble bounds (position + size) for edge/corner resizing
+ipcMain.on('set-bubble-bounds', (_event, x, y, width, height) => {
+  if (!bubbleWindow) return
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
+  // Enforce min size
+  if (width < 320) width = 320
+  if (height < 400) height = 400
+  // Clamp to screen
+  if (x < 0) x = 0
+  if (y < 0) y = 0
+  if (x + width > screenW) width = screenW - x
+  if (y + height > screenH) height = screenH - y
+  bubbleWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) })
 })
 
 // Get current bubble position
@@ -169,6 +231,21 @@ ipcMain.handle('get-bubble-pos', async () => {
   if (!bubbleWindow) return { x: 0, y: 0 }
   const bounds = bubbleWindow.getBounds()
   return { x: bounds.x, y: bounds.y }
+})
+
+// Capture screenshot of primary display for AI vision
+ipcMain.handle('capture-screenshot', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: 1280, height: 720 },
+    })
+    if (!sources.length) return null
+    return sources[0].thumbnail.toDataURL()
+  } catch (err) {
+    console.error('capture-screenshot error:', err)
+    return null
+  }
 })
 
 // Handle desktopCapturer for Meet feature
@@ -184,6 +261,46 @@ ipcMain.handle('get-sources', async () => {
     return []
   }
 })
+
+// ============================================================
+// SYSTEM TRAY
+// ============================================================
+function createTray() {
+  tray = new Tray(path.join(__dirname, 'assets', 'icon.png'))
+  tray.setToolTip('Ramppy')
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Abrir Ramppy',
+      click: () => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore()
+          mainWindow.show()
+          mainWindow.focus()
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Sair',
+      click: () => {
+        app.isQuitting = true
+        app.quit()
+      },
+    },
+  ])
+
+  tray.setContextMenu(contextMenu)
+
+  // Double-click on tray icon opens the main window
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+}
 
 // ============================================================
 // APP LIFECYCLE
@@ -208,6 +325,7 @@ app.whenReady().then(() => {
 
   createMainWindow()
   createBubbleWindow()
+  createTray()
   startAuthBridge()
 
   app.on('activate', () => {
@@ -217,6 +335,10 @@ app.whenReady().then(() => {
       startAuthBridge()
     }
   })
+})
+
+app.on('before-quit', () => {
+  app.isQuitting = true
 })
 
 app.on('window-all-closed', () => {
