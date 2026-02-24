@@ -956,7 +956,6 @@ export default function FollowUpView() {
       const data = await response.json()
       if (data.success) {
         setSyncStatus('synced')
-        loadConversations()
       } else {
         setSyncStatus('error')
       }
@@ -964,6 +963,9 @@ export default function FollowUpView() {
       setSyncStatus('error')
     } finally {
       setIsSyncing(false)
+      // Always load conversations from DB — real-time messages create conversations
+      // even when sync (getChats) fails
+      loadConversations()
     }
   }
 
