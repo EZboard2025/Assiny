@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { getClientState, getAllConnectedClients } from '@/lib/whatsapp-client'
+import { getAllConnectedClients } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,35 +31,19 @@ export async function GET(request: Request) {
       .select('user_id, status')
       .in('user_id', userIds)
 
-    // WhatsApp: from DB
-    const { data: whatsappData } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('user_id, status, display_phone_number')
-      .in('user_id', userIds)
-
-    // WhatsApp: ALL in-memory connected clients (real-time truth)
+    // WhatsApp: ONLY in-memory check (real-time truth)
+    // If the seller has an active WhatsApp client right now → connected
     const allConnected = getAllConnectedClients()
-    const connectedSet = new Set(allConnected.map(c => c.userId))
-    const connectedPhones: Record<string, string | null> = {}
-    for (const c of allConnected) {
-      connectedPhones[c.userId] = c.phone
-    }
+    const connectedMap = new Map(allConnected.map(c => [c.userId, c.phone]))
 
     // Build map
     const connections: Record<string, { google: boolean; whatsapp: boolean; whatsappPhone: string | null }> = {}
 
     for (const uid of userIds) {
-      // WhatsApp: in-memory first, DB fallback
-      const inMemory = connectedSet.has(uid)
-      const dbRecord = whatsappData?.find(w => w.user_id === uid && w.status === 'active')
-
-      const waConnected = inMemory || !!dbRecord
-      const waPhone = connectedPhones[uid] || dbRecord?.display_phone_number || null
-
       connections[uid] = {
         google: false,
-        whatsapp: waConnected,
-        whatsappPhone: waPhone
+        whatsapp: connectedMap.has(uid),
+        whatsappPhone: connectedMap.get(uid) || null
       }
     }
 
@@ -68,10 +52,6 @@ export async function GET(request: Request) {
         connections[gc.user_id] = { ...connections[gc.user_id], google: true }
       }
     }
-
-    // Debug: log connected clients for troubleshooting
-    const waConnectedUsers = Object.entries(connections).filter(([, v]) => v.whatsapp).map(([uid]) => uid)
-    console.log(`[Seller Connections] Company ${companyId}: ${waConnectedUsers.length} WA connected, in-memory clients: [${allConnected.map(c => c.userId.substring(0, 8)).join(', ')}]`)
 
     return NextResponse.json({ data: connections })
   } catch (error: any) {
