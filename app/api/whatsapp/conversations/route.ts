@@ -83,19 +83,29 @@ export async function GET(request: NextRequest) {
 
     // Deduplicate by normalized phone AND by contact_name
     // This handles cases where same contact has multiple entries with different phone formats
+    // Process non-LID entries first so they set the name mapping (LID should merge INTO regular, not the other way)
+    const isLidPhone = (phone: string) => phone.startsWith('lid_')
+    const sortedConversations = [...(rawConversations || [])].sort((a, b) => {
+      const aLid = isLidPhone(a.contact_phone) ? 1 : 0
+      const bLid = isLidPhone(b.contact_phone) ? 1 : 0
+      return aLid - bLid // non-LID first
+    })
+
     const deduplicatedMap = new Map<string, any>()
     const nameToPhoneMap = new Map<string, string>() // Track name -> normalized phone mapping
 
-    for (const conv of rawConversations || []) {
+    for (const conv of sortedConversations) {
       const phone = conv.contact_phone
       const normalizedPhone = normalizePhone(phone)
       const contactName = conv.contact_name?.toLowerCase().trim() || ''
+      const isLid = isLidPhone(phone)
 
       // Check if we've seen this name before with a different phone (skip groups — multiple groups can share names)
       let dedupeKey = normalizedPhone
       if (!isGroupPhone(phone) && contactName && nameToPhoneMap.has(contactName)) {
         dedupeKey = nameToPhoneMap.get(contactName)!
-      } else if (!isGroupPhone(phone) && contactName) {
+      } else if (!isGroupPhone(phone) && !isLid && contactName) {
+        // Only let non-LID entries define the name mapping (LID should merge into regular, not vice versa)
         nameToPhoneMap.set(contactName, normalizedPhone)
       }
 

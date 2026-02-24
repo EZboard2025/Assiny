@@ -2705,11 +2705,13 @@ export default function FollowUpView() {
             )}
 
             {isLoadingMessages ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center justify-center h-full gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-[#00a884]" />
+                <p className="text-[#8696a0] text-sm">Carregando mensagens...</p>
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center justify-center h-full gap-2">
+                <MessageSquare className="w-10 h-10 text-[#364147]" />
                 <p className="text-[#8696a0] text-sm">Nenhuma mensagem encontrada</p>
               </div>
             ) : (

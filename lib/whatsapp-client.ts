@@ -1172,7 +1172,7 @@ async function syncChatHistory(state: ClientState): Promise<void> {
         const lightChats: Array<{
           id: string; name: string | null; isGroup: boolean;
           lastMsgBody: string | null; lastMsgTimestamp: number | null; lastMsgFromMe: boolean;
-          unreadCount: number
+          unreadCount: number; phone: string | null
         }> = await Promise.race([
           page.evaluate(() => {
             try {
@@ -1181,17 +1181,23 @@ async function syncChatHistory(state: ClientState): Promise<void> {
                 .filter((c: any) => !c.id?._serialized?.includes('status@broadcast'))
                 .sort((a: any, b: any) => (b.t || 0) - (a.t || 0))
                 .slice(0, 50)
-                .map((c: any) => ({
-                  id: c.id?._serialized || '',
-                  name: c.name || c.formattedTitle || c.contact?.pushname || c.contact?.name || null,
-                  isGroup: c.isGroup || false,
-                  lastMsgBody: c.lastReceivedKey?.fromMe !== undefined
-                    ? (c.msgs?.getModelsArray?.()?.slice(-1)?.[0]?.body || null)
-                    : null,
-                  lastMsgTimestamp: c.t ? c.t * 1000 : null,
-                  lastMsgFromMe: c.lastReceivedKey?.fromMe || false,
-                  unreadCount: c.unreadCount || 0
-                }))
+                .map((c: any) => {
+                  // Get the actual last message timestamp (more accurate than c.t which can be sync time)
+                  const lastMsg = c.msgs?.getModelsArray?.()?.slice(-1)?.[0]
+                  const lastMsgTs = lastMsg?.t ? lastMsg.t * 1000 : (c.t ? c.t * 1000 : null)
+
+                  return {
+                    id: c.id?._serialized || '',
+                    name: c.name || c.formattedTitle || c.contact?.pushname || c.contact?.name || null,
+                    isGroup: c.isGroup || false,
+                    lastMsgBody: lastMsg?.body || null,
+                    lastMsgTimestamp: lastMsgTs,
+                    lastMsgFromMe: lastMsg?.id?.fromMe || false,
+                    unreadCount: c.unreadCount || 0,
+                    // Resolve real phone number for LID contacts
+                    phone: c.contact?.number || c.contact?.userid || null
+                  }
+                })
             } catch { return [] }
           }),
           new Promise<never>((_, reject) =>
@@ -1213,7 +1219,10 @@ async function syncChatHistory(state: ClientState): Promise<void> {
               if (isGroup) {
                 contactPhone = chat.id
               } else if (isLid) {
-                contactPhone = `lid_${chat.id.replace('@lid', '')}`
+                // Try to use real phone number instead of LID to avoid duplicate conversations
+                const realPhone = chat.phone ? String(chat.phone).replace(/[^0-9]/g, '') : ''
+                const isValidPhone = realPhone && realPhone.length >= 8 && realPhone.length <= 15
+                contactPhone = isValidPhone ? realPhone : `lid_${chat.id.replace('@lid', '')}`
               } else {
                 contactPhone = chat.id.replace('@c.us', '')
               }

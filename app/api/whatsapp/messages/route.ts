@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
         error = suffixResult.error
       }
 
-      // Step 3: If still no results, check lid_ contacts by resolving phone
+      // Step 3: If still no results, check lid_ contacts by normalizing phone digits
       if (messages.length === 0 && !error) {
         let lidQuery = supabaseAdmin
           .from('whatsapp_messages')
@@ -162,6 +162,44 @@ export async function GET(request: NextRequest) {
             const normalizedMsgPhone = normalizePhone(msg.contact_phone || '')
             return normalizedMsgPhone === normalizedRequestPhone
           }).slice(0, queryLimit)
+        }
+      }
+
+      // Step 4: If still no results, find LID variant via conversation name matching
+      // LID numbers have no relationship to regular phone numbers, so normalization can't match them.
+      // Instead, find the conversation for the requested phone, get its contact_name,
+      // then find a LID conversation with the same name and query messages by that LID phone.
+      if (messages.length === 0 && !error) {
+        // Get all conversations for this user (LID + regular) in one query
+        const { data: allConvs } = await supabaseAdmin
+          .from('whatsapp_conversations')
+          .select('contact_phone, contact_name')
+          .eq('user_id', user.id)
+
+        if (allConvs) {
+          // Find the conversation matching the requested phone
+          const requestedConv = allConvs.find(c => c.contact_phone === contactPhone)
+          const requestedName = requestedConv?.contact_name?.toLowerCase().trim()
+
+          if (requestedName) {
+            // Find LID conversations with the same contact name
+            const matchingLid = allConvs.find(c =>
+              c.contact_phone.startsWith('lid_') &&
+              c.contact_name?.toLowerCase().trim() === requestedName
+            )
+
+            if (matchingLid) {
+              const lidMsgResult = await buildQuery(
+                supabaseAdmin
+                  .from('whatsapp_messages')
+                  .select(MESSAGE_COLUMNS)
+                  .eq('user_id', user.id)
+                  .eq('contact_phone', matchingLid.contact_phone)
+              )
+              messages = lidMsgResult.data || []
+              error = lidMsgResult.error
+            }
+          }
         }
       }
     }
