@@ -3,9 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    background-color: #f9fafb;
+  }
   body {
     @apply bg-gray-50 text-gray-900;
   }
+}
+
+/* Viewport zoom compensation — when ViewportScaler sets --viewport-zoom on <html>,
+   h-screen (100vh) and min-h-screen render shorter than the physical viewport.
+   These overrides scale them back so they fill the viewport correctly. */
+.h-screen {
+  height: calc(100vh / var(--viewport-zoom, 1)) !important;
+}
+.min-h-screen {
+  min-height: calc(100vh / var(--viewport-zoom, 1)) !important;
 }
 
 @keyframes fade-in {
@@ -496,4 +509,6 @@
 .whatsapp-chat-bg {
   background-color: #0b141a;
 }
+
+/* Desktop viewport scaling is handled by components/ViewportScaler.tsx (JS-based zoom on html) */
 

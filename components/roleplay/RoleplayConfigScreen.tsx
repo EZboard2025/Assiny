@@ -105,7 +105,7 @@ export default function RoleplayConfigScreen(props: RoleplayConfigScreenProps) {
   const personaEvalScore = selectedPersonaObj?.evaluation_score
 
   return (
-    <div className="min-h-screen relative z-10 py-8 pl-28 pr-[420px]">
+    <div className="relative z-10 py-8 pl-20 pr-6">
       <div className="max-w-6xl">
 
         {/* Challenge Banner */}

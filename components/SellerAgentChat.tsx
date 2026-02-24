@@ -29,6 +29,7 @@ interface SellerAgentChatProps {
   userRole?: string
   currentView?: ViewContext
   viewingContext?: ViewingContext | null
+  onOpenChange?: (open: boolean, width: number) => void
 }
 
 type Suggestion = { text: string; icon: any; color: string }
@@ -84,8 +85,8 @@ const MIN_PANEL_W = 340
 const MAX_PANEL_W = 700
 const DEFAULT_PANEL_W = 380
 
-export default function SellerAgentChat({ userName, userRole, currentView = 'home', viewingContext }: SellerAgentChatProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export default function SellerAgentChat({ userName, userRole, currentView = 'home', viewingContext, onOpenChange }: SellerAgentChatProps) {
+  const [isOpen, setIsOpen] = useState(true)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -109,6 +110,11 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const resizeRef = useRef<{ startX: number; origW: number } | null>(null)
+
+  // Notify parent of open/width changes
+  useEffect(() => {
+    onOpenChange?.(isOpen, panelWidth)
+  }, [isOpen, panelWidth, onOpenChange])
 
   // Load auth token on mount
   useEffect(() => {
