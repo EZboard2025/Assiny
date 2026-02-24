@@ -305,11 +305,12 @@ export async function initializeClient(userId: string, companyId: string | null)
   // Authentication event - start a timeout for ready (only once, ignore duplicate fires)
   client.on('authenticated', () => {
     console.log(`[WA] Authenticated for user ${userId}${authFired ? ' (duplicate, ignoring)' : ''}`)
-    state.status = 'connecting'
 
-    // Only set timeout on first authenticated event — duplicates should not reset the timer
+    // Only process first authenticated event — duplicates MUST NOT reset status
+    // (duplicate auth events can fire AFTER ready, resetting 'connected' → 'connecting')
     if (authFired) return
     authFired = true
+    state.status = 'connecting'
 
     // If ready doesn't fire within 45s, the client is stuck
     // (when it works, ready fires in 2-5s after authenticated)
