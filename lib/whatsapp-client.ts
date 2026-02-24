@@ -683,50 +683,97 @@ if (!globalForWA.waReaperStarted) {
 // ============================================
 
 async function upsertConnection(state: ClientState): Promise<void> {
-  // First check if connection exists for this user
-  const { data: existing } = await supabaseAdmin
-    .from('whatsapp_connections')
-    .select('id')
-    .eq('user_id', state.userId)
-    .single()
+  const currentPhone = state.phoneNumber || 'wwebjs'
 
-  if (existing) {
-    const { error: updateError } = await supabaseAdmin
+  // Fetch ALL connections for this user (may have multiple from different phones)
+  const { data: existingConns } = await supabaseAdmin
+    .from('whatsapp_connections')
+    .select('id, phone_number_id, status')
+    .eq('user_id', state.userId)
+
+  // Find connection matching current phone (user may be switching back to a previous phone)
+  const matchingPhone = existingConns?.find(c => c.phone_number_id === currentPhone)
+
+  if (matchingPhone) {
+    // Reuse existing connection for this phone — preserves old conversations
+    // First disconnect any OTHER active connections for this user
+    const otherActive = existingConns?.filter(c => c.id !== matchingPhone.id && c.status === 'active') || []
+    for (const conn of otherActive) {
+      await supabaseAdmin
+        .from('whatsapp_connections')
+        .update({ status: 'disconnected' })
+        .eq('id', conn.id)
+    }
+
+    // Reactivate this connection
+    await supabaseAdmin
       .from('whatsapp_connections')
       .update({
         status: 'active',
-        phone_number_id: state.phoneNumber || 'wwebjs',
-        display_phone_number: state.phoneNumber,
         connected_at: new Date().toISOString(),
         last_webhook_at: new Date().toISOString()
       })
-      .eq('id', existing.id)
+      .eq('id', matchingPhone.id)
 
-    if (updateError) {
-      console.error(`[WA] Failed to update connection:`, updateError)
-    }
-    state.connectionId = existing.id
-    console.log(`[WA] Connection updated: ${state.connectionId}`)
-  } else {
-    // Allow same phone number on multiple accounts (simultaneous connections)
-    if (state.phoneNumber) {
-      const { data: existingByPhone } = await supabaseAdmin
-        .from('whatsapp_connections')
-        .select('id, user_id')
-        .eq('phone_number_id', state.phoneNumber)
-        .neq('user_id', state.userId)
+    state.connectionId = matchingPhone.id
+    console.log(`[WA] Connection reactivated for phone ${currentPhone}: ${state.connectionId}`)
 
-      if (existingByPhone && existingByPhone.length > 0) {
-        console.log(`[WA] Phone ${state.phoneNumber} also connected to ${existingByPhone.length} other user(s) — keeping all`)
+  } else if (existingConns && existingConns.length > 0) {
+    // Phone changed — disconnect all existing connections for this user
+    for (const conn of existingConns) {
+      if (conn.status === 'active') {
+        await supabaseAdmin
+          .from('whatsapp_connections')
+          .update({ status: 'disconnected' })
+          .eq('id', conn.id)
       }
     }
+    console.log(`[WA] Phone changed for user ${state.userId}: disconnected ${existingConns.length} old connection(s)`)
 
+    // Create new connection for new phone
     const { data: inserted, error: insertError } = await supabaseAdmin
       .from('whatsapp_connections')
       .insert({
         user_id: state.userId,
         company_id: state.companyId,
-        phone_number_id: state.phoneNumber || `wwebjs_${state.userId.substring(0, 8)}`,
+        phone_number_id: currentPhone,
+        waba_id: 'wwebjs',
+        display_phone_number: state.phoneNumber,
+        access_token: 'wwebjs_session',
+        status: 'active',
+        connected_at: new Date().toISOString()
+      })
+      .select('id')
+      .single()
+
+    if (insertError) {
+      console.error(`[WA] Failed to insert new connection:`, insertError)
+      // Fallback: reuse the most recent existing connection
+      const fallback = existingConns[0]
+      await supabaseAdmin
+        .from('whatsapp_connections')
+        .update({
+          status: 'active',
+          phone_number_id: currentPhone,
+          display_phone_number: state.phoneNumber,
+          connected_at: new Date().toISOString()
+        })
+        .eq('id', fallback.id)
+      state.connectionId = fallback.id
+      console.log(`[WA] Fallback: updated existing connection ${fallback.id} with new phone`)
+    } else {
+      state.connectionId = inserted?.id || null
+      console.log(`[WA] New connection created for phone ${currentPhone}: ${state.connectionId}`)
+    }
+
+  } else {
+    // No existing connections — create first one
+    const { data: inserted, error: insertError } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .insert({
+        user_id: state.userId,
+        company_id: state.companyId,
+        phone_number_id: currentPhone,
         waba_id: 'wwebjs',
         display_phone_number: state.phoneNumber,
         access_token: 'wwebjs_session',

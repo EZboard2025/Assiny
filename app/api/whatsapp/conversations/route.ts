@@ -21,11 +21,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch conversations ordered by most recent message
-    const { data: rawConversations, error } = await supabaseAdmin
+    // Get user's active connection to filter conversations by connected phone
+    const { data: activeConnection } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .limit(1)
+      .single()
+
+    // If no active connection, use the most recent one
+    let connectionId = activeConnection?.id
+    if (!connectionId) {
+      const { data: latestConnection } = await supabaseAdmin
+        .from('whatsapp_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('connected_at', { ascending: false })
+        .limit(1)
+        .single()
+      connectionId = latestConnection?.id
+    }
+
+    // Fetch conversations filtered by connection (only shows conversations from current phone)
+    let query = supabaseAdmin
       .from('whatsapp_conversations')
       .select('*')
       .eq('user_id', user.id)
+
+    if (connectionId) {
+      query = query.eq('connection_id', connectionId)
+    }
+
+    const { data: rawConversations, error } = await query
       .order('last_message_at', { ascending: false })
       .limit(100)
 
