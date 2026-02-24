@@ -1867,7 +1867,7 @@ export async function POST(req: NextRequest) {
     const isManager = userRole === 'admin' || userRole === 'gestor'
 
     // Parse body
-    const { message, conversationHistory = [] } = await req.json()
+    const { message, conversationHistory = [], viewingContext } = await req.json()
     if (!message) {
       return NextResponse.json({ error: 'Mensagem é obrigatória' }, { status: 400 })
     }
@@ -1878,6 +1878,19 @@ export async function POST(req: NextRequest) {
 
     if (isManager) {
       systemMessage += MANAGER_PROMPT_EXTENSION
+    }
+
+    // Inject viewing context (what the manager is currently looking at)
+    if (viewingContext && isManager) {
+      const vc = viewingContext
+      const spinLabel = (v: number) => v >= 8 ? 'Excelente' : v >= 6 ? 'Bom' : v >= 4 ? 'Regular' : 'Precisa melhorar'
+      systemMessage += `\n\n--- CONTEXTO ATUAL ---\nO gestor está visualizando o perfil do vendedor: ${vc.sellerName} (${vc.sellerEmail})\n`
+      systemMessage += `Nota Geral: ${vc.overallAverage > 0 ? vc.overallAverage.toFixed(1) + '/10' : 'Sem dados'}\n`
+      systemMessage += `Total de Treinos (Roleplay): ${vc.totalSessions}\n`
+      systemMessage += `Total de Meets Avaliados: ${vc.totalMeets}\n`
+      systemMessage += `Tendência: ${vc.trend === 'improving' ? 'Melhorando' : vc.trend === 'declining' ? 'Piorando' : 'Estável'}\n`
+      systemMessage += `SPIN Selling:\n- Situação (S): ${vc.spinS > 0 ? vc.spinS.toFixed(1) + ' — ' + spinLabel(vc.spinS) : 'Sem dados'}\n- Problema (P): ${vc.spinP > 0 ? vc.spinP.toFixed(1) + ' — ' + spinLabel(vc.spinP) : 'Sem dados'}\n- Implicação (I): ${vc.spinI > 0 ? vc.spinI.toFixed(1) + ' — ' + spinLabel(vc.spinI) : 'Sem dados'}\n- Necessidade (N): ${vc.spinN > 0 ? vc.spinN.toFixed(1) + ' — ' + spinLabel(vc.spinN) : 'Sem dados'}\n`
+      systemMessage += `Use esses dados para contextualizar suas respostas. Quando o gestor perguntar sobre "este vendedor" ou "ele/ela", refira-se a ${vc.sellerName}.`
     }
 
     const activeTools = isManager ? [...toolDefinitions, ...teamToolDefinitions] : toolDefinitions

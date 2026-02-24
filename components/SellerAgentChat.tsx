@@ -11,10 +11,24 @@ interface Message {
 
 type ViewContext = 'home' | 'perfil' | 'roleplay' | string
 
+interface ViewingContext {
+  sellerName: string
+  sellerEmail: string
+  overallAverage: number
+  totalSessions: number
+  totalMeets: number
+  spinS: number
+  spinP: number
+  spinI: number
+  spinN: number
+  trend: string
+}
+
 interface SellerAgentChatProps {
   userName?: string
   userRole?: string
   currentView?: ViewContext
+  viewingContext?: ViewingContext | null
 }
 
 type Suggestion = { text: string; icon: any; color: string }
@@ -59,13 +73,18 @@ const MANAGER_SUGGESTIONS: Record<string, Suggestion[]> = {
     { text: 'Compare os vendedores', icon: BarChart3, color: 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100' },
     { text: 'Quem mais evoluiu?', icon: Trophy, color: 'text-amber-600 bg-amber-50 border-amber-200 hover:bg-amber-100' },
   ],
+  seller_detail: [
+    { text: 'Analise este vendedor', icon: UserCircle2, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
+    { text: 'Onde ele deve melhorar?', icon: Target, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
+    { text: 'Compare com a equipe', icon: BarChart3, color: 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100' },
+  ],
 }
 
 const MIN_PANEL_W = 340
 const MAX_PANEL_W = 700
 const DEFAULT_PANEL_W = 380
 
-export default function SellerAgentChat({ userName, userRole, currentView = 'home' }: SellerAgentChatProps) {
+export default function SellerAgentChat({ userName, userRole, currentView = 'home', viewingContext }: SellerAgentChatProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -198,6 +217,7 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
         body: JSON.stringify({
           message: text.trim(),
           conversationHistory: messages,
+          ...(viewingContext ? { viewingContext } : {}),
         }),
       })
 

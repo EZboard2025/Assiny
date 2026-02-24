@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import SellerGrid from './manager/SellerGrid'
@@ -60,8 +60,22 @@ export default function UnifiedManagerPage() {
         )}
       </div>
 
-      {/* Unified AI Assistant - auto-detects role and userName */}
-      <SellerAgentChat currentView="manager" />
+      {/* Unified AI Assistant - context-aware */}
+      <SellerAgentChat
+        currentView={view.type === 'detail' ? 'seller_detail' : 'manager'}
+        viewingContext={view.type === 'detail' ? {
+          sellerName: view.seller.user_name,
+          sellerEmail: view.seller.user_email,
+          overallAverage: view.seller.overall_average,
+          totalSessions: view.seller.total_sessions,
+          totalMeets: 0,
+          spinS: view.seller.spin_s_average,
+          spinP: view.seller.spin_p_average,
+          spinI: view.seller.spin_i_average,
+          spinN: view.seller.spin_n_average,
+          trend: view.seller.trend,
+        } : null}
+      />
     </div>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Loader2, CalendarDays, Clock, ChevronDown, Video, X, TrendingUp, TrendingDown, Search, Settings, Zap, Target, Award, User, BarChart3, Activity } from 'lucide-react'
+import { Loader2, CalendarDays, Clock, ChevronDown, Video, X, TrendingUp, TrendingDown, Search, Settings, Zap, Target, Award, User, BarChart3, Activity, History } from 'lucide-react'
 import CalendarWeekView from '../CalendarWeekView'
 import MiniCalendar from '../MiniCalendar'
 import MeetHistoryContent from '../MeetHistoryContent'
 import SellerWhatsAppViewer from './SellerWhatsAppViewer'
+import SellerRoleplayHistory from './SellerRoleplayHistory'
 import EvolutionChart from '../perfil/EvolutionChart'
 import type { ChartDataPoint } from '../PerfilView'
 import type { SellerPerformance } from './SellerGrid'
@@ -39,8 +40,6 @@ interface MeetEvaluation {
   overall_score: number
   created_at: string
 }
-
-type PerformanceTab = 'geral' | 'spin'
 
 interface SellerDetailViewProps {
   seller: SellerPerformance
@@ -112,13 +111,13 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventRaw[]>([])
   const [upcomingMeetings, setUpcomingMeetings] = useState<CalendarEventRaw[]>([])
   const [meetEvaluations, setMeetEvaluations] = useState<MeetEvaluation[]>([])
-  const [perfTab, setPerfTab] = useState<PerformanceTab>('geral')
 
   // Collapsible sections
   const [meetingsOpen, setMeetingsOpen] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [allMeetingsOpen, setAllMeetingsOpen] = useState(false)
   const [whatsappViewerOpen, setWhatsappViewerOpen] = useState(false)
+  const [roleplayHistoryOpen, setRoleplayHistoryOpen] = useState(false)
 
   // Calendar navigation
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()))
@@ -252,7 +251,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   return (
     <div className="space-y-4">
       {/* ── Performance Header (PerfilView style) ──────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Col 1 — Seller Info + Score */}
         <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
           <h2 className="text-xl font-bold text-gray-900 mb-0.5">{seller.user_name}</h2>
@@ -265,12 +264,25 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
               <User className="w-10 h-10 text-green-600" />
             </div>
           </div>
-          <div className="text-center">
+          <div className="text-center mb-4">
             <p className={`text-3xl font-bold ${seller.total_sessions > 0 ? getScoreColor(seller.overall_average) : 'text-gray-300'}`}>
               {seller.total_sessions > 0 ? seller.overall_average.toFixed(1) : '—'}
             </p>
             <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Nota Geral</p>
           </div>
+
+          {/* Session History Button */}
+          {seller.timeline.length > 0 && (
+            <button
+              onClick={() => { setRoleplayHistoryOpen(true); setHistoryOpen(false); setAllMeetingsOpen(false); setWhatsappViewerOpen(false) }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
+            >
+              <History className="w-4 h-4 text-green-600 flex-shrink-0" />
+              <span className="text-xs font-semibold text-green-700 flex-1 text-left">Historico de Sessoes</span>
+              <span className="text-[10px] text-green-500 font-medium">{seller.timeline.length}</span>
+              <span className="text-[10px] text-green-500">&rsaquo;</span>
+            </button>
+          )}
         </div>
 
         {/* Col 2 — KPI Stats */}
@@ -309,150 +321,43 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
           </div>
         </div>
 
-        {/* Col 3 — Top Strengths & Gaps */}
-        <div className="space-y-3">
-          <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full" />
-              Pontos Fortes
-            </h3>
-            {seller.top_strengths.length > 0 ? (
-              <div className="space-y-1.5">
-                {seller.top_strengths.slice(0, 4).map((s, i) => (
-                  <div key={i} className="flex items-start gap-2 text-[11px] text-gray-600">
-                    <span className="text-green-500 mt-0.5 flex-shrink-0">+</span>
-                    <span className="line-clamp-2">{s.text}</span>
-                    {s.count > 1 && <span className="text-[9px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full flex-shrink-0">{s.count}x</span>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] text-gray-400">Sem dados ainda</p>
-            )}
-          </div>
-          <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 bg-red-500 rounded-full" />
-              Gaps Criticos
-            </h3>
-            {seller.critical_gaps.length > 0 ? (
-              <div className="space-y-1.5">
-                {seller.critical_gaps.slice(0, 4).map((g, i) => (
-                  <div key={i} className="flex items-start gap-2 text-[11px] text-gray-600">
-                    <span className="text-red-500 mt-0.5 flex-shrink-0">!</span>
-                    <span className="line-clamp-2">{g.text}</span>
-                    {g.count > 1 && <span className="text-[9px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full flex-shrink-0">{g.count}x</span>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] text-gray-400">Sem dados ainda</p>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* ── Performance Tabs ────────────────────────────────────────────── */}
-      <div className="flex border-b border-gray-200 bg-white rounded-t-xl">
-        {([
-          { key: 'geral' as PerformanceTab, label: 'Visão Geral', icon: BarChart3 },
-          { key: 'spin' as PerformanceTab, label: 'Análise SPIN', icon: Zap },
-        ]).map(tab => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setPerfTab(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${
-                perfTab === tab.key
-                  ? 'border-green-500 text-green-700 bg-green-50/50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Tab Content ─────────────────────────────────────────────────── */}
-      {perfTab === 'geral' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Evolution Chart — same toggle as PerfilView */}
-          <div className="lg:col-span-2">
-            <EvolutionChart data={chartData} latestSession={latestSession} loading={false} />
-          </div>
-
-          {/* SPIN Metrics */}
-          <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
-                <Zap className="w-4.5 h-4.5 text-green-600" />
-              </div>
-              <h3 className="text-sm font-bold text-gray-900">Metricas SPIN</h3>
-            </div>
-            <div className="space-y-3">
-              {spinPillars.map(pillar => {
-                const score = seller[`spin_${pillar.key.toLowerCase()}_average` as keyof typeof seller] as number || 0
-                const hasScore = score > 0
-                return (
-                  <div key={pillar.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-8 rounded-full ${hasScore ? getBarColor(score) : 'bg-gray-300'}`} />
-                      <div>
-                        <span className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">{pillar.key}</span>
-                        <p className="text-sm font-semibold text-gray-700">{pillar.label}</p>
-                      </div>
-                    </div>
-                    <span className={`text-xl font-bold ${hasScore ? getScoreColor(score) : 'text-gray-300'}`}>
-                      {hasScore ? score.toFixed(1) : '—'}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+      {/* ── Evolution Chart + SPIN Metrics ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <EvolutionChart data={chartData} latestSession={latestSession} loading={false} />
         </div>
-      ) : (
-        /* ── SPIN Analysis Tab ──────────────────────────────────────────── */
+
         <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
+              <Zap className="w-4.5 h-4.5 text-green-600" />
+            </div>
+            <h3 className="text-sm font-bold text-gray-900">Metricas SPIN</h3>
+          </div>
+          <div className="space-y-3">
             {spinPillars.map(pillar => {
               const score = seller[`spin_${pillar.key.toLowerCase()}_average` as keyof typeof seller] as number || 0
               const hasScore = score > 0
-              const PillarIcon = pillar.icon
               return (
-                <div key={pillar.key} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${pillar.bg}`}>
-                      <PillarIcon className={`w-4 h-4 ${pillar.color}`} />
-                    </div>
+                <div key={pillar.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-8 rounded-full ${hasScore ? getBarColor(score) : 'bg-gray-300'}`} />
                     <div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase">{pillar.key}</p>
-                      <p className="text-xs font-semibold text-gray-700">{pillar.label}</p>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">{pillar.key}</span>
+                      <p className="text-sm font-semibold text-gray-700">{pillar.label}</p>
                     </div>
                   </div>
-                  <div className="text-center py-3">
-                    <p className={`text-4xl font-bold ${hasScore ? getScoreColor(score) : 'text-gray-300'}`}>
-                      {hasScore ? score.toFixed(1) : '—'}
-                    </p>
-                  </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
-                    <div
-                      className={`h-full rounded-full transition-all ${hasScore ? getBarColor(score) : 'bg-gray-200'}`}
-                      style={{ width: `${Math.max((score / 10) * 100, 0)}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-gray-400 text-center mt-2">
-                    {hasScore ? (score >= 8 ? 'Excelente' : score >= 6 ? 'Bom' : score >= 4 ? 'Regular' : 'Precisa melhorar') : 'Sem dados'}
-                  </p>
+                  <span className={`text-xl font-bold ${hasScore ? getScoreColor(score) : 'text-gray-300'}`}>
+                    {hasScore ? score.toFixed(1) : '—'}
+                  </span>
                 </div>
               )
             })}
           </div>
         </div>
-      )}
+      </div>
 
       {/* ── Grid: Left + Right ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -692,6 +597,19 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
         )}
       </div>
       </div>
+
+      {/* ── Full-screen Roleplay History Overlay ──────────────────────── */}
+      {roleplayHistoryOpen && (
+        <div className="fixed inset-0 z-[60] bg-gray-50 pr-[400px]">
+          <div className="max-w-7xl mx-auto py-6 px-6 h-full">
+            <SellerRoleplayHistory
+              sellerId={seller.user_id}
+              sellerName={seller.user_name}
+              onClose={() => setRoleplayHistoryOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
