@@ -17,7 +17,7 @@ function CustomTooltip({ active, payload, label }: any) {
   if (validEntries.length === 0) return null
   return (
     <div className="bg-white rounded-lg shadow-lg border border-gray-200 px-3 py-2 min-w-[140px]">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className="text-xs text-gray-500 mb-1">Sessão {label}</p>
       {validEntries.map((entry: any) => (
         <div key={entry.name} className="flex items-center justify-between gap-3 py-0.5">
           <div className="flex items-center gap-1.5">
@@ -47,10 +47,11 @@ export default function EvolutionChart({ data, loading, onClick }: EvolutionChar
   const hasM = data.some(d => d.meet !== null)
   const hasData = hasRoleplay || hasM
 
-  // Filter data based on view mode
-  const filteredData = viewMode === 'roleplay'
+  // Filter data based on view mode and number independently
+  const filteredData = (viewMode === 'roleplay'
     ? data.filter(d => d.roleplay !== null)
     : data.filter(d => d.meet !== null)
+  ).map((d, idx) => ({ ...d, label: `#${idx + 1}` }))
 
   const TOGGLE_OPTIONS: { value: ViewMode; label: string; color: string; available: boolean }[] = [
     { value: 'roleplay', label: 'Roleplay', color: 'bg-green-500 text-white', available: hasRoleplay },
@@ -106,7 +107,7 @@ export default function EvolutionChart({ data, loading, onClick }: EvolutionChar
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                tick={false}
                 tickLine={false}
                 axisLine={{ stroke: '#e5e7eb' }}
               />

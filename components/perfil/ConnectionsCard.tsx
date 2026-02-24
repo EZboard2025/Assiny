@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '@/lib/supabase'
-import { MoreHorizontal, X, Loader2, Check, ExternalLink } from 'lucide-react'
+import { MoreHorizontal, X, Loader2, Check, Smartphone, QrCode } from 'lucide-react'
 
 interface Connection {
   key: string
@@ -13,6 +13,8 @@ interface Connection {
   description: string
 }
 
+type WhatsAppStep = 'idle' | 'initializing' | 'qr' | 'connecting' | 'connected'
+
 export default function ConnectionsCard() {
   const [googleConnected, setGoogleConnected] = useState(false)
   const [whatsappConnected, setWhatsappConnected] = useState(false)
@@ -20,9 +22,21 @@ export default function ConnectionsCard() {
   const [showModal, setShowModal] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
+  // WhatsApp connection state
+  const [waStep, setWaStep] = useState<WhatsAppStep>('idle')
+  const [waQrCode, setWaQrCode] = useState<string | null>(null)
+  const waPollingRef = useRef<NodeJS.Timeout | null>(null)
+  const waTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   useEffect(() => {
     checkConnections()
+    return () => stopWaPolling()
   }, [])
+
+  const stopWaPolling = () => {
+    if (waPollingRef.current) { clearInterval(waPollingRef.current); waPollingRef.current = null }
+    if (waTimeoutRef.current) { clearTimeout(waTimeoutRef.current); waTimeoutRef.current = null }
+  }
 
   const getAuthHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -60,7 +74,6 @@ export default function ConnectionsCard() {
 
       if (data.authUrl) {
         window.open(data.authUrl, '_blank')
-        // Poll for connection after OAuth
         const interval = setInterval(async () => {
           try {
             const statusRes = await fetch('/api/calendar/status', { headers })
@@ -72,7 +85,6 @@ export default function ConnectionsCard() {
             }
           } catch {}
         }, 3000)
-        // Stop polling after 2 minutes
         setTimeout(() => { clearInterval(interval); setActionLoading(null) }, 120000)
       }
     } catch {
@@ -100,13 +112,97 @@ export default function ConnectionsCard() {
     }
   }
 
+  const handleDisconnectWhatsApp = async () => {
+    try {
+      setActionLoading('whatsapp')
+      const headers = await getAuthHeaders()
+      if (!headers) return
+
+      const res = await fetch('/api/whatsapp/disconnect', {
+        method: 'POST',
+        headers,
+      })
+      if (res.ok) {
+        setWhatsappConnected(false)
+        setWaStep('idle')
+        setWaQrCode(null)
+        stopWaPolling()
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // --- WhatsApp Connection Flow ---
+  const handleConnectWhatsApp = async () => {
+    try {
+      setWaStep('initializing')
+      setWaQrCode(null)
+      const headers = await getAuthHeaders()
+      if (!headers) { setWaStep('idle'); return }
+
+      const res = await fetch('/api/whatsapp/connect', { method: 'POST', headers })
+      const data = await res.json()
+
+      if (data.qrcode) {
+        setWaQrCode(data.qrcode)
+        setWaStep('qr')
+      } else if (data.status === 'connected') {
+        setWhatsappConnected(true)
+        setWaStep('connected')
+        return
+      }
+
+      // Poll for QR updates and connection status
+      stopWaPolling()
+      waPollingRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch('/api/whatsapp/connect', { headers })
+          const pollData = await pollRes.json()
+
+          if (pollData.status === 'connected') {
+            setWhatsappConnected(true)
+            setWaStep('connected')
+            stopWaPolling()
+          } else if (pollData.status === 'connecting') {
+            setWaStep('connecting')
+          } else if (pollData.qrcode) {
+            setWaQrCode(pollData.qrcode)
+            setWaStep('qr')
+          }
+        } catch {}
+      }, 2000)
+
+      // Stop after 3 minutes
+      waTimeoutRef.current = setTimeout(() => {
+        stopWaPolling()
+        if (waStep !== 'connected') setWaStep('idle')
+      }, 180000)
+
+    } catch {
+      setWaStep('idle')
+    }
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    if (waStep !== 'connected' && waStep !== 'idle') {
+      // If user closes mid-connection, reset but don't kill the client
+      setWaStep('idle')
+      setWaQrCode(null)
+      stopWaPolling()
+    }
+  }
+
   const activeCount = (googleConnected ? 1 : 0) + (whatsappConnected ? 1 : 0)
 
   const connections: Connection[] = [
     {
       key: 'google',
-      name: 'Google Calendar',
-      description: 'Analise de reunioes Meet',
+      name: 'Google',
+      description: 'Calendar, Meet e Gmail',
       icon: (
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -120,7 +216,7 @@ export default function ConnectionsCard() {
     {
       key: 'whatsapp',
       name: 'WhatsApp',
-      description: 'Follow-up e copiloto IA',
+      description: 'Copiloto de IA e piloto automático',
       icon: (
         <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
@@ -153,13 +249,13 @@ export default function ConnectionsCard() {
         onClick={() => setShowModal(true)}
       >
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-base font-bold text-gray-900">Conexoes</h3>
+          <h3 className="text-base font-bold text-gray-900">Conexões</h3>
           <button className="text-gray-400 hover:text-gray-600 transition-colors">
             <MoreHorizontal className="w-5 h-5" />
           </button>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          {activeCount} {activeCount === 1 ? 'Conexao Ativa' : 'Conexoes Ativas'}
+          {activeCount} {activeCount === 1 ? 'Conexão Ativa' : 'Conexões Ativas'}
         </p>
 
         <div className="flex items-center gap-3">
@@ -187,16 +283,16 @@ export default function ConnectionsCard() {
       {/* Connections Manager Modal (portal to body) */}
       {showModal && createPortal(
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseModal} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Gerenciar Conexoes</h2>
+                <h2 className="text-lg font-bold text-gray-900">Gerenciar Conexões</h2>
                 <p className="text-sm text-gray-500 mt-0.5">{activeCount} de {connections.length} ativas</p>
               </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={handleCloseModal}
                 className="w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
@@ -206,63 +302,103 @@ export default function ConnectionsCard() {
             {/* Connections List */}
             <div className="p-6 space-y-3">
               {connections.map(c => (
-                <div
-                  key={c.key}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
-                    c.connected ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-gray-50/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm">
-                      {c.icon}
+                <div key={c.key}>
+                  <div
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
+                      c.connected ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-gray-50/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm">
+                        {c.icon}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{c.name}</p>
+                        <p className="text-xs text-gray-500">{c.description}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{c.name}</p>
-                      <p className="text-xs text-gray-500">{c.description}</p>
+
+                    <div className="flex items-center gap-2">
+                      {c.connected && (
+                        <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                          <Check className="w-3 h-3" />
+                          Conectado
+                        </span>
+                      )}
+
+                      {c.key === 'google' && (
+                        actionLoading === 'google' ? (
+                          <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                        ) : c.connected ? (
+                          <button
+                            onClick={handleDisconnectGoogle}
+                            className="text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Desconectar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleConnectGoogle}
+                            className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Conectar
+                          </button>
+                        )
+                      )}
+
+                      {c.key === 'whatsapp' && (
+                        c.connected ? (
+                          <button
+                            onClick={handleDisconnectWhatsApp}
+                            disabled={actionLoading === 'whatsapp'}
+                            className="text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {actionLoading === 'whatsapp' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Desconectar'}
+                          </button>
+                        ) : waStep === 'idle' ? (
+                          <button
+                            onClick={handleConnectWhatsApp}
+                            className="text-xs font-medium text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Conectar
+                          </button>
+                        ) : waStep === 'initializing' ? (
+                          <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
+                        ) : waStep === 'connecting' ? (
+                          <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Conectando...
+                          </span>
+                        ) : null
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {c.connected && (
-                      <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                        <Check className="w-3 h-3" />
-                        Conectado
-                      </span>
-                    )}
-
-                    {c.key === 'google' && (
-                      actionLoading === 'google' ? (
-                        <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                      ) : c.connected ? (
-                        <button
-                          onClick={handleDisconnectGoogle}
-                          className="text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                        >
-                          Desconectar
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleConnectGoogle}
-                          className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                        >
-                          Conectar
-                        </button>
-                      )
-                    )}
-
-                    {c.key === 'whatsapp' && (
-                      c.connected ? (
-                        <span className="text-xs text-gray-400 px-3 py-1.5">
-                          Via Follow-Up
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400 flex items-center gap-1 px-3 py-1.5">
-                          Conecte no Follow-Up
-                          <ExternalLink className="w-3 h-3" />
-                        </span>
-                      )
-                    )}
-                  </div>
+                  {/* WhatsApp QR Code Panel */}
+                  {c.key === 'whatsapp' && waStep === 'qr' && waQrCode && (
+                    <div className="mt-2 p-5 rounded-xl border border-green-200 bg-green-50/30 animate-[fadeIn_200ms_ease-out]">
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center gap-2 mb-3">
+                          <QrCode className="w-4 h-4 text-green-600" />
+                          <p className="text-sm font-semibold text-gray-900">Escaneie o QR Code</p>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-4 text-center">
+                          Abra o WhatsApp no celular &gt; Menu &gt; Dispositivos conectados &gt; Conectar dispositivo
+                        </p>
+                        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
+                          <img
+                            src={waQrCode}
+                            alt="WhatsApp QR Code"
+                            className="w-48 h-48"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-3">
+                          <Smartphone className="w-3.5 h-3.5 text-gray-400" />
+                          <p className="text-[10px] text-gray-400">Aguardando leitura do QR code...</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -274,7 +410,7 @@ export default function ConnectionsCard() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Mais integrações em breve</p>
-                    <p className="text-xs text-gray-400">CRM, email, e mais</p>
+                    <p className="text-xs text-gray-400">CRM e mais</p>
                   </div>
                 </div>
               </div>

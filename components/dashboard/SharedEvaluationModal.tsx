@@ -151,7 +151,7 @@ export default function SharedEvaluationModal({ shareId, userId, onClose }: Shar
                   {shared.evaluation?.seller_name || 'Reunião'}
                 </h2>
                 <div className="text-sm text-gray-500 mt-0.5">
-                  Score: {shared.evaluation?.overall_score ? Math.round(shared.evaluation.overall_score / 10) : '--'}/10
+                  Score: {shared.evaluation?.overall_score ? (shared.evaluation.overall_score > 10 ? (shared.evaluation.overall_score / 10).toFixed(1) : shared.evaluation.overall_score.toFixed(1)) : '--'}/10
                   {shared.evaluation?.created_at && (
                     <span className="ml-2">
                       · {new Date(shared.evaluation.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}

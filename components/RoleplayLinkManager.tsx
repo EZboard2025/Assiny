@@ -18,6 +18,8 @@ import {
   BarChart3
 } from 'lucide-react'
 import { getPersonas, getObjections, type Persona, type Objection } from '@/lib/config'
+import { useToast, ToastContainer } from '@/components/Toast'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 interface RoleplayLink {
   id: string
@@ -47,6 +49,9 @@ interface RoleplayLinkManagerProps {
 }
 
 export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerProps) {
+  const { toasts, showToast, removeToast } = useToast()
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; linkId: string | null }>({ open: false, linkId: null })
+
   // Estados
   const [links, setLinks] = useState<RoleplayLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -124,7 +129,7 @@ export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerPr
 
   const handleCreateLink = async () => {
     if (!formData.name || !formData.persona_id || formData.objection_ids.length === 0) {
-      alert('Preencha todos os campos obrigatórios!')
+      showToast('warning', 'Campos obrigatórios', 'Preencha todos os campos obrigatórios')
       return
     }
 
@@ -152,13 +157,13 @@ export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerPr
         await loadLinks()
         setShowCreateModal(false)
         resetForm()
-        alert('Link criado com sucesso!')
+        showToast('success', 'Sucesso', 'Link criado com sucesso!')
       } else {
-        alert(data.error || 'Erro ao criar link')
+        showToast('error', 'Erro', data.error || 'Erro ao criar link')
       }
     } catch (error) {
       console.error('Erro ao criar link:', error)
-      alert('Erro ao criar link')
+      showToast('error', 'Erro', 'Erro ao criar link')
     } finally {
       setSavingLink(false)
     }
@@ -193,13 +198,13 @@ export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerPr
         setShowEditModal(false)
         setEditingLink(null)
         resetForm()
-        alert('Link atualizado com sucesso!')
+        showToast('success', 'Sucesso', 'Link atualizado com sucesso!')
       } else {
-        alert(data.error || 'Erro ao atualizar link')
+        showToast('error', 'Erro', data.error || 'Erro ao atualizar link')
       }
     } catch (error) {
       console.error('Erro ao atualizar link:', error)
-      alert('Erro ao atualizar link')
+      showToast('error', 'Erro', 'Erro ao atualizar link')
     } finally {
       setSavingLink(false)
     }
@@ -221,18 +226,22 @@ export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerPr
       if (data.success) {
         await loadLinks()
       } else {
-        alert(data.error || 'Erro ao atualizar status')
+        showToast('error', 'Erro', data.error || 'Erro ao atualizar status')
       }
     } catch (error) {
       console.error('Erro ao atualizar status:', error)
-      alert('Erro ao atualizar status')
+      showToast('error', 'Erro', 'Erro ao atualizar status')
     }
   }
 
-  const handleDeleteLink = async (linkId: string) => {
-    if (!confirm('Tem certeza que deseja deletar este link? Esta ação não pode ser desfeita.')) {
-      return
-    }
+  const handleDeleteLink = (linkId: string) => {
+    setDeleteConfirm({ open: true, linkId })
+  }
+
+  const confirmDeleteLink = async () => {
+    const linkId = deleteConfirm.linkId
+    setDeleteConfirm({ open: false, linkId: null })
+    if (!linkId) return
 
     try {
       setDeletingLinkId(linkId)
@@ -245,13 +254,13 @@ export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerPr
 
       if (data.success) {
         await loadLinks()
-        alert('Link deletado com sucesso!')
+        showToast('success', 'Sucesso', 'Link deletado com sucesso!')
       } else {
-        alert(data.error || 'Erro ao deletar link')
+        showToast('error', 'Erro', data.error || 'Erro ao deletar link')
       }
     } catch (error) {
       console.error('Erro ao deletar link:', error)
-      alert('Erro ao deletar link')
+      showToast('error', 'Erro', 'Erro ao deletar link')
     } finally {
       setDeletingLinkId(null)
     }
@@ -259,7 +268,7 @@ export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerPr
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
-    alert('Link copiado para a área de transferência!')
+    showToast('success', 'Copiado', 'Link copiado para a área de transferência!')
   }
 
   const openEditModal = (link: RoleplayLink) => {
@@ -598,6 +607,17 @@ export default function RoleplayLinkManager({ companyId }: RoleplayLinkManagerPr
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, linkId: null })}
+        onConfirm={confirmDeleteLink}
+        title="Excluir link"
+        message="Tem certeza que deseja deletar este link? Esta ação não pode ser desfeita."
+        confirmText="Excluir"
+        cancelText="Cancelar"
+      />
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   )
 }

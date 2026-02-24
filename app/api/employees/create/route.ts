@@ -104,9 +104,37 @@ export async function POST(request: Request) {
       }
     })
 
+    let userId: string
+
     if (authError) {
-      console.error('Erro ao criar usuário de autenticação:', authError)
-      return NextResponse.json({ error: authError.message }, { status: 400 })
+      // Se o email já existe no Auth, tentar recuperar o user e vincular ao employees
+      if (authError.message.includes('already been registered')) {
+        console.warn('⚠️ Email já existe no Auth, verificando tabela employees...')
+        const { data: listData } = await supabaseAdmin.auth.admin.listUsers()
+        const existingUser = (listData?.users as any[])?.find((u: any) => u.email === email)
+        if (!existingUser) {
+          return NextResponse.json({ error: 'Email registrado mas usuário não encontrado' }, { status: 400 })
+        }
+
+        // Verificar se já tem registro em employees para esta empresa
+        const { data: existingEmployee } = await supabaseAdmin
+          .from('employees')
+          .select('*')
+          .eq('user_id', existingUser.id)
+          .eq('company_id', companyId)
+          .single()
+
+        if (existingEmployee) {
+          return NextResponse.json({ employee: existingEmployee })
+        }
+
+        userId = existingUser.id
+      } else {
+        console.error('Erro ao criar usuário:', authError.message)
+        return NextResponse.json({ error: authError.message }, { status: 400 })
+      }
+    } else {
+      userId = authData.user.id
     }
 
     // Criar registro na tabela employees (vinculado ao company_id e user_id)
@@ -116,7 +144,7 @@ export async function POST(request: Request) {
         name,
         email,
         role: userRole,
-        user_id: authData.user.id,
+        user_id: userId,
         company_id: companyId
       }])
       .select()
@@ -124,8 +152,8 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Erro ao adicionar funcionário:', error)
-      // Tentar reverter criação do usuário se falhou
-      if (authData.user) {
+      // Só reverter se foi um novo usuário (não um existente recuperado)
+      if (!authError && authData?.user) {
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       }
       return NextResponse.json({ error: error.message }, { status: 400 })
