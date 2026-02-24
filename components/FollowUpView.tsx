@@ -267,6 +267,7 @@ export default function FollowUpView() {
 
   // Auth token for API calls
   const [authToken, setAuthToken] = useState<string | null>(null)
+  const [authEmail, setAuthEmail] = useState<string | null>(null)
 
   // Helper to get auth headers
   const getAuthHeaders = (): HeadersInit => {
@@ -280,34 +281,31 @@ export default function FollowUpView() {
   // NOTE: Auto-disconnect removed. Only the server-side TTL reaper (20 min inactivity)
   // should disconnect the client. API errors just show error messages, not full disconnect.
 
-  // Load auth token on mount (robust: handles subdomains, different browsers)
+  // Load auth token on mount — uses getUser() first (server-validated, never stale)
   useEffect(() => {
     const loadAuth = async () => {
       try {
         const { supabase } = await import('@/lib/supabase')
 
-        // Strategy 1: getSession (works in most cases)
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.access_token) {
-          setAuthToken(session.access_token)
-          return
-        }
-
-        // Strategy 2: refreshSession (forces token refresh from Supabase)
-        const { data: { session: refreshed } } = await supabase.auth.refreshSession()
-        if (refreshed?.access_token) {
-          setAuthToken(refreshed.access_token)
-          return
-        }
-
-        // Strategy 3: getUser validates the cookie, then retry getSession
+        // Strategy 1: getUser() → refreshSession() — server-validated, avoids stale localStorage
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          const { data: { session: retried } } = await supabase.auth.getSession()
-          if (retried?.access_token) {
-            setAuthToken(retried.access_token)
+          setAuthEmail(user.email || null)
+          const { data: { session } } = await supabase.auth.refreshSession()
+          if (session?.access_token) {
+            setAuthToken(session.access_token)
+            console.log(`[Auth] Loaded token for ${user.email} (${user.id})`)
             return
           }
+        }
+
+        // Strategy 2: getSession fallback
+        const { data: { session: fallback } } = await supabase.auth.getSession()
+        if (fallback?.access_token) {
+          setAuthToken(fallback.access_token)
+          setAuthEmail(fallback.user?.email || null)
+          console.log(`[Auth] Fallback token for ${fallback.user?.email}`)
+          return
         }
 
         console.warn('[Auth] Could not retrieve auth token after all strategies')
@@ -2306,7 +2304,10 @@ export default function FollowUpView() {
         <>
           {/* Header */}
           <div className="h-[60px] bg-[#202c33] px-5 flex items-center justify-between">
-            <span className="text-[#e9edef] text-[22px] font-bold">WhatsApp</span>
+            <div className="min-w-0">
+              <span className="text-[#e9edef] text-[22px] font-bold">WhatsApp</span>
+              {authEmail && <span className="text-[#8696a0] text-[11px] ml-2">{authEmail}</span>}
+            </div>
             <div className="flex items-center gap-1">
               <div className="relative group/tip">
                 <button
