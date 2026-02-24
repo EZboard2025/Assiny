@@ -31,19 +31,33 @@ export async function GET(request: Request) {
       .select('user_id, status')
       .in('user_id', userIds)
 
-    // WhatsApp: ONLY in-memory check (real-time truth)
-    // If the seller has an active WhatsApp client right now → connected
+    // WhatsApp: in-memory check first (real-time truth), DB fallback
     const allConnected = getAllConnectedClients()
     const connectedMap = new Map(allConnected.map(c => [c.userId, c.phone]))
 
-    // Build map
+    // DB fallback: check active connections for sellers not found in-memory
+    // This handles cases where the manager panel runs on a different instance
+    // or when the client exists but the employee query didn't match
+    const { data: dbConnections } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('user_id, display_phone_number')
+      .in('user_id', userIds)
+      .eq('status', 'active')
+
+    const dbConnMap = new Map(
+      (dbConnections || []).map(c => [c.user_id, c.display_phone_number])
+    )
+
+    // Build map — prefer in-memory, fallback to DB
     const connections: Record<string, { google: boolean; whatsapp: boolean; whatsappPhone: string | null }> = {}
 
     for (const uid of userIds) {
+      const inMemory = connectedMap.has(uid)
+      const inDb = dbConnMap.has(uid)
       connections[uid] = {
         google: false,
-        whatsapp: connectedMap.has(uid),
-        whatsappPhone: connectedMap.get(uid) || null
+        whatsapp: inMemory || inDb,
+        whatsappPhone: connectedMap.get(uid) || dbConnMap.get(uid) || null
       }
     }
 

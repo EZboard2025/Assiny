@@ -1182,9 +1182,11 @@ async function syncChatHistory(state: ClientState): Promise<void> {
                 .sort((a: any, b: any) => (b.t || 0) - (a.t || 0))
                 .slice(0, 50)
                 .map((c: any) => {
-                  // Get the actual last message timestamp (more accurate than c.t which can be sync time)
-                  const lastMsg = c.msgs?.getModelsArray?.()?.slice(-1)?.[0]
-                  const lastMsgTs = lastMsg?.t ? lastMsg.t * 1000 : (c.t ? c.t * 1000 : null)
+                  // Get the actual last message timestamp — ONLY from real messages
+                  // c.t is unreliable (reflects when chat was loaded, not last real message)
+                  const msgsArray = c.msgs?.getModelsArray?.() || []
+                  const lastMsg = msgsArray.length > 0 ? msgsArray[msgsArray.length - 1] : null
+                  const lastMsgTs = lastMsg?.t ? lastMsg.t * 1000 : null
 
                   return {
                     id: c.id?._serialized || '',
@@ -1227,19 +1229,25 @@ async function syncChatHistory(state: ClientState): Promise<void> {
                 contactPhone = chat.id.replace('@c.us', '')
               }
 
+              // Only include last_message_at if we have a real timestamp
+              // (avoids overwriting existing timestamps with null on re-sync)
+              const convData: any = {
+                connection_id: cachedConnId,
+                user_id: state.userId,
+                company_id: state.companyId,
+                contact_phone: contactPhone,
+                contact_name: chat.name,
+                last_message_preview: chat.lastMsgBody?.substring(0, 200) || null,
+                unread_count: chat.unreadCount,
+                updated_at: new Date().toISOString()
+              }
+              if (chat.lastMsgTimestamp) {
+                convData.last_message_at = new Date(chat.lastMsgTimestamp).toISOString()
+              }
+
               await supabaseAdmin
                 .from('whatsapp_conversations')
-                .upsert({
-                  connection_id: cachedConnId,
-                  user_id: state.userId,
-                  company_id: state.companyId,
-                  contact_phone: contactPhone,
-                  contact_name: chat.name,
-                  last_message_at: chat.lastMsgTimestamp ? new Date(chat.lastMsgTimestamp).toISOString() : null,
-                  last_message_preview: chat.lastMsgBody?.substring(0, 200) || null,
-                  unread_count: chat.unreadCount,
-                  updated_at: new Date().toISOString()
-                }, { onConflict: 'connection_id,contact_phone' })
+                .upsert(convData, { onConflict: 'connection_id,contact_phone' })
 
               savedCount++
             } catch (err: any) {
