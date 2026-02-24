@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getClientState } from '@/lib/whatsapp-client'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,34 +26,30 @@ export async function GET(request: Request) {
 
     const userIds = employees.map(e => e.user_id)
 
-    // Fetch Google Calendar and WhatsApp connections in parallel
-    const [googleRes, whatsappRes] = await Promise.all([
-      supabaseAdmin
-        .from('google_calendar_connections')
-        .select('user_id, status')
-        .in('user_id', userIds),
-      supabaseAdmin
-        .from('whatsapp_connections')
-        .select('user_id, status, display_phone_number')
-        .in('user_id', userIds),
-    ])
+    // Fetch Google Calendar connections from DB
+    const { data: googleData } = await supabaseAdmin
+      .from('google_calendar_connections')
+      .select('user_id, status')
+      .in('user_id', userIds)
 
-    // Build map: { user_id: { google: boolean, whatsapp: boolean, whatsappPhone: string | null } }
+    // Build map
     const connections: Record<string, { google: boolean; whatsapp: boolean; whatsappPhone: string | null }> = {}
 
     for (const uid of userIds) {
-      connections[uid] = { google: false, whatsapp: false, whatsappPhone: null }
-    }
+      // WhatsApp: check in-memory client state (real-time, source of truth)
+      const waState = getClientState(uid)
+      const waConnected = waState?.status === 'connected'
 
-    for (const gc of googleRes.data || []) {
-      if (gc.status === 'active' || gc.status === 'expired') {
-        connections[gc.user_id] = { ...connections[gc.user_id], google: true }
+      connections[uid] = {
+        google: false,
+        whatsapp: waConnected,
+        whatsappPhone: waConnected ? (waState.phoneNumber || null) : null
       }
     }
 
-    for (const wc of whatsappRes.data || []) {
-      if (wc.status === 'active') {
-        connections[wc.user_id] = { ...connections[wc.user_id], whatsapp: true, whatsappPhone: wc.display_phone_number || null }
+    for (const gc of googleData || []) {
+      if (gc.status === 'active' || gc.status === 'expired') {
+        connections[gc.user_id] = { ...connections[gc.user_id], google: true }
       }
     }
 
