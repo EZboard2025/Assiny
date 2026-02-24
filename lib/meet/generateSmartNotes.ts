@@ -108,17 +108,6 @@ Se durante a reuniao foram realizados comparativos, simulacoes, calculos de ROI,
 Isso e frequentemente o momento decisivo da reuniao e deve ser documentado com precisao.
 
 ═══════════════════════════════════════
-PROXIMOS PASSOS (OBRIGATORIO)
-═══════════════════════════════════════
-
-Extraia TODOS os compromissos e acoes mencionados:
-- Quem e responsavel: "seller" (vendedor), "client" (cliente), "both" (ambos)
-- Prazo: data/periodo mencionado ou null
-- Status: "agreed" (explicitamente acordado), "suggested" (proposto mas nao confirmado), "pending" (implicitamente necessario)
-
-Seja ESPECIFICO. "Enviar proposta" e vago. "Enviar proposta detalhada com 3 cenarios de preco ate sexta-feira" e excelente.
-
-═══════════════════════════════════════
 STATUS DO DEAL (OBRIGATORIO)
 ═══════════════════════════════════════
 
@@ -158,15 +147,6 @@ Retorne APENAS JSON valido (sem markdown, sem codigo):
           "sub_items": ["Sub-ponto detalhado 1", "Sub-ponto detalhado 2"]
         }
       ]
-    }
-  ],
-
-  "next_steps": [
-    {
-      "action": "Descricao ESPECIFICA da acao concreta",
-      "owner": "seller|client|both",
-      "deadline": "Prazo mencionado ou null",
-      "status": "agreed|suggested|pending"
     }
   ],
 
@@ -343,10 +323,6 @@ Gere notas inteligentes no formato JSON especificado. Lembre-se:
     return { success: false, error: 'Estrutura de notas invalida - sections ausente' }
   }
 
-  if (!notes.next_steps || !Array.isArray(notes.next_steps)) {
-    notes.next_steps = []
-  }
-
   if (!notes.deal_status) {
     notes.deal_status = {
       temperature: 'warm',
@@ -382,7 +358,7 @@ Gere notas inteligentes no formato JSON especificado. Lembre-se:
   // Add metadata
   notes.generated_at = new Date().toISOString()
 
-  console.log(`[SmartNotes] Notas geradas: ${notes.sections.length} secoes, ${notes.next_steps.length} proximos passos, temperatura: ${notes.deal_status.temperature}`)
+  console.log(`[SmartNotes] Notas geradas: ${notes.sections.length} secoes, temperatura: ${notes.deal_status.temperature}`)
 
   return { success: true, notes }
 }

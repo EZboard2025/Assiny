@@ -2086,204 +2086,170 @@ export default function MeetAnalysisView() {
                 </div>
               </div>
 
-              {/* Content */}
-              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                {/* SPIN Scores */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Metodologia SPIN</h3>
-                  <div className="grid grid-cols-4 gap-4">
-                    {['S', 'P', 'I', 'N'].map((letter) => {
+              {/* Content — Report style */}
+              <div className="px-8 py-6 max-h-[70vh] overflow-y-auto text-[15px] leading-relaxed text-gray-700">
+
+                {/* Executive Summary */}
+                {evaluation.executive_summary && (
+                  <section className="mb-6">
+                    <p className="whitespace-pre-line">{evaluation.executive_summary}</p>
+                  </section>
+                )}
+
+                {/* SPIN */}
+                <section className="mb-6">
+                  <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">Metodologia SPIN</h3>
+                  <div className="space-y-4">
+                    {(['S', 'P', 'I', 'N'] as const).map((letter) => {
                       const spinData = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]
-                      const score = spinData?.final_score || 0
-                      const color = score >= 7 ? 'text-green-600 bg-green-50 border-green-200' : score >= 5 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'
+                      if (!spinData) return null
+                      const score = spinData.final_score ?? 0
+                      const scoreColor = score >= 7 ? 'text-green-600' : score >= 5 ? 'text-amber-600' : 'text-red-600'
                       const labels: Record<string, string> = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
                       return (
-                        <div key={letter} className={`rounded-xl p-4 border ${color.split(' ').slice(1).join(' ')}`}>
-                          <div className={`text-3xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
-                          <div className="text-gray-600 text-sm font-medium">{labels[letter]}</div>
-                          {spinData?.technical_feedback && (
-                            <p className="text-xs text-gray-500 mt-2 line-clamp-3">{spinData.technical_feedback}</p>
+                        <div key={letter}>
+                          <p className="mb-0.5">
+                            <span className="font-semibold text-gray-900">{labels[letter]}</span>
+                            <span className={`ml-2 font-bold ${scoreColor}`}>{score.toFixed(1)}</span>
+                          </p>
+                          {spinData.technical_feedback && (
+                            <p className="text-gray-600 text-sm">{spinData.technical_feedback}</p>
+                          )}
+                          {spinData.missed_opportunities && spinData.missed_opportunities.length > 0 && (
+                            <ul className="mt-1 ml-4 text-sm text-amber-700 list-disc">
+                              {spinData.missed_opportunities.map((opp: string, i: number) => (
+                                <li key={i}>{opp}</li>
+                              ))}
+                            </ul>
                           )}
                         </div>
                       )
                     })}
                   </div>
-                </div>
-
-                {/* Playbook Adherence */}
-                {evaluation.playbook_adherence && (
-                  <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <div className="flex items-center gap-2 mb-4">
-                      <BookOpen className="w-5 h-5 text-green-600" />
-                      <h3 className="text-lg font-bold text-gray-900">Aderência ao Playbook</h3>
-                      <span className={`ml-auto px-3 py-1 rounded-full text-sm font-bold ${
-                        evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-800' :
-                        evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-green-50 text-green-700' :
-                        evaluation.playbook_adherence.adherence_level === 'partial' ? 'bg-amber-100 text-amber-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {evaluation.playbook_adherence.overall_adherence_score}% - {
-                          evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'Exemplar' :
-                          evaluation.playbook_adherence.adherence_level === 'compliant' ? 'Conforme' :
-                          evaluation.playbook_adherence.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'
-                        }
-                      </span>
-                    </div>
-
-                    {/* Dimensions */}
-                    <div className="grid grid-cols-5 gap-3 mb-4">
-                      {Object.entries(evaluation.playbook_adherence.dimensions || {}).map(([key, dim]) => {
-                        if (!dim) return null
-                        const dimLabels: Record<string, string> = {
-                          opening: 'Abertura',
-                          closing: 'Fechamento',
-                          conduct: 'Conduta',
-                          required_scripts: 'Scripts',
-                          process: 'Processo'
-                        }
-                        const scoreColor = dim.score >= 70 ? 'text-green-600 bg-green-50 border-green-200' : dim.score >= 50 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'
-                        return (
-                          <div key={key} className={`rounded-lg p-3 text-center border ${scoreColor.split(' ').slice(1).join(' ')}`}>
-                            <div className={`text-xl font-bold ${scoreColor.split(' ')[0]}`}>{dim.score}%</div>
-                            <div className="text-xs text-gray-600">{dimLabels[key] || key}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Violations */}
-                    {evaluation.playbook_adherence.violations && evaluation.playbook_adherence.violations.length > 0 && (
-                      <div className="bg-red-50 rounded-lg p-3 mb-3 border border-red-200">
-                        <h4 className="text-sm font-bold text-red-800 mb-2">Violações</h4>
-                        <ul className="space-y-1">
-                          {evaluation.playbook_adherence.violations.map((v: any, i: number) => (
-                            <li key={i} className="text-sm text-red-700 flex items-start gap-1">
-                              <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              {typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Exemplary Moments */}
-                    {evaluation.playbook_adherence.exemplary_moments && evaluation.playbook_adherence.exemplary_moments.length > 0 && (
-                      <div className="bg-green-50 rounded-lg p-3 mb-3 border border-green-200">
-                        <h4 className="text-sm font-bold text-green-800 mb-2">Momentos Exemplares</h4>
-                        <ul className="space-y-2">
-                          {evaluation.playbook_adherence.exemplary_moments.map((m: any, i: number) => (
-                            <li key={i} className="text-sm text-green-700">
-                              <div className="flex items-start gap-1">
-                                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                                <span className="font-medium">{typeof m === 'string' ? m : m?.criterion || ''}</span>
-                              </div>
-                              {typeof m === 'object' && m?.evidence && (
-                                <p className="text-green-600 text-xs ml-5 mt-0.5">{m.evidence}</p>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Coaching Notes */}
-                    {evaluation.playbook_adherence.coaching_notes && (
-                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                        <h4 className="text-sm font-bold text-gray-700 mb-1">Notas de Coaching</h4>
-                        <p className="text-sm text-gray-600">{evaluation.playbook_adherence.coaching_notes}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Executive Summary */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Resumo Executivo</h3>
-                  <p className="text-gray-700 whitespace-pre-line">{evaluation.executive_summary}</p>
-                </div>
+                </section>
 
                 {/* Strengths & Gaps */}
-                <div className="grid grid-cols-2 gap-4">
-                  {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
-                    <div className="bg-white rounded-xl p-5 border border-gray-200">
-                      <h4 className="text-md font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        Pontos Fortes
-                      </h4>
-                      <ul className="space-y-2">
-                        {evaluation.top_strengths.map((strength, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-gray-700 text-sm">
-                            <span className="text-green-500 mt-0.5">•</span>
-                            <span>{strength}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
-                    <div className="bg-white rounded-xl p-5 border border-gray-200">
-                      <h4 className="text-md font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-amber-600" />
-                        Gaps Críticos
-                      </h4>
-                      <ul className="space-y-2">
-                        {evaluation.critical_gaps.map((gap, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-gray-700 text-sm">
-                            <span className="text-amber-500 mt-0.5">•</span>
-                            <span>{gap}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+                {((evaluation.top_strengths && evaluation.top_strengths.length > 0) || (evaluation.critical_gaps && evaluation.critical_gaps.length > 0)) && (
+                  <section className="mb-6">
+                    <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">Pontos Fortes e Gaps</h3>
+                    {evaluation.top_strengths && evaluation.top_strengths.length > 0 && (
+                      <div className="mb-3">
+                        <p className="font-semibold text-green-700 text-sm mb-1">Pontos Fortes</p>
+                        <ul className="ml-4 list-disc space-y-0.5">
+                          {evaluation.top_strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    {evaluation.critical_gaps && evaluation.critical_gaps.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-amber-700 text-sm mb-1">Gaps Críticos</p>
+                        <ul className="ml-4 list-disc space-y-0.5">
+                          {evaluation.critical_gaps.map((g: string, i: number) => <li key={i}>{g}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </section>
+                )}
 
-                {/* Objections Analysis */}
+                {/* Objections */}
                 {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
-                  <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Análise de Objeções</h3>
-                    <div className="space-y-4">
-                      {evaluation.objections_analysis.map((obj, idx) => (
-                        <div key={idx} className="border-l-4 border-green-400 pl-4 py-2 bg-gray-50 rounded-r-lg">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
-                              {obj.objection_type}
+                  <section className="mb-6">
+                    <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">Objeções Identificadas</h3>
+                    <div className="space-y-3">
+                      {evaluation.objections_analysis.map((obj: any, idx: number) => (
+                        <div key={idx}>
+                          <p className="mb-0.5">
+                            <span className="font-semibold text-gray-900">{obj.objection_type || `Objeção ${idx + 1}`}</span>
+                            <span className={`ml-2 text-sm font-bold ${(obj.score ?? 0) >= 7 ? 'text-green-600' : (obj.score ?? 0) >= 5 ? 'text-amber-600' : 'text-red-600'}`}>
+                              {obj.score}/10
                             </span>
-                            <span className={`text-sm font-bold ${obj.score >= 7 ? 'text-green-600' : obj.score >= 5 ? 'text-amber-600' : 'text-red-600'}`}>
-                              Nota: {obj.score}/10
-                            </span>
-                          </div>
-                          <p className="text-gray-600 text-sm italic mb-2">"{obj.objection_text}"</p>
-                          <p className="text-gray-700 text-sm">{obj.detailed_analysis}</p>
+                          </p>
+                          {obj.objection_text && <p className="text-gray-500 text-sm italic">"{obj.objection_text}"</p>}
+                          {obj.detailed_analysis && <p className="text-sm">{obj.detailed_analysis}</p>}
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </section>
+                )}
+
+                {/* Playbook Adherence */}
+                {evaluation.playbook_adherence && (
+                  <section className="mb-6">
+                    <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">
+                      Aderência ao Playbook
+                      <span className={`ml-2 text-sm font-bold ${
+                        (evaluation.playbook_adherence.overall_adherence_score ?? 0) >= 70 ? 'text-green-600' :
+                        (evaluation.playbook_adherence.overall_adherence_score ?? 0) >= 50 ? 'text-amber-600' : 'text-red-600'
+                      }`}>
+                        {evaluation.playbook_adherence.overall_adherence_score}%
+                      </span>
+                    </h3>
+
+                    {evaluation.playbook_adherence.dimensions && (
+                      <div className="mb-3">
+                        {Object.entries(evaluation.playbook_adherence.dimensions).map(([key, dim]: [string, any]) => {
+                          if (!dim) return null
+                          const dimLabels: Record<string, string> = { opening: 'Abertura', closing: 'Fechamento', conduct: 'Conduta', required_scripts: 'Scripts', process: 'Processo' }
+                          const scoreColor = dim.score >= 70 ? 'text-green-600' : dim.score >= 50 ? 'text-amber-600' : 'text-red-600'
+                          return (
+                            <p key={key} className="text-sm">
+                              <span className="text-gray-600">{dimLabels[key] || key}:</span>
+                              <span className={`ml-1 font-semibold ${scoreColor}`}>{dim.score}%</span>
+                            </p>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {evaluation.playbook_adherence.violations && evaluation.playbook_adherence.violations.length > 0 && (
+                      <div className="mb-2">
+                        <p className="font-semibold text-red-700 text-sm mb-1">Violações</p>
+                        <ul className="ml-4 list-disc text-sm text-red-700 space-y-0.5">
+                          {evaluation.playbook_adherence.violations.map((v: any, i: number) => (
+                            <li key={i}>{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {evaluation.playbook_adherence.exemplary_moments && evaluation.playbook_adherence.exemplary_moments.length > 0 && (
+                      <div className="mb-2">
+                        <p className="font-semibold text-green-700 text-sm mb-1">Momentos Exemplares</p>
+                        <ul className="ml-4 list-disc text-sm text-green-700 space-y-0.5">
+                          {evaluation.playbook_adherence.exemplary_moments.map((m: any, i: number) => (
+                            <li key={i}>{typeof m === 'string' ? m : m?.criterion || ''}{typeof m === 'object' && m?.evidence ? ` — ${m.evidence}` : ''}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {evaluation.playbook_adherence.coaching_notes && (
+                      <p className="text-sm text-gray-600 mt-2"><span className="font-semibold">Coaching:</span> {evaluation.playbook_adherence.coaching_notes}</p>
+                    )}
+                  </section>
                 )}
 
                 {/* Priority Improvements */}
                 {evaluation.priority_improvements && evaluation.priority_improvements.length > 0 && (
-                  <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Melhorias Prioritárias</h3>
+                  <section className="mb-6">
+                    <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">Melhorias Prioritárias</h3>
                     <div className="space-y-3">
-                      {evaluation.priority_improvements.map((imp, idx) => (
-                        <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                              imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
-                              imp.priority === 'high' ? 'bg-amber-100 text-amber-700' :
-                              'bg-green-100 text-green-700'
+                      {evaluation.priority_improvements.map((imp: any, idx: number) => (
+                        <div key={idx}>
+                          <p className="font-semibold text-gray-900 text-sm">
+                            {imp.area}
+                            <span className={`ml-2 text-xs font-medium ${
+                              imp.priority === 'critical' ? 'text-red-600' : imp.priority === 'high' ? 'text-amber-600' : 'text-green-600'
                             }`}>
-                              {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
+                              ({imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'})
                             </span>
-                            <span className="font-semibold text-gray-900">{imp.area}</span>
-                          </div>
-                          <p className="text-gray-600 text-sm mb-1"><strong>Gap:</strong> {imp.current_gap}</p>
-                          <p className="text-gray-700 text-sm"><strong>Plano:</strong> {imp.action_plan}</p>
+                          </p>
+                          {imp.current_gap && <p className="text-sm text-gray-600">{imp.current_gap}</p>}
+                          {imp.action_plan && <p className="text-sm text-gray-700"><span className="font-medium">Plano:</span> {imp.action_plan}</p>}
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </section>
                 )}
 
                 {/* Simulation Loading */}

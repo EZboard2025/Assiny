@@ -38,23 +38,6 @@ export function buildSmartNotesHtml(notes: any): string {
     }
   }
 
-  // Next steps
-  if (notes.next_steps?.length) {
-    html += `<div style="margin-bottom:12px">
-      <p style="color:#111827;font-size:13px;font-weight:700;margin:0 0 8px">Próximos Passos</p>`
-    notes.next_steps.forEach((step: any, idx: number) => {
-      const ownerLabel = step.owner === 'seller' ? 'Vendedor' : step.owner === 'client' ? 'Cliente' : 'Ambos'
-      html += `<div style="margin-bottom:8px;display:flex;gap:8px">
-        <span style="background:#dcfce7;color:#15803d;width:20px;height:20px;border-radius:50%;display:inline-block;text-align:center;line-height:20px;font-size:11px;font-weight:700;flex-shrink:0">${idx + 1}</span>
-        <div>
-          <p style="color:#374151;font-size:13px;margin:0;line-height:1.4">${escHtml(step.action)}</p>
-          <p style="color:#9ca3af;font-size:11px;margin:2px 0 0">${escHtml(ownerLabel)}${step.deadline ? ` · ${escHtml(step.deadline)}` : ''}</p>
-        </div>
-      </div>`
-    })
-    html += '</div>'
-  }
-
   // Deal status
   if (notes.deal_status) {
     const tempLabel = notes.deal_status.temperature === 'hot' ? 'Quente' : notes.deal_status.temperature === 'warm' ? 'Morno' : 'Frio'

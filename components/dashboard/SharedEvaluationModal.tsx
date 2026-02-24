@@ -74,14 +74,6 @@ function formatSmartNotesText(notes: any): string {
     lines.push('')
   })
 
-  if (notes.next_steps?.length) {
-    lines.push('## Próximos Passos')
-    notes.next_steps.forEach((step: any, i: number) => {
-      lines.push(`${i + 1}. ${step.action}${step.deadline ? ` (${step.deadline})` : ''}`)
-    })
-    lines.push('')
-  }
-
   if (notes.deal_status) {
     lines.push('## Status da Oportunidade')
     if (notes.deal_status.summary) lines.push(notes.deal_status.summary)
@@ -268,41 +260,6 @@ export default function SharedEvaluationModal({ shareId, userId, onClose }: Shar
                       )
                     })}
                   </div>
-
-                  {/* Next Steps */}
-                  {notes.next_steps?.length > 0 && (
-                    <div className="bg-green-50/50 border border-green-100 rounded-lg p-3 mt-3">
-                      <h4 className="text-xs font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                        <CheckCircle className="w-3.5 h-3.5 text-green-600" /> Próximos Passos
-                      </h4>
-                      <div className="space-y-1.5">
-                        {notes.next_steps.map((step: any, idx: number) => (
-                          <div key={idx} className="flex items-start gap-2">
-                            <span className="w-4 h-4 bg-green-100 text-green-700 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
-                              {idx + 1}
-                            </span>
-                            <div className="flex-1">
-                              <p className="text-xs text-gray-800">{step.action}</p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${
-                                  step.owner === 'seller' ? 'bg-blue-100 text-blue-700' :
-                                  step.owner === 'client' ? 'bg-purple-100 text-purple-700' :
-                                  'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {step.owner === 'seller' ? 'Vendedor' : step.owner === 'client' ? 'Cliente' : 'Ambos'}
-                                </span>
-                                {step.deadline && (
-                                  <span className="text-[9px] text-gray-500 flex items-center gap-0.5">
-                                    <Clock className="w-2.5 h-2.5" /> {step.deadline}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Deal Status */}
                   {notes.deal_status && (
