@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, Loader2, MessageCircle, Image as ImageIcon, FileText, Mic, Eye, X, User } from 'lucide-react'
+import { Search, Loader2, MessageCircle, Image as ImageIcon, FileText, Mic, Eye, X, User, Download } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -92,7 +98,20 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
   const [loadingConvs, setLoadingConvs] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [search, setSearch] = useState('')
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthToken(data.session?.access_token || null)
+    })
+  }, [])
+
+  const getMediaSrc = (mediaId: string) => {
+    if (!authToken) return ''
+    return `/api/whatsapp/media/${encodeURIComponent(mediaId)}?token=${encodeURIComponent(authToken)}`
+  }
 
   useEffect(() => {
     loadConversations()
@@ -293,7 +312,7 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
                         </span>
                       </div>
                       {group.msgs.map(msg => (
-                        <MessageBubble key={msg.id} msg={msg} />
+                        <MessageBubble key={msg.id} msg={msg} getMediaSrc={getMediaSrc} onImageClick={setLightboxImage} />
                       ))}
                     </div>
                   ))}
@@ -310,17 +329,35 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
           </>
         )}
       </div>
+      {/* Image lightbox */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center cursor-pointer"
+          onClick={() => setLightboxImage(null)}
+        >
+          <img src={lightboxImage} className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" alt="" />
+          <button className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30">
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Message Bubble ───────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: Message }) {
+function MessageBubble({ msg, getMediaSrc, onImageClick }: {
+  msg: Message
+  getMediaSrc: (mediaId: string) => string
+  onImageClick: (src: string) => void
+}) {
   const isOutbound = msg.direction === 'outbound'
   const isImage = msg.message_type === 'image' || msg.media_mime_type?.startsWith('image/')
   const isAudio = msg.message_type === 'ptt' || msg.message_type === 'audio' || msg.media_mime_type?.startsWith('audio/')
   const isDocument = msg.message_type === 'document'
+  const isVideo = msg.message_type === 'video'
+  const isSticker = msg.message_type === 'sticker'
 
   return (
     <div className={`flex mb-1 ${isOutbound ? 'justify-end' : 'justify-start'}`}>
@@ -330,12 +367,32 @@ function MessageBubble({ msg }: { msg: Message }) {
           : 'bg-white border border-gray-200'
       }`}>
         {/* Image */}
-        {isImage && msg.media_id && (
+        {isImage && !isSticker && msg.media_id && (
           <img
-            src={`/api/whatsapp/media/${msg.media_id}`}
-            className="max-w-full rounded-md mb-1"
+            src={getMediaSrc(msg.media_id)}
+            className="max-w-full rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
             style={{ maxHeight: '200px' }}
             alt=""
+            onClick={() => onImageClick(getMediaSrc(msg.media_id!))}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.style.display = 'none'
+              target.insertAdjacentHTML('afterend', '<div class="flex items-center gap-1.5 py-2"><span class="text-gray-400 text-[10px]">📷 Foto</span></div>')
+            }}
+          />
+        )}
+
+        {/* Sticker */}
+        {isSticker && msg.media_id && (
+          <img
+            src={getMediaSrc(msg.media_id)}
+            className="max-w-[120px] max-h-[120px] mb-1"
+            alt="Sticker"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.style.display = 'none'
+              target.insertAdjacentHTML('afterend', '<span class="text-gray-400 text-[10px] italic">🎨 Sticker</span>')
+            }}
           />
         )}
 
@@ -345,24 +402,42 @@ function MessageBubble({ msg }: { msg: Message }) {
             <Mic className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
             {msg.media_id ? (
               <audio controls className="h-7 max-w-[200px]" style={{ minWidth: '160px' }}>
-                <source src={`/api/whatsapp/media/${msg.media_id}`} />
+                <source src={getMediaSrc(msg.media_id)} />
               </audio>
             ) : (
-              <span className="text-[10px] text-gray-500 italic">Audio</span>
+              <span className="text-[10px] text-gray-500 italic">Audio indisponivel</span>
             )}
+          </div>
+        )}
+
+        {/* Video */}
+        {isVideo && (
+          <div className="flex items-center gap-2 mb-1 bg-gray-100 rounded px-2 py-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span className="text-[10px] text-gray-500">Video</span>
           </div>
         )}
 
         {/* Document */}
         {isDocument && (
-          <div className="flex items-center gap-1.5 mb-1">
-            <FileText className="w-3.5 h-3.5 text-blue-500" />
-            <span className="text-[10px] text-blue-600">Documento</span>
+          <div className="flex items-center gap-1.5 mb-1 bg-gray-100 rounded px-2 py-1.5">
+            <FileText className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            <span className="text-[10px] text-blue-600 truncate flex-1">{msg.content || 'Documento'}</span>
+            {msg.media_id && (
+              <a
+                href={getMediaSrc(msg.media_id)}
+                download
+                className="text-blue-500 hover:text-blue-700 flex-shrink-0"
+                onClick={e => e.stopPropagation()}
+              >
+                <Download className="w-3.5 h-3.5" />
+              </a>
+            )}
           </div>
         )}
 
-        {/* Text content */}
-        {msg.content && (
+        {/* Text content (skip for document/sticker since they already show content) */}
+        {msg.content && !isDocument && !isSticker && (
           <p className="text-[12px] text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
             {msg.content}
           </p>
