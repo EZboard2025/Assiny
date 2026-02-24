@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Loader2, CalendarDays, Clock, ChevronDown, Video, X, TrendingUp, TrendingDown, Search, Settings, Zap, Target } from 'lucide-react'
+import { Loader2, CalendarDays, Clock, ChevronDown, Video, X, TrendingUp, TrendingDown, Search, Settings, Zap, Target, Award, User, BarChart3, Activity } from 'lucide-react'
 import CalendarWeekView from '../CalendarWeekView'
 import MiniCalendar from '../MiniCalendar'
 import MeetHistoryContent from '../MeetHistoryContent'
 import SellerWhatsAppViewer from './SellerWhatsAppViewer'
+import EvolutionChart from '../perfil/EvolutionChart'
+import type { ChartDataPoint } from '../PerfilView'
 import type { SellerPerformance } from './SellerGrid'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -31,6 +33,14 @@ interface CalendarEventRaw {
   botStatus: string
   evaluationId?: string | null
 }
+
+interface MeetEvaluation {
+  id: string
+  overall_score: number
+  created_at: string
+}
+
+type PerformanceTab = 'geral' | 'spin'
 
 interface SellerDetailViewProps {
   seller: SellerPerformance
@@ -101,6 +111,8 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
   const [whatsappConn, setWhatsappConn] = useState<WhatsAppConnection>({ connected: false, phone: null })
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventRaw[]>([])
   const [upcomingMeetings, setUpcomingMeetings] = useState<CalendarEventRaw[]>([])
+  const [meetEvaluations, setMeetEvaluations] = useState<MeetEvaluation[]>([])
+  const [perfTab, setPerfTab] = useState<PerformanceTab>('geral')
 
   // Collapsible sections
   const [meetingsOpen, setMeetingsOpen] = useState(true)
@@ -128,16 +140,26 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
       const companyId = await getCompanyId()
       const headers = { 'x-company-id': companyId || '' }
 
-      const [calendarRes, connectionsRes] = await Promise.all([
+      const [calendarRes, connectionsRes, meetRes] = await Promise.all([
         fetch(`/api/admin/seller-calendar?sellerId=${seller.user_id}`, { headers, signal }),
-        fetch('/api/admin/seller-connections', { headers, signal })
+        fetch('/api/admin/seller-connections', { headers, signal }),
+        fetch(`/api/admin/seller-meet-history?sellerId=${seller.user_id}`, { headers, signal })
       ])
       const calendarData = await calendarRes.json()
       const connectionsData = await connectionsRes.json()
+      const meetData = await meetRes.json()
 
       setConnection(calendarData.connection || { connected: false, googleEmail: null })
       setCalendarEvents(calendarData.allEvents || [])
       setUpcomingMeetings(calendarData.upcomingMeetings || [])
+
+      if (meetData.evaluations) {
+        setMeetEvaluations(meetData.evaluations.map((e: any) => ({
+          id: e.id,
+          overall_score: e.overall_score ? (e.overall_score > 10 ? e.overall_score / 10 : e.overall_score) : 0,
+          created_at: e.created_at
+        })).filter((e: MeetEvaluation) => e.overall_score > 0))
+      }
 
       // WhatsApp connection status
       const sellerConn = connectionsData.data?.[seller.user_id]
@@ -152,6 +174,37 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
       setLoading(false)
     }
   }
+
+  // ── Computed performance data ─────────────────────────────────────────
+  const { chartData, bestScore, trendValue, latestSession } = useMemo(() => {
+    const timeline = [...(seller.timeline || [])].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )
+    const allPoints: Array<{ roleplay: number | null; meet: number | null; timestamp: number; type: 'roleplay' | 'meet' }> = []
+    timeline.forEach(s => {
+      if (s.overall_score > 0) allPoints.push({ roleplay: s.overall_score, meet: null, timestamp: new Date(s.created_at).getTime(), type: 'roleplay' })
+    })
+    meetEvaluations.forEach(me => {
+      if (me.overall_score > 0) allPoints.push({ roleplay: null, meet: me.overall_score, timestamp: new Date(me.created_at).getTime(), type: 'meet' })
+    })
+    allPoints.sort((a, b) => a.timestamp - b.timestamp)
+    let rCount = 0, mCount = 0
+    const chartData: ChartDataPoint[] = allPoints.map(p => {
+      if (p.type === 'roleplay') { rCount++; return { label: `R#${rCount}`, roleplay: p.roleplay, meet: null } }
+      else { mCount++; return { label: `M#${mCount}`, roleplay: null, meet: p.meet } }
+    })
+    const allScores = timeline.map(s => s.overall_score).filter(s => s > 0)
+    const bestScore = allScores.length > 0 ? Math.max(...allScores) : 0
+    let trendValue = 0
+    if (allScores.length >= 2) trendValue = allScores[allScores.length - 1] - allScores[allScores.length - 2]
+    let latestSession: { label: string; score: number; improvement: number } | null = null
+    if (timeline.length > 0) {
+      const last = timeline[timeline.length - 1]
+      const prev = timeline.length > 1 ? timeline[timeline.length - 2] : null
+      latestSession = { label: `R#${timeline.length}`, score: last.overall_score, improvement: prev ? last.overall_score - prev.overall_score : 0 }
+    }
+    return { chartData, bestScore, trendValue, latestSession }
+  }, [seller.timeline, meetEvaluations])
 
   // Convert calendar events to CalendarWeekView format
   const weekViewEvents = useMemo(() =>
@@ -198,80 +251,208 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
   return (
     <div className="space-y-4">
-      {/* ── Performance Summary (full width) ─────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <div className="flex items-center gap-6 flex-wrap lg:flex-nowrap">
-          {/* Score */}
-          <div className="text-center flex-shrink-0">
+      {/* ── Performance Header (PerfilView style) ──────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Col 1 — Seller Info + Score */}
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+          <h2 className="text-xl font-bold text-gray-900 mb-0.5">{seller.user_name}</h2>
+          <p className="text-gray-500 text-xs flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 bg-green-500 rounded-full" />
+            {seller.user_email}
+          </p>
+          <div className="flex justify-center mb-4">
+            <div className="w-20 h-20 rounded-full bg-green-50 flex items-center justify-center">
+              <User className="w-10 h-10 text-green-600" />
+            </div>
+          </div>
+          <div className="text-center">
             <p className={`text-3xl font-bold ${seller.total_sessions > 0 ? getScoreColor(seller.overall_average) : 'text-gray-300'}`}>
               {seller.total_sessions > 0 ? seller.overall_average.toFixed(1) : '—'}
             </p>
-            <p className="text-[10px] text-gray-400 font-medium">Nota Geral</p>
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Nota Geral</p>
           </div>
-          <div className="h-10 w-px bg-gray-200 hidden lg:block" />
-          {/* Sessions + Trend */}
-          <div className="flex gap-6 flex-shrink-0">
-            <div className="text-center">
-              <p className="text-lg font-bold text-gray-900">{seller.total_sessions}</p>
-              <p className="text-[10px] text-gray-400 font-medium">Treinos</p>
+        </div>
+
+        {/* Col 2 — KPI Stats */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm text-center">
+              <Award className="w-5 h-5 text-green-600 mx-auto mb-2" />
+              <p className={`text-2xl font-bold ${bestScore >= 7 ? 'text-green-600' : bestScore >= 5 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                {seller.total_sessions > 0 ? bestScore.toFixed(1) : '—'}
+              </p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Melhor Nota</p>
             </div>
-            <div className="text-center">
-              {seller.trend === 'improving' ? (
-                <div className="flex items-center justify-center gap-1">
-                  <TrendingUp className="w-4 h-4 text-green-500" />
-                  <span className="text-sm font-bold text-green-600">Subindo</span>
-                </div>
-              ) : seller.trend === 'declining' ? (
-                <div className="flex items-center justify-center gap-1">
-                  <TrendingDown className="w-4 h-4 text-red-500" />
-                  <span className="text-sm font-bold text-red-500">Caindo</span>
-                </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm text-center">
+              {trendValue >= 0 ? (
+                <TrendingUp className="w-5 h-5 text-green-600 mx-auto mb-2" />
               ) : (
-                <p className="text-sm font-bold text-gray-400">Estável</p>
+                <TrendingDown className="w-5 h-5 text-red-500 mx-auto mb-2" />
               )}
-              <p className="text-[10px] text-gray-400 font-medium">Tendência</p>
+              <p className={`text-2xl font-bold ${trendValue >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {seller.total_sessions > 0 ? `${trendValue >= 0 ? '+' : ''}${trendValue.toFixed(1)}` : '—'}
+              </p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Tendencia</p>
             </div>
           </div>
-          <div className="h-10 w-px bg-gray-200 hidden lg:block" />
-          {/* SPIN Bars */}
-          <div className="flex-1 min-w-0 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm text-center">
+              <BarChart3 className="w-5 h-5 text-green-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-gray-900">{seller.total_sessions}</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Treinos</p>
+            </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm text-center">
+              <Activity className="w-5 h-5 text-blue-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-gray-900">{meetEvaluations.length}</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Meets</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Col 3 — Top Strengths & Gaps */}
+        <div className="space-y-3">
+          <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
+            <h3 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full" />
+              Pontos Fortes
+            </h3>
+            {seller.top_strengths.length > 0 ? (
+              <div className="space-y-1.5">
+                {seller.top_strengths.slice(0, 4).map((s, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px] text-gray-600">
+                    <span className="text-green-500 mt-0.5 flex-shrink-0">+</span>
+                    <span className="line-clamp-2">{s.text}</span>
+                    {s.count > 1 && <span className="text-[9px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full flex-shrink-0">{s.count}x</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-gray-400">Sem dados ainda</p>
+            )}
+          </div>
+          <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
+            <h3 className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <span className="w-2 h-2 bg-red-500 rounded-full" />
+              Gaps Criticos
+            </h3>
+            {seller.critical_gaps.length > 0 ? (
+              <div className="space-y-1.5">
+                {seller.critical_gaps.slice(0, 4).map((g, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px] text-gray-600">
+                    <span className="text-red-500 mt-0.5 flex-shrink-0">!</span>
+                    <span className="line-clamp-2">{g.text}</span>
+                    {g.count > 1 && <span className="text-[9px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full flex-shrink-0">{g.count}x</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-gray-400">Sem dados ainda</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Performance Tabs ────────────────────────────────────────────── */}
+      <div className="flex border-b border-gray-200 bg-white rounded-t-xl">
+        {([
+          { key: 'geral' as PerformanceTab, label: 'Visão Geral', icon: BarChart3 },
+          { key: 'spin' as PerformanceTab, label: 'Análise SPIN', icon: Zap },
+        ]).map(tab => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setPerfTab(tab.key)}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${
+                perfTab === tab.key
+                  ? 'border-green-500 text-green-700 bg-green-50/50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Tab Content ─────────────────────────────────────────────────── */}
+      {perfTab === 'geral' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Evolution Chart — same toggle as PerfilView */}
+          <div className="lg:col-span-2">
+            <EvolutionChart data={chartData} latestSession={latestSession} loading={false} />
+          </div>
+
+          {/* SPIN Metrics */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center">
+                <Zap className="w-4.5 h-4.5 text-green-600" />
+              </div>
+              <h3 className="text-sm font-bold text-gray-900">Metricas SPIN</h3>
+            </div>
+            <div className="space-y-3">
+              {spinPillars.map(pillar => {
+                const score = seller[`spin_${pillar.key.toLowerCase()}_average` as keyof typeof seller] as number || 0
+                const hasScore = score > 0
+                return (
+                  <div key={pillar.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-8 rounded-full ${hasScore ? getBarColor(score) : 'bg-gray-300'}`} />
+                      <div>
+                        <span className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">{pillar.key}</span>
+                        <p className="text-sm font-semibold text-gray-700">{pillar.label}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xl font-bold ${hasScore ? getScoreColor(score) : 'text-gray-300'}`}>
+                      {hasScore ? score.toFixed(1) : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── SPIN Analysis Tab ──────────────────────────────────────────── */
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {spinPillars.map(pillar => {
               const score = seller[`spin_${pillar.key.toLowerCase()}_average` as keyof typeof seller] as number || 0
+              const hasScore = score > 0
               const PillarIcon = pillar.icon
               return (
-                <div key={pillar.key} className="flex items-center gap-2">
-                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${pillar.bg}`}>
-                    <PillarIcon className={`w-3 h-3 ${pillar.color}`} />
+                <div key={pillar.key} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${pillar.bg}`}>
+                      <PillarIcon className={`w-4 h-4 ${pillar.color}`} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">{pillar.key}</p>
+                      <p className="text-xs font-semibold text-gray-700">{pillar.label}</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-medium text-gray-500 w-5">{pillar.key}</span>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="text-center py-3">
+                    <p className={`text-4xl font-bold ${hasScore ? getScoreColor(score) : 'text-gray-300'}`}>
+                      {hasScore ? score.toFixed(1) : '—'}
+                    </p>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
                     <div
-                      className={`h-full rounded-full transition-all ${getBarColor(score)}`}
+                      className={`h-full rounded-full transition-all ${hasScore ? getBarColor(score) : 'bg-gray-200'}`}
                       style={{ width: `${Math.max((score / 10) * 100, 0)}%` }}
                     />
                   </div>
-                  <span className={`text-[11px] font-bold w-7 text-right ${score > 0 ? getScoreColor(score) : 'text-gray-300'}`}>
-                    {score > 0 ? score.toFixed(1) : '—'}
-                  </span>
+                  <p className="text-[10px] text-gray-400 text-center mt-2">
+                    {hasScore ? (score >= 8 ? 'Excelente' : score >= 6 ? 'Bom' : score >= 4 ? 'Regular' : 'Precisa melhorar') : 'Sem dados'}
+                  </p>
                 </div>
               )
             })}
           </div>
-          {/* WhatsApp Follow-up stats */}
-          {(whatsappSummary.count > 0) && (
-            <>
-              <div className="h-10 w-px bg-gray-200 hidden lg:block" />
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-[10px] text-gray-400 font-medium">Follow-up</span>
-                <span className="text-[10px] text-gray-500">{whatsappSummary.count} análises</span>
-                <span className={`text-xs font-bold ${getScoreColor(whatsappSummary.avg)}`}>
-                  {whatsappSummary.avg.toFixed(1)}
-                </span>
-              </div>
-            </>
-          )}
         </div>
-      </div>
+      )}
 
       {/* ── Grid: Left + Right ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
