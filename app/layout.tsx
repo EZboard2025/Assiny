@@ -6,8 +6,8 @@ import { CompanyProvider } from '@/lib/contexts/CompanyContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Ramppy - Plataforma de Treinamento',
-  description: 'Centro de treinamento e desenvolvimento para vendedores',
+  title: 'Ramppy - Ecossistema Completo de Vendas',
+  description: 'Ecossistema completo de vendas com IA: treinamento, copiloto, follow-up inteligente e an\u00e1lise de performance.',
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',

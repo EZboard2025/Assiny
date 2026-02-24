@@ -142,7 +142,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                       latestMeetEval.overall_score >= 70 ? 'text-green-600' :
                       latestMeetEval.overall_score >= 40 ? 'text-amber-600' : 'text-red-600'
                     }`}>
-                      {Math.round(latestMeetEval.overall_score / 10)}/10
+                      {(latestMeetEval.overall_score / 10).toFixed(1)}/10
                     </span>
                   </>
                 )}
@@ -254,7 +254,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                                   sMeetEval.overall_score >= 70 ? 'text-green-600' :
                                   sMeetEval.overall_score >= 40 ? 'text-amber-600' : 'text-red-600'
                                 }`}>
-                                  Nota: {Math.round(sMeetEval.overall_score / 10)}/10
+                                  Nota: {(sMeetEval.overall_score / 10).toFixed(1)}/10
                                 </span>
                               </>
                             )}
@@ -335,7 +335,7 @@ export default function SavedSimulationCard({ userId }: SavedSimulationCardProps
                             simMeetEval.overall_score >= 70 ? 'text-green-600' :
                             simMeetEval.overall_score >= 40 ? 'text-amber-600' : 'text-red-600'
                           }`}>
-                            Nota: {Math.round(simMeetEval.overall_score / 10)}/10
+                            Nota: {(simMeetEval.overall_score / 10).toFixed(1)}/10
                           </span>
                         </>
                       )}

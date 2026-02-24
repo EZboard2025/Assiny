@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ShieldAlert, Lock, Loader2, ChevronDown, ChevronUp, Search, X, Info } from 'lucide-react'
 import type { Objection } from '@/lib/config'
+import { getObjectionTitle } from '@/lib/utils/objectionTitle'
 
 interface ObjectionSelectorProps {
   objections: Objection[]
@@ -11,29 +12,6 @@ interface ObjectionSelectorProps {
   isConfigLocked: boolean
   hiddenMode: boolean
   dataLoading: boolean
-}
-
-// Extract a short, scannable title from the full objection text
-function getObjectionTitle(name: string): string {
-  let text = name.trim()
-
-  // Remove common leading words that add no meaning
-  text = text
-    .replace(/^(O |A |Os |As |Eu |Nós |Meu |Minha |Nosso |Nossa |Nossos |Nossas |Cliente )/i, '')
-    .trim()
-
-  // Cut at first comma, semicolon, or dash if within reasonable range
-  const breakChars = [',', ';', ' - ', ' — ', ' – ']
-  for (const ch of breakChars) {
-    const idx = text.indexOf(ch)
-    if (idx > 0 && idx < 80) {
-      text = text.substring(0, idx).trim()
-      break
-    }
-  }
-
-  // Capitalize first letter
-  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 export default function ObjectionSelector({

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target, MessageCircle, CheckCheck, Shield, ScrollText, Settings, Building, DollarSign, CreditCard, TrendingDown, Zap, Award, Heart, Star, Flag, Bookmark, Package, Truck, ShoppingCart, Percent, PieChart, Activity, Layers, Database, Lock, Unlock, Eye, Search, Filter, Tag, Hash, ArrowUpRight, ArrowDownRight, Globe, Phone, Mail, MessageSquare, HelpCircle, BarChart, Briefcase, XCircle, Share2, X, Users as UsersIcon, Copy, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 interface MeetEvaluation {
   id: string
@@ -147,6 +148,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedEvaluation, setSelectedEvaluation] = useState<MeetEvaluation | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null })
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set())
   const [simulations, setSimulations] = useState<Record<string, any>>({})
   const [correctionScores, setCorrectionScores] = useState<Record<string, number | null>>({})
@@ -342,8 +344,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
     router.push('/roleplay')
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta avaliação?')) return
+  const handleDelete = (id: string) => {
+    setDeleteConfirm({ open: true, id })
+  }
+
+  const confirmDeleteMeet = async () => {
+    const id = deleteConfirm.id
+    setDeleteConfirm({ open: false, id: null })
+    if (!id) return
 
     try {
       const { error } = await supabase
@@ -485,7 +493,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
   // Normalize score to 0-10 scale (DB stores 0-100)
   const normalizeScore = (score: number | null): number => {
     if (score === null) return 0
-    return score > 10 ? Math.round(score / 10) : score
+    return score > 10 ? score / 10 : score
   }
 
   const getScoreColor = (score: number | null) => {
@@ -609,7 +617,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     <div className="flex items-center gap-3">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${getScoreBg(shared.evaluation?.overall_score)}`}>
                         <span className={`text-lg font-bold ${getScoreColor(shared.evaluation?.overall_score)}`}>
-                          {shared.evaluation?.overall_score !== null ? Math.round(shared.evaluation.overall_score / 10) : '--'}
+                          {shared.evaluation?.overall_score !== null ? (shared.evaluation.overall_score > 10 ? (shared.evaluation.overall_score / 10).toFixed(1) : shared.evaluation.overall_score.toFixed(1)) : '--'}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -692,7 +700,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                       {/* Score */}
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isNew ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${getScoreBg(evaluation.overall_score)}`}>
                         <span className={`text-lg font-bold ${getScoreColor(evaluation.overall_score)}`}>
-                          {evaluation.overall_score !== null ? Math.round(evaluation.overall_score / 10) : '--'}
+                          {evaluation.overall_score !== null ? normalizeScore(evaluation.overall_score).toFixed(1) : '--'}
                         </span>
                       </div>
 
@@ -753,7 +761,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                   <div className="flex items-center gap-3 mb-1.5">
                     <div className={`${isManagerView ? 'w-10 h-10 rounded-lg' : 'w-14 h-14 rounded-xl'} flex items-center justify-center ${getScoreBg(selectedEvaluation.overall_score)}`}>
                       <span className={`${isManagerView ? 'text-lg' : 'text-2xl'} font-bold ${getScoreColor(selectedEvaluation.overall_score)}`}>
-                        {selectedEvaluation.overall_score !== null ? Math.round(selectedEvaluation.overall_score / 10) : '--'}
+                        {selectedEvaluation.overall_score !== null ? normalizeScore(selectedEvaluation.overall_score).toFixed(1) : '--'}
                       </span>
                     </div>
                     <div>
@@ -2203,7 +2211,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     {selectedShared.evaluation?.seller_name || 'Reunião'}
                   </h2>
                   <div className="text-sm text-gray-500 mt-1">
-                    Score: {selectedShared.evaluation?.overall_score ? Math.round(selectedShared.evaluation.overall_score / 10) : '--'}/10
+                    Score: {selectedShared.evaluation?.overall_score ? normalizeScore(selectedShared.evaluation.overall_score).toFixed(1) : '--'}/10
                     {selectedShared.evaluation?.created_at && (
                       <span className="ml-2">
                         · {new Date(selectedShared.evaluation.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -2437,6 +2445,16 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, id: null })}
+        onConfirm={confirmDeleteMeet}
+        title="Excluir avaliação"
+        message="Tem certeza que deseja excluir esta avaliação? Esta ação não pode ser desfeita."
+        confirmText="Excluir"
+        cancelText="Cancelar"
+      />
     </div>
   )
 }

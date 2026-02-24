@@ -1754,7 +1754,8 @@ export default function MeetAnalysisView() {
                 </div>
                 <div className="space-y-2">
                   {recentEvaluations.map((ev) => {
-                    const score = ev.overall_score || 0
+                    const rawScore = ev.overall_score || 0
+                    const score = rawScore > 10 ? rawScore / 10 : rawScore
                     const scoreColor = score >= 7 ? 'text-green-600 bg-green-50 border-green-200' :
                       score >= 5 ? 'text-amber-600 bg-amber-50 border-amber-200' :
                       'text-red-600 bg-red-50 border-red-200'

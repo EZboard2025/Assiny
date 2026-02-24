@@ -63,11 +63,18 @@ function loadLayout(userId: string | null, cards: CardDef[]): ColumnLayout {
     const saved = localStorage.getItem(STORAGE_KEY_PREFIX + userId)
     if (saved) {
       const parsed = JSON.parse(saved) as ColumnLayout
-      // Validate: ensure all card IDs are present
+      // Validate: ensure all card IDs are present, and filter out stale IDs
       const allIds = new Set(cards.map(c => c.id))
       const savedIds = new Set([...parsed.left, ...parsed.center, ...parsed.right])
       const missing = [...allIds].filter(id => !savedIds.has(id))
-      if (missing.length === 0) return parsed
+      if (missing.length === 0) {
+        // Filter out IDs that no longer exist in cards (e.g. disabled features)
+        return {
+          left: parsed.left.filter(id => allIds.has(id)),
+          center: parsed.center.filter(id => allIds.has(id)),
+          right: parsed.right.filter(id => allIds.has(id)),
+        }
+      }
     }
   } catch { /* ignore */ }
   return getDefaultLayout(cards)
