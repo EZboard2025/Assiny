@@ -1,9 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
-/desktop/node_modules
-/desktop/release
+node_modules
 /.pnp
 .pnp.js
 
@@ -43,7 +41,8 @@ next-env.d.ts
 .wwebjs_auth/
 .wwebjs_cache/
 
-# desktop build artifacts
+# desktop app
+desktop/release/
 desktop/build/vc_redist.x64.exe
 
 # download files (served locally)
