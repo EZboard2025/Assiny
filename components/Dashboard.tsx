@@ -67,6 +67,7 @@ const MeetAnalysisView = dynamic(() => import('./MeetAnalysisView'), { ssr: fals
 const RepresentanteView = dynamic(() => import('./RepresentanteView'), { ssr: false, loading: ViewLoadingSkeleton })
 const ChallengeHistoryView = dynamic(() => import('./dashboard/ChallengeHistoryView'), { ssr: false, loading: ViewLoadingSkeleton })
 const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), { ssr: false, loading: ViewLoadingSkeleton })
+const DownloadView = dynamic(() => import('./DownloadView'), { ssr: false, loading: ViewLoadingSkeleton })
 
 interface DashboardProps {
   onLogout: () => void
@@ -84,6 +85,7 @@ const prefetchMap: Record<string, () => void> = {
   'followup-history': () => { import('./FollowUpHistoryView') },
   'challenge-history': () => { import('./dashboard/ChallengeHistoryView') },
   chat: () => { import('./ChatInterface') },
+  download: () => { import('./DownloadView') },
 }
 
 export default function Dashboard({ onLogout }: DashboardProps) {
@@ -91,7 +93,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis' | 'challenge-history' | 'manager'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis' | 'challenge-history' | 'download' | 'manager'>('home')
   const [mounted, setMounted] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -591,6 +593,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'meet-analysis') {
       return <MeetAnalysisView />
+    }
+
+    if (currentView === 'download') {
+      return <DownloadView />
     }
 
     if (currentView === 'challenge-history') {
