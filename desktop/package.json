@@ -1,0 +1,51 @@
+{
+  "name": "ramppy",
+  "version": "1.0.0",
+  "description": "Ramppy — Plataforma de treinamento de vendas com IA",
+  "main": "main.js",
+  "scripts": {
+    "postinstall": "node patch-electron-cli.js",
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.ramppy.app",
+    "productName": "Ramppy",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "bubble.html",
+      "bubble.css",
+      "bubble.js",
+      "index.html",
+      "style.css",
+      "app.js",
+      "supabase.min.js",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.business"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "shortcutName": "Ramppy"
+    }
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^25.0.0"
+  }
+}

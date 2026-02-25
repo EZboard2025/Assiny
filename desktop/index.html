@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://*.supabase.co wss://api.deepgram.com https://ramppy.site http://localhost:3000; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <title>Ramppy Meet</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="supabase.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <div class="header-left">
+        <img src="assets/icon.png" alt="Ramppy" class="logo">
+        <span class="brand">Ramppy Meet</span>
+      </div>
+      <div class="header-right">
+        <span id="user-name" class="user-name"></span>
+        <button id="btn-logout" class="btn-icon" title="Sair" style="display:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Login Screen -->
+    <section id="screen-login" class="screen">
+      <div class="login-card">
+        <h2>Entrar na sua conta</h2>
+        <p class="login-subtitle">Use suas credenciais do Ramppy</p>
+        <form id="login-form">
+          <div class="field">
+            <label for="login-email">E-mail</label>
+            <input type="email" id="login-email" placeholder="seu@email.com" required>
+          </div>
+          <div class="field">
+            <label for="login-password">Senha</label>
+            <input type="password" id="login-password" placeholder="••••••••" required>
+          </div>
+          <div id="login-error" class="error-msg" style="display:none;"></div>
+          <button type="submit" id="btn-login" class="btn-primary">
+            <span class="btn-text">Entrar</span>
+            <span class="btn-loading" style="display:none;">
+              <svg class="spinner" width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="30 70" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Idle Screen -->
+    <section id="screen-idle" class="screen" style="display:none;">
+      <div class="idle-content">
+        <div class="record-section">
+          <p class="idle-hint">Abra sua reunião em qualquer plataforma e clique para gravar.</p>
+          <button id="btn-start" class="btn-record">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+            <span>Iniciar Gravação</span>
+          </button>
+          <p class="record-hint">Captura áudio do sistema + microfone</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recording Screen -->
+    <section id="screen-recording" class="screen" style="display:none;">
+      <div class="recording-header">
+        <div class="rec-indicator">
+          <span class="rec-dot"></span>
+          <span>GRAVANDO</span>
+        </div>
+        <span id="rec-timer" class="rec-timer">00:00</span>
+      </div>
+
+      <div id="transcript-container" class="transcript-container">
+        <div id="transcript-list" class="transcript-list">
+          <p class="transcript-placeholder">Aguardando transcrição...</p>
+        </div>
+      </div>
+
+      <div class="recording-stats">
+        <div class="stat">
+          <span class="stat-label">Segmentos</span>
+          <span id="stat-segments" class="stat-value">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Palavras</span>
+          <span id="stat-words" class="stat-value">0</span>
+        </div>
+      </div>
+
+      <button id="btn-stop" class="btn-stop">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+        <span>Parar e Avaliar</span>
+      </button>
+    </section>
+
+    <!-- Evaluating Screen -->
+    <section id="screen-evaluating" class="screen" style="display:none;">
+      <div class="evaluating-content">
+        <div class="eval-spinner-container">
+          <svg class="eval-spinner" width="48" height="48" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="30 70" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Avaliando transcrição...</h3>
+        <p class="eval-subtitle">Análise SPIN em andamento</p>
+        <div class="eval-stats">
+          <span id="eval-duration"></span>
+          <span id="eval-words"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results Screen -->
+    <section id="screen-results" class="screen" style="display:none;">
+      <div class="results-content">
+        <div class="score-card">
+          <div class="score-circle">
+            <span id="result-score" class="score-number">0</span>
+            <span class="score-max">/10</span>
+          </div>
+          <span id="result-level" class="score-level"></span>
+        </div>
+
+        <div id="spin-scores" class="spin-grid">
+          <div class="spin-item"><span class="spin-label">S</span><span id="spin-s" class="spin-value">-</span></div>
+          <div class="spin-item"><span class="spin-label">P</span><span id="spin-p" class="spin-value">-</span></div>
+          <div class="spin-item"><span class="spin-label">I</span><span id="spin-i" class="spin-value">-</span></div>
+          <div class="spin-item"><span class="spin-label">N</span><span id="spin-n" class="spin-value">-</span></div>
+        </div>
+
+        <div id="result-summary" class="result-summary"></div>
+
+        <div class="result-actions">
+          <button id="btn-new-recording" class="btn-primary">Nova Gravação</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Error Screen -->
+    <section id="screen-error" class="screen" style="display:none;">
+      <div class="error-content">
+        <div class="error-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <h3>Ocorreu um erro</h3>
+        <p id="error-message" class="error-detail"></p>
+        <button id="btn-retry" class="btn-secondary">Tentar Novamente</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
