@@ -43,4 +43,5 @@ next-env.d.ts
 
 # desktop app
 desktop/release/
+desktop/build/vc_redist.x64.exe
 public/downloads/*.exe

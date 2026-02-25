@@ -3,7 +3,7 @@
 import { Monitor, Download, CheckCircle, ArrowRight } from 'lucide-react'
 
 export default function DownloadView() {
-  const installerUrl = '/downloads/Ramppy 1.0.0.exe'
+  const installerUrl = '/downloads/Ramppy Setup 1.0.0.exe'
 
   const steps = [
     { number: '1', title: 'Baixar', description: 'Clique no botão abaixo para baixar o instalador' },
@@ -47,7 +47,7 @@ export default function DownloadView() {
           </a>
 
           <p className="text-xs text-gray-400 text-center mt-3">
-            Ramppy 1.0.0.exe — ~67 MB
+            Ramppy Setup 1.0.0.exe — ~98 MB
           </p>
         </div>
 
