@@ -4,6 +4,7 @@
 // ============================================================
 
 const API_URL = 'http://localhost:3000/api/agent/chat'
+const SUGGESTIONS_URL = 'http://localhost:3000/api/agent/suggestions'
 
 // --- State ---
 let accessToken = null
@@ -23,6 +24,7 @@ const welcomeTitle = document.getElementById('welcome-title')
 const welcomeInput = document.getElementById('welcome-input')
 const btnSendWelcome = document.getElementById('btn-send-welcome')
 const chatInput = document.getElementById('chat-input')
+const welcomeSuggestions = document.getElementById('welcome-suggestions')
 const btnSend = document.getElementById('btn-send')
 const btnClose = document.getElementById('btn-close')
 const chatPills = document.getElementById('chat-pills')
@@ -44,30 +46,134 @@ if (window.electronAPI && window.electronAPI.onAuthToken) {
 }
 
 // --- UI: Expand / Collapse ---
-function expand() {
+let savedBubblePos = null // bubble position before expanding
+let suggestionsLoaded = false // only load once per session
+
+// 3 icon SVGs to rotate through for dynamic suggestions
+const SUGGESTION_ICONS = [
+  '<svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  '<svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+  '<svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+]
+
+const DEFAULT_SUGGESTIONS = [
+  'Quem precisa de atenção?',
+  'Compare os vendedores',
+  'Como está minha performance?',
+]
+
+function renderSuggestions(suggestions) {
+  welcomeSuggestions.innerHTML = ''
+  suggestions.forEach((text, i) => {
+    const btn = document.createElement('button')
+    btn.className = 'suggestion-card fade-in'
+    btn.dataset.msg = text
+    btn.innerHTML = `${SUGGESTION_ICONS[i % SUGGESTION_ICONS.length]}<span>${escapeHtml(text)}</span>`
+    btn.addEventListener('click', () => sendMessage(text))
+    welcomeSuggestions.appendChild(btn)
+  })
+}
+
+function showSuggestionsLoading() {
+  welcomeSuggestions.innerHTML = `
+    <div class="suggestion-skeleton"><div class="skeleton-line"></div></div>
+    <div class="suggestion-skeleton"><div class="skeleton-line"></div></div>
+    <div class="suggestion-skeleton"><div class="skeleton-line"></div></div>
+  `
+}
+
+async function loadContextualSuggestions() {
+  if (suggestionsLoaded || hasMessages) return
+  showSuggestionsLoading()
+
+  try {
+    // Capture screenshot of what the user is seeing
+    let screenshot = null
+    if (window.electronAPI && window.electronAPI.captureScreenshot) {
+      screenshot = await window.electronAPI.captureScreenshot()
+    }
+
+    if (!screenshot) {
+      renderSuggestions(DEFAULT_SUGGESTIONS)
+      suggestionsLoaded = true
+      return
+    }
+
+    const res = await fetch(SUGGESTIONS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ screenshot }),
+    })
+
+    if (!res.ok) throw new Error('API error')
+
+    const data = await res.json()
+    const suggestions = data.suggestions && data.suggestions.length >= 3
+      ? data.suggestions.slice(0, 3)
+      : DEFAULT_SUGGESTIONS
+
+    renderSuggestions(suggestions)
+    suggestionsLoaded = true
+  } catch (err) {
+    console.error('Failed to load contextual suggestions:', err)
+    renderSuggestions(DEFAULT_SUGGESTIONS)
+    suggestionsLoaded = true
+  }
+}
+
+async function expand() {
   if (peekTimeout) { clearTimeout(peekTimeout); peekTimeout = null }
+  if (snapBarTimeout) { clearTimeout(snapBarTimeout); snapBarTimeout = null }
+  removeBarState()
+
+  // Save exact bubble position — this is sacred, never change it
+  savedBubblePos = await window.electronAPI.getBubblePos()
+
   isExpanded = true
   snappedEdge = null
   isHidden = false
   isAnimating = false
   bubble.style.display = 'none'
   chatPanel.style.display = 'flex'
-  window.electronAPI.resizeBubble(380, 520)
+
+  // Panel opens at bubble position, only shift if it overflows the screen
+  const scr = await window.electronAPI.getScreenSize()
+  const panelW = 280
+  const panelH = 550
+  let px = savedBubblePos.x
+  let py = savedBubblePos.y
+
+  if (px + panelW > scr.width) px = scr.width - panelW - 8
+  if (px < 0) px = 8
+  if (py + panelH > scr.height) py = scr.height - panelH - 8
+  if (py < 0) py = 8
+
+  // Atomic: set position + size in one call to avoid visual jumps
+  window.electronAPI.setBubbleBounds(px, py, panelW, panelH)
+
   if (hasMessages) {
     chatInput.focus()
   } else {
     welcomeInput.focus()
+    // Load contextual suggestions based on what's on screen
+    loadContextualSuggestions()
   }
 }
 
-function collapse() {
+async function collapse() {
   isExpanded = false
   chatPanel.style.display = 'none'
   bubble.style.display = 'flex'
-  window.electronAPI.resizeBubble(72, 72)
-  // Re-snap to edge only if it was previously snapped
-  if (snappedEdge) {
-    setTimeout(snapToEdge, 300)
+  removeBarState()
+
+  // Reset suggestions so next open captures a fresh screenshot
+  suggestionsLoaded = false
+
+  // Atomic: restore exact saved position + bubble size in one call
+  if (savedBubblePos) {
+    window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, 72, 72)
+  } else {
+    await window.electronAPI.resizeBubble(72, 72)
   }
 }
 
@@ -80,6 +186,54 @@ const BUBBLE_SIZE = 72
 const VISIBLE_PX = 20   // pixels visible when hidden at edge
 const PEEK_OFFSET = 8   // pixels from edge when peeking (hover)
 const SNAP_THRESHOLD = 50 // only snap if dropped within 50px of a screen edge
+
+// Bar dimensions when hidden at edge
+const BAR_THICKNESS = 12  // thin dimension (px)
+const BAR_LENGTH = 90     // long dimension (px)
+let snapBarTimeout = null
+
+function applyBarState(edge) {
+  bubble.classList.add('edge-bar', `edge-bar-${edge}`)
+}
+
+function removeBarState() {
+  bubble.classList.remove('edge-bar', 'edge-bar-left', 'edge-bar-right', 'edge-bar-top', 'edge-bar-bottom')
+}
+
+function getBarBounds(edge, scr) {
+  const isVert = edge === 'left' || edge === 'right'
+  const barW = isVert ? BAR_THICKNESS : BAR_LENGTH
+  const barH = isVert ? BAR_LENGTH : BAR_THICKNESS
+
+  let bx, by
+  switch (edge) {
+    case 'left':
+      bx = 0
+      by = snappedCoord + (BUBBLE_SIZE - BAR_LENGTH) / 2
+      break
+    case 'right':
+      bx = scr.width - BAR_THICKNESS
+      by = snappedCoord + (BUBBLE_SIZE - BAR_LENGTH) / 2
+      break
+    case 'top':
+      bx = snappedCoord + (BUBBLE_SIZE - BAR_LENGTH) / 2
+      by = 0
+      break
+    case 'bottom':
+      bx = snappedCoord + (BUBBLE_SIZE - BAR_LENGTH) / 2
+      by = scr.height - BAR_THICKNESS
+      break
+  }
+
+  // Clamp to screen
+  if (isVert) {
+    by = Math.max(0, Math.min(by, scr.height - barH))
+  } else {
+    bx = Math.max(0, Math.min(bx, scr.width - barW))
+  }
+
+  return { x: bx, y: by, w: barW, h: barH }
+}
 
 async function snapIfNearEdge() {
   if (isExpanded) return
@@ -103,6 +257,7 @@ async function snapIfNearEdge() {
 async function snapToEdge() {
   if (isExpanded) return
   isAnimating = true
+  if (snapBarTimeout) { clearTimeout(snapBarTimeout); snapBarTimeout = null }
 
   const pos = await window.electronAPI.getBubblePos()
   const scr = await window.electronAPI.getScreenSize()
@@ -123,43 +278,76 @@ async function snapToEdge() {
   }
   snappedEdge = minEdge
 
-  // Calculate hidden position (only VISIBLE_PX showing)
+  // Save original bubble coordinate for peek position
+  switch (snappedEdge) {
+    case 'left':
+    case 'right':
+      snappedCoord = Math.max(0, Math.min(pos.y, scr.height - BUBBLE_SIZE))
+      break
+    case 'top':
+    case 'bottom':
+      snappedCoord = Math.max(0, Math.min(pos.x, scr.width - BUBBLE_SIZE))
+      break
+  }
+
+  // Phase 1: Animate bubble (circle) toward the edge
   let targetX, targetY
   switch (snappedEdge) {
     case 'left':
       targetX = -(BUBBLE_SIZE - VISIBLE_PX)
-      targetY = Math.max(0, Math.min(pos.y, scr.height - BUBBLE_SIZE))
-      snappedCoord = targetY
+      targetY = snappedCoord
       break
     case 'right':
       targetX = scr.width - VISIBLE_PX
-      targetY = Math.max(0, Math.min(pos.y, scr.height - BUBBLE_SIZE))
-      snappedCoord = targetY
+      targetY = snappedCoord
       break
     case 'top':
-      targetX = Math.max(0, Math.min(pos.x, scr.width - BUBBLE_SIZE))
+      targetX = snappedCoord
       targetY = -(BUBBLE_SIZE - VISIBLE_PX)
-      snappedCoord = targetX
       break
     case 'bottom':
-      targetX = Math.max(0, Math.min(pos.x, scr.width - BUBBLE_SIZE))
+      targetX = snappedCoord
       targetY = scr.height - VISIBLE_PX
-      snappedCoord = targetX
       break
   }
 
-  isHidden = true
   window.electronAPI.snapBubble(targetX, targetY, 250)
-  setTimeout(() => { isAnimating = false }, 300)
+
+  // Phase 2: After animation completes, morph circle into bar
+  snapBarTimeout = setTimeout(async () => {
+    snapBarTimeout = null
+    if (isExpanded || !snappedEdge) return
+
+    const scr2 = await window.electronAPI.getScreenSize()
+    const bar = getBarBounds(snappedEdge, scr2)
+
+    applyBarState(snappedEdge)
+    window.electronAPI.setBubbleBounds(bar.x, bar.y, bar.w, bar.h)
+    isHidden = true
+    isAnimating = false
+  }, 300)
 }
 
 async function peekFromEdge() {
   if (!snappedEdge || isExpanded || isAnimating) return
   isAnimating = true
+  if (snapBarTimeout) { clearTimeout(snapBarTimeout); snapBarTimeout = null }
+
+  // Remove bar state — restore bubble appearance
+  removeBarState()
 
   const scr = await window.electronAPI.getScreenSize()
-  let targetX, targetY
+  const pos = await window.electronAPI.getBubblePos()
 
+  // Resize from bar back to bubble, centered on bar's midpoint
+  const isVert = snappedEdge === 'left' || snappedEdge === 'right'
+  let resizeX = isVert ? pos.x : pos.x + (BAR_LENGTH - BUBBLE_SIZE) / 2
+  let resizeY = isVert ? pos.y + (BAR_LENGTH - BUBBLE_SIZE) / 2 : pos.y
+
+  window.electronAPI.setBubbleBounds(resizeX, resizeY, BUBBLE_SIZE, BUBBLE_SIZE)
+
+  // Animate to peek position
+  let targetX, targetY
   switch (snappedEdge) {
     case 'left':
       targetX = PEEK_OFFSET
@@ -195,31 +383,15 @@ async function peekFromEdge() {
 async function hideAtEdge() {
   if (!snappedEdge || isExpanded || isAnimating) return
   isAnimating = true
+  if (snapBarTimeout) { clearTimeout(snapBarTimeout); snapBarTimeout = null }
 
   const scr = await window.electronAPI.getScreenSize()
-  let targetX, targetY
+  const bar = getBarBounds(snappedEdge, scr)
 
-  switch (snappedEdge) {
-    case 'left':
-      targetX = -(BUBBLE_SIZE - VISIBLE_PX)
-      targetY = snappedCoord
-      break
-    case 'right':
-      targetX = scr.width - VISIBLE_PX
-      targetY = snappedCoord
-      break
-    case 'top':
-      targetX = snappedCoord
-      targetY = -(BUBBLE_SIZE - VISIBLE_PX)
-      break
-    case 'bottom':
-      targetX = snappedCoord
-      targetY = scr.height - VISIBLE_PX
-      break
-  }
+  applyBarState(snappedEdge)
+  window.electronAPI.setBubbleBounds(bar.x, bar.y, bar.w, bar.h)
 
   isHidden = true
-  window.electronAPI.snapBubble(targetX, targetY, 200)
   setTimeout(() => { isAnimating = false }, 250)
 }
 
@@ -231,20 +403,50 @@ let winStartX = 0
 let winStartY = 0
 const DRAG_THRESHOLD = 5
 
-bubble.addEventListener('mousedown', async (e) => {
+bubble.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return
   isDragging = false
   dragStartX = e.screenX
   dragStartY = e.screenY
-  const pos = await window.electronAPI.getBubblePos()
-  winStartX = pos.x
-  winStartY = pos.y
+  let posReady = false
+
+  // Get position async but register listeners IMMEDIATELY to avoid race condition
+  window.electronAPI.getBubblePos().then(pos => {
+    winStartX = pos.x
+    winStartY = pos.y
+    posReady = true
+  })
+
+  const cleanup = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    isDragging = false
+  }
 
   const onMove = (ev) => {
+    // Safety: if no mouse button is held, the mouseup was lost (cursor left the window)
+    if (ev.buttons === 0) {
+      cleanup()
+      return
+    }
+    if (!posReady) return // wait for position before allowing drag
     const dx = ev.screenX - dragStartX
     const dy = ev.screenY - dragStartY
     if (!isDragging && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
       isDragging = true
+      // If in bar state, convert back to bubble for dragging
+      if (bubble.classList.contains('edge-bar')) {
+        removeBarState()
+        const newX = ev.screenX - BUBBLE_SIZE / 2
+        const newY = ev.screenY - BUBBLE_SIZE / 2
+        window.electronAPI.setBubbleBounds(newX, newY, BUBBLE_SIZE, BUBBLE_SIZE)
+        winStartX = newX
+        winStartY = newY
+        dragStartX = ev.screenX
+        dragStartY = ev.screenY
+        snappedEdge = null
+        isHidden = false
+      }
     }
     if (isDragging) {
       window.electronAPI.moveBubble(winStartX + dx, winStartY + dy)
@@ -252,9 +454,9 @@ bubble.addEventListener('mousedown', async (e) => {
   }
 
   const onUp = () => {
-    document.removeEventListener('mousemove', onMove)
-    document.removeEventListener('mouseup', onUp)
-    if (!isDragging) {
+    const wasDragging = isDragging
+    cleanup()
+    if (!wasDragging) {
       // If hidden at edge, first peek; if already peeked, expand
       if (snappedEdge && isHidden) {
         peekFromEdge()
@@ -265,7 +467,6 @@ bubble.addEventListener('mousedown', async (e) => {
       // Only snap to edge if dropped near a screen border
       snapIfNearEdge()
     }
-    isDragging = false
   }
 
   document.addEventListener('mousemove', onMove)
@@ -313,7 +514,7 @@ function switchToChatMode() {
 btnClose.addEventListener('click', collapse)
 
 // --- Avatar HTML ---
-const AVATAR_HTML = `<div class="ai-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg></div>`
+const AVATAR_HTML = `<div class="ai-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="url(#aurora-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg></div>`
 
 // --- Chat ---
 function addUserMessage(text) {
@@ -353,7 +554,7 @@ async function sendMessage(text) {
 
   if (!ensureAuth()) {
     switchToChatMode()
-    addAIMessage('Faça login na plataforma Ramppy primeiro para usar o assistente.')
+    addAIMessage('Oi! Preciso que você faça login na plataforma Ramppy primeiro para que eu possa te ajudar.')
     return
   }
 
@@ -478,7 +679,7 @@ function formatInline(text) {
   return escapeHtml(text)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`(.+?)`/g, '<code style="background:#e5e7eb;padding:1px 4px;border-radius:3px;font-size:12px;">$1</code>')
+    .replace(/`(.+?)`/g, '<code style="background:rgba(245,245,250,0.8);padding:1px 5px;border-radius:4px;font-size:12px;">$1</code>')
 }
 
 // --- Events ---
@@ -493,8 +694,8 @@ welcomeInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(welcomeInput.value) }
 })
 
-// Suggestion cards + pills
-document.querySelectorAll('.suggestion-card, .pill').forEach(btn => {
+// Pills (static in HTML — suggestion cards are now dynamic, handled in renderSuggestions)
+document.querySelectorAll('.pill').forEach(btn => {
   btn.addEventListener('click', () => sendMessage(btn.dataset.msg))
 })
 
