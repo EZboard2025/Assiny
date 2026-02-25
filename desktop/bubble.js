@@ -138,8 +138,8 @@ async function expand() {
 
   // Panel opens at bubble position, only shift if it overflows the screen
   const scr = await window.electronAPI.getScreenSize()
-  const panelW = 280
-  const panelH = 550
+  const panelW = 420
+  const panelH = 780
   let px = savedBubblePos.x
   let py = savedBubblePos.y
 
@@ -188,8 +188,8 @@ const PEEK_OFFSET = 8   // pixels from edge when peeking (hover)
 const SNAP_THRESHOLD = 50 // only snap if dropped within 50px of a screen edge
 
 // Bar dimensions when hidden at edge
-const BAR_THICKNESS = 12  // thin dimension (px)
-const BAR_LENGTH = 90     // long dimension (px)
+const BAR_THICKNESS = 18  // thin dimension (px)
+const BAR_LENGTH = 180    // long dimension (px) — tall visible bar
 let snapBarTimeout = null
 
 function applyBarState(edge) {
@@ -487,14 +487,16 @@ chatHeader.addEventListener('mousedown', async (e) => {
   const startY = e.screenY
   const pos = await window.electronAPI.getBubblePos()
 
-  const onMove = (ev) => {
-    window.electronAPI.moveBubble(pos.x + ev.screenX - startX, pos.y + ev.screenY - startY)
-  }
-
   const onUp = () => {
     chatHeader.style.cursor = 'grab'
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+  }
+
+  const onMove = (ev) => {
+    // Safety: if no mouse button held, mouseup was lost (cursor left the window)
+    if (ev.buttons === 0) { onUp(); return }
+    window.electronAPI.moveBubble(pos.x + ev.screenX - startX, pos.y + ev.screenY - startY)
   }
 
   document.addEventListener('mousemove', onMove)
@@ -724,7 +726,13 @@ document.querySelectorAll('.resize-handle').forEach(handle => {
     const pos = await window.electronAPI.getBubblePos()
     const startBounds = { x: pos.x, y: pos.y, w: window.outerWidth, h: window.outerHeight }
 
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+
     const onMove = (ev) => {
+      if (ev.buttons === 0) { onUp(); return }
       const dx = ev.screenX - startX
       const dy = ev.screenY - startY
       let { x, y, w, h } = startBounds
@@ -735,11 +743,6 @@ document.querySelectorAll('.resize-handle').forEach(handle => {
       if (dir.includes('n')) { h -= dy; y += dy }
 
       window.electronAPI.setBubbleBounds(x, y, w, h)
-    }
-
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
     }
 
     document.addEventListener('mousemove', onMove)

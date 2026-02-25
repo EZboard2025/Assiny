@@ -40,7 +40,7 @@ export default function Sidebar({
     // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden
     { icon: TrendingUp, view: 'manager', label: 'Gestão', show: isAdmin || isGestor },
     { icon: Link2, view: 'roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
-    { icon: Download, view: 'download', label: 'Download', show: true },
+    { icon: Download, view: 'download', label: 'Download', show: typeof window !== 'undefined' && !(window as any).electronAPI },
   ]
 
   return (

@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "electron": "^30.5.1",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "rcedit": "^5.0.2"
   }
 }

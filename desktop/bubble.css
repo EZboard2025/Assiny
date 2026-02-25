@@ -195,12 +195,14 @@ body {
   left: 0;
   border-radius: 20px;
   overflow: hidden;
-  animation: panel-open 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: panel-open 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: bottom right;
 }
 
 @keyframes panel-open {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
+  0%   { opacity: 0; transform: scale(0.4); border-radius: 28px; }
+  60%  { opacity: 1; transform: scale(1.02); border-radius: 22px; }
+  100% { opacity: 1; transform: scale(1); border-radius: 20px; }
 }
 
 /* Aurora decorative line at top of panel */
@@ -573,7 +575,7 @@ body {
 .resize-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: sw-resize; }
 
 /* ============================================================
-   EDGE BAR STATE — bubble morphs into a bar when hidden at edge
+   EDGE BAR STATE — bubble morphs into a sleek capsule at edge
    ============================================================ */
 .bubble.edge-bar {
   inset: 0;
@@ -582,78 +584,84 @@ body {
   transform: none !important;
   transition: none;
 }
-
+/* CRITICAL: Cancel all bubble hover effects on bar */
 .bubble.edge-bar:hover { transform: none !important; }
 .bubble.edge-bar:active { transform: none !important; }
+.bubble.edge-bar:hover .siri-orb { animation: none !important; }
+.bubble.edge-bar:hover .siri-icon { animation: none !important; }
 
 .bubble.edge-bar .siri-orb {
   width: 100%;
   height: 100%;
-  border-radius: 0;
   overflow: hidden;
+  transition: border-radius 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .bubble.edge-bar .siri-icon { display: none; }
 .bubble.edge-bar .siri-glow { display: none; }
 
+/* Hide blobs in bar state */
 .bubble.edge-bar .siri-blob {
-  filter: blur(12px) saturate(1.8);
-  opacity: 0.6;
+  display: none !important;
 }
 
-/* Direction-specific rounded corners (bar peeks from edge) */
-.bubble.edge-bar-left .siri-orb   { border-radius: 0 6px 6px 0; }
-.bubble.edge-bar-right .siri-orb  { border-radius: 6px 0 0 6px; }
-.bubble.edge-bar-top .siri-orb    { border-radius: 0 0 6px 6px; }
-.bubble.edge-bar-bottom .siri-orb { border-radius: 6px 6px 0 0; }
-
-/* Aurora gradient background for vertical edges (left/right) */
+/* ---- Vertical bar (left / right edges) ---- */
 .bubble.edge-bar-left .siri-orb,
 .bubble.edge-bar-right .siri-orb {
-  background: linear-gradient(180deg,
-    rgba(52, 211, 153, 0.55),
-    rgba(16, 185, 129, 0.45),
-    rgba(5, 150, 105, 0.55),
-    rgba(16, 185, 129, 0.45),
-    rgba(52, 211, 153, 0.55));
-  background-size: 100% 200%;
-  animation: bar-aurora-v 3s ease-in-out infinite;
+  border-radius: 0 8px 8px 0;
+  background: linear-gradient(180deg, #6ee7b7, #34d399, #10b981, #059669);
+  border: none;
+  box-shadow: none;
+}
+.bubble.edge-bar-right .siri-orb {
+  border-radius: 8px 0 0 8px;
 }
 
-/* Aurora gradient background for horizontal edges (top/bottom) */
+.bubble.edge-bar-left .siri-blob,
+.bubble.edge-bar-right .siri-blob {
+  left: 50% !important;
+  transform: translateX(-50%);
+}
+.bubble.edge-bar-left .siri-blob.b1,
+.bubble.edge-bar-right .siri-blob.b1 { top: 10% !important; }
+.bubble.edge-bar-left .siri-blob.b2,
+.bubble.edge-bar-right .siri-blob.b2 { top: 28% !important; }
+.bubble.edge-bar-left .siri-blob.b3,
+.bubble.edge-bar-right .siri-blob.b3 { top: 48% !important; }
+.bubble.edge-bar-left .siri-blob.b4,
+.bubble.edge-bar-right .siri-blob.b4 { top: 68% !important; }
+.bubble.edge-bar-left .siri-blob.b5,
+.bubble.edge-bar-right .siri-blob.b5 { top: 88% !important; }
+
+/* ---- Horizontal bar (top / bottom edges) ---- */
 .bubble.edge-bar-top .siri-orb,
 .bubble.edge-bar-bottom .siri-orb {
-  background: linear-gradient(90deg,
-    rgba(52, 211, 153, 0.55),
-    rgba(16, 185, 129, 0.45),
-    rgba(5, 150, 105, 0.55),
-    rgba(16, 185, 129, 0.45),
-    rgba(52, 211, 153, 0.55));
-  background-size: 200% 100%;
-  animation: bar-aurora-h 3s ease-in-out infinite;
+  border-radius: 0 0 8px 8px;
+  background: linear-gradient(90deg, #6ee7b7, #34d399, #10b981, #059669);
+  border: none;
+  box-shadow: none;
+}
+.bubble.edge-bar-bottom .siri-orb {
+  border-radius: 8px 8px 0 0;
 }
 
-@keyframes bar-aurora-v {
-  0%, 100% { background-position: 0% 0%; }
-  50%      { background-position: 0% 100%; }
+.bubble.edge-bar-top .siri-blob,
+.bubble.edge-bar-bottom .siri-blob {
+  top: 50% !important;
+  transform: translateY(-50%);
 }
-@keyframes bar-aurora-h {
-  0%, 100% { background-position: 0% 0%; }
-  50%      { background-position: 100% 0%; }
-}
+.bubble.edge-bar-top .siri-blob.b1,
+.bubble.edge-bar-bottom .siri-blob.b1 { left: 10% !important; }
+.bubble.edge-bar-top .siri-blob.b2,
+.bubble.edge-bar-bottom .siri-blob.b2 { left: 28% !important; }
+.bubble.edge-bar-top .siri-blob.b3,
+.bubble.edge-bar-bottom .siri-blob.b3 { left: 48% !important; }
+.bubble.edge-bar-top .siri-blob.b4,
+.bubble.edge-bar-bottom .siri-blob.b4 { left: 68% !important; }
+.bubble.edge-bar-top .siri-blob.b5,
+.bubble.edge-bar-bottom .siri-blob.b5 { left: 88% !important; }
 
-/* Hover glow — overrides orb-spin, keeps aurora animation */
-.bubble.edge-bar-left:hover .siri-orb,
-.bubble.edge-bar-right:hover .siri-orb {
-  animation: bar-aurora-v 3s ease-in-out infinite;
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
-}
-.bubble.edge-bar-top:hover .siri-orb,
-.bubble.edge-bar-bottom:hover .siri-orb {
-  animation: bar-aurora-h 3s ease-in-out infinite;
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
-}
-
-.bubble.edge-bar:hover .siri-blob {
-  filter: blur(10px) saturate(1.6) brightness(1.1);
+/* Hover — brighten gradient */
+.bubble.edge-bar:hover .siri-orb {
+  filter: brightness(1.1);
 }

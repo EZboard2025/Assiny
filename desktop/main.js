@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 
 const PLATFORM_URL = 'http://localhost:3000'
@@ -6,6 +6,10 @@ const ALLOWED_DOMAIN = 'localhost'
 
 const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
 const ICON_PATH = path.join(__dirname, 'assets', iconFile)
+const APP_ICON = nativeImage.createFromPath(ICON_PATH)
+
+// Force Windows taskbar to use our icon instead of default Electron icon
+app.setAppUserModelId('com.ramppy.app')
 
 let mainWindow = null
 let bubbleWindow = null
@@ -37,7 +41,7 @@ function createMainWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Ramppy',
-    icon: ICON_PATH,
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -100,14 +104,14 @@ function createBubbleWindow() {
     x: screenW - 90,
     y: screenH - 90,
     resizable: false,
-    movable: true,
+    movable: false,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
     title: 'Ramppy Assistant',
-    icon: ICON_PATH,
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -123,6 +127,11 @@ function createBubbleWindow() {
     if (input.key === 'F12') {
       bubbleWindow.webContents.toggleDevTools()
     }
+  })
+
+  // Block OS-level window dragging entirely — all moves are handled via IPC setBounds/moveBubble
+  bubbleWindow.on('will-move', (e) => {
+    e.preventDefault()
   })
 
   bubbleWindow.on('closed', () => { bubbleWindow = null })
@@ -258,19 +267,27 @@ ipcMain.on('move-bubble', (_event, x, y) => {
   bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
 })
 
-// Set bubble bounds (position + size) for edge/corner resizing
+// Set bubble bounds (position + size) — used for expand, collapse, and edge resizing
 ipcMain.on('set-bubble-bounds', (_event, x, y, width, height) => {
   if (!bubbleWindow) return
   const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
-  // Enforce min size
-  if (width < 320) width = 320
-  if (height < 400) height = 400
+
+  const isPanel = width > 200 // panel mode (≥280) vs bubble/bar mode
+
+  // Only enforce min size when resizing the panel, not when collapsing to bubble
+  if (isPanel) {
+    if (width < 320) width = 320
+    if (height < 400) height = 400
+  }
+
   // Clamp to screen
   if (x < 0) x = 0
   if (y < 0) y = 0
-  if (x + width > screenW) width = screenW - x
-  if (y + height > screenH) height = screenH - y
+  if (x + width > screenW) x = screenW - width
+  if (y + height > screenH) y = screenH - height
+
   bubbleWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) })
+  bubbleWindow.setResizable(isPanel)
 })
 
 // Get current bubble position
@@ -325,7 +342,7 @@ ipcMain.handle('get-sources', async () => {
 // SYSTEM TRAY
 // ============================================================
 function createTray() {
-  tray = new Tray(ICON_PATH)
+  tray = new Tray(APP_ICON)
   tray.setToolTip('Ramppy')
 
   const contextMenu = Menu.buildFromTemplate([
