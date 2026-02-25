@@ -846,8 +846,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         }} />
       )}
 
-      {/* Seller Agent Chat - home, profile and roleplay */}
-      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay') && (
+      {/* Seller Agent Chat - home, profile and roleplay (hidden in Electron desktop app) */}
+      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay') && typeof window !== 'undefined' && !(window as any).electronAPI && (
         <SellerAgentChat userName={userName || undefined} currentView={currentView} onOpenChange={handleAssistantChange} />
       )}
 

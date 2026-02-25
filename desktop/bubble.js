@@ -3,7 +3,7 @@
 // Design: matches SellerAgentChat.tsx from website
 // ============================================================
 
-const API_URL = 'https://assiny.ramppy.site/api/agent/chat'
+const API_URL = 'http://localhost:3000/api/agent/chat'
 
 // --- State ---
 let accessToken = null
@@ -45,7 +45,11 @@ if (window.electronAPI && window.electronAPI.onAuthToken) {
 
 // --- UI: Expand / Collapse ---
 function expand() {
+  if (peekTimeout) { clearTimeout(peekTimeout); peekTimeout = null }
   isExpanded = true
+  snappedEdge = null
+  isHidden = false
+  isAnimating = false
   bubble.style.display = 'none'
   chatPanel.style.display = 'flex'
   window.electronAPI.resizeBubble(380, 520)
@@ -61,6 +65,162 @@ function collapse() {
   chatPanel.style.display = 'none'
   bubble.style.display = 'flex'
   window.electronAPI.resizeBubble(72, 72)
+  // Re-snap to edge only if it was previously snapped
+  if (snappedEdge) {
+    setTimeout(snapToEdge, 300)
+  }
+}
+
+// --- Snap to Edge State ---
+let snappedEdge = null // 'left' | 'right' | 'top' | 'bottom' | null
+let snappedCoord = 0   // the non-edge coordinate (y for left/right, x for top/bottom)
+let isHidden = false
+let isAnimating = false
+const BUBBLE_SIZE = 72
+const VISIBLE_PX = 20   // pixels visible when hidden at edge
+const PEEK_OFFSET = 8   // pixels from edge when peeking (hover)
+const SNAP_THRESHOLD = 50 // only snap if dropped within 50px of a screen edge
+
+async function snapIfNearEdge() {
+  if (isExpanded) return
+
+  const pos = await window.electronAPI.getBubblePos()
+  const scr = await window.electronAPI.getScreenSize()
+
+  // Check if near any edge
+  const distLeft = pos.x
+  const distRight = scr.width - (pos.x + BUBBLE_SIZE)
+  const distTop = pos.y
+  const distBottom = scr.height - (pos.y + BUBBLE_SIZE)
+  const minDist = Math.min(distLeft, distRight, distTop, distBottom)
+
+  if (minDist <= SNAP_THRESHOLD) {
+    snapToEdge()
+  }
+  // Otherwise: bubble stays where user dropped it, no snap
+}
+
+async function snapToEdge() {
+  if (isExpanded) return
+  isAnimating = true
+
+  const pos = await window.electronAPI.getBubblePos()
+  const scr = await window.electronAPI.getScreenSize()
+
+  // Calculate distance to each edge
+  const distances = {
+    left: pos.x,
+    right: scr.width - (pos.x + BUBBLE_SIZE),
+    top: pos.y,
+    bottom: scr.height - (pos.y + BUBBLE_SIZE)
+  }
+
+  // Find nearest edge
+  let minEdge = 'right'
+  let minDist = Infinity
+  for (const [edge, dist] of Object.entries(distances)) {
+    if (dist < minDist) { minDist = dist; minEdge = edge }
+  }
+  snappedEdge = minEdge
+
+  // Calculate hidden position (only VISIBLE_PX showing)
+  let targetX, targetY
+  switch (snappedEdge) {
+    case 'left':
+      targetX = -(BUBBLE_SIZE - VISIBLE_PX)
+      targetY = Math.max(0, Math.min(pos.y, scr.height - BUBBLE_SIZE))
+      snappedCoord = targetY
+      break
+    case 'right':
+      targetX = scr.width - VISIBLE_PX
+      targetY = Math.max(0, Math.min(pos.y, scr.height - BUBBLE_SIZE))
+      snappedCoord = targetY
+      break
+    case 'top':
+      targetX = Math.max(0, Math.min(pos.x, scr.width - BUBBLE_SIZE))
+      targetY = -(BUBBLE_SIZE - VISIBLE_PX)
+      snappedCoord = targetX
+      break
+    case 'bottom':
+      targetX = Math.max(0, Math.min(pos.x, scr.width - BUBBLE_SIZE))
+      targetY = scr.height - VISIBLE_PX
+      snappedCoord = targetX
+      break
+  }
+
+  isHidden = true
+  window.electronAPI.snapBubble(targetX, targetY, 250)
+  setTimeout(() => { isAnimating = false }, 300)
+}
+
+async function peekFromEdge() {
+  if (!snappedEdge || isExpanded || isAnimating) return
+  isAnimating = true
+
+  const scr = await window.electronAPI.getScreenSize()
+  let targetX, targetY
+
+  switch (snappedEdge) {
+    case 'left':
+      targetX = PEEK_OFFSET
+      targetY = snappedCoord
+      break
+    case 'right':
+      targetX = scr.width - BUBBLE_SIZE - PEEK_OFFSET
+      targetY = snappedCoord
+      break
+    case 'top':
+      targetX = snappedCoord
+      targetY = PEEK_OFFSET
+      break
+    case 'bottom':
+      targetX = snappedCoord
+      targetY = scr.height - BUBBLE_SIZE - PEEK_OFFSET
+      break
+  }
+
+  isHidden = false
+  window.electronAPI.snapBubble(targetX, targetY, 150)
+  setTimeout(() => { isAnimating = false }, 200)
+
+  // Auto-hide after 3 seconds if not clicked again
+  if (peekTimeout) clearTimeout(peekTimeout)
+  peekTimeout = setTimeout(() => {
+    if (snappedEdge && !isExpanded && !isHidden && !isDragging) {
+      hideAtEdge()
+    }
+  }, 3000)
+}
+
+async function hideAtEdge() {
+  if (!snappedEdge || isExpanded || isAnimating) return
+  isAnimating = true
+
+  const scr = await window.electronAPI.getScreenSize()
+  let targetX, targetY
+
+  switch (snappedEdge) {
+    case 'left':
+      targetX = -(BUBBLE_SIZE - VISIBLE_PX)
+      targetY = snappedCoord
+      break
+    case 'right':
+      targetX = scr.width - VISIBLE_PX
+      targetY = snappedCoord
+      break
+    case 'top':
+      targetX = snappedCoord
+      targetY = -(BUBBLE_SIZE - VISIBLE_PX)
+      break
+    case 'bottom':
+      targetX = snappedCoord
+      targetY = scr.height - VISIBLE_PX
+      break
+  }
+
+  isHidden = true
+  window.electronAPI.snapBubble(targetX, targetY, 200)
+  setTimeout(() => { isAnimating = false }, 250)
 }
 
 // --- Drag Logic (bubble) ---
@@ -95,8 +255,17 @@ bubble.addEventListener('mousedown', async (e) => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
     if (!isDragging) {
-      expand()
+      // If hidden at edge, first peek; if already peeked, expand
+      if (snappedEdge && isHidden) {
+        peekFromEdge()
+      } else {
+        expand()
+      }
+    } else {
+      // Only snap to edge if dropped near a screen border
+      snapIfNearEdge()
     }
+    isDragging = false
   }
 
   document.addEventListener('mousemove', onMove)
@@ -376,6 +545,9 @@ document.querySelectorAll('.resize-handle').forEach(handle => {
     document.addEventListener('mouseup', onUp)
   })
 })
+
+// --- Snap to Edge: Auto-hide after peek timeout ---
+let peekTimeout = null
 
 // --- Init ---
 // Auth token will be received via IPC from main window

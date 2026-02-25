@@ -1,8 +1,11 @@
 const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu } = require('electron')
 const path = require('path')
 
-const PLATFORM_URL = 'https://assiny.ramppy.site'
-const ALLOWED_DOMAIN = 'ramppy.site'
+const PLATFORM_URL = 'http://localhost:3000'
+const ALLOWED_DOMAIN = 'localhost'
+
+const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
+const ICON_PATH = path.join(__dirname, 'assets', iconFile)
 
 let mainWindow = null
 let bubbleWindow = null
@@ -34,7 +37,7 @@ function createMainWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Ramppy',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -43,6 +46,7 @@ function createMainWindow() {
   })
 
   mainWindow.loadURL(PLATFORM_URL)
+  mainWindow.webContents.setZoomFactor(1.2)
   mainWindow.setMenuBarVisibility(false)
 
   // Open external links in system browser
@@ -103,7 +107,7 @@ function createBubbleWindow() {
     skipTaskbar: true,
     hasShadow: false,
     title: 'Ramppy Assistant',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -172,6 +176,49 @@ function startAuthBridge() {
 }
 
 // ============================================================
+// BUBBLE ANIMATION HELPER
+// ============================================================
+let bubbleAnimationTimer = null
+
+function animateBubbleTo(targetX, targetY, duration = 200) {
+  if (!bubbleWindow || bubbleWindow.isDestroyed()) return
+
+  // Cancel any ongoing animation
+  if (bubbleAnimationTimer) {
+    clearInterval(bubbleAnimationTimer)
+    bubbleAnimationTimer = null
+  }
+
+  const bounds = bubbleWindow.getBounds()
+  const startX = bounds.x
+  const startY = bounds.y
+  const startTime = Date.now()
+
+  bubbleAnimationTimer = setInterval(() => {
+    if (!bubbleWindow || bubbleWindow.isDestroyed()) {
+      clearInterval(bubbleAnimationTimer)
+      bubbleAnimationTimer = null
+      return
+    }
+
+    const elapsed = Date.now() - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    // Ease out cubic for smooth deceleration
+    const eased = 1 - Math.pow(1 - progress, 3)
+
+    const x = Math.round(startX + (targetX - startX) * eased)
+    const y = Math.round(startY + (targetY - startY) * eased)
+
+    bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
+
+    if (progress >= 1) {
+      clearInterval(bubbleAnimationTimer)
+      bubbleAnimationTimer = null
+    }
+  }, 16) // ~60fps
+}
+
+// ============================================================
 // IPC HANDLERS
 // ============================================================
 
@@ -233,6 +280,18 @@ ipcMain.handle('get-bubble-pos', async () => {
   return { x: bounds.x, y: bounds.y }
 })
 
+// Animate bubble to position (allows off-screen for snap-to-edge)
+ipcMain.on('snap-bubble', (_event, x, y, duration) => {
+  if (!bubbleWindow) return
+  animateBubbleTo(x, y, duration || 200)
+})
+
+// Get screen work area size
+ipcMain.handle('get-screen-size', async () => {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  return { width, height }
+})
+
 // Capture screenshot of primary display for AI vision
 ipcMain.handle('capture-screenshot', async () => {
   try {
@@ -266,7 +325,7 @@ ipcMain.handle('get-sources', async () => {
 // SYSTEM TRAY
 // ============================================================
 function createTray() {
-  tray = new Tray(path.join(__dirname, 'assets', 'icon.png'))
+  tray = new Tray(ICON_PATH)
   tray.setToolTip('Ramppy')
 
   const contextMenu = Menu.buildFromTemplate([
