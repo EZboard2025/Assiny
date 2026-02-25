@@ -3,7 +3,7 @@
 // Design: matches SellerAgentChat.tsx from website
 // ============================================================
 
-const API_URL = 'https://assiny.ramppy.site/api/agent/chat'
+const API_URL = 'https://ramppy.site/api/agent/chat'
 
 // --- State ---
 let accessToken = null
@@ -43,11 +43,41 @@ if (window.electronAPI && window.electronAPI.onAuthToken) {
   })
 }
 
+// --- Mouse event forwarding (transparent areas pass clicks through) ---
+// The body has pointer-events: none by default.
+// When the mouse enters an interactive element, we tell Electron to capture mouse events.
+// When it leaves, we go back to forwarding mode.
+
+function enableMouseCapture() {
+  if (window.electronAPI && window.electronAPI.setIgnoreMouse) {
+    window.electronAPI.setIgnoreMouse(false)
+  }
+}
+
+function disableMouseCapture() {
+  if (window.electronAPI && window.electronAPI.setIgnoreMouse) {
+    window.electronAPI.setIgnoreMouse(true)
+  }
+}
+
+// The bubble element: capture mouse when hovering over it
+bubble.addEventListener('mouseenter', enableMouseCapture)
+bubble.addEventListener('mouseleave', () => {
+  // Only disable if not dragging and not expanded
+  if (!isDragging && !isExpanded) {
+    disableMouseCapture()
+  }
+})
+
+// Chat panel: always capture mouse when expanded
+// (handled in expand/collapse functions)
+
 // --- UI: Expand / Collapse ---
 function expand() {
   isExpanded = true
   bubble.style.display = 'none'
   chatPanel.style.display = 'flex'
+  enableMouseCapture()
   window.electronAPI.resizeBubble(380, 520)
   if (hasMessages) {
     chatInput.focus()
@@ -60,10 +90,22 @@ function collapse() {
   isExpanded = false
   chatPanel.style.display = 'none'
   bubble.style.display = 'flex'
+  disableMouseCapture()
   window.electronAPI.resizeBubble(72, 72)
 }
 
-// --- Drag Logic (bubble) ---
+// --- Global shortcut toggle (Cmd+Shift+R) ---
+if (window.electronAPI && window.electronAPI.onToggleBubble) {
+  window.electronAPI.onToggleBubble(() => {
+    if (isExpanded) {
+      collapse()
+    } else {
+      expand()
+    }
+  })
+}
+
+// --- Drag Logic (bubble) with edge snapping ---
 let isDragging = false
 let dragStartX = 0
 let dragStartY = 0
@@ -85,6 +127,7 @@ bubble.addEventListener('mousedown', async (e) => {
     const dy = ev.screenY - dragStartY
     if (!isDragging && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
       isDragging = true
+      bubble.classList.add('dragging')
     }
     if (isDragging) {
       window.electronAPI.moveBubble(winStartX + dx, winStartY + dy)
@@ -94,7 +137,16 @@ bubble.addEventListener('mousedown', async (e) => {
   const onUp = () => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
-    if (!isDragging) {
+
+    if (isDragging) {
+      bubble.classList.remove('dragging')
+      // Snap to nearest screen edge after drag
+      if (window.electronAPI.snapToEdge) {
+        window.electronAPI.snapToEdge()
+      }
+      isDragging = false
+    } else {
+      // Click (not drag) — expand
       expand()
     }
   }
@@ -105,7 +157,6 @@ bubble.addEventListener('mousedown', async (e) => {
 
 // --- Drag Logic (chat header) ---
 const chatHeader = document.querySelector('.chat-header')
-chatHeader.style.cursor = 'grab'
 
 chatHeader.addEventListener('mousedown', async (e) => {
   // Ignore clicks on the close button
@@ -376,6 +427,21 @@ document.querySelectorAll('.resize-handle').forEach(handle => {
     document.addEventListener('mouseup', onUp)
   })
 })
+
+// --- Recording state indicator (Meet auto-detection) ---
+const recBadge = document.getElementById('rec-badge')
+
+if (window.electronAPI && window.electronAPI.onRecordingState) {
+  window.electronAPI.onRecordingState((isRecording) => {
+    if (isRecording) {
+      bubble.classList.add('recording')
+      recBadge.style.display = 'flex'
+    } else {
+      bubble.classList.remove('recording')
+      recBadge.style.display = 'none'
+    }
+  })
+}
 
 // --- Init ---
 // Auth token will be received via IPC from main window

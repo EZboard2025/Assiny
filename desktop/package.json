@@ -21,6 +21,9 @@
       "bubble.html",
       "bubble.css",
       "bubble.js",
+      "recording.html",
+      "recording.css",
+      "recording.js",
       "assets/**/*"
     ],
     "win": {
@@ -36,10 +39,21 @@
       "identity": null
     },
     "dmg": {
-      "window": { "width": 540, "height": 380 },
+      "window": {
+        "width": 540,
+        "height": 380
+      },
       "contents": [
-        { "x": 140, "y": 190 },
-        { "x": 400, "y": 190, "type": "link", "path": "/Applications" }
+        {
+          "x": 140,
+          "y": 190
+        },
+        {
+          "x": 400,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
       ],
       "icon": "assets/icon.icns",
       "iconSize": 80
@@ -58,7 +72,8 @@
     }
   },
   "devDependencies": {
-    "electron": "^30.5.1",
+    "electron": "^40.6.1",
     "electron-builder": "^25.0.0"
-  }
+  },
+  "dependencies": {}
 }

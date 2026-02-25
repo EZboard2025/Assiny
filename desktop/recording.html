@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; connect-src https://*.supabase.co wss://api.deepgram.com https://ramppy.site https://*.ramppy.site http://localhost:* ; img-src 'self' data:;">
+  <title>Ramppy Recorder</title>
+  <link rel="stylesheet" href="recording.css">
+</head>
+<body>
+  <!-- Custom titlebar -->
+  <div id="titlebar">
+    <div id="titlebar-drag">
+      <div id="titlebar-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" x2="12" y1="19" y2="22"/>
+        </svg>
+      </div>
+      <span id="titlebar-text">Ramppy Recorder</span>
+    </div>
+    <div id="titlebar-buttons">
+      <button id="btn-minimize" title="Minimizar">&#x2013;</button>
+      <button id="btn-close" title="Fechar">&#x2715;</button>
+    </div>
+  </div>
+
+  <!-- Screen: Waiting for auth -->
+  <div id="screen-waiting" class="screen">
+    <div class="center-content">
+      <div class="spinner"></div>
+      <p class="waiting-text">Conectando...</p>
+      <p class="waiting-sub">Faça login na janela principal do Ramppy</p>
+    </div>
+  </div>
+
+  <!-- Screen: Idle (ready to record) -->
+  <div id="screen-idle" class="screen" style="display:none">
+    <div class="center-content">
+      <div class="mic-icon-large">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" x2="12" y1="19" y2="22"/>
+        </svg>
+      </div>
+      <h2>Gravar Reuniao</h2>
+      <p class="idle-desc">Captura o audio do sistema (outros participantes) e do microfone (voce). Funciona com Meet, Zoom, Teams ou qualquer app.</p>
+      <button id="btn-start" class="btn-primary">
+        <span class="btn-text">Iniciar Gravacao</span>
+        <span class="btn-loading" style="display:none">Iniciando...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Screen: Recording -->
+  <div id="screen-recording" class="screen" style="display:none">
+    <div class="recording-header">
+      <div class="rec-indicator">
+        <span class="rec-dot"></span>
+        <span id="rec-timer">00:00</span>
+      </div>
+      <div class="rec-stats">
+        <span><strong id="stat-segments">0</strong> segmentos</span>
+        <span><strong id="stat-words">0</strong> palavras</span>
+      </div>
+    </div>
+    <div id="transcript-container">
+      <div id="transcript-list">
+        <p class="transcript-placeholder">Aguardando transcricao...</p>
+      </div>
+    </div>
+    <div class="recording-footer">
+      <button id="btn-stop" class="btn-stop">
+        <span class="btn-text">Parar e Avaliar</span>
+        <span class="btn-loading" style="display:none">Parando...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Screen: Evaluating -->
+  <div id="screen-evaluating" class="screen" style="display:none">
+    <div class="center-content">
+      <div class="spinner"></div>
+      <h2>Analisando reuniao...</h2>
+      <p class="eval-info">
+        <span id="eval-duration"></span> &middot; <span id="eval-words"></span>
+      </p>
+      <p class="eval-sub">Avaliacao SPIN + Smart Notes</p>
+    </div>
+  </div>
+
+  <!-- Screen: Results -->
+  <div id="screen-results" class="screen" style="display:none">
+    <div class="results-content">
+      <div class="score-section">
+        <div class="score-circle">
+          <span id="result-score">0</span>
+        </div>
+        <p id="result-level" class="result-level"></p>
+      </div>
+
+      <div class="spin-grid">
+        <div class="spin-card">
+          <span class="spin-label">S</span>
+          <span id="spin-s" class="spin-value">-</span>
+        </div>
+        <div class="spin-card">
+          <span class="spin-label">P</span>
+          <span id="spin-p" class="spin-value">-</span>
+        </div>
+        <div class="spin-card">
+          <span class="spin-label">I</span>
+          <span id="spin-i" class="spin-value">-</span>
+        </div>
+        <div class="spin-card">
+          <span class="spin-label">N</span>
+          <span id="spin-n" class="spin-value">-</span>
+        </div>
+      </div>
+
+      <div class="summary-section">
+        <h3>Resumo</h3>
+        <p id="result-summary"></p>
+      </div>
+
+      <div class="results-actions">
+        <button id="btn-view-full" class="btn-secondary">Ver Analise Completa</button>
+        <button id="btn-new-recording" class="btn-primary">Nova Gravacao</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen: Error -->
+  <div id="screen-error" class="screen" style="display:none">
+    <div class="center-content">
+      <div class="error-icon">!</div>
+      <p id="error-message" class="error-text"></p>
+      <button id="btn-retry" class="btn-primary">Tentar Novamente</button>
+    </div>
+  </div>
+
+  <script src="recording.js"></script>
+</body>
+</html>

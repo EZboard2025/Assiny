@@ -30,7 +30,10 @@ import {
   Mic,
   Sparkles,
   Globe,
-  LogOut
+  LogOut,
+  Monitor,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -204,8 +207,13 @@ export default function MeetAnalysisView() {
   const [editEventData, setEditEventData] = useState<{ id: string; title: string; start: string; end: string | null; meetLink?: string; attendees?: Array<{ email: string; displayName?: string; responseStatus?: string }>; description?: string | null } | null>(null)
 
   // Tab & calendar week state
-  type MeetTab = 'calendar' | 'manual'
+  type MeetTab = 'calendar' | 'manual' | 'transcricoes'
   const [activeTab, setActiveTab] = useState<MeetTab>('calendar')
+  const [desktopTranscriptions, setDesktopTranscriptions] = useState<any[]>([])
+  const [loadingTranscriptions, setLoadingTranscriptions] = useState(false)
+  const [expandedTranscription, setExpandedTranscription] = useState<string | null>(null)
+  const [liveSession, setLiveSession] = useState<any | null>(null)
+  const liveTranscriptEndRef = useRef<HTMLDivElement>(null)
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
     const now = new Date()
     const day = now.getDay()
@@ -328,6 +336,109 @@ export default function MeetAnalysisView() {
     // Mark mount complete so persist effect can start working
     hasRestoredSessionRef.current = true
   }, [])
+
+  // Load desktop transcriptions when tab is active
+  const loadDesktopTranscriptions = useCallback(async () => {
+    setLoadingTranscriptions(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('meet_evaluations')
+        .select('id, meeting_id, seller_name, transcript, evaluation, overall_score, performance_level, spin_s_score, spin_p_score, spin_i_score, spin_n_score, created_at')
+        .eq('user_id', user.id)
+        .like('meeting_id', 'desktop_%')
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        setDesktopTranscriptions(data)
+      }
+    } catch (e) {
+      console.error('Error loading desktop transcriptions:', e)
+    } finally {
+      setLoadingTranscriptions(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'transcricoes') {
+      loadDesktopTranscriptions()
+    }
+  }, [activeTab, loadDesktopTranscriptions])
+
+  // Subscribe to live recording sessions via Supabase Realtime
+  useEffect(() => {
+    let channel: any = null
+
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Check for existing live session
+      const { data: existing } = await supabase
+        .from('meet_live_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('status', ['recording', 'evaluating'])
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existing) {
+        setLiveSession(existing)
+      }
+
+      // Subscribe to changes
+      channel = supabase
+        .channel('live-session-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'meet_live_sessions',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              const row = payload.new
+              if (row.status === 'recording' || row.status === 'evaluating') {
+                setLiveSession(row)
+              } else {
+                // completed or error — remove live card, refresh list
+                setLiveSession(null)
+                if (activeTab === 'transcricoes') {
+                  loadDesktopTranscriptions()
+                }
+              }
+            }
+            if (payload.eventType === 'DELETE') {
+              setLiveSession(null)
+              if (activeTab === 'transcricoes') {
+                loadDesktopTranscriptions()
+              }
+            }
+          }
+        )
+        .subscribe()
+    }
+
+    setupRealtime()
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [activeTab, loadDesktopTranscriptions])
+
+  // Auto-scroll live transcript to bottom
+  useEffect(() => {
+    if (liveTranscriptEndRef.current && liveSession?.status === 'recording') {
+      liveTranscriptEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [liveSession?.transcript?.length, liveSession?.status])
 
   // Persist session to localStorage (skip initial null before restore)
   useEffect(() => {
@@ -1004,6 +1115,8 @@ export default function MeetAnalysisView() {
         setHasWriteAccess(data.hasWriteAccess || false)
         if (data.connected) {
           loadCalendarEvents(authSession.access_token)
+        } else if (activeTab === 'calendar') {
+          setActiveTab('manual')
         }
       }
     } catch (e) {
@@ -1399,6 +1512,31 @@ export default function MeetAnalysisView() {
           </div>
         )}
 
+        {/* Live recording banner (visible on all tabs) */}
+        {liveSession && activeTab !== 'transcricoes' && (
+          <div
+            className="mb-4 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:from-green-600 hover:to-emerald-600 transition-all shadow-md"
+            onClick={() => setActiveTab('transcricoes')}
+          >
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+              </span>
+              <span className="text-sm font-semibold text-white">
+                {liveSession.status === 'recording' ? 'Reunião sendo gravada pelo App' : 'Avaliando reunião...'}
+              </span>
+              <span className="text-xs text-white/70">
+                {liveSession.segment_count || 0} segmentos • {liveSession.word_count || 0} palavras
+              </span>
+            </div>
+            <span className="text-xs text-white/80 font-medium flex items-center gap-1">
+              Ver transcrição ao vivo
+              <ChevronRight className="w-4 h-4" />
+            </span>
+          </div>
+        )}
+
         {/* Content Section */}
         {!session && (
           <>
@@ -1438,6 +1576,31 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
+            {/* Tab Navigation (when NOT connected — show Manual + Transcrições) */}
+            {!calendarConnected && !calendarLoading && (
+              <div className="mb-4">
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+                  {([
+                    { id: 'manual' as MeetTab, icon: Link2, label: 'Manual' },
+                    { id: 'transcricoes' as MeetTab, icon: Monitor, label: 'Transcrições App' },
+                  ]).map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      <tab.icon className="w-4 h-4" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Re-auth banner (write scopes needed) */}
             {calendarConnected && !hasWriteAccess && (
               <div className="mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -1464,6 +1627,7 @@ export default function MeetAnalysisView() {
                     {([
                       { id: 'calendar' as MeetTab, icon: CalendarDays, label: 'Calendário' },
                       { id: 'manual' as MeetTab, icon: Link2, label: 'Manual' },
+                      { id: 'transcricoes' as MeetTab, icon: Monitor, label: 'Transcrições App' },
                     ]).map(tab => (
                       <button
                         key={tab.id}
@@ -1663,8 +1827,8 @@ export default function MeetAnalysisView() {
               editEvent={editEventData}
             />
 
-            {/* ========== TAB: Manual (or when not connected) ========== */}
-            {(activeTab === 'manual' || (!calendarConnected && !calendarLoading)) && (
+            {/* ========== TAB: Manual (or when not connected and on manual tab) ========== */}
+            {(activeTab === 'manual') && (
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -1708,8 +1872,8 @@ export default function MeetAnalysisView() {
             </div>
             )}
 
-            {/* Steps + Background notice (only when calendar not connected) */}
-            {!calendarConnected && !calendarLoading && (
+            {/* Steps + Background notice (only when calendar not connected and on manual tab) */}
+            {!calendarConnected && !calendarLoading && activeTab === 'manual' && (
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
@@ -1739,8 +1903,271 @@ export default function MeetAnalysisView() {
               </>
             )}
 
+            {/* ========== TAB: Transcrições App (desktop recordings) ========== */}
+            {activeTab === 'transcricoes' && (
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-5 h-5 text-green-600" />
+                    <h2 className="text-sm font-semibold text-gray-700">Transcrições do App Desktop</h2>
+                  </div>
+                  <button
+                    onClick={loadDesktopTranscriptions}
+                    disabled={loadingTranscriptions}
+                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Atualizar"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingTranscriptions ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {/* How it works */}
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Transcrição automática via App Desktop</p>
+                      <p className="text-xs text-green-600 mt-1">
+                        O app Ramppy detecta automaticamente quando um Google Meet abre no seu computador, grava o áudio e transcreve em tempo real. Ao final da reunião, a avaliação SPIN é gerada automaticamente.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ===== LIVE SESSION CARD ===== */}
+                {liveSession && (
+                  <div className="bg-white rounded-xl border-2 border-green-400 shadow-lg overflow-hidden animate-in">
+                    {/* Live header */}
+                    <div className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                        </span>
+                        <span className="text-sm font-semibold text-white">
+                          {liveSession.status === 'recording' ? 'Gravando reunião ao vivo' : 'Avaliando reunião...'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-white/80 text-xs">
+                        <span>{liveSession.segment_count || 0} segmentos</span>
+                        <span>•</span>
+                        <span>{liveSession.word_count || 0} palavras</span>
+                        {liveSession.seller_name && (
+                          <>
+                            <span>•</span>
+                            <span>{liveSession.seller_name}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Live transcript */}
+                    <div className="max-h-96 overflow-y-auto p-4 space-y-2">
+                      {liveSession.status === 'evaluating' && (
+                        <div className="flex items-center justify-center py-6 gap-3">
+                          <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+                          <span className="text-sm text-gray-600">Gerando avaliação SPIN...</span>
+                        </div>
+                      )}
+                      {(() => {
+                        const transcript = Array.isArray(liveSession.transcript) ? liveSession.transcript : []
+                        if (transcript.length === 0 && liveSession.status === 'recording') {
+                          return (
+                            <div className="flex items-center justify-center py-6 text-gray-400 text-sm">
+                              <Mic className="w-4 h-4 mr-2 animate-pulse" />
+                              Aguardando fala...
+                            </div>
+                          )
+                        }
+                        return transcript.map((seg: any, idx: number) => {
+                          const spNum = parseInt(seg.speaker?.replace('Speaker ', '') || '0')
+                          return (
+                            <div key={idx} className="flex gap-2 animate-in">
+                              <span className={`text-xs font-semibold whitespace-nowrap min-w-[70px] ${spNum > 0 ? 'text-blue-600' : 'text-green-600'}`}>
+                                {seg.speaker || `#${idx + 1}`}
+                              </span>
+                              <p className="text-sm text-gray-700">{seg.text}</p>
+                            </div>
+                          )
+                        })
+                      })()}
+                      <div ref={liveTranscriptEndRef} />
+                    </div>
+
+                    {/* Live footer with elapsed time */}
+                    {liveSession.status === 'recording' && (
+                      <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-xs text-gray-400">
+                          Iniciado às {new Date(liveSession.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-xs text-green-600 font-medium flex items-center gap-1.5">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                          </span>
+                          Transcrição em tempo real
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Loading state */}
+                {loadingTranscriptions && (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!loadingTranscriptions && desktopTranscriptions.length === 0 && !liveSession && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                    <Monitor className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 font-medium">Nenhuma transcrição do app ainda</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Abra o app desktop Ramppy e entre em um Google Meet para gravar automaticamente.
+                    </p>
+                  </div>
+                )}
+
+                {/* Transcription list */}
+                {!loadingTranscriptions && desktopTranscriptions.map((item) => {
+                  const rawScore = item.overall_score || 0
+                  const score = rawScore > 10 ? rawScore / 10 : rawScore
+                  const scoreColor = score >= 7 ? 'text-green-600 bg-green-50 border-green-200' :
+                    score >= 5 ? 'text-amber-600 bg-amber-50 border-amber-200' :
+                    'text-red-600 bg-red-50 border-red-200'
+                  const date = new Date(item.created_at)
+                  const isExpanded = expandedTranscription === item.id
+                  const transcript = Array.isArray(item.transcript) ? item.transcript : []
+                  const wordCount = transcript.reduce((acc: number, seg: any) => acc + (seg.text?.split(' ').length || 0), 0)
+                  const evaluation = item.evaluation || {}
+
+                  return (
+                    <div key={item.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                      {/* Card header */}
+                      <div
+                        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => setExpandedTranscription(isExpanded ? null : item.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${scoreColor}`}>
+                              <span className="text-sm font-bold">{score.toFixed(1)}</span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {item.seller_name || 'Reunião'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-xs text-gray-400">
+                                  {date.toLocaleDateString('pt-BR')} às {date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span className="text-xs text-gray-300">•</span>
+                                <span className="text-xs text-gray-400">{transcript.length} segmentos</span>
+                                <span className="text-xs text-gray-300">•</span>
+                                <span className="text-xs text-gray-400">{wordCount} palavras</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {/* SPIN mini scores */}
+                            <div className="hidden sm:flex items-center gap-1.5">
+                              {['S', 'P', 'I', 'N'].map((letter) => {
+                                const key = `spin_${letter.toLowerCase()}_score` as keyof typeof item
+                                const val = parseFloat(item[key]) || 0
+                                const color = val >= 7 ? 'text-green-600' : val >= 5 ? 'text-amber-600' : 'text-red-500'
+                                return (
+                                  <span key={letter} className={`text-xs font-medium ${color}`}>
+                                    {letter}:{val.toFixed(0)}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/history?tab=meet&evaluationId=${item.id}`) }}
+                              className="px-3 py-1.5 text-xs font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors border border-green-200"
+                            >
+                              Ver Análise
+                            </button>
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                          </div>
+                        </div>
+
+                        {/* Executive summary preview */}
+                        {evaluation.executive_summary && !isExpanded && (
+                          <p className="text-xs text-gray-500 mt-2 line-clamp-2">{evaluation.executive_summary}</p>
+                        )}
+                      </div>
+
+                      {/* Expanded: Transcript */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-100">
+                          {/* Summary */}
+                          {evaluation.executive_summary && (
+                            <div className="px-4 py-3 bg-gray-50">
+                              <p className="text-xs font-medium text-gray-600 mb-1">Resumo</p>
+                              <p className="text-sm text-gray-700">{evaluation.executive_summary}</p>
+                            </div>
+                          )}
+
+                          {/* Strengths + Gaps */}
+                          {(evaluation.top_strengths?.length > 0 || evaluation.critical_gaps?.length > 0) && (
+                            <div className="px-4 py-3 grid grid-cols-2 gap-4 bg-gray-50 border-t border-gray-100">
+                              {evaluation.top_strengths?.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-green-700 mb-1">Pontos Fortes</p>
+                                  {evaluation.top_strengths.slice(0, 3).map((s: string, i: number) => (
+                                    <p key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                                      <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
+                                      {s}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                              {evaluation.critical_gaps?.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-red-700 mb-1">Gaps Críticos</p>
+                                  {evaluation.critical_gaps.slice(0, 3).map((g: string, i: number) => (
+                                    <p key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                                      <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0 mt-0.5" />
+                                      {g}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Transcript segments */}
+                          <div className="px-4 py-3 border-t border-gray-100">
+                            <p className="text-xs font-medium text-gray-600 mb-2">Transcrição ({transcript.length} segmentos)</p>
+                            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                              {transcript.length === 0 ? (
+                                <p className="text-xs text-gray-400 italic">Sem transcrição disponível</p>
+                              ) : (
+                                transcript.map((seg: any, idx: number) => (
+                                  <div key={idx} className="flex gap-2">
+                                    <span className="text-xs font-medium text-green-600 whitespace-nowrap min-w-[60px]">
+                                      {seg.speaker || `#${idx + 1}`}
+                                    </span>
+                                    <p className="text-xs text-gray-700">{seg.text}</p>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
             {/* Recent Analyses */}
-            {recentEvaluations.length > 0 && (
+            {recentEvaluations.length > 0 && activeTab !== 'transcricoes' && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold text-gray-700">Análises Recentes</h2>
@@ -1788,7 +2215,7 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {recentEvaluations.length === 0 && (
+            {recentEvaluations.length === 0 && activeTab !== 'transcricoes' && (
               <p className="text-sm text-gray-400 text-center py-6">Nenhuma análise ainda</p>
             )}
           </>

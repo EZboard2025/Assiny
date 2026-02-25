@@ -2,15 +2,20 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://ramppy.site https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self';">
   <title>Ramppy Assistant</title>
   <link rel="stylesheet" href="bubble.css">
 </head>
 <body>
   <!-- Collapsed: floating bubble -->
-  <div id="bubble" class="bubble" title="Assistente Ramppy">
+  <div id="bubble" class="bubble">
     <svg class="bubble-sparkle" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
     <span class="bubble-ping"></span>
+    <span id="rec-badge" class="rec-badge" style="display:none;">
+      <span class="rec-dot"></span>
+      <span class="rec-label">REC</span>
+    </span>
+    <span class="bubble-tooltip">Assistente Ramppy <kbd>&#8984;&#8679;R</kbd></span>
   </div>
 
   <!-- Expanded: chat panel -->
@@ -51,7 +56,6 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
-
         <!-- Suggestion cards (welcome state) -->
         <div class="welcome-suggestions">
           <button class="suggestion-card" data-msg="Quem precisa de atenção?">
