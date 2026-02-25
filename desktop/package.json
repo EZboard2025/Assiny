@@ -32,10 +32,21 @@
       "icon": "assets/icon.png",
       "signAndEditExecutable": false
     },
+    "afterPack": "./scripts/sign-mac.js",
     "mac": {
-      "target": ["dmg"],
+      "target": "dmg",
       "icon": "assets/icon.icns",
-      "category": "public.app-category.business"
+      "category": "public.app-category.business",
+      "identity": null
+    },
+    "dmg": {
+      "window": { "width": 540, "height": 380 },
+      "contents": [
+        { "x": 140, "y": 190 },
+        { "x": 400, "y": 190, "type": "link", "path": "/Applications" }
+      ],
+      "icon": "assets/icon.icns",
+      "iconSize": 80
     },
     "nsis": {
       "oneClick": true,

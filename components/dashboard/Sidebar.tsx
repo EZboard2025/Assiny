@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp } from 'lucide-react'
+import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp, Download } from 'lucide-react'
 
 interface SidebarProps {
   currentView: string
@@ -40,6 +40,7 @@ export default function Sidebar({
     // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden
     { icon: TrendingUp, view: 'manager', label: 'Gestão', show: isAdmin || isGestor },
     { icon: Link2, view: 'roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
+    { icon: Download, view: 'download', label: 'Download', show: true },
   ]
 
   return (

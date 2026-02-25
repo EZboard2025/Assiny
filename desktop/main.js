@@ -102,6 +102,7 @@ function createBubbleWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    show: false, // Start hidden — only show after user logs in
     title: 'Ramppy Assistant',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
@@ -159,6 +160,10 @@ function startAuthBridge() {
 
       if (authData) {
         bubbleWindow.webContents.send('auth-token', JSON.parse(authData))
+        // Show bubble once user is authenticated
+        if (!bubbleWindow.isVisible()) {
+          bubbleWindow.show()
+        }
       }
     } catch (_) {
       // Main window may not be ready yet

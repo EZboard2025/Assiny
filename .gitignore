@@ -42,3 +42,9 @@ next-env.d.ts
 # whatsapp-web.js session data (legacy)
 .wwebjs_auth/
 .wwebjs_cache/
+
+# desktop build artifacts
+desktop/build/vc_redist.x64.exe
+
+# download files (served locally)
+public/downloads/
