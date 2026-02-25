@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface MiniCalendarProps {
@@ -37,23 +37,30 @@ function isInCurrentWeek(date: Date, weekStart: Date): boolean {
 
 export default function MiniCalendar({ currentWeekStart, onDateClick }: MiniCalendarProps) {
   const [viewDate, setViewDate] = useState(() => new Date(currentWeekStart))
+  const prevWeekStartRef = useRef(currentWeekStart)
 
-  // Sync viewDate month when currentWeekStart changes significantly
+  // Sync viewDate month only when currentWeekStart actually changes
   // (e.g. user navigates weeks past the current viewDate month)
-  const weekMid = new Date(currentWeekStart)
-  weekMid.setDate(weekMid.getDate() + 3) // Wed of the week
-  if (weekMid.getMonth() !== viewDate.getMonth() || weekMid.getFullYear() !== viewDate.getFullYear()) {
-    // Only sync if the viewed month doesn't contain ANY day of the current week
-    const weekEnd = new Date(currentWeekStart)
-    weekEnd.setDate(weekEnd.getDate() + 6)
-    const viewMonth = viewDate.getMonth()
-    const viewYear = viewDate.getFullYear()
-    const weekStartInView = currentWeekStart.getMonth() === viewMonth && currentWeekStart.getFullYear() === viewYear
-    const weekEndInView = weekEnd.getMonth() === viewMonth && weekEnd.getFullYear() === viewYear
-    if (!weekStartInView && !weekEndInView) {
-      setViewDate(new Date(weekMid.getFullYear(), weekMid.getMonth(), 1))
-    }
-  }
+  useEffect(() => {
+    if (prevWeekStartRef.current === currentWeekStart) return
+    prevWeekStartRef.current = currentWeekStart
+
+    const weekMid = new Date(currentWeekStart)
+    weekMid.setDate(weekMid.getDate() + 3)
+
+    setViewDate(prev => {
+      const weekEnd = new Date(currentWeekStart)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+      const viewMonth = prev.getMonth()
+      const viewYear = prev.getFullYear()
+      const weekStartInView = currentWeekStart.getMonth() === viewMonth && currentWeekStart.getFullYear() === viewYear
+      const weekEndInView = weekEnd.getMonth() === viewMonth && weekEnd.getFullYear() === viewYear
+      if (!weekStartInView && !weekEndInView) {
+        return new Date(weekMid.getFullYear(), weekMid.getMonth(), 1)
+      }
+      return prev
+    })
+  }, [currentWeekStart])
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()

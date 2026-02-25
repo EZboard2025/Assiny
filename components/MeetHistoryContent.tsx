@@ -68,14 +68,6 @@ function formatSmartNotesForCopy(notes: any): string {
     lines.push('')
   })
 
-  if (notes.next_steps?.length) {
-    lines.push('## Próximos Passos')
-    notes.next_steps.forEach((step: any, i: number) => {
-      lines.push(`${i + 1}. ${step.action}${step.deadline ? ` (${step.deadline})` : ''}`)
-    })
-    lines.push('')
-  }
-
   if (notes.deal_status) {
     lines.push('## Status da Oportunidade')
     if (notes.deal_status.summary) lines.push(notes.deal_status.summary)
@@ -949,47 +941,6 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                             </div>
                           )
                         })}
-
-                        {/* Next Steps */}
-                        {selectedEvaluation.smart_notes.next_steps?.length > 0 && (
-                          <div className={`py-4 border-t border-gray-100`}>
-                            <div className="flex items-center gap-2 mb-3">
-                              <CheckCircle className="w-4 h-4 text-emerald-600" />
-                              <h4 className="text-[13px] font-semibold text-gray-900">Próximos Passos</h4>
-                            </div>
-                            <div className="space-y-2.5">
-                              {selectedEvaluation.smart_notes.next_steps.map((step: any, idx: number) => (
-                                <div key={idx} className="flex items-start gap-2.5">
-                                  <span className="w-5 h-5 bg-emerald-50 text-emerald-700 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
-                                    {idx + 1}
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[13px] text-gray-800 leading-relaxed">{step.action}</p>
-                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                                        step.owner === 'seller' ? 'bg-blue-50 text-blue-600' :
-                                        step.owner === 'client' ? 'bg-purple-50 text-purple-600' :
-                                        'bg-gray-100 text-gray-500'
-                                      }`}>
-                                        {step.owner === 'seller' ? 'Vendedor' : step.owner === 'client' ? 'Cliente' : 'Ambos'}
-                                      </span>
-                                      {step.deadline && (
-                                        <span className="text-[10px] text-gray-400">{step.deadline}</span>
-                                      )}
-                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                        step.status === 'agreed' ? 'bg-emerald-50 text-emerald-600' :
-                                        step.status === 'suggested' ? 'bg-amber-50 text-amber-600' :
-                                        'bg-gray-100 text-gray-400'
-                                      }`}>
-                                        {step.status === 'agreed' ? 'Acordado' : step.status === 'suggested' ? 'Sugerido' : 'Pendente'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
 
                         {/* Deal Status */}
                         {selectedEvaluation.smart_notes.deal_status && (

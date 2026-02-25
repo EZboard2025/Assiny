@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { CompanyProvider } from '@/lib/contexts/CompanyContext'
+import { ViewportScaler } from '@/components/ViewportScaler'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
+        <ViewportScaler />
         <CompanyProvider>
           {children}
         </CompanyProvider>

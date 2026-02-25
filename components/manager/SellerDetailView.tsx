@@ -600,7 +600,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
 
       {/* ── Full-screen Roleplay History Overlay ──────────────────────── */}
       {roleplayHistoryOpen && (
-        <div className="fixed inset-0 z-[60] bg-gray-50 pr-[400px]">
+        <div className="fixed inset-0 z-[60] bg-gray-50">
           <div className="max-w-7xl mx-auto py-6 px-6 h-full">
             <SellerRoleplayHistory
               sellerId={seller.user_id}

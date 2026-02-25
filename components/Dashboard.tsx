@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import type { ChatInterfaceHandle } from './ChatInterface'
@@ -132,6 +132,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [sharedModalShareId, setSharedModalShareId] = useState<string | null>(null)
   const [pendingEvaluationId, setPendingEvaluationId] = useState<string | null>(null)
   const [pendingHistoryTab, setPendingHistoryTab] = useState<string | null>(null)
+  const [assistantWidth, setAssistantWidth] = useState(0)
+  const handleAssistantChange = useCallback((open: boolean, width: number) => {
+    setAssistantWidth(open ? width : 0)
+  }, [])
 
   // Count meet-specific notifications for sidebar badge
   const meetNotificationCount = notifications.filter(n =>
@@ -634,45 +638,50 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                   <StreakIndicator streak={streak} loading={streakLoading} />
                 </div>
               </div>
-              {/* Edit layout button */}
-              <button
-                onClick={() => setIsEditingLayout(prev => !prev)}
-                className={`p-2.5 rounded-xl transition-colors ${
-                  isEditingLayout
-                    ? 'bg-green-100 text-green-600 ring-1 ring-green-300'
-                    : 'hover:bg-gray-100 text-gray-400'
-                }`}
-                title={isEditingLayout ? 'Salvar layout' : 'Personalizar layout'}
+              {/* Edit layout + Notification buttons — shift left when assistant is open */}
+              <div
+                className="flex items-center gap-1 transition-all duration-300 relative z-50"
+                style={{ marginRight: assistantWidth > 0 ? 58 : 0 }}
               >
-                <LayoutGrid className="w-5 h-5" />
-              </button>
-
-              {/* Notification bell */}
-              <div className="relative">
                 <button
-                  ref={bellRef}
-                  onClick={() => setShowNotifications(prev => !prev)}
-                  className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  onClick={() => setIsEditingLayout(prev => !prev)}
+                  className={`p-2.5 rounded-xl transition-colors ${
+                    isEditingLayout
+                      ? 'bg-green-100 text-green-600 ring-1 ring-green-300'
+                      : 'hover:bg-gray-100 text-gray-400'
+                  }`}
+                  title={isEditingLayout ? 'Salvar layout' : 'Personalizar layout'}
                 >
-                  <Bell className="w-5 h-5 text-gray-500" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
+                  <LayoutGrid className="w-5 h-5" />
                 </button>
-                {showNotifications && (
-                  <NotificationPanel
-                    notifications={notifications}
-                    allNotifications={allNotifications}
-                    onMarkAsRead={markAsRead}
-                    onMarkAllAsRead={handleMarkAllAsRead}
-                    onNotificationClick={handleNotificationClick}
-                    onClose={() => setShowNotifications(false)}
-                    onFetchAll={fetchAllNotifications}
-                    anchorRef={bellRef}
-                  />
-                )}
+
+                {/* Notification bell */}
+                <div className="relative">
+                  <button
+                    ref={bellRef}
+                    onClick={() => setShowNotifications(prev => !prev)}
+                    className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  >
+                    <Bell className="w-5 h-5 text-gray-500" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                  {showNotifications && (
+                    <NotificationPanel
+                      notifications={notifications}
+                      allNotifications={allNotifications}
+                      onMarkAsRead={markAsRead}
+                      onMarkAllAsRead={handleMarkAllAsRead}
+                      onNotificationClick={handleNotificationClick}
+                      onClose={() => setShowNotifications(false)}
+                      onFetchAll={fetchAllNotifications}
+                      anchorRef={bellRef}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -839,7 +848,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Seller Agent Chat - home, profile and roleplay */}
       {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay') && (
-        <SellerAgentChat userName={userName || undefined} currentView={currentView} />
+        <SellerAgentChat userName={userName || undefined} currentView={currentView} onOpenChange={handleAssistantChange} />
       )}
 
       {/* Configuration Required Overlay */}
