@@ -268,7 +268,7 @@ ipcMain.on('move-bubble', (_event, x, y) => {
 })
 
 // Set bubble bounds (position + size) — used for expand, collapse, and edge resizing
-ipcMain.on('set-bubble-bounds', (_event, x, y, width, height) => {
+ipcMain.handle('set-bubble-bounds', async (_event, x, y, width, height) => {
   if (!bubbleWindow) return
   const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
 
@@ -288,6 +288,12 @@ ipcMain.on('set-bubble-bounds', (_event, x, y, width, height) => {
 
   bubbleWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) })
   bubbleWindow.setResizable(isPanel)
+})
+
+// Set bubble window opacity (hide dark flash during resize on Windows)
+ipcMain.handle('set-bubble-opacity', async (_event, opacity) => {
+  if (!bubbleWindow || bubbleWindow.isDestroyed()) return
+  bubbleWindow.setOpacity(opacity)
 })
 
 // Get current bubble position

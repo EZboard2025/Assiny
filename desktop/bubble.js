@@ -133,10 +133,8 @@ async function expand() {
   snappedEdge = null
   isHidden = false
   isAnimating = false
-  bubble.style.display = 'none'
-  chatPanel.style.display = 'flex'
 
-  // Panel opens at bubble position, only shift if it overflows the screen
+  // Calculate target position BEFORE any visual changes
   const scr = await window.electronAPI.getScreenSize()
   const panelW = 420
   const panelH = 780
@@ -148,8 +146,15 @@ async function expand() {
   if (py + panelH > scr.height) py = scr.height - panelH - 8
   if (py < 0) py = 8
 
-  // Atomic: set position + size in one call to avoid visual jumps
-  window.electronAPI.setBubbleBounds(px, py, panelW, panelH)
+  // Hide window → resize → show panel → restore window (prevents dark flash on Windows)
+  await window.electronAPI.setBubbleOpacity(0)
+  bubble.style.display = 'none'
+  chatPanel.classList.remove('panel-animate')
+  chatPanel.style.display = 'flex'
+  await window.electronAPI.setBubbleBounds(px, py, panelW, panelH)
+  void chatPanel.offsetWidth // force reflow
+  chatPanel.classList.add('panel-animate')
+  await window.electronAPI.setBubbleOpacity(1)
 
   if (hasMessages) {
     chatInput.focus()
@@ -162,19 +167,21 @@ async function expand() {
 
 async function collapse() {
   isExpanded = false
-  chatPanel.style.display = 'none'
-  bubble.style.display = 'flex'
   removeBarState()
-
-  // Reset suggestions so next open captures a fresh screenshot
   suggestionsLoaded = false
 
-  // Atomic: restore exact saved position + bubble size in one call
+  // Hide window → resize back to bubble → show (prevents dark flash)
+  await window.electronAPI.setBubbleOpacity(0)
+  chatPanel.style.display = 'none'
+  chatPanel.classList.remove('panel-animate')
+  bubble.style.display = 'flex'
+
   if (savedBubblePos) {
-    window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, 72, 72)
+    await window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, BUBBLE_SIZE, BUBBLE_SIZE)
   } else {
-    await window.electronAPI.resizeBubble(72, 72)
+    await window.electronAPI.resizeBubble(BUBBLE_SIZE, BUBBLE_SIZE)
   }
+  await window.electronAPI.setBubbleOpacity(1)
 }
 
 // --- Snap to Edge State ---
