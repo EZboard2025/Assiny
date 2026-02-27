@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://ramppy.site https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://ramppy.site https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
   <title>Ramppy Assistant</title>
   <link rel="stylesheet" href="bubble.css">
 </head>
@@ -29,7 +29,8 @@
     <div class="resize-handle resize-nw" data-dir="nw"></div>
     <div class="resize-handle resize-se" data-dir="se"></div>
     <div class="resize-handle resize-sw" data-dir="sw"></div>
-    <!-- Header (same as site) -->
+
+    <!-- Header -->
     <div class="chat-header">
       <div class="chat-header-center">
         <svg class="header-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
@@ -47,41 +48,38 @@
       <div id="welcome-state" class="welcome-state">
         <svg class="welcome-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
         <p class="welcome-title" id="welcome-title">Sou seu assistente pessoal.</p>
-        <p class="welcome-sub">Performance, reuniões, treinos, agenda e gestão da equipe</p>
-
-        <!-- Input inline (welcome state) -->
+        <p class="welcome-sub">Performance, reunioes, treinos, agenda e gestao da equipe</p>
         <div class="welcome-input-wrap">
           <input type="text" id="welcome-input" class="welcome-input" placeholder="Pergunte qualquer coisa..." autocomplete="off">
           <button id="btn-send-welcome" class="btn-send-small" title="Enviar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
-        <!-- Suggestion cards (welcome state) -->
         <div class="welcome-suggestions">
-          <button class="suggestion-card" data-msg="Quem precisa de atenção?">
+          <button class="suggestion-card" data-msg="Quem precisa de atencao?">
             <svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-            <span>Quem precisa de atenção?</span>
+            <span>Quem precisa de atencao?</span>
           </button>
           <button class="suggestion-card" data-msg="Compare os vendedores">
             <svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="12" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg>
             <span>Compare os vendedores</span>
           </button>
-          <button class="suggestion-card" data-msg="Como está minha performance?">
+          <button class="suggestion-card" data-msg="Como esta minha performance?">
             <svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            <span>Como está minha performance?</span>
+            <span>Como esta minha performance?</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Suggestion pills (during chat) -->
+    <!-- Suggestion pills -->
     <div id="chat-pills" class="chat-pills" style="display:none;">
-      <button class="pill" data-msg="Como está minha performance?">Como está minha performance?</button>
-      <button class="pill" data-msg="Quem precisa de atenção?">Quem precisa de atenção?</button>
+      <button class="pill" data-msg="Como esta minha performance?">Como esta minha performance?</button>
+      <button class="pill" data-msg="Quem precisa de atencao?">Quem precisa de atencao?</button>
       <button class="pill" data-msg="Compare os vendedores">Compare os vendedores</button>
     </div>
 
-    <!-- Input bar (during chat) -->
+    <!-- Input bar -->
     <div id="chat-input-bar" class="chat-input-bar" style="display:none;">
       <div class="input-wrap">
         <input type="text" id="chat-input" class="chat-input" placeholder="Pergunte qualquer coisa..." autocomplete="off">

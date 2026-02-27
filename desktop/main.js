@@ -11,8 +11,13 @@ const ALLOWED_DOMAIN = 'ramppy.site'
 let mainWindow = null
 let bubbleWindow = null
 let recordingWindow = null
+let whatsappWindow = null
+let copilotWindow = null
 let authTokenInterval = null
 let tray = null
+
+// WhatsApp scraper state (forwarded from whatsappWindow to bubbleWindow)
+let whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
 
 // Meet auto-detection state
 let meetDetectionInterval = null
@@ -296,6 +301,159 @@ function createRecordingWindow(autoStart = false) {
 }
 
 // ============================================================
+// WHATSAPP WINDOW (separate window for WhatsApp Web)
+// ============================================================
+function createWhatsAppWindow() {
+  if (whatsappWindow && !whatsappWindow.isDestroyed()) {
+    whatsappWindow.focus()
+    return
+  }
+
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
+  const copilotWidth = 400
+  const waWidth = Math.min(1100, screenW - copilotWidth - 20)
+  const totalWidth = waWidth + copilotWidth
+  const startX = Math.round((screenW - totalWidth) / 2)
+  const startY = Math.round((screenH - 750) / 2)
+
+  // Configure the WhatsApp partition with proper permissions
+  const waSession = session.fromPartition('persist:whatsapp')
+  waSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(true)
+  })
+  waSession.setPermissionCheckHandler(() => true)
+
+  // Use a real Chrome user agent (WhatsApp Web blocks non-standard browsers)
+  const electronVersion = process.versions.chrome || '131.0.0.0'
+  const chromeUA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${electronVersion} Safari/537.36`
+
+  whatsappWindow = new BrowserWindow({
+    width: waWidth,
+    height: 750,
+    x: startX,
+    y: startY,
+    resizable: true,
+    minWidth: 700,
+    minHeight: 500,
+    title: 'WhatsApp — Ramppy',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'whatsapp-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      // Persist WhatsApp session across restarts (no QR every time)
+      partition: 'persist:whatsapp',
+    },
+  })
+
+  // Override user agent to match real Chrome
+  whatsappWindow.webContents.setUserAgent(chromeUA)
+
+  whatsappWindow.loadURL('https://web.whatsapp.com')
+  whatsappWindow.setMenuBarVisibility(false)
+
+  // Inject scraper script after WhatsApp Web loads (and on SPA navigations)
+  const injectScraper = () => {
+    if (!whatsappWindow || whatsappWindow.isDestroyed()) return
+    const fs = require('fs')
+    const scraperPath = path.join(__dirname, 'whatsapp-scraper.js')
+    try {
+      const scraperCode = fs.readFileSync(scraperPath, 'utf-8')
+      whatsappWindow.webContents.executeJavaScript(scraperCode)
+      console.log('[WhatsApp] Scraper injected successfully')
+    } catch (err) {
+      console.error('[WhatsApp] Failed to inject scraper:', err)
+    }
+  }
+
+  whatsappWindow.webContents.on('did-finish-load', injectScraper)
+  // Re-inject on in-page navigation (e.g., after QR scan redirects)
+  whatsappWindow.webContents.on('did-navigate-in-page', injectScraper)
+
+  // F12 for DevTools
+  whatsappWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.key === 'F12') {
+      whatsappWindow.webContents.toggleDevTools()
+    }
+  })
+
+  // Create copilot window docked to the right
+  createCopilotWindow(startX + waWidth, startY, copilotWidth, 750)
+
+  // Keep copilot docked when WhatsApp moves or resizes
+  whatsappWindow.on('move', () => {
+    if (!copilotWindow || copilotWindow.isDestroyed()) return
+    const waBounds = whatsappWindow.getBounds()
+    copilotWindow.setBounds({
+      x: waBounds.x + waBounds.width,
+      y: waBounds.y,
+      width: copilotWidth,
+      height: waBounds.height,
+    })
+  })
+
+  whatsappWindow.on('resize', () => {
+    if (!copilotWindow || copilotWindow.isDestroyed()) return
+    const waBounds = whatsappWindow.getBounds()
+    copilotWindow.setBounds({
+      x: waBounds.x + waBounds.width,
+      y: waBounds.y,
+      width: copilotWidth,
+      height: waBounds.height,
+    })
+  })
+
+  whatsappWindow.on('closed', () => {
+    whatsappWindow = null
+    // Close copilot when WhatsApp closes
+    if (copilotWindow && !copilotWindow.isDestroyed()) {
+      copilotWindow.close()
+    }
+    // Reset WhatsApp context
+    whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
+  })
+}
+
+// ============================================================
+// COPILOT WINDOW (docked to WhatsApp, sales AI assistant)
+// ============================================================
+function createCopilotWindow(x, y, width, height) {
+  if (copilotWindow && !copilotWindow.isDestroyed()) {
+    copilotWindow.focus()
+    return
+  }
+
+  copilotWindow = new BrowserWindow({
+    width,
+    height,
+    x,
+    y,
+    resizable: false,
+    movable: false,
+    frame: false,
+    title: 'Copiloto de Vendas',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  copilotWindow.loadFile('copilot.html')
+  copilotWindow.setMenuBarVisibility(false)
+
+  // F12 for DevTools
+  copilotWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.key === 'F12') {
+      copilotWindow.webContents.toggleDevTools()
+    }
+  })
+
+  copilotWindow.on('closed', () => { copilotWindow = null })
+}
+
+// ============================================================
 // AUTH TOKEN BRIDGE (main window → bubble window + recording window)
 // ============================================================
 function startAuthBridge() {
@@ -340,6 +498,10 @@ function startAuthBridge() {
         // Forward to recording window if open
         if (recordingWindow && !recordingWindow.isDestroyed()) {
           recordingWindow.webContents.send('auth-token', parsed)
+        }
+        // Forward to copilot window if open
+        if (copilotWindow && !copilotWindow.isDestroyed()) {
+          copilotWindow.webContents.send('auth-token', parsed)
         }
       }
     } catch (_) {
@@ -482,6 +644,40 @@ ipcMain.handle('get-sources', async () => {
     console.error('getSources error:', err)
     return []
   }
+})
+
+// ============================================================
+// WHATSAPP IPC HANDLERS
+// ============================================================
+
+// WhatsApp scraper sends context updates → forward to bubble + copilot
+ipcMain.on('whatsapp-context-update', (_event, data) => {
+  whatsappContext = data
+  if (copilotWindow && !copilotWindow.isDestroyed()) {
+    copilotWindow.webContents.send('whatsapp-state', data)
+  }
+})
+
+// Bubble requests text injection into WhatsApp input
+ipcMain.on('inject-whatsapp-text', (_event, text) => {
+  if (whatsappWindow && !whatsappWindow.isDestroyed()) {
+    whatsappWindow.webContents.send('inject-whatsapp-text', text)
+  }
+})
+
+// Open or focus WhatsApp window
+ipcMain.on('open-whatsapp', () => {
+  createWhatsAppWindow()
+})
+
+// Bubble asks for current WhatsApp state
+ipcMain.handle('get-whatsapp-state', async () => {
+  return whatsappContext
+})
+
+// Return platform base URL so bubble can build API URLs (dev vs prod)
+ipcMain.handle('get-platform-url', () => {
+  return PLATFORM_URL
 })
 
 // ============================================================
@@ -649,6 +845,10 @@ function createTray() {
           mainWindow.focus()
         }
       },
+    },
+    {
+      label: 'Abrir WhatsApp',
+      click: () => { createWhatsAppWindow() },
     },
     {
       label: 'Gravar Reuniao',

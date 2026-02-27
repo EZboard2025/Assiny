@@ -512,6 +512,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       router.push('/manager')
       return
     }
+    // Desktop app: open WhatsApp in Electron window instead of loading FollowUpView
+    if (newView === 'followup' && typeof window !== 'undefined' && (window as any).electronAPI?.openWhatsApp) {
+      ;(window as any).electronAPI.openWhatsApp()
+      return
+    }
     setCurrentView(newView as typeof currentView)
   }
 

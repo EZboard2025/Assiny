@@ -18,6 +18,8 @@
     "files": [
       "main.js",
       "preload.js",
+      "whatsapp-preload.js",
+      "whatsapp-scraper.js",
       "bubble.html",
       "bubble.css",
       "bubble.js",

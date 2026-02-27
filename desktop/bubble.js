@@ -1,9 +1,14 @@
 // ============================================================
-// Ramppy Floating Assistant — Bubble Chat
-// Design: matches SellerAgentChat.tsx from website
+// Ramppy Floating Assistant — Bubble Chat (Agent Mode)
 // ============================================================
 
-const API_URL = 'https://ramppy.site/api/agent/chat'
+// API URLs — resolved dynamically (dev: localhost, prod: ramppy.site)
+let API_BASE = 'https://ramppy.site'
+if (window.electronAPI && window.electronAPI.getPlatformUrl) {
+  window.electronAPI.getPlatformUrl().then(url => { API_BASE = url })
+}
+
+function getAgentUrl() { return `${API_BASE}/api/agent/chat` }
 
 // --- State ---
 let accessToken = null
@@ -33,7 +38,6 @@ function ensureAuth() {
   return !!(accessToken && userId)
 }
 
-// Listen for auth token from main platform window
 if (window.electronAPI && window.electronAPI.onAuthToken) {
   window.electronAPI.onAuthToken((data) => {
     if (data && data.accessToken) {
@@ -44,10 +48,6 @@ if (window.electronAPI && window.electronAPI.onAuthToken) {
 }
 
 // --- Mouse event forwarding (transparent areas pass clicks through) ---
-// The body has pointer-events: none by default.
-// When the mouse enters an interactive element, we tell Electron to capture mouse events.
-// When it leaves, we go back to forwarding mode.
-
 function enableMouseCapture() {
   if (window.electronAPI && window.electronAPI.setIgnoreMouse) {
     window.electronAPI.setIgnoreMouse(false)
@@ -60,17 +60,12 @@ function disableMouseCapture() {
   }
 }
 
-// The bubble element: capture mouse when hovering over it
 bubble.addEventListener('mouseenter', enableMouseCapture)
 bubble.addEventListener('mouseleave', () => {
-  // Only disable if not dragging and not expanded
   if (!isDragging && !isExpanded) {
     disableMouseCapture()
   }
 })
-
-// Chat panel: always capture mouse when expanded
-// (handled in expand/collapse functions)
 
 // --- UI: Expand / Collapse ---
 function expand() {
@@ -140,13 +135,11 @@ bubble.addEventListener('mousedown', async (e) => {
 
     if (isDragging) {
       bubble.classList.remove('dragging')
-      // Snap to nearest screen edge after drag
       if (window.electronAPI.snapToEdge) {
         window.electronAPI.snapToEdge()
       }
       isDragging = false
     } else {
-      // Click (not drag) — expand
       expand()
     }
   }
@@ -159,7 +152,6 @@ bubble.addEventListener('mousedown', async (e) => {
 const chatHeader = document.querySelector('.chat-header')
 
 chatHeader.addEventListener('mousedown', async (e) => {
-  // Ignore clicks on the close button
   if (e.target.closest('.btn-close')) return
   if (e.button !== 0) return
 
@@ -191,7 +183,6 @@ function switchToChatMode() {
   chatInput.focus()
 }
 
-// bubble click is handled by drag logic (mousedown/mouseup)
 btnClose.addEventListener('click', collapse)
 
 // --- Avatar HTML ---
@@ -209,7 +200,6 @@ function addUserMessage(text) {
 function addAIMessage(content) {
   const wrap = document.createElement('div')
   wrap.className = 'msg-ai-wrap'
-
   const rendered = renderRichContent(content)
   wrap.innerHTML = `${AVATAR_HTML}<div class="msg-ai">${rendered}</div>`
   chatMessages.appendChild(wrap)
@@ -230,12 +220,15 @@ function removeTyping() {
   if (el) el.remove()
 }
 
+// ============================================================
+// SEND MESSAGE (Agent API)
+// ============================================================
 async function sendMessage(text) {
   if (!text.trim() || isSending) return
 
   if (!ensureAuth()) {
     switchToChatMode()
-    addAIMessage('Faça login na plataforma Ramppy primeiro para usar o assistente.')
+    addAIMessage('Faca login na plataforma Ramppy primeiro para usar o assistente.')
     return
   }
 
@@ -243,26 +236,23 @@ async function sendMessage(text) {
   if (btnSend) btnSend.disabled = true
   if (btnSendWelcome) btnSendWelcome.disabled = true
 
-  // Switch to chat mode
   switchToChatMode()
 
-  // Clear inputs
   welcomeInput.value = ''
   chatInput.value = ''
 
   addUserMessage(text)
-  conversationHistory.push({ role: 'user', content: text })
-
   showTyping()
 
-  // Auto-capture screenshot for AI vision context
-  let screenshot = null
-  if (window.electronAPI && window.electronAPI.captureScreenshot) {
-    try { screenshot = await window.electronAPI.captureScreenshot() } catch (_) {}
-  }
-
   try {
-    const res = await fetch(API_URL, {
+    conversationHistory.push({ role: 'user', content: text })
+
+    let screenshot = null
+    if (window.electronAPI && window.electronAPI.captureScreenshot) {
+      try { screenshot = await window.electronAPI.captureScreenshot() } catch (_) {}
+    }
+
+    const res = await fetch(getAgentUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -300,7 +290,6 @@ async function sendMessage(text) {
 
 // --- Rich Content Renderer ---
 function renderRichContent(content) {
-  // Strip visual tags (score, spin, etc.) - simplify for bubble
   let text = content
     .replace(/\{\{score\|([^|]*)\|([^|]*)\|([^}]*)\}\}/g, '<div class="bullet-list"><div class="bullet-item"><div class="bullet-dot"></div><div class="bullet-text"><strong>$3:</strong> $1/$2</div></div></div>')
     .replace(/\{\{spin\|([^|]*)\|([^|]*)\|([^|]*)\|([^}]*)\}\}/g, '<div class="bullet-list"><div class="bullet-item"><div class="bullet-dot"></div><div class="bullet-text"><strong>SPIN:</strong> S=$1 P=$2 I=$3 N=$4</div></div></div>')
@@ -312,7 +301,6 @@ function renderRichContent(content) {
     .replace(/\{\{ranking\|[^}]*\}\}/g, '')
     .replace(/\{\{comparison\|[^}]*\}\}/g, '')
 
-  // Process markdown-like formatting
   const lines = text.split('\n')
   let html = ''
   let inList = false
@@ -324,7 +312,6 @@ function renderRichContent(content) {
       continue
     }
 
-    // Headers (### or **)
     if (/^#{1,3}\s/.test(trimmed)) {
       if (inList) { html += '</div>'; inList = false }
       const headerText = trimmed.replace(/^#{1,3}\s/, '')
@@ -332,7 +319,6 @@ function renderRichContent(content) {
       continue
     }
 
-    // Bullet points
     if (/^[-•*]\s/.test(trimmed)) {
       if (!inList) { html += '<div class="bullet-list">'; inList = true }
       const bulletText = trimmed.replace(/^[-•*]\s/, '')
@@ -340,7 +326,6 @@ function renderRichContent(content) {
       continue
     }
 
-    // Numbered list
     if (/^\d+[.)]\s/.test(trimmed)) {
       if (!inList) { html += '<div class="bullet-list">'; inList = true }
       const numText = trimmed.replace(/^\d+[.)]\s/, '')

@@ -534,3 +534,135 @@ body {
 .resize-nw { top: 0; left: 0; width: 12px; height: 12px; cursor: nw-resize; }
 .resize-se { bottom: 0; right: 0; width: 12px; height: 12px; cursor: se-resize; }
 .resize-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: sw-resize; }
+
+/* ============================================================
+   WHATSAPP COPILOT MODE
+   ============================================================ */
+
+/* Bubble: copilot active state (WhatsApp green) */
+.bubble.copilot {
+  background: linear-gradient(135deg, #25D366, #128C7E);
+  box-shadow:
+    0 4px 12px rgba(37, 211, 102, 0.4),
+    0 0 0 0 rgba(37, 211, 102, 0);
+}
+
+.bubble.copilot:hover {
+  box-shadow:
+    0 8px 24px rgba(37, 211, 102, 0.5),
+    0 0 0 8px rgba(37, 211, 102, 0.08);
+}
+
+.bubble.copilot .bubble-ping {
+  background: #25D366;
+}
+
+/* WhatsApp badge on collapsed bubble */
+.wa-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #25D366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.5);
+  animation: recBadgeIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  z-index: 10;
+}
+
+/* Copilot header (replaces agent header) */
+.copilot-header-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.header-icon-wa { flex-shrink: 0; }
+
+.copilot-contact {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copilot-badge {
+  background: #dcfce7 !important;
+  color: #25D366 !important;
+}
+
+/* Copilot pills (WhatsApp green theme) */
+.copilot-pills-bar {
+  border-top-color: #e8f5e9;
+}
+
+.copilot-pill {
+  font-size: 12px;
+  color: #25D366;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  border: 1px solid #a5d6a7;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copilot-pill:hover {
+  color: #128C7E;
+  background: #e8f5e9;
+  border-color: #66bb6a;
+}
+
+/* Copilot action buttons (copy + paste to WA) */
+.copilot-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.copilot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.copilot-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.copilot-btn-copy:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.copilot-btn-paste {
+  border-color: #a5d6a7;
+  color: #25D366;
+}
+
+.copilot-btn-paste:hover {
+  background: #e8f5e9;
+  border-color: #66bb6a;
+  color: #128C7E;
+}

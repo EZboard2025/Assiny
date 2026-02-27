@@ -21,4 +21,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   notifyRecordingFinished: () => ipcRenderer.send('recording-finished'),
   // Recording state (bubble indicator)
   onRecordingState: (callback) => ipcRenderer.on('recording-state', (_event, isRecording) => callback(isRecording)),
+  // WhatsApp copilot IPC
+  onWhatsAppState: (callback) => ipcRenderer.on('whatsapp-state', (_event, data) => callback(data)),
+  getWhatsAppState: () => ipcRenderer.invoke('get-whatsapp-state'),
+  injectWhatsAppText: (text) => ipcRenderer.send('inject-whatsapp-text', text),
+  openWhatsApp: () => ipcRenderer.send('open-whatsapp'),
+  // Platform URL (dev vs prod)
+  getPlatformUrl: () => ipcRenderer.invoke('get-platform-url'),
 })

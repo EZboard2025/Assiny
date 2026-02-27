@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://ramppy.site https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <title>Copiloto de Vendas</title>
+  <link rel="stylesheet" href="copilot.css">
+</head>
+<body>
+  <div class="copilot-panel">
+    <!-- Neon glow border (left edge) -->
+    <div class="neon-border"></div>
+
+    <!-- Header -->
+    <div class="copilot-header">
+      <div class="header-center">
+        <svg class="header-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00a884" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+        <span class="header-title">Copiloto de Vendas</span>
+        <span class="header-badge">IA</span>
+      </div>
+      <div class="header-contact" id="header-contact" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="contact-name" class="contact-name">Cliente</span>
+      </div>
+      <button id="btn-back" class="btn-icon" title="Voltar" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
+
+    <!-- Messages area -->
+    <div id="messages" class="messages-area">
+      <!-- Welcome state -->
+      <div id="welcome-state" class="welcome-state">
+        <svg class="welcome-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#00a884" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+        <h2 class="welcome-title">Como posso ajudar?</h2>
+        <p class="welcome-sub">Analiso conversas e sugiro as melhores respostas para fechar vendas.</p>
+
+        <!-- Welcome input -->
+        <div class="welcome-input-wrap">
+          <input type="text" id="welcome-input" class="input-field" placeholder="Pergunte sobre a conversa..." autocomplete="off">
+          <button id="btn-send-welcome" class="btn-send" title="Enviar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+
+        <!-- Quick suggestions (welcome) -->
+        <div class="welcome-suggestions">
+          <button class="suggestion-card" data-msg="O que responder agora?">O que responder agora?</button>
+          <button class="suggestion-card" data-msg="Analise essa conversa">Analise essa conversa</button>
+          <button class="suggestion-card" data-msg="Como fechar essa venda?">Como fechar essa venda?</button>
+          <button class="suggestion-card" data-msg="Sugira um follow-up">Sugira um follow-up</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick pills (chat mode) -->
+    <div id="chat-pills" class="chat-pills" style="display:none;">
+      <button class="pill" data-msg="O que responder agora?">O que responder?</button>
+      <button class="pill" data-msg="Analise essa conversa">Analise a conversa</button>
+      <button class="pill" data-msg="Como fechar essa venda?">Como fechar?</button>
+      <button class="pill" data-msg="Sugira um follow-up">Follow-up</button>
+    </div>
+
+    <!-- Input bar (chat mode) -->
+    <div id="chat-input-bar" class="chat-input-bar" style="display:none;">
+      <div class="input-wrap">
+        <input type="text" id="chat-input" class="input-field" placeholder="Pergunte sobre a conversa..." autocomplete="off">
+        <button id="btn-send" class="btn-send" title="Enviar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- No conversation placeholder -->
+    <div id="no-conversation" class="no-conversation" style="display:none;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <p>Abra uma conversa no WhatsApp para ativar o copiloto.</p>
+    </div>
+  </div>
+
+  <script src="copilot.js"></script>
+</body>
+</html>
