@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu, Notification, globalShortcut, systemPreferences } = require('electron')
+const { app, BrowserWindow, BaseWindow, WebContentsView, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu, Notification, globalShortcut, systemPreferences, dialog, powerSaveBlocker } = require('electron')
 const path = require('path')
+const { isBlackHoleInstalled, installBlackHoleDriver, createMultiOutputDevice, destroyMultiOutputDevice } = require('./audio-devices')
 
 // System audio loopback is handled via setDisplayMediaRequestHandler (see app.whenReady)
 
@@ -11,12 +12,15 @@ const ALLOWED_DOMAIN = 'ramppy.site'
 let mainWindow = null
 let bubbleWindow = null
 let recordingWindow = null
-let whatsappWindow = null
-let copilotWindow = null
+let whatsappBaseWindow = null // Single window for WhatsApp + Copilot
+let waView = null             // WebContentsView: WhatsApp Web (left)
+let copilotView = null        // WebContentsView: Sales Copilot (right)
 let authTokenInterval = null
 let tray = null
 
-// WhatsApp scraper state (forwarded from whatsappWindow to bubbleWindow)
+const COPILOT_WIDTH = 400
+
+// WhatsApp scraper state (forwarded to copilot view)
 let whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
 
 // Meet auto-detection state
@@ -25,7 +29,8 @@ let isRecordingMeet = false
 let detectedMeetTitle = null
 let hasUserAuth = false
 let lastRecordedMeetCode = null // Prevents re-recording same meeting after user leaves
-let meetNoAudioSince = null // Timestamp when 🔊 disappeared from tab title
+let meetWindowGoneCount = 0 // Debounce counter for Meet tab disappearing
+let powerSaveBlockerId = null // Prevents macOS App Nap during recording
 
 // Single instance lock — prevent duplicate app processes
 const gotTheLock = app.requestSingleInstanceLock()
@@ -191,6 +196,9 @@ function createRecordingWindow(autoStart = false) {
     }
   }
 
+  // When BlackHole is installed + auto-start, window can be hidden (no picker needed)
+  const canBeHidden = autoStart && isBlackHoleInstalled()
+
   const { width: screenW } = screen.getPrimaryDisplay().workAreaSize
 
   recordingWindow = new BrowserWindow({
@@ -203,13 +211,14 @@ function createRecordingWindow(autoStart = false) {
     minHeight: 500,
     frame: false,
     alwaysOnTop: true,
-    show: !autoStart, // Hidden in auto mode (runs silently in background)
+    show: !canBeHidden, // Hidden when BlackHole handles audio (no picker needed)
     title: 'Ramppy Recorder',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: false, // CRITICAL: prevent audio drops when window is hidden
     },
   })
 
@@ -292,6 +301,7 @@ function createRecordingWindow(autoStart = false) {
     if (isRecordingMeet) {
       isRecordingMeet = false
       detectedMeetTitle = null
+      stopPowerSaveBlocker()
     }
     // Always notify bubble that recording stopped
     if (bubbleWindow && !bubbleWindow.isDestroyed()) {
@@ -301,20 +311,17 @@ function createRecordingWindow(autoStart = false) {
 }
 
 // ============================================================
-// WHATSAPP WINDOW (separate window for WhatsApp Web)
+// WHATSAPP + COPILOT WINDOW (unified: BaseWindow with two WebContentsViews)
 // ============================================================
 function createWhatsAppWindow() {
-  if (whatsappWindow && !whatsappWindow.isDestroyed()) {
-    whatsappWindow.focus()
+  if (whatsappBaseWindow && !whatsappBaseWindow.isDestroyed()) {
+    whatsappBaseWindow.focus()
     return
   }
 
   const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
-  const copilotWidth = 400
-  const waWidth = Math.min(1100, screenW - copilotWidth - 20)
-  const totalWidth = waWidth + copilotWidth
-  const startX = Math.round((screenW - totalWidth) / 2)
-  const startY = Math.round((screenH - 750) / 2)
+  const winWidth = Math.min(1400, screenW - 40)
+  const winHeight = Math.min(750, screenH - 40)
 
   // Configure the WhatsApp partition with proper permissions
   const waSession = session.fromPartition('persist:whatsapp')
@@ -327,130 +334,106 @@ function createWhatsAppWindow() {
   const electronVersion = process.versions.chrome || '131.0.0.0'
   const chromeUA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${electronVersion} Safari/537.36`
 
-  whatsappWindow = new BrowserWindow({
-    width: waWidth,
-    height: 750,
-    x: startX,
-    y: startY,
-    resizable: true,
-    minWidth: 700,
+  // Single container window (no own webContents)
+  whatsappBaseWindow = new BaseWindow({
+    width: winWidth,
+    height: winHeight,
+    minWidth: 900,
     minHeight: 500,
     title: 'WhatsApp — Ramppy',
     icon: path.join(__dirname, 'assets', 'icon.png'),
+  })
+
+  // --- WhatsApp view (left side) ---
+  waView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'whatsapp-preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      // Persist WhatsApp session across restarts (no QR every time)
       partition: 'persist:whatsapp',
     },
   })
+  whatsappBaseWindow.contentView.addChildView(waView)
+  waView.webContents.setUserAgent(chromeUA)
+  waView.webContents.loadURL('https://web.whatsapp.com')
 
-  // Override user agent to match real Chrome
-  whatsappWindow.webContents.setUserAgent(chromeUA)
-
-  whatsappWindow.loadURL('https://web.whatsapp.com')
-  whatsappWindow.setMenuBarVisibility(false)
-
-  // Inject scraper script after WhatsApp Web loads (and on SPA navigations)
-  const injectScraper = () => {
-    if (!whatsappWindow || whatsappWindow.isDestroyed()) return
-    const fs = require('fs')
-    const scraperPath = path.join(__dirname, 'whatsapp-scraper.js')
-    try {
-      const scraperCode = fs.readFileSync(scraperPath, 'utf-8')
-      whatsappWindow.webContents.executeJavaScript(scraperCode)
-      console.log('[WhatsApp] Scraper injected successfully')
-    } catch (err) {
-      console.error('[WhatsApp] Failed to inject scraper:', err)
-    }
-  }
-
-  whatsappWindow.webContents.on('did-finish-load', injectScraper)
-  // Re-inject on in-page navigation (e.g., after QR scan redirects)
-  whatsappWindow.webContents.on('did-navigate-in-page', injectScraper)
-
-  // F12 for DevTools
-  whatsappWindow.webContents.on('before-input-event', (_event, input) => {
-    if (input.key === 'F12') {
-      whatsappWindow.webContents.toggleDevTools()
-    }
-  })
-
-  // Create copilot window docked to the right
-  createCopilotWindow(startX + waWidth, startY, copilotWidth, 750)
-
-  // Keep copilot docked when WhatsApp moves or resizes
-  whatsappWindow.on('move', () => {
-    if (!copilotWindow || copilotWindow.isDestroyed()) return
-    const waBounds = whatsappWindow.getBounds()
-    copilotWindow.setBounds({
-      x: waBounds.x + waBounds.width,
-      y: waBounds.y,
-      width: copilotWidth,
-      height: waBounds.height,
-    })
-  })
-
-  whatsappWindow.on('resize', () => {
-    if (!copilotWindow || copilotWindow.isDestroyed()) return
-    const waBounds = whatsappWindow.getBounds()
-    copilotWindow.setBounds({
-      x: waBounds.x + waBounds.width,
-      y: waBounds.y,
-      width: copilotWidth,
-      height: waBounds.height,
-    })
-  })
-
-  whatsappWindow.on('closed', () => {
-    whatsappWindow = null
-    // Close copilot when WhatsApp closes
-    if (copilotWindow && !copilotWindow.isDestroyed()) {
-      copilotWindow.close()
-    }
-    // Reset WhatsApp context
-    whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
-  })
-}
-
-// ============================================================
-// COPILOT WINDOW (docked to WhatsApp, sales AI assistant)
-// ============================================================
-function createCopilotWindow(x, y, width, height) {
-  if (copilotWindow && !copilotWindow.isDestroyed()) {
-    copilotWindow.focus()
-    return
-  }
-
-  copilotWindow = new BrowserWindow({
-    width,
-    height,
-    x,
-    y,
-    resizable: false,
-    movable: false,
-    frame: false,
-    title: 'Copiloto de Vendas',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+  // --- Copilot view (right side) ---
+  copilotView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   })
+  whatsappBaseWindow.contentView.addChildView(copilotView)
+  copilotView.webContents.loadFile('copilot.html')
 
-  copilotWindow.loadFile('copilot.html')
-  copilotWindow.setMenuBarVisibility(false)
+  // --- Layout: WhatsApp fills left, copilot fixed 400px right ---
+  layoutWhatsAppViews()
+  whatsappBaseWindow.on('resize', layoutWhatsAppViews)
 
-  // F12 for DevTools
-  copilotWindow.webContents.on('before-input-event', (_event, input) => {
+  // --- Inject scraper into WhatsApp view ---
+  const injectScraper = () => {
+    if (!waView || !whatsappBaseWindow || whatsappBaseWindow.isDestroyed()) return
+    const fs = require('fs')
+    const scraperPath = path.join(__dirname, 'whatsapp-scraper.js')
+    try {
+      const scraperCode = fs.readFileSync(scraperPath, 'utf-8')
+      waView.webContents.executeJavaScript(scraperCode)
+      console.log('[WhatsApp] Scraper injected successfully')
+    } catch (err) {
+      console.error('[WhatsApp] Failed to inject scraper:', err)
+    }
+  }
+
+  waView.webContents.on('did-finish-load', injectScraper)
+  waView.webContents.on('did-navigate-in-page', injectScraper)
+
+  // --- Send initial WhatsApp state to copilot once it loads ---
+  copilotView.webContents.on('did-finish-load', () => {
+    console.log('[Copilot] View loaded, forwarding initial WhatsApp state:', whatsappContext.active ? whatsappContext.contactName : 'inactive')
+    copilotView.webContents.send('whatsapp-state', whatsappContext)
+  })
+
+  // --- Periodic state sync: ensure copilot stays in sync with scraper ---
+  const stateSyncInterval = setInterval(() => {
+    if (!copilotView || copilotView.webContents.isDestroyed()) {
+      clearInterval(stateSyncInterval)
+      return
+    }
+    if (whatsappContext.active) {
+      copilotView.webContents.send('whatsapp-state', whatsappContext)
+    }
+  }, 3000)
+
+  // --- F12 for DevTools on both views ---
+  waView.webContents.on('before-input-event', (_event, input) => {
     if (input.key === 'F12') {
-      copilotWindow.webContents.toggleDevTools()
+      waView.webContents.toggleDevTools()
+    }
+  })
+  copilotView.webContents.on('before-input-event', (_event, input) => {
+    if (input.key === 'F12') {
+      copilotView.webContents.toggleDevTools()
     }
   })
 
-  copilotWindow.on('closed', () => { copilotWindow = null })
+  // --- Cleanup ---
+  whatsappBaseWindow.on('closed', () => {
+    clearInterval(stateSyncInterval)
+    whatsappBaseWindow = null
+    waView = null
+    copilotView = null
+    whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
+  })
+}
+
+function layoutWhatsAppViews() {
+  if (!whatsappBaseWindow || whatsappBaseWindow.isDestroyed()) return
+  const [w, h] = whatsappBaseWindow.getSize()
+  const waWidth = Math.max(500, w - COPILOT_WIDTH)
+  waView.setBounds({ x: 0, y: 0, width: waWidth, height: h })
+  copilotView.setBounds({ x: waWidth, y: 0, width: COPILOT_WIDTH, height: h })
 }
 
 // ============================================================
@@ -499,9 +482,9 @@ function startAuthBridge() {
         if (recordingWindow && !recordingWindow.isDestroyed()) {
           recordingWindow.webContents.send('auth-token', parsed)
         }
-        // Forward to copilot window if open
-        if (copilotWindow && !copilotWindow.isDestroyed()) {
-          copilotWindow.webContents.send('auth-token', parsed)
+        // Forward to copilot view if open
+        if (copilotView && !copilotView.webContents.isDestroyed()) {
+          copilotView.webContents.send('auth-token', parsed)
         }
       }
     } catch (_) {
@@ -632,6 +615,7 @@ ipcMain.on('open-recording-window', () => {
   createRecordingWindow()
 })
 
+
 // Handle desktopCapturer for Meet feature
 ipcMain.handle('get-sources', async () => {
   try {
@@ -650,18 +634,21 @@ ipcMain.handle('get-sources', async () => {
 // WHATSAPP IPC HANDLERS
 // ============================================================
 
-// WhatsApp scraper sends context updates → forward to bubble + copilot
+// WhatsApp scraper sends context updates → forward to copilot view
 ipcMain.on('whatsapp-context-update', (_event, data) => {
   whatsappContext = data
-  if (copilotWindow && !copilotWindow.isDestroyed()) {
-    copilotWindow.webContents.send('whatsapp-state', data)
+  console.log('[WhatsApp IPC] Context update received:', data.active ? `active, contact: ${data.contactName}, msgs: ${data.messages?.length}` : 'inactive')
+  if (copilotView && !copilotView.webContents.isDestroyed()) {
+    copilotView.webContents.send('whatsapp-state', data)
+  } else {
+    console.log('[WhatsApp IPC] copilotView not available to forward')
   }
 })
 
-// Bubble requests text injection into WhatsApp input
+// Copilot requests text injection into WhatsApp input
 ipcMain.on('inject-whatsapp-text', (_event, text) => {
-  if (whatsappWindow && !whatsappWindow.isDestroyed()) {
-    whatsappWindow.webContents.send('inject-whatsapp-text', text)
+  if (waView && !waView.webContents.isDestroyed()) {
+    waView.webContents.send('inject-whatsapp-text', text)
   }
 })
 
@@ -681,15 +668,108 @@ ipcMain.handle('get-platform-url', () => {
 })
 
 // ============================================================
+// BLACKHOLE AUDIO DRIVER — IPC handlers
+// ============================================================
+
+ipcMain.handle('check-blackhole', () => {
+  return isBlackHoleInstalled()
+})
+
+ipcMain.handle('setup-audio-routing', () => {
+  return createMultiOutputDevice()
+})
+
+ipcMain.handle('teardown-audio-routing', () => {
+  return destroyMultiOutputDevice()
+})
+
+/**
+ * First-launch BlackHole driver installation.
+ * Shows a native macOS dialog explaining what it does, then triggers admin password prompt.
+ * Only runs once — skips if driver already installed.
+ */
+async function ensureBlackHoleInstalled() {
+  if (process.platform !== 'darwin') return
+  if (isBlackHoleInstalled()) {
+    console.log('[BlackHole] Driver already installed.')
+    return
+  }
+
+  // In dev mode: driver is at desktop/drivers/
+  // In production: driver is at Resources/drivers/ inside the .app bundle
+  const fs = require('fs')
+  const devPath = path.join(__dirname, 'drivers', 'BlackHole2ch.driver')
+  const prodPath = path.join(process.resourcesPath, 'drivers', 'BlackHole2ch.driver')
+  const driverBasePath = fs.existsSync(devPath) ? __dirname : (fs.existsSync(prodPath) ? process.resourcesPath : null)
+
+  if (!driverBasePath) {
+    console.log('[BlackHole] Driver bundle not found — skipping installation.')
+    console.log('[BlackHole] Checked dev:', devPath)
+    console.log('[BlackHole] Checked prod:', prodPath)
+    return
+  }
+
+  console.log('[BlackHole] Driver found at:', path.join(driverBasePath, 'drivers', 'BlackHole2ch.driver'))
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Configuracao de Audio',
+    message: 'O Ramppy precisa instalar um driver de audio para gravar reunioes automaticamente.',
+    detail: 'Isso e feito uma unica vez e requer a senha de administrador do Mac. Sem o driver, a gravacao ainda funciona mas mostra um dialogo de permissao a cada vez.',
+    buttons: ['Instalar Agora', 'Pular'],
+    defaultId: 0,
+    cancelId: 1,
+  })
+
+  if (result.response === 0) {
+    const success = installBlackHoleDriver(driverBasePath)
+    if (success) {
+      console.log('[BlackHole] Installation complete.')
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Driver Instalado',
+        message: 'Driver de audio instalado com sucesso!',
+        detail: 'A gravacao de reunioes agora funciona automaticamente sem dialogos de permissao.',
+        buttons: ['OK'],
+      })
+    } else {
+      console.warn('[BlackHole] Installation failed or cancelled by user.')
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Instalacao Cancelada',
+        message: 'O driver de audio nao foi instalado.',
+        detail: 'A gravacao ainda funciona, mas mostrara um dialogo de permissao a cada vez. Voce pode instalar depois reiniciando o app.',
+        buttons: ['OK'],
+      })
+    }
+  } else {
+    console.log('[BlackHole] User chose to skip driver installation.')
+  }
+}
+
+// ============================================================
 // GOOGLE MEET AUTO-DETECTION
 // ============================================================
+
+// Prevent macOS App Nap from throttling timers while recording
+function startPowerSaveBlocker() {
+  if (powerSaveBlockerId !== null) return
+  powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension')
+  console.log('[Power] App suspension blocker started (id:', powerSaveBlockerId, ')')
+}
+
+function stopPowerSaveBlocker() {
+  if (powerSaveBlockerId !== null) {
+    powerSaveBlocker.stop(powerSaveBlockerId)
+    console.log('[Power] App suspension blocker stopped (id:', powerSaveBlockerId, ')')
+    powerSaveBlockerId = null
+  }
+}
 
 // Active meeting titles contain a meeting code (e.g. "Meet: abc-defg-hij 🔊")
 // Chrome shows 🔊 when the tab is producing audio (WebRTC call active)
 // When user leaves the meeting, 🔊 disappears because audio stops
 const MEET_CODE_PATTERN = /[a-z]{3}-[a-z]{4}-[a-z]{3}/
-const MEET_AUDIO_INDICATOR = /🔊|🔈/
-const MEET_NO_AUDIO_TIMEOUT = 20_000 // 20s without 🔊 = meeting ended
 const MEET_LEFT_PATTERNS = [
   'você saiu', 'you left', 'saiu da reunião', 'left the meeting',
   'reunião encerrada', 'meeting ended', 'chamada encerrada', 'call ended',
@@ -700,17 +780,16 @@ function hasMeetCode(title) {
   return MEET_CODE_PATTERN.test(title)
 }
 
-function hasMeetAudio(title) {
-  return MEET_AUDIO_INDICATOR.test(title)
-}
-
 function isLeftMeetWindow(title) {
   const lower = title.toLowerCase()
   return MEET_LEFT_PATTERNS.some(p => lower.includes(p))
 }
 
 async function checkForMeetWindow() {
-  if (!hasUserAuth) return
+  if (!hasUserAuth) {
+    console.log('[MeetDetect] Skipping — no auth yet')
+    return
+  }
 
   try {
     const sources = await desktopCapturer.getSources({
@@ -719,27 +798,29 @@ async function checkForMeetWindow() {
     })
 
     // Categorize Meet windows
-    const meetWithAudio = sources.find(s => hasMeetCode(s.name) && hasMeetAudio(s.name) && !isLeftMeetWindow(s.name))
+    // Don't require 🔊 — Chrome hides it when tab is in background or sharing screen
+    const activeMeet = sources.find(s => hasMeetCode(s.name) && !isLeftMeetWindow(s.name))
     const meetTabAny = sources.find(s => hasMeetCode(s.name))
     const userLeft = sources.some(s => isLeftMeetWindow(s.name))
 
-    // Debug: log Meet window titles while recording
-    if (isRecordingMeet) {
-      const meetTitles = sources.filter(s => hasMeetCode(s.name)).map(s => `"${s.name}"`)
-      console.log(`[MeetDetect] Check: ${meetTitles.join(', ')} | hasAudio=${!!meetWithAudio} | userLeft=${userLeft}`)
+    // Debug: log all Meet-related windows and any window containing "meet" or "Meet"
+    const meetRelated = sources.filter(s => /meet/i.test(s.name) || hasMeetCode(s.name))
+    if (meetRelated.length > 0 || isRecordingMeet) {
+      console.log(`[MeetDetect] Windows: ${meetRelated.map(s => `"${s.name}"`).join(', ') || 'none'} | activeMeet=${!!activeMeet} | isRecording=${isRecordingMeet} | lastCode=${lastRecordedMeetCode}`)
     }
 
     if (!isRecordingMeet) {
       // Not recording — start only when meeting code + 🔊 are present
-      if (meetWithAudio) {
-        const meetCode = meetWithAudio.name.match(MEET_CODE_PATTERN)?.[0]
+      if (activeMeet) {
+        const meetCode = activeMeet.name.match(MEET_CODE_PATTERN)?.[0]
         if (meetCode && meetCode === lastRecordedMeetCode) return // Already recorded, skip
 
         isRecordingMeet = true
-        detectedMeetTitle = meetWithAudio.name
+        detectedMeetTitle = activeMeet.name
         lastRecordedMeetCode = meetCode
-        meetNoAudioSince = null
-        console.log('[MeetDetect] Active meeting detected:', meetWithAudio.name)
+        startPowerSaveBlocker()
+
+        console.log('[MeetDetect] Active meeting detected:', activeMeet.name)
 
         if (Notification.isSupported()) {
           new Notification({
@@ -757,17 +838,16 @@ async function checkForMeetWindow() {
         }
       }
     } else {
-      // Currently recording — check if meeting ended
-      if (meetWithAudio) {
-        // 🔊 still present — meeting is active
-        meetNoAudioSince = null
-      } else if (userLeft || !meetTabAny) {
-        // User explicitly left (title text) or tab was closed — stop immediately
-        const reason = userLeft ? 'User left meeting' : 'Meet window closed'
-        console.log(`[MeetDetect] Meeting ended (${reason}). Stopping recording...`)
-        meetNoAudioSince = null
+      // Currently recording — stop signals (in priority order):
+      // 1. Explicit "you left" / "meeting ended" title → instant stop
+      // 2. Meet window disappeared entirely (tab closed) → stop after 10s debounce
+      // 3. Multi-signal detector in recording.js (system audio silence + transcript gap)
+      if (userLeft) {
+        console.log('[MeetDetect] User left the meeting. Stopping recording...')
+        meetWindowGoneCount = 0
         isRecordingMeet = false
         detectedMeetTitle = null
+        stopPowerSaveBlocker()
 
         if (recordingWindow && !recordingWindow.isDestroyed()) {
           recordingWindow.webContents.send('auto-stop-recording')
@@ -775,16 +855,16 @@ async function checkForMeetWindow() {
         if (bubbleWindow && !bubbleWindow.isDestroyed()) {
           bubbleWindow.webContents.send('recording-state', false)
         }
-      } else if (meetTabAny) {
-        // Tab open with meeting code but NO 🔊 — user likely left
-        if (!meetNoAudioSince) {
-          meetNoAudioSince = Date.now()
-          console.log('[MeetDetect] Audio indicator (🔊) gone. Starting 20s grace period...')
-        } else if (Date.now() - meetNoAudioSince > MEET_NO_AUDIO_TIMEOUT) {
-          console.log('[MeetDetect] No audio indicator for 20s — meeting ended. Stopping recording.')
-          meetNoAudioSince = null
+      } else if (!meetTabAny) {
+        // Meet window gone — user closed the tab or Chrome
+        meetWindowGoneCount++
+        console.log(`[MeetDetect] Meet window not found (${meetWindowGoneCount}/2)`)
+        if (meetWindowGoneCount >= 2) { // 2 × 5s = 10s debounce
+          console.log('[MeetDetect] Meet window gone for 10s — stopping recording')
+          meetWindowGoneCount = 0
           isRecordingMeet = false
           detectedMeetTitle = null
+          stopPowerSaveBlocker()
 
           if (recordingWindow && !recordingWindow.isDestroyed()) {
             recordingWindow.webContents.send('auto-stop-recording')
@@ -793,13 +873,15 @@ async function checkForMeetWindow() {
             bubbleWindow.webContents.send('recording-state', false)
           }
         }
+      } else {
+        // Meet tab still exists (might be background/sharing screen) — keep recording
+        meetWindowGoneCount = 0
       }
     }
 
     // Reset when all Meet tabs are closed (allow detecting next meeting)
     if (!meetTabAny && !isRecordingMeet && !userLeft) {
       lastRecordedMeetCode = null
-      meetNoAudioSince = null
     }
   } catch (err) {
     console.error('[MeetDetect] Error:', err)
@@ -819,12 +901,70 @@ function stopMeetDetection() {
   }
 }
 
+// ============================================================
+// MEETING END CONFIRMATION (bubble asks user)
+// ============================================================
+
+// Recording detected heuristic signal → ask user via bubble
+ipcMain.on('meeting-maybe-ended', () => {
+  console.log('[MeetDetect] Heuristic signal: asking user if meeting ended')
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.webContents.send('ask-meeting-ended')
+  }
+})
+
+// User confirmed meeting ended → stop recording
+ipcMain.on('confirm-meeting-ended', () => {
+  console.log('[MeetDetect] User confirmed meeting ended → stopping')
+  isRecordingMeet = false
+  detectedMeetTitle = null
+  stopPowerSaveBlocker()
+
+  if (recordingWindow && !recordingWindow.isDestroyed()) {
+    recordingWindow.webContents.send('auto-stop-recording')
+  }
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.webContents.send('recording-state', false)
+  }
+})
+
+// User dismissed → meeting still going, reset detection
+ipcMain.on('dismiss-meeting-ended', () => {
+  console.log('[MeetDetect] User dismissed → meeting still going, resetting detection')
+  if (recordingWindow && !recordingWindow.isDestroyed()) {
+    recordingWindow.webContents.send('reset-meeting-detection')
+  }
+})
+
 // Notify main process that recording finished (so we can reset state)
 ipcMain.on('recording-finished', () => {
   isRecordingMeet = false
   detectedMeetTitle = null
+  stopPowerSaveBlocker()
   if (bubbleWindow && !bubbleWindow.isDestroyed()) {
     bubbleWindow.webContents.send('recording-state', false)
+  }
+
+  // Show native macOS notification with results
+  const notification = new Notification({
+    title: 'Gravacao Finalizada',
+    body: 'A avaliacao SPIN da reuniao esta pronta. Clique para ver os resultados.',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+  })
+  notification.on('click', () => {
+    // Open meet analysis page in main window
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show()
+      mainWindow.focus()
+      mainWindow.webContents.loadURL(`${PLATFORM_URL}/meet-analysis`)
+    }
+  })
+  notification.show()
+
+  // Close hidden recording window silently
+  if (recordingWindow && !recordingWindow.isDestroyed()) {
+    recordingWindow.destroy()
+    recordingWindow = null
   }
 })
 
@@ -897,28 +1037,36 @@ app.whenReady().then(() => {
   })
   session.defaultSession.setPermissionCheckHandler(() => true)
 
-  // System audio loopback: auto-select primary screen + capture ALL system audio
-  // This uses macOS ScreenCaptureKit (13+) to capture Chrome/Meet audio without a picker
+  // System audio loopback via macOS native ScreenCaptureKit picker
+  // useSystemPicker: true shows macOS native picker which properly initializes
+  // audio loopback (avoids the readyState=ended bug with manual source selection).
+  // The handler below is only called if the user cancels the system picker.
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+    console.log('[AudioLoopback] System picker was cancelled — falling back to manual source')
     try {
       const sources = await desktopCapturer.getSources({ types: ['screen'] })
       if (sources.length > 0) {
-        console.log('[AudioLoopback] Granting screen + system audio loopback:', sources[0].name)
         callback({ video: sources[0], audio: 'loopback' })
       } else {
-        console.error('[AudioLoopback] No screen sources found')
         callback({})
       }
     } catch (err) {
-      console.error('[AudioLoopback] Error getting sources:', err)
+      console.error('[AudioLoopback] Fallback error:', err)
       callback({})
     }
-  })
+  }, { useSystemPicker: true })
 
   createMainWindow()
 
-  // macOS: request microphone permission early (avoids hang during recording)
+  // BlackHole driver: prompt installation on first launch (non-blocking)
+  ensureBlackHoleInstalled().catch(err => {
+    console.error('[BlackHole] First-launch check failed:', err)
+  })
+
+  // macOS: check permissions early
   if (process.platform === 'darwin') {
+    const screenStatus = systemPreferences.getMediaAccessStatus('screen')
+    console.log('[Permissions] Screen recording status:', screenStatus)
     const micStatus = systemPreferences.getMediaAccessStatus('microphone')
     console.log('[Permissions] Microphone status:', micStatus)
     if (micStatus !== 'granted') {
@@ -985,6 +1133,9 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   app.isQuitting = true
+  stopPowerSaveBlocker()
+  // Emergency cleanup: destroy Multi-Output device if still active
+  try { destroyMultiOutputDevice() } catch (_) {}
 })
 
 app.on('window-all-closed', () => {

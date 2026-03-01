@@ -44,6 +44,7 @@ next-env.d.ts
 # desktop app
 desktop/release/
 desktop/build/vc_redist.x64.exe
+desktop/drivers/
 
 # download files (served locally)
 public/downloads/

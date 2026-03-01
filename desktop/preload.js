@@ -28,4 +28,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openWhatsApp: () => ipcRenderer.send('open-whatsapp'),
   // Platform URL (dev vs prod)
   getPlatformUrl: () => ipcRenderer.invoke('get-platform-url'),
+  // BlackHole audio driver (seamless system audio capture)
+  checkBlackHole: () => ipcRenderer.invoke('check-blackhole'),
+  setupAudioRouting: () => ipcRenderer.invoke('setup-audio-routing'),
+  teardownAudioRouting: () => ipcRenderer.invoke('teardown-audio-routing'),
+  // Meeting end confirmation (recorder ↔ main ↔ bubble)
+  notifyMeetingMaybeEnded: () => ipcRenderer.send('meeting-maybe-ended'),
+  onAskMeetingEnded: (callback) => ipcRenderer.on('ask-meeting-ended', () => callback()),
+  confirmMeetingEnded: () => ipcRenderer.send('confirm-meeting-ended'),
+  dismissMeetingEnded: () => ipcRenderer.send('dismiss-meeting-ended'),
+  onResetMeetingDetection: (callback) => ipcRenderer.on('reset-meeting-detection', () => callback()),
 })

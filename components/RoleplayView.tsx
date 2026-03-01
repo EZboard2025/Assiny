@@ -179,6 +179,9 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const userStoppedRef = useRef(false) // Tracks whether user explicitly clicked stop
+  const [recordingCooldown, setRecordingCooldown] = useState(0) // Countdown seconds remaining (0 = no cooldown)
+  const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Estados e refs para interface de videochamada
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -941,6 +944,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     stopWebcam()
 
     // Parar gravação se estiver ativa
+    userStoppedRef.current = true // Evitar que onstop processe áudio
     if (mediaRecorderRef.current) {
       try {
         if (mediaRecorderRef.current.state === 'recording') {
@@ -1120,6 +1124,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     stopWebcam()
 
     // Parar gravação se estiver ativa
+    userStoppedRef.current = true // Evitar que onstop processe áudio
     if (mediaRecorderRef.current) {
       try {
         if (mediaRecorderRef.current.state === 'recording') {
@@ -1410,6 +1415,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       // Limpar estados anteriores que podem estar travados
       setCurrentTranscription('')
+      userStoppedRef.current = false
+
+      // Fechar AudioContext anterior (evita conflito com microfone no macOS)
+      if (audioContextRef.current) {
+        await audioContextRef.current.close().catch(() => {})
+        audioContextRef.current = null
+      }
 
       // Garantir que stream anterior esteja parado
       if (streamRef.current) {
@@ -1422,6 +1434,28 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+
+      // Monitorar saúde da track de áudio
+      const audioTrack = stream.getAudioTracks()[0]
+      if (audioTrack) {
+        console.log('🎤 Audio track:', audioTrack.label, '| readyState:', audioTrack.readyState)
+        audioTrack.onended = () => {
+          console.warn('⚠️ Audio track ended unexpectedly! userStopped:', userStoppedRef.current)
+          if (!userStoppedRef.current) {
+            // Track morreu sozinha — parar MediaRecorder para salvar o que temos
+            if (mediaRecorderRef.current?.state === 'recording') {
+              console.warn('⚠️ Parando MediaRecorder porque a track morreu')
+              mediaRecorderRef.current.stop()
+            }
+          }
+        }
+        audioTrack.onmute = () => {
+          console.warn('⚠️ Audio track was muted!')
+        }
+        audioTrack.onunmute = () => {
+          console.log('🎤 Audio track unmuted')
+        }
+      }
 
       // Configurar MediaRecorder com qualidade otimizada para Whisper
       const options = {
@@ -1439,12 +1473,28 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         }
       }
 
+      mediaRecorder.onerror = (event: any) => {
+        console.error('❌ MediaRecorder error:', event.error?.name, event.error?.message)
+      }
+
       mediaRecorder.onstop = async () => {
-        console.log('🛑 MediaRecorder.onstop disparado!')
+        console.log('🛑 MediaRecorder.onstop disparado! userStopped:', userStoppedRef.current)
         console.log('🛑 Chunks de áudio capturados:', audioChunksRef.current.length)
 
         // Garantir que o indicador seja removido imediatamente
         setIsRecording(false)
+
+        // Se a gravação parou inesperadamente (não pelo usuário), avisar e não processar
+        if (!userStoppedRef.current) {
+          console.warn('⚠️ Gravação interrompida inesperadamente (track do microfone morreu)')
+          setCurrentTranscription('⚠️ Gravação interrompida. Clique no microfone para tentar novamente.')
+          setTimeout(() => setCurrentTranscription(''), 4000)
+          // Limpar stream e referências
+          stream.getTracks().forEach(track => track.stop())
+          mediaRecorderRef.current = null
+          streamRef.current = null
+          return
+        }
 
         if (audioChunksRef.current.length === 0) {
           console.log('⚠️ Nenhum chunk de áudio capturado!')
@@ -1478,8 +1528,22 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         await transcribeAudio(audioBlob)
       }
 
-      mediaRecorder.start()
+      mediaRecorder.start(500) // Chunks a cada 500ms para não perder áudio em stops inesperados
       setIsRecording(true)
+
+      // Cooldown de 5 segundos — evita clique duplo acidental no botão de parar
+      setRecordingCooldown(5)
+      if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current)
+      cooldownTimerRef.current = setInterval(() => {
+        setRecordingCooldown(prev => {
+          if (prev <= 1) {
+            clearInterval(cooldownTimerRef.current!)
+            cooldownTimerRef.current = null
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
 
     } catch (error) {
       console.error('Erro ao acessar microfone:', error)
@@ -1497,6 +1561,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     console.log('🛑 Estado atual - isRecording:', isRecording)
     console.log('🛑 MediaRecorder existe?', !!mediaRecorderRef.current)
     console.log('🛑 MediaRecorder state:', mediaRecorderRef.current?.state)
+
+    // Marcar como parada explícita pelo usuário
+    userStoppedRef.current = true
+
+    // Limpar cooldown
+    if (cooldownTimerRef.current) {
+      clearInterval(cooldownTimerRef.current)
+      cooldownTimerRef.current = null
+    }
+    setRecordingCooldown(0)
 
     // Limpar timer de silêncio
     if (silenceTimerRef.current) {
@@ -1685,6 +1759,12 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current)
           animationFrameRef.current = null
+        }
+
+        // Fechar AudioContext para evitar conflito com microfone
+        if (audioContextRef.current) {
+          audioContextRef.current.close().catch(() => {})
+          audioContextRef.current = null
         }
       }
 
@@ -2100,15 +2180,20 @@ Interprete este personagem de forma realista e consistente com todas as caracter
             {/* Botão Microfone */}
             <button
               onClick={isRecording ? stopRecording : startRecording}
-              disabled={isPlayingAudio || isLoading || showFinalizingMessage}
-              className={`p-4 rounded-full transition-colors ${
+              disabled={isPlayingAudio || isLoading || showFinalizingMessage || (isRecording && recordingCooldown > 0)}
+              className={`p-4 rounded-full transition-colors relative ${
                 isRecording
-                  ? 'bg-green-500 text-white hover:bg-green-600'
+                  ? recordingCooldown > 0
+                    ? 'bg-green-500/60 text-white/60 cursor-not-allowed'
+                    : 'bg-green-500 text-white hover:bg-green-600'
                   : 'bg-gray-700 hover:bg-gray-600 text-white'
               } ${(isPlayingAudio || isLoading || showFinalizingMessage) ? 'opacity-50 cursor-not-allowed' : ''}`}
-              title={isRecording ? 'Parar gravação' : 'Iniciar gravação'}
+              title={isRecording ? (recordingCooldown > 0 ? `Aguarde ${recordingCooldown}s...` : 'Parar gravação') : 'Iniciar gravação'}
             >
               {isRecording ? <Mic size={24} /> : <MicOff size={24} />}
+              {isRecording && recordingCooldown > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center text-white">{recordingCooldown}</span>
+              )}
             </button>
 
             {/* Botão Encerrar */}

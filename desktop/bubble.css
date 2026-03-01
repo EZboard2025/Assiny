@@ -666,3 +666,92 @@ body {
   border-color: #66bb6a;
   color: #128C7E;
 }
+
+/* ============================================================
+   MEETING END PROMPT (overlay on bubble)
+   ============================================================ */
+.meet-prompt {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  pointer-events: auto;
+  animation: meetPromptIn 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  z-index: 200;
+}
+
+@keyframes meetPromptIn {
+  from { opacity: 0; transform: scale(0.8) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.meet-prompt-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.16),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(220, 38, 38, 0.1);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.meet-prompt-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fef2f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+}
+
+.meet-prompt-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+}
+
+.meet-prompt-buttons {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.meet-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+}
+
+.meet-btn-yes {
+  background: #dc2626;
+  color: white;
+}
+
+.meet-btn-yes:hover {
+  background: #b91c1c;
+  transform: scale(1.02);
+}
+
+.meet-btn-no {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.meet-btn-no:hover {
+  background: #e5e7eb;
+  transform: scale(1.02);
+}

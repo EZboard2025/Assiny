@@ -1,44 +1,54 @@
 // ============================================================
 // WhatsApp Web DOM Scraper
-// Injected into WhatsApp Web via whatsapp-preload.js
+// Injected into WhatsApp Web via executeJavaScript
 // Extracts conversation data and sends to Electron main process
 // ============================================================
 
-// --- Selectors (update these when WhatsApp Web changes DOM) ---
-// Multiple selectors per element for resilience against DOM updates
+// --- Selectors (multiple fallbacks for resilience) ---
 const SELECTORS = {
-  // Conversation panel (right side with messages)
   conversationPanel: '#main',
-  // Contact name in conversation header (multiple fallbacks)
-  contactHeader: '#main header span[title]',
-  contactHeaderAlt: '#main header [data-testid="conversation-info-header-chat-title"]',
-  contactHeaderAlt2: '#main header [data-testid="conversation-title"]',
-  // Message rows (parent container for each message)
-  messageRow: 'div.message-in, div.message-out',
-  messageRowAlt: '[data-testid="msg-container"]',
-  // Message text content (multiple fallbacks)
-  messageText: 'span.selectable-text',
-  messageTextAlt: '[data-testid="msg-text"]',
-  // Timestamp + sender metadata
+  // Contact name in header
+  contactHeader: [
+    '#main header span[title]',
+    '#main header [data-testid="conversation-info-header-chat-title"]',
+    '#main header [data-testid="conversation-title"]',
+  ],
+  // Message containers — try class-based then data-testid
+  messageRow: [
+    'div.message-in, div.message-out',
+    '[data-testid="msg-container"]',
+  ],
+  // Message text content (many fallbacks)
+  messageText: [
+    'span.selectable-text.copyable-text',
+    'span.selectable-text',
+    'span.copyable-text',
+    '[data-testid="msg-text"]',
+  ],
+  // Timestamp metadata
   messagePrePlain: '[data-pre-plain-text]',
-  // Image messages
-  messageImage: 'img[src*="blob:"], [data-testid="image-thumb"]',
-  // Audio/PTT messages
+  // Media type detection
+  messageImage: 'img[src*="blob:"], [data-testid="image-thumb"], [data-testid="media-url-provider"]',
   messageAudio: '[data-testid="audio-play"], [data-testid="ptt-play"], [data-testid="audio-seekbar"]',
-  // Video messages
   messageVideo: '[data-testid="media-state-video"], [data-testid="video-content"]',
-  // Document messages
   messageDocument: '[data-testid="document-thumb"], [data-testid="document-message"]',
-  // Sticker messages
   messageSticker: 'img.sticker, [data-testid="sticker"]',
-  // WhatsApp input field (contenteditable)
-  inputField: '#main footer div[contenteditable="true"]',
-  inputFieldAlt: '#main [data-testid="conversation-compose-box-input"]',
-  inputFieldAlt2: '[data-testid="compose-box"] div[contenteditable="true"]',
-  // Messages container (for MutationObserver)
-  messagesContainer: '#main [role="application"]',
-  messagesContainerAlt: '#main div.message-list',
-  messagesContainerAlt2: '[data-testid="conversation-panel-messages"]',
+  // Link preview
+  messageLinkPreview: '[data-testid="link-preview"], a[href*="http"]',
+  // Input field
+  inputField: [
+    '#main footer div[contenteditable="true"]',
+    '#main [data-testid="conversation-compose-box-input"]',
+    '[data-testid="compose-box"] div[contenteditable="true"]',
+    'footer div[contenteditable="true"]',
+  ],
+  // Messages container for observer
+  messagesContainer: [
+    '#main [role="application"]',
+    '#main div.message-list',
+    '[data-testid="conversation-panel-messages"]',
+    '#main',
+  ],
 }
 
 // --- State ---
@@ -46,45 +56,45 @@ let lastContactName = null
 let lastMessageCount = 0
 let observer = null
 let debounceTimer = null
+let inactiveCount = 0       // consecutive times getContactName() returned null
 const DEBOUNCE_MS = 800
+const INACTIVE_THRESHOLD = 3 // require 3 consecutive nulls before declaring inactive
 
-// --- Helper: try multiple selectors ---
-function querySelector(parent, ...selectors) {
-  for (const sel of selectors) {
+// --- Helpers ---
+function trySelect(parent, selectors) {
+  const sels = Array.isArray(selectors) ? selectors : [selectors]
+  for (const sel of sels) {
     const el = parent.querySelector(sel)
     if (el) return el
   }
   return null
 }
 
-function querySelectorAll(parent, ...selectors) {
-  for (const sel of selectors) {
+function trySelectAll(parent, selectors) {
+  const sels = Array.isArray(selectors) ? selectors : [selectors]
+  for (const sel of sels) {
     const els = parent.querySelectorAll(sel)
-    if (els.length > 0) return els
+    if (els.length > 0) return Array.from(els)
   }
   return []
 }
 
-// --- Extract contact name from conversation header ---
+// --- Contact name ---
 function getContactName() {
-  const el = querySelector(document, SELECTORS.contactHeader, SELECTORS.contactHeaderAlt, SELECTORS.contactHeaderAlt2)
+  const el = trySelect(document, SELECTORS.contactHeader)
   if (!el) return null
   return el.textContent?.trim() || el.getAttribute('title')?.trim() || null
 }
 
-// --- Extract phone from contact info or header ---
+// --- Contact phone ---
 function getContactPhone() {
-  // WhatsApp Web sometimes shows phone in the header title
   const name = getContactName()
   if (!name) return null
-  // Check if name looks like a phone number (starts with + or digits)
   if (/^[\d+\s()-]+$/.test(name.replace(/\s/g, ''))) {
     return name.replace(/\s/g, '')
   }
-  // Otherwise try to get from the subtitle/status area
-  const subtitle = querySelector(document,
-    '#main header span[title] + span',
-    '#main header [data-testid="conversation-info-header-chat-subtitle"]'
+  const subtitle = trySelect(document,
+    ['#main header span[title] + span', '#main header [data-testid="conversation-info-header-chat-subtitle"]']
   )
   if (subtitle) {
     const text = subtitle.textContent?.trim() || ''
@@ -92,10 +102,10 @@ function getContactPhone() {
       return text.replace(/[^\d+]/g, '')
     }
   }
-  return name // fallback: use name as identifier
+  return name
 }
 
-// --- Determine message type ---
+// --- Message type detection ---
 function getMessageType(msgEl) {
   if (msgEl.querySelector(SELECTORS.messageAudio)) return 'audio'
   if (msgEl.querySelector(SELECTORS.messageVideo)) return 'video'
@@ -106,22 +116,88 @@ function getMessageType(msgEl) {
 }
 
 // --- Parse timestamp from data-pre-plain-text ---
-// Format: "[HH:MM, DD/MM/YYYY] ContactName: " or "[HH:MM, DD/MM/YYYY] "
 function parseTimestamp(prePlainText) {
   if (!prePlainText) return { time: null, date: null, sender: null }
-
   const match = prePlainText.match(/\[(\d{1,2}:\d{2}),?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.+?):\s*$/)
-  if (match) {
-    return { time: match[1], date: match[2], sender: match[3].trim() }
-  }
-
-  // Fallback: just time
+  if (match) return { time: match[1], date: match[2], sender: match[3].trim() }
   const timeMatch = prePlainText.match(/\[(\d{1,2}:\d{2})/)
-  if (timeMatch) {
-    return { time: timeMatch[1], date: null, sender: null }
+  if (timeMatch) return { time: timeMatch[1], date: null, sender: null }
+  return { time: null, date: null, sender: null }
+}
+
+// --- Robust text extraction from a message element ---
+function extractTextFromMessage(row) {
+  // Strategy 1: Try known selectors
+  const textEl = trySelect(row, SELECTORS.messageText)
+  if (textEl) {
+    const txt = textEl.innerText?.trim() || textEl.textContent?.trim()
+    if (txt) return txt
   }
 
-  return { time: null, date: null, sender: null }
+  // Strategy 2: data-pre-plain-text parent often wraps the text
+  const prePlainEl = row.querySelector('[data-pre-plain-text]')
+  if (prePlainEl) {
+    // The text is usually in a sibling/child span of the pre-plain container
+    const spans = prePlainEl.querySelectorAll('span')
+    for (const span of spans) {
+      // Skip spans that look like timestamps or metadata
+      if (span.querySelector('span') && span.children.length > 0) continue
+      const txt = span.innerText?.trim() || span.textContent?.trim()
+      if (txt && txt.length > 0 && !/^\d{1,2}:\d{2}$/.test(txt)) {
+        return txt
+      }
+    }
+    // Fallback: get innerText of pre-plain parent, strip the metadata prefix
+    const fullText = prePlainEl.innerText?.trim()
+    if (fullText) {
+      // Remove the "[time, date] sender: " prefix
+      const cleaned = fullText.replace(/^\[\d{1,2}:\d{2},?\s*\d{1,2}\/\d{1,2}\/\d{2,4}\]\s*[^:]*:\s*/, '')
+      if (cleaned && cleaned !== fullText) return cleaned
+    }
+  }
+
+  // Strategy 3: Look for any copyable/selectable text anywhere in the row
+  const candidates = row.querySelectorAll('[class*="copyable"], [class*="selectable"], [class*="text-message"]')
+  for (const el of candidates) {
+    const txt = el.innerText?.trim() || el.textContent?.trim()
+    if (txt && txt.length > 0) return txt
+  }
+
+  // Strategy 4: For link previews, get the URL
+  const linkEl = row.querySelector('a[href*="http"]')
+  if (linkEl) {
+    const href = linkEl.getAttribute('href')
+    const title = row.querySelector('[data-testid="link-preview-title"]')?.textContent?.trim()
+    if (title) return `${title} - ${href}`
+    return href
+  }
+
+  // Strategy 5: Broad text extraction — get the message bubble text
+  // Find the bubble div (usually the main content area, excluding metadata)
+  const bubble = row.querySelector('[data-testid="msg-text"], [data-testid="msg-container"] > div, .copyable-text')
+  if (bubble) {
+    const txt = bubble.innerText?.trim()
+    if (txt) return txt
+  }
+
+  return ''
+}
+
+// --- Determine if message is outgoing ---
+function isOutgoingMessage(row) {
+  // Check class directly
+  if (row.classList.contains('message-out')) return true
+  if (row.classList.contains('message-in')) return false
+  // Check parent
+  const parent = row.closest('.message-out')
+  if (parent) return true
+  const parentIn = row.closest('.message-in')
+  if (parentIn) return false
+  // data-testid fallback: check for msg-dblcheck (double check = sent)
+  if (row.querySelector('[data-testid="msg-dblcheck"]')) return true
+  if (row.querySelector('[data-icon="msg-dblcheck"]')) return true
+  if (row.querySelector('[data-icon="msg-check"]')) return true
+  return false
 }
 
 // --- Extract all messages from current conversation ---
@@ -129,21 +205,33 @@ function extractMessages() {
   const panel = document.querySelector(SELECTORS.conversationPanel)
   if (!panel) return []
 
-  let rows = querySelectorAll(panel, SELECTORS.messageRow)
-  // Fallback: try data-testid based selector
+  // Try to find message rows
+  let rows = trySelectAll(panel, SELECTORS.messageRow)
+
+  // Ultimate fallback: find elements with data-pre-plain-text (these are always message bubbles)
   if (rows.length === 0) {
-    rows = querySelectorAll(panel, SELECTORS.messageRowAlt)
+    const prePlainEls = panel.querySelectorAll('[data-pre-plain-text]')
+    rows = Array.from(prePlainEls).map(el => {
+      // Walk up to find the message container
+      let node = el
+      for (let i = 0; i < 10; i++) {
+        if (!node.parentElement) break
+        node = node.parentElement
+        if (node.classList.contains('message-in') || node.classList.contains('message-out')) return node
+        if (node.getAttribute('data-testid') === 'msg-container') return node
+      }
+      return el.parentElement || el
+    })
+    // Deduplicate
+    rows = [...new Set(rows)]
   }
+
   const messages = []
 
-  rows.forEach(row => {
-    const isOutgoing = row.classList.contains('message-out') || row.closest?.('.message-out') !== null
+  for (const row of rows) {
+    const isOutgoing = isOutgoingMessage(row)
     const type = getMessageType(row)
-
-    // Get text content (try multiple selectors)
-    let textEl = row.querySelector(SELECTORS.messageText)
-    if (!textEl) textEl = row.querySelector(SELECTORS.messageTextAlt)
-    let body = textEl ? textEl.textContent?.trim() : ''
+    let body = extractTextFromMessage(row)
 
     // For non-text messages without text, add label
     if (!body && type !== 'text') {
@@ -151,25 +239,24 @@ function extractMessages() {
       body = labels[type] || `[${type}]`
     }
 
-    // Get timestamp from data-pre-plain-text
+    // Skip completely empty messages (usually system notifications)
+    if (!body && type === 'text') continue
+
+    // Get timestamp
     const prePlainEl = row.querySelector(SELECTORS.messagePrePlain)
     const prePlainText = prePlainEl ? prePlainEl.getAttribute('data-pre-plain-text') : ''
     const { time, date, sender } = parseTimestamp(prePlainText)
 
-    // Build timestamp (combine date + time into Date object)
     let timestamp = null
     if (date && time) {
       const parts = date.split('/')
       if (parts.length === 3) {
         let year = parts[2]
         if (year.length === 2) year = '20' + year
-        // DD/MM/YYYY format
         timestamp = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T${time}:00`).getTime()
       }
     }
-    if (!timestamp) {
-      timestamp = Date.now() // fallback
-    }
+    if (!timestamp) timestamp = Date.now()
 
     messages.push({
       body,
@@ -180,7 +267,7 @@ function extractMessages() {
       type,
       sender: sender || (isOutgoing ? 'Vendedor' : getContactName() || 'Cliente'),
     })
-  })
+  }
 
   return messages
 }
@@ -189,7 +276,9 @@ function extractMessages() {
 function sendUpdate() {
   const contactName = getContactName()
   if (!contactName) {
-    // No conversation open
+    // DOM might be temporarily mutating — don't immediately declare inactive
+    inactiveCount++
+    if (inactiveCount < INACTIVE_THRESHOLD) return // wait for more confirmations
     if (lastContactName !== null) {
       lastContactName = null
       lastMessageCount = 0
@@ -199,14 +288,20 @@ function sendUpdate() {
     }
     return
   }
+  // Contact found — reset inactive counter
+  inactiveCount = 0
 
   const messages = extractMessages()
   const contactPhone = getContactPhone()
-
-  // Detect conversation change
   const conversationChanged = contactName !== lastContactName
   lastContactName = contactName
   lastMessageCount = messages.length
+
+  console.log(`[Ramppy Scraper] Update: ${contactName}, ${messages.length} msgs, changed=${conversationChanged}`)
+  if (messages.length > 0) {
+    const last = messages[messages.length - 1]
+    console.log(`[Ramppy Scraper] Last msg: "${last.body?.substring(0, 50)}" (${last.type}, fromMe=${last.fromMe})`)
+  }
 
   if (window.ramppy) {
     window.ramppy.sendContext({
@@ -225,90 +320,55 @@ function debouncedUpdate() {
   debounceTimer = setTimeout(sendUpdate, DEBOUNCE_MS)
 }
 
-// --- Setup MutationObserver on messages container ---
+// --- MutationObserver on messages container ---
 function setupObserver() {
-  // Disconnect existing observer
   if (observer) {
     observer.disconnect()
     observer = null
   }
 
-  const container = querySelector(document,
-    SELECTORS.messagesContainer,
-    SELECTORS.messagesContainerAlt,
-    SELECTORS.messagesContainerAlt2,
-    '#main'
-  )
-
+  const container = trySelect(document, SELECTORS.messagesContainer)
   if (!container) return
 
   observer = new MutationObserver((mutations) => {
-    // Check if any mutation involves message elements
     let hasRelevantChange = false
     for (const mutation of mutations) {
       if (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0) {
         hasRelevantChange = true
         break
       }
-      // Attribute changes on message elements
-      if (mutation.type === 'attributes' && mutation.target.closest?.('.message-in, .message-out')) {
-        hasRelevantChange = true
-        break
-      }
     }
-
-    if (hasRelevantChange) {
-      debouncedUpdate()
-    }
+    if (hasRelevantChange) debouncedUpdate()
   })
 
-  observer.observe(container, {
-    childList: true,
-    subtree: true,
-    attributes: false,
-  })
+  observer.observe(container, { childList: true, subtree: true, attributes: false })
 }
 
-// --- Watch for conversation panel changes (switching chats) ---
+// --- Watch for conversation panel changes ---
 function setupConversationWatcher() {
   const bodyObserver = new MutationObserver(() => {
-    const panel = document.querySelector(SELECTORS.conversationPanel)
     const currentContact = getContactName()
-
     if (currentContact !== lastContactName) {
-      // Conversation changed — re-setup observer and send update
       setupObserver()
       sendUpdate()
     }
   })
 
-  bodyObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: false,
-  })
+  bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: false })
 }
 
 // --- Inject text into WhatsApp input field ---
 function injectText(text) {
-  const input = querySelector(document, SELECTORS.inputField, SELECTORS.inputFieldAlt, SELECTORS.inputFieldAlt2)
+  const input = trySelect(document, SELECTORS.inputField)
   if (!input) {
     console.warn('[Ramppy Scraper] Input field not found')
     return false
   }
 
-  // Focus the input
   input.focus()
-
-  // Clear existing content
   input.textContent = ''
-
-  // Use execCommand for compatibility with WhatsApp's contenteditable
   document.execCommand('insertText', false, text)
-
-  // Dispatch input event for WhatsApp to detect the change
   input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }))
-
   return true
 }
 
@@ -324,21 +384,17 @@ if (window.ramppy) {
 function init() {
   console.log('[Ramppy Scraper] Initializing WhatsApp Web scraper...')
 
-  // Wait for WhatsApp Web to fully load
   const waitForApp = setInterval(() => {
-    const panel = document.querySelector(SELECTORS.conversationPanel)
     const sidebar = document.querySelector('[data-testid="chat-list"]') || document.querySelector('#pane-side')
-
     if (sidebar) {
       clearInterval(waitForApp)
       console.log('[Ramppy Scraper] WhatsApp Web loaded. Setting up observers...')
       setupObserver()
       setupConversationWatcher()
-      sendUpdate() // Initial state
+      sendUpdate()
     }
   }, 1000)
 
-  // Timeout after 30s
   setTimeout(() => clearInterval(waitForApp), 30000)
 }
 

@@ -23,6 +23,9 @@ let showActionHints = true
 let waContext = { active: false, contactName: null, contactPhone: null, messages: [] }
 let currentContact = null
 
+// Per-contact chat cache: contactName → { history, feedbackStates, sentMsgIds, showActionHints, messagesHtml }
+const contactCache = new Map()
+
 // --- DOM ---
 const messagesArea = document.getElementById('messages')
 const welcomeState = document.getElementById('welcome-state')
@@ -55,6 +58,8 @@ const AVATAR_HTML = `<div class="ai-avatar"><svg width="14" height="14" viewBox=
 // ============================================================
 
 function showWelcome() {
+  // Never reset to welcome while sending or revealing a response
+  if (isSending || revealTimer) return
   welcomeState.style.display = 'flex'
   noConversation.style.display = 'none'
   chatPills.style.display = 'none'
@@ -63,6 +68,8 @@ function showWelcome() {
 }
 
 function showNoConversation() {
+  // Never reset while sending or revealing a response
+  if (isSending || revealTimer) return
   welcomeState.style.display = 'none'
   noConversation.style.display = 'flex'
   chatPills.style.display = 'none'
@@ -81,6 +88,10 @@ function switchToChatMode() {
 }
 
 function resetChat() {
+  // Cancel any in-progress reveal
+  if (revealTimer) { clearTimeout(revealTimer); revealTimer = null }
+  // Remove cached state for this contact (explicit reset)
+  if (currentContact) contactCache.delete(currentContact)
   copilotHistory = []
   feedbackStates = {}
   sentMsgIds = new Set()
@@ -96,8 +107,59 @@ function resetChat() {
 // CONTACT / CONVERSATION CHANGE
 // ============================================================
 
+function saveCurrentContactState() {
+  if (!currentContact || !hasMessages) return
+  contactCache.set(currentContact, {
+    history: [...copilotHistory],
+    feedbackStates: { ...feedbackStates },
+    sentMsgIds: new Set(sentMsgIds),
+    showActionHints,
+    messagesHtml: messagesArea.innerHTML,
+  })
+  // Cap cache at 20 contacts to prevent memory bloat
+  if (contactCache.size > 20) {
+    const oldest = contactCache.keys().next().value
+    contactCache.delete(oldest)
+  }
+}
+
+function restoreContactState(contactName) {
+  const cached = contactCache.get(contactName)
+  if (!cached) return false
+
+  copilotHistory = [...cached.history]
+  feedbackStates = { ...cached.feedbackStates }
+  sentMsgIds = new Set(cached.sentMsgIds)
+  showActionHints = cached.showActionHints
+  hasMessages = true
+
+  // Restore DOM
+  messagesArea.innerHTML = cached.messagesHtml
+  welcomeState.style.display = 'none'
+  noConversation.style.display = 'none'
+  chatPills.style.display = 'flex'
+  chatInputBar.style.display = 'block'
+  messagesArea.scrollTop = messagesArea.scrollHeight
+  return true
+}
+
 function onContactChange(contactName) {
   if (contactName === currentContact) return
+
+  // If actively sending or revealing, defer the contact change
+  if (isSending || revealTimer) {
+    // Just update header — don't reset chat mid-response
+    if (contactName) {
+      contactNameEl.textContent = contactName
+      headerContact.style.display = 'flex'
+    }
+    currentContact = contactName
+    return
+  }
+
+  // Save current contact's chat state before switching
+  saveCurrentContactState()
+
   currentContact = contactName
 
   // Update header
@@ -108,8 +170,23 @@ function onContactChange(contactName) {
     headerContact.style.display = 'none'
   }
 
-  // Reset chat for new contact
-  resetChat()
+  // Cancel any in-progress reveal
+  if (revealTimer) { clearTimeout(revealTimer); revealTimer = null }
+
+  // Try to restore cached state for this contact
+  if (contactName && restoreContactState(contactName)) {
+    return // Restored from cache — done
+  }
+
+  // No cache — fresh start
+  copilotHistory = []
+  feedbackStates = {}
+  sentMsgIds = new Set()
+  showActionHints = true
+  hasMessages = false
+  messagesArea.innerHTML = ''
+  messagesArea.appendChild(welcomeState)
+  showWelcome()
 }
 
 // ============================================================
@@ -122,9 +199,12 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
+// Reveal timer ref (to cancel on new message)
+let revealTimer = null
+
 function addUserMessage(text) {
   const div = document.createElement('div')
-  div.className = 'msg-user-wrap'
+  div.className = 'msg-user-wrap msg-fade-in'
   div.innerHTML = `<div class="msg-user">${escapeHtml(text)}</div>`
   messagesArea.appendChild(div)
   messagesArea.scrollTop = messagesArea.scrollHeight
@@ -132,31 +212,70 @@ function addUserMessage(text) {
 
 function addAIMessage(content, feedbackId) {
   const wrap = document.createElement('div')
-  wrap.className = 'msg-ai-wrap'
+  wrap.className = 'msg-ai-wrap msg-fade-in'
   const msgId = `ai_${Date.now()}`
 
-  const rendered = renderRichContent(content)
+  // Build action buttons (hidden during reveal, shown after)
+  const actionsHtml = buildActionsHtml(msgId, feedbackId)
 
-  // Build action buttons
-  let actionsHtml = `<div class="msg-actions" data-msg-id="${msgId}">`
+  // Start with empty content — will be progressively revealed
+  wrap.innerHTML = `<div class="ai-avatar thinking"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg></div><div class="msg-ai" data-raw="${escapeHtml(content)}"></div>`
+  messagesArea.appendChild(wrap)
+  messagesArea.scrollTop = messagesArea.scrollHeight
 
-  // Send to WhatsApp button
-  actionsHtml += `
+  // Progressive word-by-word reveal
+  const msgEl = wrap.querySelector('.msg-ai')
+  const avatarEl = wrap.querySelector('.ai-avatar')
+  const steps = getRevealSteps(content)
+
+  if (steps.length === 0) {
+    // Empty content — just show actions
+    msgEl.innerHTML = renderRichContent(content) + actionsHtml
+    avatarEl.classList.remove('thinking')
+    return
+  }
+
+  let current = 0
+  if (revealTimer) clearTimeout(revealTimer)
+
+  const revealNext = () => {
+    current++
+    const visibleText = current <= steps.length ? content.slice(0, steps[Math.min(current - 1, steps.length - 1)].pos) : content
+    msgEl.innerHTML = renderRichContent(visibleText)
+    messagesArea.scrollTop = messagesArea.scrollHeight
+
+    if (current < steps.length) {
+      const delay = steps[current].isNewline ? 120 : 25 + Math.random() * 20
+      revealTimer = setTimeout(revealNext, delay)
+    } else {
+      // Reveal complete — show actions, remove thinking animation
+      msgEl.innerHTML = renderRichContent(content) + actionsHtml
+      avatarEl.classList.remove('thinking')
+      messagesArea.scrollTop = messagesArea.scrollHeight
+      revealTimer = null
+    }
+  }
+
+  revealTimer = setTimeout(revealNext, 50)
+}
+
+function buildActionsHtml(msgId, feedbackId) {
+  let html = `<div class="msg-actions" data-msg-id="${msgId}">`
+
+  html += `
     <button class="btn-action btn-send-wa" data-msg-id="${msgId}" title="Enviar para o chat" onclick="sendToWhatsApp(this)">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       Enviar
     </button>`
 
-  // Copy button
-  actionsHtml += `
+  html += `
     <button class="btn-action" title="Copiar" onclick="copyMessage(this)">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
       Copiar
     </button>`
 
-  // Feedback buttons
   if (feedbackId) {
-    actionsHtml += `
+    html += `
       <button class="btn-action btn-feedback-up" data-feedback-id="${feedbackId}" title="Útil" onclick="handleFeedback(this, true)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
       </button>
@@ -165,18 +284,42 @@ function addAIMessage(content, feedbackId) {
       </button>`
   }
 
-  actionsHtml += '</div>'
+  html += '</div>'
+  return html
+}
 
-  wrap.innerHTML = `${AVATAR_HTML}<div class="msg-ai" data-raw="${escapeHtml(content)}">${rendered}${actionsHtml}</div>`
-  messagesArea.appendChild(wrap)
-  messagesArea.scrollTop = messagesArea.scrollHeight
+// Compute reveal steps — each step is a word position (tags count as one step)
+function getRevealSteps(text) {
+  const steps = []
+  let i = 0
+  while (i < text.length) {
+    if (text[i] === '\n') {
+      i++
+      steps.push({ pos: i, isNewline: true })
+      continue
+    }
+    if (/\s/.test(text[i])) { i++; continue }
+    // Visual tag — reveal entire tag as one step
+    if (text[i] === '{' && text[i + 1] === '{') {
+      const tagMatch = text.slice(i).match(/^\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/)
+      if (tagMatch) {
+        i += tagMatch[0].length
+        steps.push({ pos: i, isNewline: false })
+        continue
+      }
+    }
+    // Regular word — advance to next whitespace
+    while (i < text.length && !/\s/.test(text[i])) i++
+    steps.push({ pos: i, isNewline: false })
+  }
+  return steps
 }
 
 function showTyping() {
   const wrap = document.createElement('div')
-  wrap.className = 'typing-wrap'
+  wrap.className = 'typing-wrap msg-fade-in'
   wrap.id = 'typing-indicator'
-  wrap.innerHTML = `${AVATAR_HTML}<div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`
+  wrap.innerHTML = `<div class="ai-avatar thinking"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg></div><div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`
   messagesArea.appendChild(wrap)
   messagesArea.scrollTop = messagesArea.scrollHeight
 }
@@ -288,6 +431,33 @@ function extractCleanMessage(text) {
 
 async function sendMessage(text) {
   if (!text.trim() || isSending) return
+
+  // Debug command: show what messages the scraper extracted
+  if (text.trim() === '!debug') {
+    switchToChatMode()
+    welcomeInput.value = ''
+    chatInput.value = ''
+    addUserMessage('!debug')
+    const msgs = waContext.messages || []
+    let debugInfo = `**Contexto WhatsApp**\n`
+    debugInfo += `- Ativo: ${waContext.active}\n`
+    debugInfo += `- Contato: ${waContext.contactName || 'nenhum'}\n`
+    debugInfo += `- Telefone: ${waContext.contactPhone || 'n/a'}\n`
+    debugInfo += `- Mensagens: ${msgs.length}\n\n`
+    if (msgs.length > 0) {
+      debugInfo += `**Ultimas 15 mensagens:**\n`
+      const last15 = msgs.slice(-15)
+      last15.forEach((m, i) => {
+        const dir = m.fromMe ? 'OUT' : 'IN'
+        const body = (m.body || '').substring(0, 80)
+        debugInfo += `- [${m.time || '??'}] ${dir} (${m.type}): ${body || '[vazio]'}\n`
+      })
+    }
+    debugInfo += `\n**Contexto formatado (primeiros 500 chars):**\n`
+    debugInfo += '`' + formatConversationContext().substring(0, 500) + '`'
+    addAIMessage(debugInfo, null)
+    return
+  }
 
   if (!accessToken || !userId) {
     switchToChatMode()
@@ -421,30 +591,12 @@ window.handleFeedback = async function (btn, wasHelpful) {
 // ============================================================
 
 function renderRichContent(content) {
-  // Process visual tags first
-  let text = content
-    .replace(/\{\{NOTA:([^}]+)\}\}/g, (_, score) => {
-      const s = parseFloat(score)
-      const cls = s >= 7 ? 'score-green' : s >= 5 ? 'score-yellow' : 'score-red'
-      return `<span class="score-badge ${cls}">${score}/10</span>`
-    })
-    .replace(/\{\{BARRA:([^|]+)\|([^|]+)\|([^}]+)\}\}/g, (_, label, val, max) => {
-      const pct = Math.round((parseFloat(val) / parseFloat(max)) * 100)
-      const s = parseFloat(val)
-      const color = s >= 7 ? '#22c55e' : s >= 5 ? '#eab308' : '#ef4444'
-      return `<div style="margin:6px 0;"><div style="font-size:11px;color:#8696a0;margin-bottom:2px;">${escapeHtml(label)} (${val}/${max})</div><div style="height:6px;background:#2a3942;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div></div></div>`
-    })
-    .replace(/\{\{TENDENCIA:([^}]+)\}\}/g, (_, trend) => {
-      const t = trend.toLowerCase()
-      const cls = t.includes('quente') ? 'trend-quente' : t.includes('frio') ? 'trend-frio' : 'trend-morno'
-      return `<span class="trend-badge ${cls}">${escapeHtml(trend)}</span>`
-    })
-    .replace(/\{\{AGENDAR:[^}]+\}\}/g, '') // Remove calendar tags in desktop
-
-  // Highlight quoted suggestions
-  text = text.replace(/"([^"]{10,})"/g, '<div class="quoted-msg">$1</div>')
+  // Strip calendar tags (not supported in desktop)
+  let text = content.replace(/\{\{AGENDAR:[^}]+\}\}/g, '')
 
   // Parse markdown-like content
+  // NOTE: visual tags (NOTA, BARRA, TENDENCIA) are processed in formatInline/formatVisualTags
+  // AFTER escapeHtml, so they don't get double-escaped
   const lines = text.split('\n')
   let html = ''
   let inList = false
@@ -453,6 +605,14 @@ function renderRichContent(content) {
     const trimmed = line.trim()
     if (!trimmed) {
       if (inList) { html += '</div>'; inList = false }
+      continue
+    }
+
+    // Standalone quoted message (entire line is "..." or \u201c...\u201d)
+    const quoteMatch = trimmed.match(/^(?:"|[\u201c])(.{10,})(?:"|[\u201d])$/)
+    if (quoteMatch) {
+      if (inList) { html += '</div>'; inList = false }
+      html += `<div class="quoted-msg">${escapeHtml(quoteMatch[1])}</div>`
       continue
     }
 
@@ -486,33 +646,74 @@ function renderRichContent(content) {
 }
 
 function formatInline(text) {
-  return escapeHtml(text)
+  let escaped = escapeHtml(text)
+  // 1. Quoted suggestions FIRST (on plain escaped text — no HTML attributes to match)
+  escaped = escaped.replace(/\u201c([^\u201d]{10,}?)\u201d/g, '<span class="quoted-msg">$1</span>')
+  escaped = escaped.replace(/"([^"<>]{10,}?)"/g, '<span class="quoted-msg">$1</span>')
+  // 2. Visual tags AFTER quotes (generates HTML with "..." in attributes — safe now)
+  escaped = formatVisualTags(escaped)
+  // 3. Markdown formatting last
+  return escaped
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code style="background:#1a2730;padding:1px 4px;border-radius:3px;font-size:12px;color:#00a884;">$1</code>')
+}
+
+// Process visual tags on already-escaped text (safe — no double-escaping)
+function formatVisualTags(escaped) {
+  return escaped
+    .replace(/\{\{NOTA:([^}]+)\}\}/g, (_, score) => {
+      const s = parseFloat(score)
+      const cls = s >= 7 ? 'score-green' : s >= 5 ? 'score-yellow' : 'score-red'
+      return `<span class="score-badge ${cls}">${score}/10</span>`
+    })
+    .replace(/\{\{BARRA:([^|]+)\|([^|]+)\|([^}]+)\}\}/g, (_, label, val, max) => {
+      const pct = Math.round((parseFloat(val) / parseFloat(max)) * 100)
+      const s = parseFloat(val)
+      const color = s >= 7 ? '#22c55e' : s >= 5 ? '#eab308' : '#ef4444'
+      return `<div style="margin:6px 0;"><div style="font-size:11px;color:#8696a0;margin-bottom:2px;">${label} (${val}/${max})</div><div style="height:6px;background:#2a3942;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div></div></div>`
+    })
+    .replace(/\{\{TENDENCIA:([^}]+)\}\}/g, (_, trend) => {
+      const t = trend.toLowerCase()
+      const cls = t.includes('quente') ? 'trend-quente' : t.includes('frio') ? 'trend-frio' : 'trend-morno'
+      return `<span class="trend-badge ${cls}">${trend}</span>`
+    })
 }
 
 // ============================================================
 // WHATSAPP STATE LISTENER
 // ============================================================
 
+let inactiveTimer = null // debounce inactive transitions
+
 if (window.electronAPI && window.electronAPI.onWhatsAppState) {
   window.electronAPI.onWhatsAppState((data) => {
     waContext = data
 
     if (data.active && data.contactName) {
+      // Cancel any pending inactive transition
+      if (inactiveTimer) { clearTimeout(inactiveTimer); inactiveTimer = null }
       onContactChange(data.contactName)
-      // Make sure welcome or chat is showing (not no-conversation)
-      if (!hasMessages) {
-        showWelcome()
+      // Only show welcome if no messages AND not mid-response
+      if (!hasMessages && !isSending && !revealTimer) {
+        noConversation.style.display = 'none'
+        welcomeState.style.display = 'flex'
       }
     } else if (!data.active || !data.contactName) {
-      currentContact = null
-      headerContact.style.display = 'none'
-      showNoConversation()
+      // Debounce: wait 2s before showing "no conversation" (avoids flicker from DOM mutations)
+      if (!inactiveTimer) {
+        inactiveTimer = setTimeout(() => {
+          inactiveTimer = null
+          if (!isSending && !revealTimer) {
+            currentContact = null
+            headerContact.style.display = 'none'
+            showNoConversation()
+          }
+        }, 2000)
+      }
     }
 
-    // Handle conversation change within same session
+    // Handle explicit conversation change
     if (data.conversationChanged && data.contactName) {
       onContactChange(data.contactName)
     }

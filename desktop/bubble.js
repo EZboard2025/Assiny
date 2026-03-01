@@ -428,5 +428,57 @@ if (window.electronAPI && window.electronAPI.onRecordingState) {
   })
 }
 
+// --- Meeting End Prompt ---
+const meetPrompt = document.getElementById('meet-prompt')
+const btnMeetYes = document.getElementById('btn-meet-yes')
+const btnMeetNo = document.getElementById('btn-meet-no')
+let meetPromptVisible = false
+
+function showMeetPrompt() {
+  if (meetPromptVisible) return
+  meetPromptVisible = true
+
+  // Hide bubble and chat panel, show prompt
+  bubble.style.display = 'none'
+  chatPanel.style.display = 'none'
+  meetPrompt.style.display = 'block'
+
+  // Expand window to fit the prompt card
+  enableMouseCapture()
+  window.electronAPI.resizeBubble(240, 180)
+}
+
+function hideMeetPrompt() {
+  meetPromptVisible = false
+  meetPrompt.style.display = 'none'
+
+  // Restore bubble (collapsed state)
+  if (isExpanded) {
+    chatPanel.style.display = 'flex'
+    window.electronAPI.resizeBubble(380, 520)
+  } else {
+    bubble.style.display = 'flex'
+    disableMouseCapture()
+    window.electronAPI.resizeBubble(72, 72)
+  }
+}
+
+btnMeetYes.addEventListener('click', () => {
+  hideMeetPrompt()
+  window.electronAPI.confirmMeetingEnded()
+})
+
+btnMeetNo.addEventListener('click', () => {
+  hideMeetPrompt()
+  window.electronAPI.dismissMeetingEnded()
+})
+
+// Listen for prompt request from main process
+if (window.electronAPI && window.electronAPI.onAskMeetingEnded) {
+  window.electronAPI.onAskMeetingEnded(() => {
+    showMeetPrompt()
+  })
+}
+
 // --- Init ---
 // Auth token will be received via IPC from main window

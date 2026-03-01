@@ -7,6 +7,7 @@
     "postinstall": "node patch-electron-cli.js",
     "start": "electron .",
     "build:win": "electron-builder --win",
+    "prebuild:mac": "bash scripts/fetch-blackhole.sh",
     "build:mac": "electron-builder --mac"
   },
   "build": {
@@ -20,6 +21,7 @@
       "preload.js",
       "whatsapp-preload.js",
       "whatsapp-scraper.js",
+      "audio-devices.js",
       "bubble.html",
       "bubble.css",
       "bubble.js",
@@ -38,7 +40,13 @@
       "target": "dmg",
       "icon": "assets/icon.icns",
       "category": "public.app-category.business",
-      "identity": null
+      "identity": null,
+      "extraResources": [
+        {
+          "from": "drivers/BlackHole2ch.driver",
+          "to": "drivers/BlackHole2ch.driver"
+        }
+      ]
     },
     "dmg": {
       "window": {
@@ -77,5 +85,7 @@
     "electron": "^40.6.1",
     "electron-builder": "^25.0.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "macos-audio-devices": "^1.4.0"
+  }
 }

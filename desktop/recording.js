@@ -63,9 +63,20 @@ let liveSessionId = null
 let liveUpdateTimer = null
 let liveUpdateDirty = false
 let isRecording = false
+let usingBlackHole = false // Track if BlackHole path is active (for cleanup)
+
+// --- Meeting-end detection (multi-signal approach) ---
 let lastTranscriptTime = null
-let silenceCheckInterval = null
-const SILENCE_TIMEOUT_MS = 30 * 1000 // 30s no transcription = meeting likely ended
+let lastMeaningfulTranscriptTime = null
+let systemEnergyReadings = []
+let systemAudioSilentSince = null
+let meetingEndCheckInterval = null
+const SYSTEM_AUDIO_SILENT_THRESHOLD = 0.003 // RMS below this = no meeting audio on system channel
+const SYSTEM_AUDIO_SILENT_TIMEOUT = 20_000  // 20s of quiet system audio (user confirms, so aggressive)
+const NO_MEANINGFUL_TRANSCRIPT_TIMEOUT = 30_000 // 30s no meaningful transcript (user confirms)
+const ABSOLUTE_SILENCE_TIMEOUT = 45_000 // 45s no transcript at all (user confirms)
+const MEANINGFUL_WORD_MIN = 3 // Minimum words to count as meaningful speech
+const ENERGY_WINDOW_SIZE = 30 // ~30 buffers ≈ 5s at 8192/48kHz
 
 // ============================================================
 // AUTH (received from main process via IPC bridge)
@@ -158,39 +169,89 @@ async function fetchDeepgramKey() {
 }
 
 // ============================================================
-// AUDIO CAPTURE — System audio loopback via electron-audio-loopback
-// Uses getDisplayMedia with Chromium loopback flags (macOS 13+)
+// AUDIO CAPTURE — Dual path:
+// 1. BlackHole (seamless, no picker) — if driver is installed
+// 2. ScreenCaptureKit fallback (shows picker) — if no BlackHole
 // ============================================================
 
 async function startAudioCapture(deepgramKey) {
-  // 1. Capture system audio via loopback (handled by main process setDisplayMediaRequestHandler)
-  // Main process auto-selects primary screen + system audio loopback (macOS ScreenCaptureKit)
-  console.log('[Recorder] Step 1: Capturing system audio loopback...')
-  try {
-    const loopbackStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: true,
-    })
-    // Remove video tracks (we only need audio)
-    loopbackStream.getVideoTracks().forEach(t => {
-      t.stop()
-      loopbackStream.removeTrack(t)
-    })
-    systemStream = loopbackStream
-    console.log('[Recorder] System audio loopback captured! Tracks:', systemStream.getAudioTracks().length)
-  } catch (err) {
-    console.error('[Recorder] System audio loopback FAILED:', err.name, err.message)
-    throw new Error('Falha ao capturar audio do sistema. Verifique as permissoes de gravacao de tela.')
+  usingBlackHole = false
+
+  // Check if BlackHole is available for seamless capture
+  let blackHoleOk = false
+  if (window.electronAPI?.checkBlackHole) {
+    try {
+      const hasBlackHole = await window.electronAPI.checkBlackHole()
+      if (hasBlackHole) {
+        blackHoleOk = await startAudioCaptureViaBlackHole()
+      }
+    } catch (err) {
+      console.warn('[Recorder] BlackHole check failed:', err.message)
+    }
   }
 
-  // 2. Capture microphone (user's voice)
-  console.log('[Recorder] Step 2: Capturing microphone...')
+  // Fallback to ScreenCaptureKit if BlackHole not available or failed
+  if (!blackHoleOk) {
+    await startAudioCaptureViaScreenCapture()
+  }
+
+  // If no system audio AND no mic, we can't record anything
+  if (!systemStream && !micStream) {
+    throw new Error('Nenhuma fonte de audio disponivel. Verifique permissoes de microfone e gravacao de tela.')
+  }
+
+  // Build the audio pipeline and connect to Deepgram
+  const numChannels = await buildAudioPipeline()
+  await connectToDeepgram(deepgramKey, numChannels)
+
+  console.log('[Recorder] Audio capture started successfully!')
+}
+
+// --- Path 1: BlackHole (seamless, no picker) ---
+async function startAudioCaptureViaBlackHole() {
+  console.log('[Recorder] Attempting BlackHole audio capture (no screen picker)...')
+
+  // 1. Set up Multi-Output device (speakers + BlackHole)
+  const routingResult = await window.electronAPI.setupAudioRouting()
+  if (!routingResult.success) {
+    console.warn('[Recorder] Multi-Output setup failed:', routingResult.error, '— falling back to ScreenCaptureKit')
+    return false
+  }
+
+  // 2. Wait for CoreAudio to register the new device
+  await new Promise(r => setTimeout(r, 500))
+
+  // 3. Find BlackHole in available audio input devices
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  const blackholeDevice = devices.find(d =>
+    d.kind === 'audioinput' && d.label.toLowerCase().includes('blackhole')
+  )
+
+  if (!blackholeDevice) {
+    console.warn('[Recorder] BlackHole not found in enumerateDevices — falling back')
+    await window.electronAPI.teardownAudioRouting()
+    return false
+  }
+
+  console.log('[Recorder] BlackHole device found:', blackholeDevice.label, blackholeDevice.deviceId)
+
+  // 4. Capture system audio via BlackHole (no picker!)
+  try {
+    systemStream = await navigator.mediaDevices.getUserMedia({
+      audio: { deviceId: { exact: blackholeDevice.deviceId } }
+    })
+    console.log('[Recorder] System audio via BlackHole captured!')
+  } catch (err) {
+    console.error('[Recorder] BlackHole getUserMedia failed:', err.message)
+    await window.electronAPI.teardownAudioRouting()
+    return false
+  }
+
+  // 5. Capture microphone separately
+  console.log('[Recorder] Capturing microphone...')
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
+      audio: { echoCancellation: true, noiseSuppression: true }
     })
     console.log('[Recorder] Microphone captured! Tracks:', micStream.getAudioTracks().length)
   } catch (micErr) {
@@ -198,49 +259,138 @@ async function startAudioCapture(deepgramKey) {
     micStream = null
   }
 
-  // 3. Create STEREO stream: left=system (participants), right=mic (you)
-  // Raw PCM sent to Deepgram for proper multichannel speaker identification
-  console.log('[Recorder] Step 3: Creating stereo audio (L=system, R=mic)...')
+  usingBlackHole = true
+  return true
+}
+
+// --- Path 2: ScreenCaptureKit fallback (shows picker) ---
+async function startAudioCaptureViaScreenCapture() {
+  console.log('[Recorder] Using ScreenCaptureKit audio capture (may show picker)...')
+
+  let loopbackOk = false
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const loopbackStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      })
+      // IMPORTANT: Do NOT stop video tracks — on macOS ScreenCaptureKit, stopping video
+      // kills the entire capture session (including audio). Just ignore video tracks.
+      systemStream = loopbackStream
+      const audioTracks = systemStream.getAudioTracks()
+      const videoTracks = systemStream.getVideoTracks()
+      console.log(`[Recorder] Attempt ${attempt}: Audio tracks: ${audioTracks.length}, Video tracks: ${videoTracks.length}`)
+
+      if (audioTracks.length > 0) {
+        const t = audioTracks[0]
+        console.log(`[Recorder] Audio track: label="${t.label}", enabled=${t.enabled}, muted=${t.muted}, readyState=${t.readyState}`)
+        console.log(`[Recorder] Audio track settings:`, JSON.stringify(t.getSettings()))
+
+        if (t.readyState === 'live') {
+          loopbackOk = true
+          break
+        } else {
+          console.warn(`[Recorder] Audio track readyState="${t.readyState}" — track is dead. ${attempt < 2 ? 'Retrying...' : 'Proceeding with mic-only.'}`)
+          loopbackStream.getTracks().forEach(tr => tr.stop())
+          systemStream = null
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 1000))
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[Recorder] Loopback attempt ${attempt} FAILED:`, err.name, err.message)
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 1000))
+      }
+    }
+  }
+
+  if (!loopbackOk) {
+    console.warn('[Recorder] System audio loopback unavailable — will use mic-only mode')
+  }
+
+  // Capture microphone
+  console.log('[Recorder] Capturing microphone...')
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true }
+    })
+    console.log('[Recorder] Microphone captured! Tracks:', micStream.getAudioTracks().length)
+  } catch (micErr) {
+    console.warn('[Recorder] Microphone not available:', micErr.message)
+    micStream = null
+  }
+}
+
+// --- Shared: Build audio pipeline (ScriptProcessor for PCM) ---
+async function buildAudioPipeline() {
+  console.log('[Recorder] Creating audio pipeline...')
   audioContext = new AudioContext()
   if (audioContext.state === 'suspended') await audioContext.resume()
 
-  const sysSource = audioContext.createMediaStreamSource(systemStream)
-
-  // ChannelMerger: 2 mono inputs → 1 stereo output
+  const hasSys = !!systemStream && systemStream.getAudioTracks().some(t => t.readyState === 'live')
   const hasMic = !!micStream
-  const numChannels = hasMic ? 2 : 1
-  const sampleRate = audioContext.sampleRate
 
-  const merger = audioContext.createChannelMerger(2)
-
-  // System audio → left channel (channel 0 = other participants)
-  sysSource.connect(merger, 0, 0)
-
-  if (micStream) {
-    // Mic → right channel (channel 1 = the user)
+  let numChannels
+  if (hasSys && hasMic) {
+    // STEREO: left=system (participants), right=mic (you)
+    const sysAudioOnly = new MediaStream(systemStream.getAudioTracks())
+    const sysSource = audioContext.createMediaStreamSource(sysAudioOnly)
     const micSource = audioContext.createMediaStreamSource(micStream)
+    const merger = audioContext.createChannelMerger(2)
+    sysSource.connect(merger, 0, 0)
     micSource.connect(merger, 0, 1)
-    console.log('[Recorder] Stereo: L=system audio, R=microphone')
+    numChannels = 2
+    console.log(`[Recorder] Stereo: L=system audio${usingBlackHole ? ' (BlackHole)' : ' (ScreenCaptureKit)'}, R=microphone`)
+
+    // Use 8192 buffer to reduce frame drops in hidden/background windows
+    const scriptProcessor = audioContext.createScriptProcessor(8192, numChannels, 1)
+    const silentGain = audioContext.createGain()
+    silentGain.gain.value = 0
+    merger.connect(scriptProcessor)
+    scriptProcessor.connect(silentGain)
+    silentGain.connect(audioContext.destination)
+    processorNode = scriptProcessor
+  } else if (hasMic) {
+    // MIC-ONLY: mono, use diarization to distinguish speakers
+    const micSource = audioContext.createMediaStreamSource(micStream)
+    numChannels = 1
+    console.log('[Recorder] Mic-only mode (system audio unavailable). Using diarization.')
+
+    const scriptProcessor = audioContext.createScriptProcessor(8192, numChannels, 1)
+    const silentGain = audioContext.createGain()
+    silentGain.gain.value = 0
+    micSource.connect(scriptProcessor)
+    scriptProcessor.connect(silentGain)
+    silentGain.connect(audioContext.destination)
+    processorNode = scriptProcessor
   } else {
-    // No mic — duplicate system audio to both channels
-    sysSource.connect(merger, 0, 1)
-    console.log('[Recorder] Stereo: system audio only (both channels)')
+    // SYSTEM-ONLY
+    const sysAudioOnly = new MediaStream(systemStream.getAudioTracks())
+    const sysSource = audioContext.createMediaStreamSource(sysAudioOnly)
+    numChannels = 1
+    console.log('[Recorder] System audio only (no microphone)')
+
+    const scriptProcessor = audioContext.createScriptProcessor(8192, numChannels, 1)
+    const silentGain = audioContext.createGain()
+    silentGain.gain.value = 0
+    sysSource.connect(scriptProcessor)
+    scriptProcessor.connect(silentGain)
+    silentGain.connect(audioContext.destination)
+    processorNode = scriptProcessor
   }
 
-  // ScriptProcessor extracts raw interleaved PCM (linear16) for Deepgram
-  // This avoids WebM/Opus encoding which downmixes stereo to mono
-  const scriptProcessor = audioContext.createScriptProcessor(4096, numChannels, 1)
-  const silentGain = audioContext.createGain()
-  silentGain.gain.value = 0
-
-  merger.connect(scriptProcessor)
-  scriptProcessor.connect(silentGain)
-  silentGain.connect(audioContext.destination) // Must connect to destination for onaudioprocess to fire
-
+  const sampleRate = audioContext.sampleRate
   console.log('[Recorder] PCM processor ready. Channels:', numChannels, 'Sample rate:', sampleRate)
+  return numChannels
+}
 
-  // 4. Connect to Deepgram via WebSocket (raw PCM, multichannel)
-  console.log('[Recorder] Step 4: Connecting to Deepgram...')
+// --- Shared: Connect to Deepgram and wire audio ---
+function connectToDeepgram(deepgramKey, numChannels) {
+  console.log('[Recorder] Connecting to Deepgram...')
+  const sampleRate = audioContext.sampleRate
+
   const deepgramParams = new URLSearchParams({
     model: 'nova-3',
     language: 'pt-BR',
@@ -252,20 +402,20 @@ async function startAudioCapture(deepgramKey) {
     interim_results: 'true',
     utterance_end_ms: '1000',
     vad_events: 'true',
-    ...(hasMic ? { multichannel: 'true' } : { diarize: 'true' }),
+    ...(numChannels === 2 ? { multichannel: 'true' } : { diarize: 'true' }),
   })
 
   deepgramWs = new WebSocket(`${DEEPGRAM_WS_URL}?${deepgramParams}`, ['token', deepgramKey])
 
   let chunkCount = 0
   let diagCount = 0
-  const DIAG_EVERY = Math.floor(10 * sampleRate / 4096) // Log audio levels every ~10s
+  const DIAG_EVERY = Math.floor(10 * sampleRate / 8192) // Log audio levels every ~10s
 
   deepgramWs.onopen = () => {
-    console.log(`[Recorder] Deepgram connected! Streaming raw PCM: linear16, ${sampleRate}Hz, ${numChannels}ch${hasMic ? ', multichannel' : ', diarize'}`)
+    console.log(`[Recorder] Deepgram connected! Streaming raw PCM: linear16, ${sampleRate}Hz, ${numChannels}ch${numChannels === 2 ? ', multichannel' : ', diarize'}${usingBlackHole ? ' (BlackHole)' : ''}`)
 
     // Wire ScriptProcessor output to Deepgram WebSocket
-    scriptProcessor.onaudioprocess = (event) => {
+    processorNode.onaudioprocess = (event) => {
       if (!deepgramWs || deepgramWs.readyState !== WebSocket.OPEN) return
 
       const inputBuffer = event.inputBuffer
@@ -286,7 +436,7 @@ async function startAudioCapture(deepgramKey) {
         console.log(`[Recorder] Audio chunk #${chunkCount}, size: ${pcm.buffer.byteLength} bytes`)
       }
 
-      // Diagnostic: log audio levels per channel every ~10s
+      // Diagnostic: log audio levels every ~10s
       diagCount++
       if (diagCount % DIAG_EVERY === 0) {
         const levels = []
@@ -296,11 +446,17 @@ async function startAudioCapture(deepgramKey) {
           for (let i = 0; i < data.length; i++) sum += data[i] * data[i]
           levels.push(Math.sqrt(sum / data.length).toFixed(4))
         }
-        console.log(`[Recorder] Audio levels — ${numCh > 1 ? `System(L): ${levels[0]}, Mic(R): ${levels[1]}` : `Mono: ${levels[0]}`}`)
+        console.log(`[Recorder] Audio levels — ${numCh > 1 ? `System(L): ${levels[0]}, Mic(R): ${levels[1]}` : `Level: ${levels[0]}`}`)
+      }
+
+      // Track system audio energy for meeting-end detection (stereo + auto mode only)
+      if (numCh >= 2 && isAutoMode) {
+        const sysData = inputBuffer.getChannelData(0)
+        let sysSum = 0
+        for (let j = 0; j < sysData.length; j++) sysSum += sysData[j] * sysData[j]
+        trackSystemAudioEnergy(Math.sqrt(sysSum / sysData.length))
       }
     }
-
-    processorNode = scriptProcessor
   }
 
   deepgramWs.onmessage = (event) => {
@@ -314,11 +470,22 @@ async function startAudioCapture(deepgramKey) {
     }
   }
 
+  // Send keepalive every 10s to prevent Deepgram from closing idle connections
+  const keepAliveInterval = setInterval(() => {
+    if (deepgramWs && deepgramWs.readyState === WebSocket.OPEN) {
+      deepgramWs.send(JSON.stringify({ type: 'KeepAlive' }))
+    } else {
+      clearInterval(keepAliveInterval)
+    }
+  }, 10000)
+
   deepgramWs.onerror = (err) => {
     console.error('[Recorder] Deepgram error:', err)
+    clearInterval(keepAliveInterval)
   }
 
   deepgramWs.onclose = (event) => {
+    clearInterval(keepAliveInterval)
     console.log('[Recorder] Deepgram disconnected. Code:', event.code, 'Reason:', event.reason || '(none)')
     // Unexpected close during auto-recording (e.g. no audio timeout) = meeting ended
     if (isRecording && isAutoMode && event.code !== 1000) {
@@ -326,16 +493,22 @@ async function startAudioCapture(deepgramKey) {
       triggerAutoStop()
     }
   }
-
-  console.log('[Recorder] Audio capture started successfully!')
 }
 
 function handleDeepgramResult(data) {
   const alt = data.channel?.alternatives?.[0]
   if (!alt?.transcript) return
 
-  // Track last speech time for silence detection
+  // Track last speech time for meeting-end detection
   lastTranscriptTime = Date.now()
+
+  // Track meaningful transcripts (>= N words) — ambient noise produces short fragments
+  if (data.is_final) {
+    const wc = alt.transcript.trim().split(/\s+/).length
+    if (wc >= MEANINGFUL_WORD_MIN) {
+      lastMeaningfulTranscriptTime = Date.now()
+    }
+  }
 
   // Multichannel: channel 0 = system audio (participants), channel 1 = mic (you)
   // Fallback to diarization speaker number if not multichannel
@@ -387,34 +560,135 @@ function stopAudioCapture() {
   micStream?.getTracks().forEach(t => t.stop())
   systemStream = null
   micStream = null
-}
 
-// ============================================================
-// SILENCE DETECTION (auto-stop when meeting ends)
-// ============================================================
-
-function startSilenceChecker() {
-  lastTranscriptTime = Date.now()
-  if (silenceCheckInterval) clearInterval(silenceCheckInterval)
-  silenceCheckInterval = setInterval(() => {
-    if (!isRecording || !lastTranscriptTime) return
-    const silenceMs = Date.now() - lastTranscriptTime
-    if (silenceMs > SILENCE_TIMEOUT_MS) {
-      console.log(`[Recorder] ${Math.round(silenceMs / 1000)}s of silence — meeting likely ended`)
-      stopSilenceChecker()
-      if (isAutoMode) {
-        triggerAutoStop()
-      }
-    }
-  }, 30_000) // Check every 30s
-}
-
-function stopSilenceChecker() {
-  if (silenceCheckInterval) {
-    clearInterval(silenceCheckInterval)
-    silenceCheckInterval = null
+  // Teardown BlackHole Multi-Output device (restores original audio output)
+  if (usingBlackHole && window.electronAPI?.teardownAudioRouting) {
+    window.electronAPI.teardownAudioRouting().catch(err => {
+      console.warn('[Recorder] BlackHole teardown failed:', err)
+    })
+    usingBlackHole = false
   }
+}
+
+// ============================================================
+// MEETING END DETECTION (multi-signal approach)
+// Replaces simple silence timeout — works reliably in noisy offices
+//
+// Signal 1: System audio channel (ch0/BlackHole) drops to near-zero
+//           → WebRTC voices stopped → meeting ended
+// Signal 2: No meaningful Deepgram transcript (>= 3 words) for 90s
+//           → ambient noise may trigger short fragments, but not real speech
+// Signal 3: No Deepgram transcript at all for 2 min (ultimate fallback)
+// ============================================================
+
+function startMeetingEndDetector() {
+  const now = Date.now()
+  lastTranscriptTime = now
+  lastMeaningfulTranscriptTime = now
+  systemAudioSilentSince = null
+  systemEnergyReadings = []
+
+  if (meetingEndCheckInterval) clearInterval(meetingEndCheckInterval)
+  meetingEndCheckInterval = setInterval(checkMeetingEnd, 10_000) // Every 10s
+  console.log('[MeetEnd] Detector started (system-audio-silence + transcript-gap + absolute-silence)')
+}
+
+function stopMeetingEndDetector() {
+  if (meetingEndCheckInterval) {
+    clearInterval(meetingEndCheckInterval)
+    meetingEndCheckInterval = null
+  }
+  systemEnergyReadings = []
+  systemAudioSilentSince = null
+  lastMeaningfulTranscriptTime = null
   lastTranscriptTime = null
+  meetEndPromptPending = false
+}
+
+/**
+ * Called from onaudioprocess with the RMS energy of system audio channel (ch0).
+ * Tracks a rolling window and updates silence state every ~5s of audio.
+ */
+function trackSystemAudioEnergy(rms) {
+  systemEnergyReadings.push(rms)
+  if (systemEnergyReadings.length > 600) systemEnergyReadings.shift() // Keep ~100s
+
+  // Every ~5s of buffers, compute average and update silence tracking
+  if (systemEnergyReadings.length % ENERGY_WINDOW_SIZE === 0) {
+    const recent = systemEnergyReadings.slice(-ENERGY_WINDOW_SIZE)
+    const avgRms = recent.reduce((a, b) => a + b, 0) / recent.length
+
+    if (avgRms < SYSTEM_AUDIO_SILENT_THRESHOLD) {
+      if (!systemAudioSilentSince) {
+        systemAudioSilentSince = Date.now()
+        console.log(`[MeetEnd] System audio dropped below threshold (avg RMS: ${avgRms.toFixed(5)})`)
+      }
+    } else {
+      if (systemAudioSilentSince) {
+        console.log(`[MeetEnd] System audio active again (avg RMS: ${avgRms.toFixed(5)})`)
+      }
+      systemAudioSilentSince = null
+    }
+  }
+}
+
+let meetEndPromptPending = false // Prevent spamming the prompt
+
+function checkMeetingEnd() {
+  if (!isRecording || !isAutoMode || meetEndPromptPending) return
+  const now = Date.now()
+
+  let shouldAsk = false
+  let reason = ''
+
+  // Signal 1: System audio silent (no WebRTC voices) + no meaningful transcript
+  if (systemAudioSilentSince) {
+    const silentMs = now - systemAudioSilentSince
+    const noTranscriptMs = lastMeaningfulTranscriptTime ? (now - lastMeaningfulTranscriptTime) : Infinity
+    if (silentMs > SYSTEM_AUDIO_SILENT_TIMEOUT && noTranscriptMs > 10_000) {
+      reason = `sysAudioSilent=${Math.round(silentMs / 1000)}s + noTx=${Math.round(noTranscriptMs / 1000)}s`
+      shouldAsk = true
+    }
+  }
+
+  // Signal 2: No meaningful transcription for extended period
+  if (!shouldAsk && lastMeaningfulTranscriptTime) {
+    const gapMs = now - lastMeaningfulTranscriptTime
+    if (gapMs > NO_MEANINGFUL_TRANSCRIPT_TIMEOUT) {
+      reason = `noMeaningfulTx=${Math.round(gapMs / 1000)}s`
+      shouldAsk = true
+    }
+  }
+
+  // Signal 3: Absolute silence — no Deepgram transcript at all
+  if (!shouldAsk && lastTranscriptTime) {
+    const absMs = now - lastTranscriptTime
+    if (absMs > ABSOLUTE_SILENCE_TIMEOUT) {
+      reason = `absoluteSilence=${Math.round(absMs / 1000)}s`
+      shouldAsk = true
+    }
+  }
+
+  if (shouldAsk) {
+    console.log(`[MeetEnd] Heuristic triggered (${reason}) → asking user via bubble`)
+    meetEndPromptPending = true
+    // Pause detector while prompt is showing
+    if (meetingEndCheckInterval) {
+      clearInterval(meetingEndCheckInterval)
+      meetingEndCheckInterval = null
+    }
+    // Ask user via bubble (IPC: recorder → main → bubble)
+    if (window.electronAPI?.notifyMeetingMaybeEnded) {
+      window.electronAPI.notifyMeetingMaybeEnded()
+    }
+    return
+  }
+
+  // Debug: log current state every check
+  const sysMs = systemAudioSilentSince ? Math.round((now - systemAudioSilentSince) / 1000) : 0
+  const txMs = lastMeaningfulTranscriptTime ? Math.round((now - lastMeaningfulTranscriptTime) / 1000) : 0
+  const absMs = lastTranscriptTime ? Math.round((now - lastTranscriptTime) / 1000) : 0
+  console.log(`[MeetEnd] Check: sysAudioSilent=${sysMs}s, noMeaningfulTx=${txMs}s, noAnyTx=${absMs}s`)
 }
 
 // ============================================================
@@ -742,7 +1016,7 @@ els.btnStart.addEventListener('click', async () => {
     els.statWords.textContent = '0'
     showScreen('screen-recording')
     startTimer()
-    startSilenceChecker()
+    startMeetingEndDetector()
 
     // Start live session for real-time viewing on web
     startLiveSession()
@@ -763,7 +1037,7 @@ els.btnStop.addEventListener('click', async () => {
   els.btnStop.querySelector('.btn-loading').style.display = ''
 
   isRecording = false
-  stopSilenceChecker()
+  stopMeetingEndDetector()
   stopTimer()
   stopAudioCapture()
   await stopLiveSession('evaluating')
@@ -849,7 +1123,7 @@ async function triggerAutoStart() {
     els.statWords.textContent = '0'
     showScreen('screen-recording')
     startTimer()
-    startSilenceChecker()
+    startMeetingEndDetector()
 
     // Start live session for real-time viewing on web
     startLiveSession()
@@ -866,7 +1140,7 @@ async function triggerAutoStop() {
   isRecording = false
   console.log('[Recorder] Auto-stopping recording (Meet closed)')
 
-  stopSilenceChecker()
+  stopMeetingEndDetector()
   stopTimer()
   stopAudioCapture()
   await stopLiveSession('evaluating')
@@ -881,18 +1155,12 @@ async function triggerAutoStop() {
     cleanupLiveSession()
     showResults(evaluation)
 
-    // Notify main process that recording is done
+    // Notify main process that recording is done (triggers notification + auto-close)
     if (window.electronAPI.notifyRecordingFinished) {
       window.electronAPI.notifyRecordingFinished()
     }
 
-    // In auto mode, close window after showing results briefly
-    if (isAutoMode) {
-      isAutoMode = false
-      setTimeout(() => {
-        window.close()
-      }, 5000) // Show results for 5 seconds then close
-    }
+    isAutoMode = false
   } catch (err) {
     console.error('[Recorder] Auto-stop evaluation error:', err)
     isAutoMode = false
@@ -906,6 +1174,18 @@ async function triggerAutoStop() {
 
     showError(err.message)
   }
+}
+
+// Listen for meeting detection reset (user said "Nao, continua")
+if (window.electronAPI.onResetMeetingDetection) {
+  window.electronAPI.onResetMeetingDetection(() => {
+    console.log('[MeetEnd] User dismissed prompt — resetting detection timers')
+    meetEndPromptPending = false
+    // Restart detector with fresh timers
+    if (isRecording && isAutoMode) {
+      startMeetingEndDetector()
+    }
+  })
 }
 
 // Listen for auto-start signal from main process
