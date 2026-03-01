@@ -206,14 +206,42 @@ body {
   100% { background-position: 200% 0; }
 }
 
-/* --- Header (minimal — close button only) --- */
+/* --- Header — sparkle indicator + title + close --- */
 .chat-header {
-  height: 36px;
-  padding: 0 8px;
+  height: 42px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 8px;
   flex-shrink: 0;
+}
+.header-sparkle {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+.header-sparkle.thinking {
+  animation: heartbeat 1.2s ease-in-out infinite;
+}
+@keyframes heartbeat {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(1.18); }
+  30%  { transform: scale(1); }
+  45%  { transform: scale(1.12); }
+  60%  { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+.header-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: -0.01em;
 }
 .btn-close {
   margin-left: auto;
@@ -231,6 +259,56 @@ body {
   justify-content: center;
 }
 .btn-close:hover { color: #374151; background: rgba(0, 0, 0, 0.05); }
+
+/* Call button in header */
+.btn-call {
+  padding: 5px;
+  border-radius: 50%;
+  color: #9ca3af;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-call:hover { color: #374151; background: rgba(0, 0, 0, 0.05); }
+.btn-call.active {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+/* Mic button */
+.btn-mic {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: none;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s;
+  flex-shrink: 0;
+}
+.btn-mic:hover {
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.06);
+}
+.btn-mic.recording {
+  color: white;
+  background: #ef4444;
+  border-color: #ef4444;
+  animation: mic-pulse 1.5s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50%      { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
 
 /* --- Messages --- */
 .chat-messages {
@@ -653,3 +731,139 @@ body {
 .bubble.edge-bar:hover .siri-orb {
   filter: brightness(1.1);
 }
+
+/* ============================================================
+   CALL MODE — Phone Call Experience
+   ============================================================ */
+.call-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #0d1b16 0%, #091411 50%, #060e0b 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  border-radius: 20px;
+  animation: call-fade-in 0.4s ease-out;
+}
+@keyframes call-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.call-name {
+  color: #f0fdf4;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+.call-status {
+  color: rgba(167, 243, 208, 0.6);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 48px;
+  transition: color 0.3s;
+}
+
+/* Orb container */
+.call-orb-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 64px;
+}
+
+/* Glowing ring around orb */
+.call-orb-ring {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 2px solid rgba(16, 185, 129, 0.12);
+  z-index: 1;
+  transition: border-color 0.3s;
+}
+.call-orb-ring.call-listening {
+  animation: call-ring-pulse 2.5s ease-in-out infinite;
+}
+.call-orb-ring.call-thinking {
+  border-color: rgba(16, 185, 129, 0.2);
+  animation: call-ring-think 1.2s ease-in-out infinite;
+}
+.call-orb-ring.call-speaking {
+  border-color: rgba(16, 185, 129, 0.3);
+  animation: call-ring-speak 1s ease-in-out infinite;
+}
+
+@keyframes call-ring-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50%      { transform: scale(1.08); opacity: 0.8; }
+}
+@keyframes call-ring-think {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50%      { transform: scale(1.05); opacity: 1; }
+}
+@keyframes call-ring-speak {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50%      { transform: scale(1.12); opacity: 1; }
+}
+
+/* Main orb */
+.call-orb {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 38%, #6ee7b7, #34d399, #10b981, #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 60px rgba(16, 185, 129, 0.25);
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+  z-index: 2;
+}
+.call-orb.call-listening {
+  animation: call-listen-pulse 2.5s ease-in-out infinite;
+}
+.call-orb.call-thinking {
+  animation: call-think-pulse 1.2s ease-in-out infinite;
+}
+/* Speaking: no CSS animation — JS controls transform via audio volume */
+
+@keyframes call-listen-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(16, 185, 129, 0.2); }
+  50%      { transform: scale(1.05); box-shadow: 0 0 70px rgba(16, 185, 129, 0.35); }
+}
+@keyframes call-think-pulse {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(1.08); }
+  30%  { transform: scale(1); }
+  45%  { transform: scale(1.05); }
+  60%  { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+
+/* Hang-up button */
+.btn-hangup {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 4px 24px rgba(239, 68, 68, 0.3);
+}
+.btn-hangup:hover {
+  background: #dc2626;
+  transform: scale(1.08);
+  box-shadow: 0 6px 32px rgba(239, 68, 68, 0.4);
+}
+.btn-hangup:active { transform: scale(0.95); }

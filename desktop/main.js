@@ -11,6 +11,9 @@ const APP_ICON = nativeImage.createFromPath(ICON_PATH)
 // Force Windows taskbar to use our icon instead of default Electron icon
 app.setAppUserModelId('com.ramppy.app')
 
+// Allow audio autoplay without user gesture (needed for TTS in bubble window)
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+
 let mainWindow = null
 let bubbleWindow = null
 let authTokenInterval = null
@@ -341,6 +344,235 @@ ipcMain.handle('get-sources', async () => {
   } catch (err) {
     console.error('getSources error:', err)
     return []
+  }
+})
+
+// ============================================================
+// COMPUTER SEARCH (find files, folders, installed programs)
+// ============================================================
+
+ipcMain.handle('search-computer', async (_event, query) => {
+  console.log('[Search Computer]', JSON.stringify(query))
+  if (!query || !query.type) return { results: [] }
+
+  const { execFile } = require('child_process')
+  const fs = require('fs')
+  const os = require('os')
+
+  // Run PowerShell via temp script file (avoids all escaping issues)
+  const runPS = (script) => new Promise((resolve) => {
+    const tmpFile = path.join(os.tmpdir(), `ramppy_search_${Date.now()}.ps1`)
+    fs.writeFileSync(tmpFile, script, 'utf8')
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpFile], { timeout: 15000, windowsHide: true }, (err, stdout) => {
+      try { fs.unlinkSync(tmpFile) } catch (_) {}
+      if (err) { console.error('[Search] PS error:', err.message); resolve('') }
+      else { console.log('[Search] PS output:', stdout.substring(0, 200)); resolve(stdout.trim()) }
+    })
+  })
+
+  try {
+    const searchName = (query.name || '').trim()
+    if (!searchName) return { results: [] }
+    // Sanitize: only allow safe characters
+    const safeName = searchName.replace(/['"`;$&|<>]/g, '')
+
+    switch (query.type) {
+      case 'installed_apps': {
+        const script = `
+$results = @()
+$regPaths = @(
+  'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+  'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
+)
+foreach ($rp in $regPaths) {
+  Get-ItemProperty $rp -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like '*${safeName}*' } | ForEach-Object {
+    $loc = $_.InstallLocation
+    if (-not $loc) { $loc = Split-Path $_.DisplayIcon -Parent -ErrorAction SilentlyContinue }
+    $results += @{ Name = $_.DisplayName; Path = $loc }
+  }
+}
+if ($results.Count -gt 0) {
+  $results | Select-Object -First 5 | ConvertTo-Json -Compress
+} else {
+  Write-Output '[]'
+}
+`
+        const output = await runPS(script)
+        if (!output || output === '[]') return { results: [] }
+        try {
+          let parsed = JSON.parse(output)
+          if (!Array.isArray(parsed)) parsed = [parsed]
+          return { results: parsed.filter(r => r.Name).map(r => ({ name: r.Name, path: r.Path || '' })) }
+        } catch { return { results: [] } }
+      }
+
+      case 'find_folder': {
+        const script = `
+$found = @()
+$drives = (Get-PSDrive -PSProvider FileSystem).Root
+foreach ($d in $drives) {
+  Get-ChildItem -Path $d -Directory -Recurse -Depth 4 -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '*${safeName}*' } |
+    Select-Object -First 3 |
+    ForEach-Object { $found += $_.FullName }
+  if ($found.Count -ge 5) { break }
+}
+if ($found.Count -gt 0) {
+  $found | Select-Object -First 5 | ConvertTo-Json -Compress
+} else {
+  Write-Output '[]'
+}
+`
+        const output = await runPS(script)
+        if (!output || output === '[]') return { results: [] }
+        try {
+          let parsed = JSON.parse(output)
+          if (!Array.isArray(parsed)) parsed = [parsed]
+          return { results: parsed.map(p => ({ path: typeof p === 'string' ? p : p.toString() })) }
+        } catch { return { results: [{ path: output }] } }
+      }
+
+      case 'find_file': {
+        const userHome = os.homedir()
+        const script = `
+$found = @()
+Get-ChildItem -Path '${userHome.replace(/'/g, "''")}' -Recurse -Depth 5 -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -like '*${safeName}*' -and -not $_.PSIsContainer } |
+  Select-Object -First 5 |
+  ForEach-Object { $found += $_.FullName }
+if ($found.Count -gt 0) {
+  $found | ConvertTo-Json -Compress
+} else {
+  Write-Output '[]'
+}
+`
+        const output = await runPS(script)
+        if (!output || output === '[]') return { results: [] }
+        try {
+          let parsed = JSON.parse(output)
+          if (!Array.isArray(parsed)) parsed = [parsed]
+          return { results: parsed.map(p => ({ path: typeof p === 'string' ? p : p.toString() })) }
+        } catch { return { results: [] } }
+      }
+
+      default:
+        return { results: [] }
+    }
+  } catch (err) {
+    console.error('[Search Computer] Error:', err)
+    return { results: [], error: err.message }
+  }
+})
+
+// ============================================================
+// DESKTOP ACTIONS (AI-triggered app/URL/folder opening)
+// ============================================================
+
+const APP_REGISTRY = {
+  chrome:       'start chrome',
+  'google chrome': 'start chrome',
+  firefox:      'start firefox',
+  edge:         'start msedge',
+  'microsoft edge': 'start msedge',
+  notepad:      'notepad.exe',
+  'bloco de notas': 'notepad.exe',
+  calculator:   'calc.exe',
+  calc:         'calc.exe',
+  calculadora:  'calc.exe',
+  explorer:     'explorer.exe',
+  'file explorer': 'explorer.exe',
+  'explorador de arquivos': 'explorer.exe',
+  vscode:       'code',
+  'vs code':    'code',
+  code:         'code',
+  terminal:     'start wt',
+  cmd:          'start cmd',
+  powershell:   'start powershell',
+  paint:        'mspaint.exe',
+  mspaint:      'mspaint.exe',
+  word:         'start winword',
+  'microsoft word': 'start winword',
+  excel:        'start excel',
+  'microsoft excel': 'start excel',
+  powerpoint:   'start powerpnt',
+  ppt:          'start powerpnt',
+  outlook:      'start outlook',
+  email:        'start outlook',
+  spotify:      'start spotify:',
+  whatsapp:     'start whatsapp:',
+}
+
+ipcMain.handle('execute-desktop-action', async (_event, action) => {
+  console.log('[Desktop Action]', JSON.stringify(action))
+
+  if (!action || !action.type || !action.target) {
+    return { success: false, error: 'Invalid action format' }
+  }
+
+  try {
+    switch (action.type) {
+      case 'open_url': {
+        try {
+          const url = new URL(action.target)
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            return { success: false, error: 'Only http/https URLs allowed' }
+          }
+        } catch {
+          return { success: false, error: 'Invalid URL' }
+        }
+        await shell.openExternal(action.target)
+        return { success: true }
+      }
+
+      case 'open_path': {
+        const fs = require('fs')
+        if (!fs.existsSync(action.target)) {
+          return { success: false, error: 'Path does not exist' }
+        }
+        const result = await shell.openPath(action.target)
+        return result ? { success: false, error: result } : { success: true }
+      }
+
+      case 'open_app': {
+        const appKey = action.target.toLowerCase().trim()
+        const cmd = APP_REGISTRY[appKey]
+
+        if (!cmd) {
+          return { success: false, error: `App "${action.target}" not in whitelist` }
+        }
+
+        // Protocol-based apps (spotify:, whatsapp:, etc.)
+        if (cmd.startsWith('start ') && cmd.endsWith(':')) {
+          const protocol = cmd.replace('start ', '')
+          console.log('[Desktop Action] Opening protocol:', protocol)
+          await shell.openExternal(protocol)
+          return { success: true }
+        }
+
+        // Launch app via cmd /c (safe: cmd comes from whitelist, not user input)
+        console.log('[Desktop Action] Running command:', cmd)
+        const { exec } = require('child_process')
+        return new Promise((resolve) => {
+          exec(cmd, { timeout: 5000, windowsHide: true }, (err) => {
+            if (err) {
+              console.error('[Desktop Action] exec error:', err.message)
+              // 'start' returns error code 1 sometimes even when app opens fine
+              resolve({ success: true })
+            } else {
+              console.log('[Desktop Action] exec success')
+              resolve({ success: true })
+            }
+          })
+        })
+      }
+
+      default:
+        return { success: false, error: `Unknown action type: ${action.type}` }
+    }
+  } catch (err) {
+    console.error('[Desktop Action] Error:', err)
+    return { success: false, error: err.message || 'Unknown error' }
   }
 })
 

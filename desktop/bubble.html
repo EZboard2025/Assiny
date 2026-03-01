@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self'; media-src 'self' blob:;">
   <title>Nicole — Assistente Ramppy</title>
   <link rel="stylesheet" href="bubble.css">
 </head>
@@ -49,8 +49,12 @@
     <!-- Aurora decorative line at top -->
     <div class="aurora-line"></div>
 
-    <!-- Close button only -->
+    <!-- Header with sparkle indicator + close button -->
     <div class="chat-header">
+      <div id="header-sparkle" class="header-sparkle">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#aurora-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+      </div>
+      <span class="header-title">Nicole</span>
       <button id="btn-close" class="btn-close" title="Fechar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -69,6 +73,9 @@
         <!-- Input inline (welcome state) -->
         <div class="welcome-input-wrap">
           <input type="text" id="welcome-input" class="welcome-input" placeholder="Me pergunte qualquer coisa..." autocomplete="off">
+          <button id="btn-mic-welcome" class="btn-mic" title="Falar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
           <button id="btn-send-welcome" class="btn-send-small" title="Enviar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
@@ -101,11 +108,29 @@
       <div class="input-wrap">
         <input type="text" id="chat-input" class="chat-input" placeholder="Fale com a Nicole..." autocomplete="off">
         <div class="input-actions">
+          <button id="btn-mic" class="btn-mic" title="Falar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
           <button id="btn-send" class="btn-send-small" title="Enviar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Call mode overlay (phone call experience) -->
+    <div id="call-overlay" class="call-overlay" style="display:none;">
+      <div class="call-name">Nicole</div>
+      <div class="call-status" id="call-status">Conectando...</div>
+      <div class="call-orb-wrap">
+        <div class="call-orb-ring" id="call-orb-ring"></div>
+        <div class="call-orb" id="call-orb">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+        </div>
+      </div>
+      <button id="btn-hangup" class="btn-hangup" title="Encerrar chamada">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 011.72 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.11 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
     </div>
   </div>
 

@@ -58,6 +58,29 @@ ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Ativa o bot na reunião..." → get_scheduled_bots (para achar o scheduled_bot_id) + toggle_meeting_bot
 - "Estou livre amanhã?" → get_calendar_freebusy
 - Perguntas gerais sobre empresa → get_company_info
+- "Abre o Chrome" / "Abre a calculadora" → execute_desktop_action(open_app, "chrome") ou (open_app, "calculator")
+- "Abre google.com" → execute_desktop_action(open_url, "https://google.com")
+- "Abre a pasta do Fortnite" → search_computer(installed_apps, "fortnite") → pega InstallLocation → execute_desktop_action(open_path, caminho_encontrado)
+- "Onde está minha planilha?" → search_computer(find_file, "planilha") → retorna caminhos → execute_desktop_action(open_path, caminho_encontrado)
+
+AÇÕES NO DESKTOP:
+- Quando o vendedor pedir para abrir aplicativos, URLs ou pastas, use execute_desktop_action
+- Sempre responda de forma natural e confirme a ação: "Claro! Abrindo o Chrome para você..."
+- Se a ação falhar, informe gentilmente e sugira alternativas
+- Apps suportados: chrome, firefox, edge, notepad, calculadora (calculator/calc), vscode (code), terminal, cmd, powershell, explorer, paint, word, excel, powerpoint, outlook, teams, spotify, slack, whatsapp
+- Para URLs: use open_url com a URL completa (inclua https://)
+- Para pastas: use open_path com o caminho completo
+- NUNCA execute ações perigosas — apenas abrir apps/URLs/pastas
+- NUNCA INVENTE URLs ou caminhos que você não tem certeza que existem
+- Site institucional da Ramppy: https://ramppy.com (NÃO ramppy.site — esse é a plataforma de vendas)
+- Plataforma Ramppy (app de vendas): https://ramppy.site
+- Para qualquer sub-página que você NÃO tem certeza da URL exata, pesquise no Google: execute_desktop_action(open_url, "https://www.google.com/search?q=ramppy+founders")
+
+BUSCA NO COMPUTADOR:
+- Quando o vendedor pedir pra encontrar algo no PC (pastas, programas, arquivos), PRIMEIRO use search_computer para achar o caminho real
+- search_computer retorna os caminhos encontrados — depois use execute_desktop_action(open_path, caminho) para abrir
+- NUNCA chute caminhos como "C:\\Jogos\\Epic Games\\Fortnite" — SEMPRE busque primeiro com search_computer
+- Se a busca não retornar resultados, informe o vendedor e pergunte se sabe o caminho
 
 IMPORTANTE: Chame 2-4 ferramentas por vez para cruzar dados e dar respostas completas. Nunca se limite a apenas 1 ferramenta.
 
@@ -467,6 +490,50 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
           send_email: { type: 'boolean', description: 'Enviar email com os dados (padrão: true). Requer Google Calendar conectado.' }
         },
         required: ['evaluation_id', 'teammate_user_ids']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'execute_desktop_action',
+      description: 'Executa uma ação no computador do vendedor (abrir aplicativo, URL ou pasta). Só funciona no app desktop Ramppy.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action_type: {
+            type: 'string',
+            enum: ['open_app', 'open_url', 'open_path'],
+            description: 'Tipo: open_app (abrir aplicativo), open_url (abrir URL no navegador), open_path (abrir arquivo ou pasta)'
+          },
+          target: {
+            type: 'string',
+            description: 'Para open_app: nome do app (chrome, firefox, notepad, calculator, vscode, terminal, word, excel, etc). Para open_url: URL completa. Para open_path: caminho do arquivo/pasta.'
+          }
+        },
+        required: ['action_type', 'target']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_computer',
+      description: 'Busca no computador do vendedor: programas instalados, pastas ou arquivos. Use ANTES de execute_desktop_action quando não souber o caminho exato. A busca retorna caminhos reais encontrados no PC. Só funciona no app desktop.',
+      parameters: {
+        type: 'object',
+        properties: {
+          search_type: {
+            type: 'string',
+            enum: ['installed_apps', 'find_folder', 'find_file'],
+            description: 'installed_apps: busca no registro do Windows por programas instalados. find_folder: busca pastas por nome. find_file: busca arquivos por nome.'
+          },
+          name: {
+            type: 'string',
+            description: 'Nome do programa, pasta ou arquivo para buscar (ex: "fortnite", "planilha vendas", "proposta.pdf")'
+          }
+        },
+        required: ['search_type', 'name']
       }
     }
   }
@@ -1795,6 +1862,50 @@ async function executeFunction(
         return { sellers_compared: comparison }
       }
 
+      case 'execute_desktop_action': {
+        const { action_type, target } = params
+        const validTypes = ['open_app', 'open_url', 'open_path']
+        if (!validTypes.includes(action_type)) {
+          return { success: false, error: 'Tipo de ação inválido' }
+        }
+        if (!target || typeof target !== 'string' || target.trim().length === 0) {
+          return { success: false, error: 'Alvo da ação não especificado' }
+        }
+        if (action_type === 'open_url') {
+          try {
+            const url = new URL(target)
+            if (!['http:', 'https:'].includes(url.protocol)) {
+              return { success: false, error: 'Apenas URLs http/https são permitidas' }
+            }
+          } catch {
+            return { success: false, error: 'URL inválida' }
+          }
+        }
+        return {
+          success: true,
+          action_type,
+          target: action_type === 'open_path' ? target.trim() : target.trim().toLowerCase(),
+          message: `Ação ${action_type} para "${target}" será executada no app desktop.`
+        }
+      }
+
+      case 'search_computer': {
+        const { search_type, name: searchName } = params
+        const validSearchTypes = ['installed_apps', 'find_folder', 'find_file']
+        if (!validSearchTypes.includes(search_type)) {
+          return { success: false, error: 'Tipo de busca inválido' }
+        }
+        if (!searchName || typeof searchName !== 'string') {
+          return { success: false, error: 'Nome para busca não especificado' }
+        }
+        return {
+          success: true,
+          search_type,
+          name: searchName.trim(),
+          message: `Busca "${searchName}" será executada no app desktop. Os resultados serão retornados automaticamente.`
+        }
+      }
+
       default:
         return { error: `Função desconhecida: ${name}` }
     }
@@ -1940,6 +2051,8 @@ export async function POST(req: NextRequest) {
 
     // Tool calling loop (max 5 rounds to prevent infinite loops)
     const toolsUsed: string[] = []
+    const desktopActions: Array<{ type: string; target: string }> = []
+    const searchActions: Array<{ search_type: string; name: string }> = []
     const MAX_ROUNDS = 5
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -1959,15 +2072,34 @@ export async function POST(req: NextRequest) {
           response: choice.message.content || 'Desculpe, não consegui processar sua pergunta.',
           toolsUsed,
           isManager,
+          ...(desktopActions.length > 0 ? { desktopActions } : {}),
+          ...(searchActions.length > 0 ? { searchActions } : {}),
         })
       }
 
       // Execute tool calls in parallel
       const toolResults = await Promise.all(
         choice.message.tool_calls.map(async (tc) => {
-          const tcFn = tc as { function: { name: string }; id: string }
+          const tcFn = tc as { function: { name: string; arguments: string }; id: string }
           toolsUsed.push(tcFn.function.name)
           const result = await executeFunction(tc, user.id, companyId)
+
+          // Collect desktop actions for client-side execution
+          if (tcFn.function.name === 'execute_desktop_action' && result && (result as Record<string, unknown>).success) {
+            desktopActions.push({
+              type: (result as Record<string, unknown>).action_type as string,
+              target: (result as Record<string, unknown>).target as string,
+            })
+          }
+
+          // Collect search actions for client-side execution
+          if (tcFn.function.name === 'search_computer' && result && (result as Record<string, unknown>).success) {
+            searchActions.push({
+              search_type: (result as Record<string, unknown>).search_type as string,
+              name: (result as Record<string, unknown>).name as string,
+            })
+          }
+
           const resultStr = JSON.stringify(result)
           return {
             role: 'tool' as const,
@@ -1994,6 +2126,7 @@ export async function POST(req: NextRequest) {
       response: finalResponse.choices[0].message.content || 'Desculpe, ocorreu um erro.',
       toolsUsed,
       isManager,
+      ...(desktopActions.length > 0 ? { desktopActions } : {}),
     })
 
   } catch (error) {

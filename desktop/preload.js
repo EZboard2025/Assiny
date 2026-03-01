@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getBubblePos: () => ipcRenderer.invoke('get-bubble-pos'),
   snapBubble: (x, y, duration) => ipcRenderer.send('snap-bubble', x, y, duration),
   getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
+  executeDesktopAction: (action) => ipcRenderer.invoke('execute-desktop-action', action),
+  searchComputer: (query) => ipcRenderer.invoke('search-computer', query),
   onAuthToken: (callback) => ipcRenderer.on('auth-token', (_event, data) => callback(data)),
 })

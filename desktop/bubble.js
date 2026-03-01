@@ -5,6 +5,8 @@
 
 const API_URL = 'http://localhost:3000/api/agent/chat'
 const SUGGESTIONS_URL = 'http://localhost:3000/api/agent/suggestions'
+const TRANSCRIBE_URL = 'http://localhost:3000/api/roleplay/transcribe'
+const TTS_URL = 'http://localhost:3000/api/agent/tts'
 
 // --- State ---
 let accessToken = null
@@ -14,6 +16,19 @@ let conversationHistory = []
 let isExpanded = false
 let isSending = false
 let hasMessages = false
+
+// --- Voice State ---
+let isRecording = false
+let mediaRecorder = null
+let audioChunks = []
+let currentAudio = null  // currently playing TTS audio
+
+// --- Call Mode State ---
+let isInCall = false
+let callAudioContext = null
+let callAnalyser = null
+let callStream = null
+let speechDetected = false
 
 // --- DOM ---
 const bubble = document.getElementById('bubble')
@@ -29,6 +44,15 @@ const btnSend = document.getElementById('btn-send')
 const btnClose = document.getElementById('btn-close')
 const chatPills = document.getElementById('chat-pills')
 const chatInputBar = document.getElementById('chat-input-bar')
+const headerSparkle = document.getElementById('header-sparkle')
+const btnCall = document.getElementById('btn-call')
+const btnHangup = document.getElementById('btn-hangup')
+const callOverlay = document.getElementById('call-overlay')
+const callOrb = document.getElementById('call-orb')
+const callOrbRing = document.getElementById('call-orb-ring')
+const callStatusEl = document.getElementById('call-status')
+const btnMic = document.getElementById('btn-mic')
+const btnMicWelcome = document.getElementById('btn-mic-welcome')
 
 // --- Auth (received from main window via IPC) ---
 function ensureAuth() {
@@ -169,6 +193,9 @@ async function collapse() {
   isExpanded = false
   removeBarState()
   suggestionsLoaded = false
+
+  // End call if active
+  if (isInCall) endCall()
 
   // Hide window → resize back to bubble → show (prevents dark flash)
   await window.electronAPI.setBubbleOpacity(0)
@@ -551,15 +578,112 @@ function showTyping() {
   wrap.innerHTML = `${AVATAR_HTML}<div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`
   chatMessages.appendChild(wrap)
   chatMessages.scrollTop = chatMessages.scrollHeight
+  // Heartbeat on sparkle while AI thinks
+  if (headerSparkle) headerSparkle.classList.add('thinking')
 }
 
 function removeTyping() {
   const el = document.getElementById('typing-indicator')
   if (el) el.remove()
+  // Stop heartbeat (unless in call mode)
+  if (headerSparkle && !isInCall) headerSparkle.classList.remove('thinking')
+}
+
+// --- Instant Desktop Action Detector (fires before AI processes) ---
+const LOCAL_ACTION_MAP = {
+  chrome: 'chrome', 'google chrome': 'chrome',
+  firefox: 'firefox', 'mozilla firefox': 'firefox',
+  edge: 'edge', 'microsoft edge': 'edge', msedge: 'edge',
+  notepad: 'notepad', 'bloco de notas': 'notepad',
+  calculadora: 'calculator', calculator: 'calculator', calc: 'calculator',
+  explorer: 'explorer', 'explorador de arquivos': 'explorer', 'file explorer': 'explorer',
+  vscode: 'vscode', 'vs code': 'vscode', 'visual studio code': 'vscode', code: 'vscode',
+  terminal: 'terminal', cmd: 'cmd', powershell: 'powershell',
+  paint: 'paint', mspaint: 'paint',
+  word: 'word', 'microsoft word': 'word',
+  excel: 'excel', 'microsoft excel': 'excel',
+  powerpoint: 'powerpoint', ppt: 'powerpoint',
+  outlook: 'outlook', email: 'outlook',
+  spotify: 'spotify', whatsapp: 'whatsapp',
+}
+
+// Known site shortcuts
+const SITE_MAP = {
+  ramppy: 'https://ramppy.com',
+  google: 'https://google.com',
+  gmail: 'https://mail.google.com',
+  youtube: 'https://youtube.com',
+  linkedin: 'https://linkedin.com',
+  instagram: 'https://instagram.com',
+  facebook: 'https://facebook.com',
+  twitter: 'https://x.com',
+  github: 'https://github.com',
+  chatgpt: 'https://chat.openai.com',
+}
+
+function tryInstantAction(text) {
+  if (!window.electronAPI || !window.electronAPI.executeDesktopAction) return false
+  const lower = text.toLowerCase().trim()
+  console.log('[InstantAction] checking:', lower)
+
+  // Broad verb patterns for opening/navigating
+  const verbs = 'abre|abrir|abra|open|entra|entrar|vai|ir|navega|navegar|acessa|acessar|visita|visitar|me leva|leva-me|vai pra|vai pro|vai para|entra no|entra na|entra em|abre o|abre a'
+  const match = lower.match(new RegExp(`(?:${verbs})\\s+(.+?)[.!?]*$`))
+
+  if (!match) {
+    console.log('[InstantAction] no match for pattern')
+    return false
+  }
+
+  // Clean target: remove articles and prepositions at the start
+  let target = match[1].trim().replace(/^(?:o|a|os|as|no|na|nos|nas|do|da|dos|das|de|em|pro|pra|para|ao|à)\s+/g, '').trim()
+  console.log('[InstantAction] target:', target)
+
+  // Check if target mentions a known site
+  for (const [name, url] of Object.entries(SITE_MAP)) {
+    if (target.includes(name)) {
+      console.log('[InstantAction] known site:', name, '→', url)
+      window.electronAPI.executeDesktopAction({ type: 'open_url', target: url }).then(r => console.log('[InstantAction] result:', r))
+      return true
+    }
+  }
+
+  // Check if it's a URL pattern
+  if (target.includes('.com') || target.includes('.org') || target.includes('.net') || target.includes('.io') || target.includes('.site') || target.startsWith('http')) {
+    // Extract the URL part
+    const urlPart = target.match(/(https?:\/\/\S+|\S+\.\w{2,})/)?.[1] || target
+    const url = urlPart.startsWith('http') ? urlPart : `https://${urlPart}`
+    console.log('[InstantAction] opening URL:', url)
+    window.electronAPI.executeDesktopAction({ type: 'open_url', target: url }).then(r => console.log('[InstantAction] result:', r))
+    return true
+  }
+
+  // Check if it's a known app (exact match)
+  const appKey = LOCAL_ACTION_MAP[target]
+  if (appKey) {
+    console.log('[InstantAction] exact match:', target, '→', appKey)
+    window.electronAPI.executeDesktopAction({ type: 'open_app', target: appKey }).then(r => console.log('[InstantAction] result:', r))
+    return true
+  }
+
+  // Try partial match (e.g. "o chrome" → "chrome")
+  for (const [name, key] of Object.entries(LOCAL_ACTION_MAP)) {
+    if (target.includes(name)) {
+      console.log('[InstantAction] partial match:', target, 'contains', name, '→', key)
+      window.electronAPI.executeDesktopAction({ type: 'open_app', target: key }).then(r => console.log('[InstantAction] result:', r))
+      return true
+    }
+  }
+
+  console.log('[InstantAction] no app match for:', target)
+  return false
 }
 
 async function sendMessage(text) {
   if (!text.trim() || isSending) return
+
+  // Fire desktop action instantly (don't wait for AI)
+  tryInstantAction(text)
 
   if (!ensureAuth()) {
     switchToChatMode()
@@ -615,8 +739,77 @@ async function sendMessage(text) {
 
     addAIMessage(reply)
     conversationHistory.push({ role: 'assistant', content: reply })
+
+    // Execute desktop actions if present (only in Electron)
+    if (data.desktopActions && window.electronAPI && window.electronAPI.executeDesktopAction) {
+      for (const action of data.desktopActions) {
+        try {
+          const result = await window.electronAPI.executeDesktopAction(action)
+          if (!result.success) console.warn('[Desktop Action] Failed:', action, result.error)
+        } catch (err) {
+          console.error('[Desktop Action] IPC error:', err)
+        }
+      }
+    }
+
+    // Execute search actions: search locally, then send results back to AI automatically
+    if (data.searchActions && window.electronAPI && window.electronAPI.searchComputer) {
+      const allResults = []
+      for (const search of data.searchActions) {
+        try {
+          console.log('[Search] Executing:', search)
+          const result = await window.electronAPI.searchComputer({ type: search.search_type, name: search.name })
+          console.log('[Search] Results:', result)
+          allResults.push({ query: search, results: result.results || [] })
+        } catch (err) {
+          console.error('[Search] IPC error:', err)
+        }
+      }
+      // Send search results back to AI as a follow-up message
+      if (allResults.length > 0) {
+        const resultsText = allResults.map(r => {
+          const paths = r.results.map(res => res.path || res.name || JSON.stringify(res)).join('\n- ')
+          return `Busca "${r.query.name}" (${r.query.search_type}): ${r.results.length > 0 ? `\n- ${paths}` : 'Nenhum resultado encontrado.'}`
+        }).join('\n\n')
+        // Auto-send results to AI (hidden from user, sent as system context)
+        showTyping()
+        if (headerSparkle) headerSparkle.classList.add('thinking')
+        try {
+          const followUp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({
+              message: `[RESULTADOS DA BUSCA NO COMPUTADOR - use esses caminhos reais para abrir com execute_desktop_action]\n${resultsText}\n\nAgora abra o resultado mais relevante usando execute_desktop_action(open_path, caminho_encontrado). Se não encontrou, informe o vendedor.`,
+              conversationHistory: conversationHistory.slice(-20),
+            }),
+          })
+          removeTyping()
+          if (followUp.ok) {
+            const data2 = await followUp.json()
+            const reply2 = data2.response || ''
+            if (reply2) {
+              addAIMessage(reply2)
+              conversationHistory.push({ role: 'assistant', content: reply2 })
+            }
+            // Execute desktop actions from follow-up
+            if (data2.desktopActions && window.electronAPI.executeDesktopAction) {
+              for (const action of data2.desktopActions) {
+                try { await window.electronAPI.executeDesktopAction(action) } catch (_) {}
+              }
+            }
+          }
+        } catch (err) {
+          removeTyping()
+          console.error('[Search follow-up] Error:', err)
+        }
+        if (headerSparkle) headerSparkle.classList.remove('thinking')
+      }
+    }
+
+    if (headerSparkle) headerSparkle.classList.remove('thinking')
   } catch (err) {
     removeTyping()
+    if (headerSparkle) headerSparkle.classList.remove('thinking')
     addAIMessage(`Erro: ${err.message}`)
   } finally {
     isSending = false
@@ -691,9 +884,426 @@ function formatInline(text) {
     .replace(/`(.+?)`/g, '<code style="background:rgba(245,245,250,0.8);padding:1px 5px;border-radius:4px;font-size:12px;">$1</code>')
 }
 
+// --- Whisper Hallucination Filter ---
+const WHISPER_HALLUCINATIONS = [
+  'legendas pela comunidade amara.org',
+  'legendas pela comunidade amara',
+  'legendas pela comunidade',
+  'obrigado por assistir',
+  'inscreva-se no canal',
+  'não se esqueça de se inscrever',
+  'até a próxima',
+  'continue assistindo',
+  'subtitles by the amara.org community',
+  'thank you for watching',
+  'thanks for watching',
+]
+
+function isWhisperHallucination(text) {
+  if (!text) return true
+  const lower = text.toLowerCase().trim()
+  if (lower.length < 2) return true
+  return WHISPER_HALLUCINATIONS.some(h => lower.includes(h))
+}
+
+// --- Voice: Recording ---
+let recordingStartTime = 0
+const MIN_RECORDING_MS = 500
+
+async function startRecording(micBtn) {
+  if (isRecording || isSending) return
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    audioChunks = []
+    recordingStartTime = Date.now()
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data)
+    }
+
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop())
+      if (micBtn) micBtn.classList.remove('recording')
+      isRecording = false
+
+      // Discard recordings that are too short (prevents Whisper hallucinations)
+      const duration = Date.now() - recordingStartTime
+      if (audioChunks.length === 0 || duration < MIN_RECORDING_MS) return
+
+      const blob = new Blob(audioChunks, { type: 'audio/webm' })
+      await transcribeAndSend(blob)
+    }
+
+    mediaRecorder.start()
+    isRecording = true
+    if (micBtn) micBtn.classList.add('recording')
+  } catch (err) {
+    console.error('Mic access denied:', err)
+    isRecording = false
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop()
+  }
+}
+
+function toggleRecording(micBtn) {
+  if (isRecording) {
+    stopRecording()
+  } else {
+    startRecording(micBtn)
+  }
+}
+
+async function transcribeAndSend(blob) {
+  const formData = new FormData()
+  formData.append('audio', blob, 'voice.webm')
+
+  try {
+    switchToChatMode()
+    showTyping()
+
+    const res = await fetch(TRANSCRIBE_URL, { method: 'POST', body: formData })
+    if (!res.ok) throw new Error('Transcription failed')
+
+    const data = await res.json()
+    const text = data.text?.trim()
+
+    removeTyping()
+
+    if (!text || isWhisperHallucination(text)) {
+      if (headerSparkle) headerSparkle.classList.remove('thinking')
+      return
+    }
+
+    // Send as regular message
+    await sendMessage(text)
+  } catch (err) {
+    removeTyping()
+    if (headerSparkle) headerSparkle.classList.remove('thinking')
+    addAIMessage('Erro ao transcrever áudio. Tente novamente.')
+    console.error('Transcribe error:', err)
+  }
+}
+
+// --- Call Mode: Phone Call Experience ---
+function setCallState(state) {
+  if (callOrb) {
+    callOrb.className = 'call-orb'
+    if (state !== 'idle') callOrb.classList.add('call-' + state)
+    callOrb.style.transform = ''
+    callOrb.style.boxShadow = ''
+  }
+  if (callOrbRing) {
+    callOrbRing.className = 'call-orb-ring'
+    if (state !== 'idle') callOrbRing.classList.add('call-' + state)
+  }
+  if (callStatusEl) {
+    switch (state) {
+      case 'listening': callStatusEl.textContent = 'Ouvindo...'; break
+      case 'thinking': callStatusEl.textContent = 'Pensando...'; break
+      case 'speaking': callStatusEl.textContent = 'Nicole está falando...'; break
+      default: callStatusEl.textContent = ''; break
+    }
+  }
+}
+
+async function startCall() {
+  if (isInCall || isSending) return
+  if (!ensureAuth()) {
+    switchToChatMode()
+    addAIMessage('Faça login na plataforma Ramppy primeiro para usar a chamada de voz.')
+    return
+  }
+
+  isInCall = true
+  if (btnCall) btnCall.classList.add('active')
+  if (callOverlay) callOverlay.style.display = 'flex'
+
+  switchToChatMode()
+  startCallListening()
+}
+
+function endCall() {
+  isInCall = false
+
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.onstop = () => {
+      if (callStream) { callStream.getTracks().forEach(t => t.stop()); callStream = null }
+    }
+    mediaRecorder.stop()
+  }
+  isRecording = false
+
+  if (currentAudio) { currentAudio.pause(); currentAudio = null }
+
+  if (callAudioContext) {
+    callAudioContext.close().catch(() => {})
+    callAudioContext = null
+    callAnalyser = null
+  }
+  if (callStream) { callStream.getTracks().forEach(t => t.stop()); callStream = null }
+
+  setCallState('idle')
+  if (callOverlay) callOverlay.style.display = 'none'
+  if (btnCall) btnCall.classList.remove('active')
+  if (headerSparkle) headerSparkle.classList.remove('thinking')
+}
+
+async function startCallListening() {
+  if (!isInCall) return
+
+  setCallState('listening')
+  speechDetected = false
+
+  try {
+    callStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+    callAudioContext = new AudioContext()
+    callAnalyser = callAudioContext.createAnalyser()
+    callAnalyser.fftSize = 256
+    callAnalyser.smoothingTimeConstant = 0.3
+    const source = callAudioContext.createMediaStreamSource(callStream)
+    source.connect(callAnalyser)
+
+    audioChunks = []
+    recordingStartTime = Date.now()
+    mediaRecorder = new MediaRecorder(callStream, { mimeType: 'audio/webm;codecs=opus' })
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data)
+    }
+
+    mediaRecorder.onstop = async () => {
+      if (!isInCall) return
+
+      if (callStream) { callStream.getTracks().forEach(t => t.stop()); callStream = null }
+      if (callAudioContext) { callAudioContext.close().catch(() => {}); callAudioContext = null; callAnalyser = null }
+      isRecording = false
+
+      const duration = Date.now() - recordingStartTime
+      if (audioChunks.length === 0 || !speechDetected || duration < MIN_RECORDING_MS) {
+        if (isInCall) setTimeout(() => startCallListening(), 300)
+        return
+      }
+
+      const blob = new Blob(audioChunks, { type: 'audio/webm' })
+      setCallState('thinking')
+      if (headerSparkle) headerSparkle.classList.add('thinking')
+
+      await transcribeAndSendCall(blob)
+    }
+
+    mediaRecorder.start()
+    isRecording = true
+    monitorSilence()
+  } catch (err) {
+    console.error('Mic error in call:', err)
+    endCall()
+  }
+}
+
+function monitorSilence() {
+  if (!isInCall || !callAnalyser) return
+
+  let silenceStart = null
+  const SILENCE_THRESHOLD = 18
+  const SPEECH_THRESHOLD = 28
+  const SILENCE_DURATION = 1800
+
+  const dataArray = new Uint8Array(callAnalyser.frequencyBinCount)
+
+  function check() {
+    if (!isInCall || !isRecording || !callAnalyser) return
+
+    callAnalyser.getByteFrequencyData(dataArray)
+    const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+
+    if (avg > SPEECH_THRESHOLD) {
+      speechDetected = true
+      silenceStart = null
+    } else if (speechDetected && avg < SILENCE_THRESHOLD) {
+      if (!silenceStart) silenceStart = Date.now()
+      else if (Date.now() - silenceStart > SILENCE_DURATION) {
+        if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop()
+        return
+      }
+    }
+
+    requestAnimationFrame(check)
+  }
+
+  check()
+}
+
+async function transcribeAndSendCall(blob) {
+  if (!isInCall) return
+
+  const formData = new FormData()
+  formData.append('audio', blob, 'voice.webm')
+
+  try {
+    const res = await fetch(TRANSCRIBE_URL, { method: 'POST', body: formData })
+    if (!res.ok) throw new Error('Transcription failed')
+
+    const data = await res.json()
+    const text = data.text?.trim()
+
+    if (!text || isWhisperHallucination(text)) {
+      if (isInCall) startCallListening()
+      return
+    }
+
+    addUserMessage(text)
+    conversationHistory.push({ role: 'user', content: text })
+
+    // Fire desktop action instantly in call mode too
+    tryInstantAction(text)
+
+    let screenshot = null
+    if (window.electronAPI && window.electronAPI.captureScreenshot) {
+      try { screenshot = await window.electronAPI.captureScreenshot() } catch (_) {}
+    }
+
+    const res2 = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        message: text,
+        conversationHistory: conversationHistory.slice(-20),
+        screenshot,
+      }),
+    })
+
+    if (!res2.ok) {
+      const err = await res2.json().catch(() => ({}))
+      throw new Error(err.error || `Erro ${res2.status}`)
+    }
+
+    const data2 = await res2.json()
+    const reply = data2.response || 'Sem resposta.'
+
+    addAIMessage(reply)
+    conversationHistory.push({ role: 'assistant', content: reply })
+
+    // Execute desktop actions from call mode too
+    if (data2.desktopActions && window.electronAPI && window.electronAPI.executeDesktopAction) {
+      for (const action of data2.desktopActions) {
+        try {
+          await window.electronAPI.executeDesktopAction(action)
+        } catch (err) {
+          console.error('[Desktop Action] IPC error:', err)
+        }
+      }
+    }
+
+    if (headerSparkle) headerSparkle.classList.remove('thinking')
+
+    if (isInCall) {
+      setCallState('speaking')
+      await playCallTTS(reply)
+      if (isInCall) startCallListening()
+    }
+  } catch (err) {
+    console.error('Call flow error:', err)
+    if (isInCall) {
+      if (headerSparkle) headerSparkle.classList.remove('thinking')
+      startCallListening()
+    }
+  }
+}
+
+function playCallTTS(text) {
+  return new Promise(async (resolve) => {
+    if (!isInCall) { resolve(); return }
+
+    try {
+      const res = await fetch(TTS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+
+      if (!res.ok) {
+        console.error('TTS failed:', res.status)
+        resolve()
+        return
+      }
+
+      const audioBlob = await res.blob()
+      const audioUrl = URL.createObjectURL(audioBlob)
+
+      if (currentAudio) { currentAudio.pause(); currentAudio = null }
+
+      currentAudio = new Audio(audioUrl)
+
+      currentAudio.onended = () => {
+        URL.revokeObjectURL(audioUrl)
+        currentAudio = null
+        resolve()
+      }
+      currentAudio.onerror = (e) => {
+        console.error('Audio playback error:', e)
+        URL.revokeObjectURL(audioUrl)
+        currentAudio = null
+        resolve()
+      }
+
+      // Play audio directly — no AudioContext (createMediaElementSource captures output and kills sound)
+      try {
+        currentAudio.volume = 1.0
+        await currentAudio.play()
+        console.log('TTS audio playing, duration:', currentAudio.duration)
+
+        // Simple CSS-based orb pulse while speaking (no Web Audio API needed)
+        function pulseOrb() {
+          if (!currentAudio || currentAudio.paused || currentAudio.ended) {
+            if (callOrb) {
+              callOrb.style.transform = 'scale(1)'
+              callOrb.style.boxShadow = ''
+            }
+            return
+          }
+          // Simulate voice energy with a subtle random pulse
+          const energy = 0.5 + Math.random() * 0.5
+          if (callOrb) {
+            const scale = 1 + energy * 0.12
+            const glow = 30 + energy * 50
+            callOrb.style.transform = `scale(${scale})`
+            callOrb.style.boxShadow = `0 0 ${glow}px rgba(16, 185, 129, ${(0.15 + energy * 0.25).toFixed(2)})`
+          }
+          requestAnimationFrame(pulseOrb)
+        }
+        pulseOrb()
+      } catch (playErr) {
+        console.error('TTS play() failed:', playErr)
+        resolve()
+      }
+    } catch (err) {
+      console.error('TTS error:', err)
+      resolve()
+    }
+  })
+}
+
 // --- Events ---
 btnSend.addEventListener('click', () => sendMessage(chatInput.value))
 btnSendWelcome.addEventListener('click', () => sendMessage(welcomeInput.value))
+
+// Mic buttons
+if (btnMic) btnMic.addEventListener('click', () => toggleRecording(btnMic))
+if (btnMicWelcome) btnMicWelcome.addEventListener('click', () => toggleRecording(btnMicWelcome))
+
+// Call mode
+if (btnCall) btnCall.addEventListener('click', startCall)
+if (btnHangup) btnHangup.addEventListener('click', endCall)
 
 chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(chatInput.value) }
@@ -708,9 +1318,12 @@ document.querySelectorAll('.pill').forEach(btn => {
   btn.addEventListener('click', () => sendMessage(btn.dataset.msg))
 })
 
-// Escape to minimize
+// Escape: end call first, or minimize
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && isExpanded) collapse()
+  if (e.key === 'Escape') {
+    if (isInCall) endCall()
+    else if (isExpanded) collapse()
+  }
 })
 
 // --- Utils ---
