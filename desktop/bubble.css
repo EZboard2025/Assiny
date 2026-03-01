@@ -498,6 +498,173 @@ body {
   padding: 10px 14px;
 }
 
+/* --- Briefing Card --- */
+.briefing-card {
+  flex: 1;
+  min-width: 0;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(5, 150, 105, 0.03));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 14px;
+  padding: 14px;
+  animation: briefing-in 0.4s ease-out;
+}
+
+@keyframes briefing-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.briefing-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.briefing-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #34d399, #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.briefing-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  flex: 1;
+}
+
+.briefing-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.badge-high {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+.badge-medium {
+  background: rgba(234, 179, 8, 0.15);
+  color: #a16207;
+}
+
+.badge-low {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.briefing-contact {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.briefing-contact-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 3px;
+}
+
+.briefing-contact-detail {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.briefing-last-msg {
+  margin-top: 4px;
+  font-style: italic;
+  color: #9ca3af;
+}
+
+.briefing-web-profile {
+  background: rgba(10, 102, 194, 0.05);
+  border: 1px solid rgba(10, 102, 194, 0.12);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.briefing-web-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #0a66c2;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.briefing-web-text {
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.briefing-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.25), transparent);
+  margin: 10px 0;
+}
+
+.briefing-content {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.55;
+}
+
+.briefing-content .text-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #059669;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.briefing-content .bullet-item {
+  padding-left: 2px;
+}
+
+.briefing-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.briefing-linkedin-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0a66c2;
+  background: rgba(10, 102, 194, 0.08);
+  border: 1px solid rgba(10, 102, 194, 0.2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.briefing-linkedin-btn:hover {
+  background: rgba(10, 102, 194, 0.15);
+  transform: translateY(-1px);
+}
+
 /* --- Typing Indicator --- */
 .typing-wrap { display: flex; gap: 10px; align-items: flex-start; animation: message-in 0.25s ease-out; }
 .typing-bubble {

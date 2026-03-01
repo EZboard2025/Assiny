@@ -82,6 +82,19 @@ BUSCA NO COMPUTADOR:
 - NUNCA chute caminhos como "C:\\Jogos\\Epic Games\\Fortnite" — SEMPRE busque primeiro com search_computer
 - Se a busca não retornar resultados, informe o vendedor e pergunte se sabe o caminho
 
+CONTEXTO ENRIQUECIDO PRÉ-REUNIÃO:
+- Quando o vendedor pedir para "preparar reunião", "briefing de", "me prepara pro call com", "quem é o [nome]" ou qualquer variação → use enrich_contact
+- SEMPRE passe o nome. Se souber empresa ou telefone, passe também — quanto mais dados, melhor o match
+- NUNCA gere briefing apenas com nome sem âncora adicional (empresa, cargo ou telefone). Se só tiver o nome, PERGUNTE "De qual empresa?" antes de chamar enrich_contact
+- A busca no LinkedIn/web roda automaticamente em segundo plano no servidor — NÃO use execute_desktop_action para abrir LinkedIn
+- Se confidence_level retornar "low" e não tiver web_profile, avise o vendedor: "Não encontrei informações sobre esse contato. Quer que eu gere o briefing mesmo assim?"
+- Se confidence_level for "high" (match por telefone), apresente o briefing direto sem pedir confirmação
+- Se confidence_level for "medium", apresente os dados encontrados e confirme: "Encontrei informações sobre [nome]. Aqui está o briefing:"
+- O briefing já vem pronto no resultado da tool — apresente-o de forma organizada ao vendedor
+- O briefing custa 1 crédito — avise se estiver perto do limite
+- Exemplo de fluxo:
+  "Preparar reunião com João da TechCorp" → enrich_contact(name:"João", company:"TechCorp") → apresenta briefing com dados do LinkedIn + WhatsApp + RAG
+
 IMPORTANTE: Chame 2-4 ferramentas por vez para cruzar dados e dar respostas completas. Nunca se limite a apenas 1 ferramenta.
 
 AÇÕES NO CALENDÁRIO:
@@ -490,6 +503,31 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
           send_email: { type: 'boolean', description: 'Enviar email com os dados (padrão: true). Requer Google Calendar conectado.' }
         },
         required: ['evaluation_id', 'teammate_user_ids']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'enrich_contact',
+      description: 'Busca informações de um contato/lead nos dados do sistema (WhatsApp, RAG, empresa) e gera briefing pré-reunião. Use quando o vendedor pedir para preparar reunião, briefing, ou quiser saber sobre um lead antes de um call.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'Nome do contato/lead'
+          },
+          company: {
+            type: 'string',
+            description: 'Empresa do contato (se conhecida). Âncora importante para desambiguação.'
+          },
+          phone: {
+            type: 'string',
+            description: 'Telefone do contato (se conhecido). Âncora mais forte para match.'
+          }
+        },
+        required: ['name']
       }
     }
   },
@@ -1862,6 +1900,247 @@ async function executeFunction(
         return { sellers_compared: comparison }
       }
 
+      case 'enrich_contact': {
+        const { name: contactName, company: contactCompany, phone: contactPhone } = params
+
+        if (!contactName || typeof contactName !== 'string') {
+          return { success: false, error: 'Nome do contato é obrigatório' }
+        }
+
+        // ── 1. Search WhatsApp conversations ──────────────────────────────
+        let waConversations: any[] = []
+
+        if (contactPhone) {
+          const phoneSuffix = String(contactPhone).replace(/\D/g, '').slice(-9)
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_phone', `%${phoneSuffix}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        if (!waConversations.length) {
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_name', `%${contactName}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        // ── 2. Get recent messages for context ────────────────────────────
+        let recentMessages: any[] = []
+        if (waConversations.length > 0) {
+          const { data: msgs } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .select('content, direction, message_timestamp')
+            .eq('user_id', userId)
+            .eq('contact_phone', waConversations[0].contact_phone)
+            .not('content', 'is', null)
+            .order('message_timestamp', { ascending: false })
+            .limit(20)
+          recentMessages = (msgs || []).reverse()
+        }
+
+        // ── 3. Web search for LinkedIn profile + public info (background) ─
+        let webProfile = ''
+        let rawLinkedinUrls: string[] = []
+        try {
+          const searchQuery = `${contactName} ${contactCompany || ''} LinkedIn`
+          // Brave Search returns server-rendered HTML with real results (no bot blocking)
+          const searchUrl = `https://search.brave.com/search?q=${encodeURIComponent(searchQuery)}&source=web`
+
+          let snippets = ''
+          try {
+              const searchRes = await fetch(searchUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                  'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+                  'Accept': 'text/html',
+                },
+                signal: AbortSignal.timeout(8000),
+              })
+              if (searchRes.ok) {
+                const html = await searchRes.text()
+                // Extract LinkedIn profile URLs from raw HTML before stripping tags
+                const profileMatches = html.match(/(?:https?:\/\/)?(?:[a-z]{2}\.)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/g)
+                if (profileMatches) {
+                  const unique = [...new Set(profileMatches.map((u: string) => u.startsWith('http') ? u : `https://${u}`))]
+                  rawLinkedinUrls.push(...unique)
+                }
+                snippets = html
+                  .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                  .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                  .replace(/<[^>]+>/g, ' ')
+                  .replace(/&[a-z]+;/gi, ' ')
+                  .replace(/\s+/g, ' ')
+                  .slice(0, 4000)
+              }
+          } catch (_) { /* search failed, continue without web data */ }
+
+          if (snippets.length > 200) {
+            // Use GPT-4o-mini to extract structured profile info from search snippets
+            const extractResponse = await openai.chat.completions.create({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'system',
+                  content: `Extraia informações profissionais da pessoa "${contactName}"${contactCompany ? ` da empresa "${contactCompany}"` : ''} a partir dos resultados de busca. Retorne APENAS o que encontrar de concreto (não invente):
+- Cargo/título atual
+- Empresa atual
+- Localização
+- Setor/indústria
+- Experiência relevante (breve)
+- URL do perfil LinkedIn (se encontrar)
+Se não encontrar alguma info, omita. Se não encontrar NADA sobre essa pessoa, diga "Nenhuma informação encontrada". Formato: texto corrido, máximo 100 palavras.`
+                },
+                { role: 'user', content: snippets }
+              ],
+              temperature: 0.2,
+              max_tokens: 300,
+            })
+            webProfile = extractResponse.choices[0].message.content || ''
+          }
+        } catch (err: unknown) {
+          console.log('[Enrich] Web search failed (non-blocking):', (err as Error).message)
+        }
+
+        // ── 4. RAG - parallel queries for examples and company knowledge ──
+        const embeddingText = `reunião vendas ${contactName} ${contactCompany || ''}`
+        const embeddingResponse = await openai.embeddings.create({
+          model: 'text-embedding-3-small',
+          input: embeddingText.slice(0, 8000)
+        })
+        const embedding = embeddingResponse.data[0].embedding
+
+        const [successResult, knowledgeResult] = await Promise.allSettled([
+          supabaseAdmin.rpc('match_followup_success', {
+            query_embedding: embedding,
+            company_id_filter: companyId,
+            match_threshold: 0.4,
+            match_count: 3
+          }),
+          supabaseAdmin.rpc('match_company_knowledge', {
+            query_embedding: embedding,
+            match_threshold: 0.5,
+            match_count: 3
+          })
+        ])
+
+        const successExamples = successResult.status === 'fulfilled' ? successResult.value.data || [] : []
+        const companyKnowledge = knowledgeResult.status === 'fulfilled' ? knowledgeResult.value.data || [] : []
+
+        // ── 5. Determine confidence ───────────────────────────────────────
+        let confidenceLevel: 'high' | 'medium' | 'low' = 'low'
+        let matchSource: 'whatsapp_phone' | 'whatsapp_name' | 'web_search' | 'manual' = 'manual'
+
+        if (contactPhone && waConversations.length > 0) {
+          confidenceLevel = 'high'
+          matchSource = 'whatsapp_phone'
+        } else if (waConversations.length > 0) {
+          confidenceLevel = 'medium'
+          matchSource = 'whatsapp_name'
+        } else if (webProfile) {
+          confidenceLevel = 'medium'
+          matchSource = 'web_search'
+        }
+
+        // Extract real LinkedIn profile URL: try GPT output first, then raw HTML, then fallback to search
+        const linkedinProfileRegex = /https?:\/\/(?:[a-z]{2}\.)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/
+        const linkedinProfileMatch = webProfile.match(linkedinProfileRegex)
+        const linkedinQuery = encodeURIComponent(`${contactName} ${contactCompany || ''}`.trim())
+        const linkedinUrl = linkedinProfileMatch
+          ? linkedinProfileMatch[0]
+          : rawLinkedinUrls.length > 0
+            ? rawLinkedinUrls[0]
+            : `https://www.linkedin.com/search/results/all/?keywords=${linkedinQuery}`
+
+        // ── 6. Generate briefing via GPT-4o (enriched with web data) ──────
+        const conversationSummary = recentMessages.length > 0
+          ? recentMessages.map(m => `[${m.direction === 'outbound' ? 'Vendedor' : 'Lead'}]: ${m.content}`).join('\n')
+          : 'Nenhuma conversa anterior encontrada.'
+
+        const examplesContext = successExamples.length > 0
+          ? successExamples.map((e: any) => e.content?.slice(0, 300)).join('\n---\n')
+          : 'Nenhum exemplo disponível.'
+
+        const knowledgeContext = companyKnowledge.length > 0
+          ? companyKnowledge.map((k: any) => k.content?.slice(0, 300)).join('\n')
+          : ''
+
+        const briefingResponse = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: `Gere um briefing pré-reunião conciso em português BR com estas seções:
+- **Perfil do Prospect**: Nome, cargo, empresa, setor, localização (use dados reais da busca web/LinkedIn)
+- **Histórico de Interação**: Resumo das conversas anteriores no WhatsApp (tom, interesses, objeções levantadas). Se não houver histórico, diga explicitamente
+- **Inteligência Competitiva**: O que sabemos sobre a empresa/setor do prospect que pode ser útil
+- **Pontos de Atenção**: Objeções prováveis baseadas no perfil e histórico
+- **Estratégia de Abordagem**: 2-3 táticas específicas baseadas nos exemplos de sucesso e perfil do prospect
+- **Perguntas SPIN Recomendadas**: 1 pergunta situacional + 1 de problema personalizadas para este prospect
+
+REGRAS:
+- Use APENAS informações reais encontradas. NUNCA invente dados sobre o prospect
+- Se não tiver informação sobre algo, diga "Não identificado" em vez de inventar
+- Seja direto e prático. Máximo 300 palavras
+- Personalize as perguntas SPIN com base no cargo/empresa real do prospect`
+            },
+            {
+              role: 'user',
+              content: `CONTATO: ${contactName}${contactCompany ? ` | Empresa: ${contactCompany}` : ''}${contactPhone ? ` | Tel: ${contactPhone}` : ''}
+
+DADOS DO LINKEDIN / WEB (pesquisa automática):
+${webProfile || 'Nenhuma informação pública encontrada.'}
+
+CONVERSAS WHATSAPP:
+${conversationSummary}
+
+ABORDAGENS BEM-SUCEDIDAS (RAG):
+${examplesContext}
+
+CONHECIMENTO DA NOSSA EMPRESA:
+${knowledgeContext || 'Não disponível.'}`
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 1000,
+        })
+
+        const briefing = briefingResponse.choices[0].message.content || ''
+
+        // ── 7. Consume 1 credit ───────────────────────────────────────────
+        const { data: credits } = await supabaseAdmin
+          .from('companies')
+          .select('monthly_credits_used')
+          .eq('id', companyId)
+          .single()
+
+        if (credits) {
+          await supabaseAdmin
+            .from('companies')
+            .update({ monthly_credits_used: (credits.monthly_credits_used || 0) + 1 })
+            .eq('id', companyId)
+        }
+
+        return {
+          success: true,
+          confidence_level: confidenceLevel,
+          match_source: matchSource,
+          whatsapp_match: waConversations[0] || null,
+          matches_found: waConversations.length,
+          recent_messages_count: recentMessages.length,
+          web_profile: webProfile || null,
+          briefing,
+          linkedin_url: linkedinUrl,
+          success_examples_count: successExamples.length,
+        }
+      }
+
       case 'execute_desktop_action': {
         const { action_type, target } = params
         const validTypes = ['open_app', 'open_url', 'open_path']
@@ -2053,6 +2332,7 @@ export async function POST(req: NextRequest) {
     const toolsUsed: string[] = []
     const desktopActions: Array<{ type: string; target: string }> = []
     const searchActions: Array<{ search_type: string; name: string }> = []
+    const enrichActions: Array<{ confidence_level: string; match_source: string; contact: any; web_profile: string | null; briefing: string; linkedin_url: string }> = []
     const MAX_ROUNDS = 5
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -2074,6 +2354,7 @@ export async function POST(req: NextRequest) {
           isManager,
           ...(desktopActions.length > 0 ? { desktopActions } : {}),
           ...(searchActions.length > 0 ? { searchActions } : {}),
+          ...(enrichActions.length > 0 ? { enrichActions } : {}),
         })
       }
 
@@ -2097,6 +2378,19 @@ export async function POST(req: NextRequest) {
             searchActions.push({
               search_type: (result as Record<string, unknown>).search_type as string,
               name: (result as Record<string, unknown>).name as string,
+            })
+          }
+
+          // Collect enrich actions for client-side briefing card
+          if (tcFn.function.name === 'enrich_contact' && result && (result as Record<string, unknown>).success) {
+            const r = result as Record<string, unknown>
+            enrichActions.push({
+              confidence_level: r.confidence_level as string,
+              match_source: r.match_source as string,
+              contact: r.whatsapp_match || { name: JSON.parse(tcFn.function.arguments).name },
+              web_profile: (r.web_profile as string) || null,
+              briefing: r.briefing as string,
+              linkedin_url: r.linkedin_url as string,
             })
           }
 
@@ -2127,6 +2421,8 @@ export async function POST(req: NextRequest) {
       toolsUsed,
       isManager,
       ...(desktopActions.length > 0 ? { desktopActions } : {}),
+      ...(searchActions.length > 0 ? { searchActions } : {}),
+      ...(enrichActions.length > 0 ? { enrichActions } : {}),
     })
 
   } catch (error) {

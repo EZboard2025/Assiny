@@ -571,6 +571,83 @@ function addAIMessage(content) {
   chatMessages.scrollTop = chatMessages.scrollHeight
 }
 
+// --- Briefing Card ---
+function addBriefingCard(enrich) {
+  const wrap = document.createElement('div')
+  wrap.className = 'msg-ai-wrap'
+
+  const contact = enrich.contact || {}
+  const contactName = contact.contact_name || contact.name || 'Contato'
+  const phone = contact.contact_phone || contact.phone || ''
+  const lastMsg = contact.last_message_preview || ''
+  const confidence = enrich.confidence_level || 'low'
+  const matchSource = enrich.match_source || 'manual'
+
+  const confidenceBadge = confidence === 'high'
+    ? '<span class="briefing-badge badge-high">Alta confiança</span>'
+    : confidence === 'medium'
+      ? '<span class="briefing-badge badge-medium">Média confiança</span>'
+      : '<span class="briefing-badge badge-low">Baixa confiança</span>'
+
+  const sourceLabel = matchSource === 'whatsapp_phone' ? 'WhatsApp (telefone)'
+    : matchSource === 'whatsapp_name' ? 'WhatsApp (nome)'
+    : matchSource === 'web_search' ? 'LinkedIn / Web'
+    : 'Busca manual'
+
+  const webProfile = enrich.web_profile || ''
+
+  // Parse briefing sections from markdown
+  const briefingHtml = renderRichContent(enrich.briefing || '')
+
+  const webProfileHtml = webProfile
+    ? `<div class="briefing-web-profile">
+        <div class="briefing-web-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          Dados da web
+        </div>
+        <div class="briefing-web-text">${escapeHtml(webProfile)}</div>
+      </div>`
+    : ''
+
+  wrap.innerHTML = `${AVATAR_HTML}<div class="briefing-card">
+    <div class="briefing-header">
+      <div class="briefing-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      </div>
+      <div class="briefing-title">Briefing Pré-Reunião</div>
+      ${confidenceBadge}
+    </div>
+    <div class="briefing-contact">
+      <div class="briefing-contact-name">${escapeHtml(contactName)}</div>
+      ${phone ? `<div class="briefing-contact-detail">${escapeHtml(phone)}</div>` : ''}
+      <div class="briefing-contact-detail">Fonte: ${escapeHtml(sourceLabel)}</div>
+      ${lastMsg ? `<div class="briefing-contact-detail briefing-last-msg">"${escapeHtml(lastMsg.slice(0, 80))}${lastMsg.length > 80 ? '...' : ''}"</div>` : ''}
+    </div>
+    ${webProfileHtml}
+    <div class="briefing-divider"></div>
+    <div class="briefing-content">${briefingHtml}</div>
+    <div class="briefing-actions">
+      ${enrich.linkedin_url ? '<button class="briefing-linkedin-btn" data-linkedin-url><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>Ver LinkedIn</button>' : ''}
+    </div>
+  </div>`
+
+  chatMessages.appendChild(wrap)
+
+  // Attach LinkedIn button event listener (inline onclick blocked by CSP in Electron)
+  if (enrich.linkedin_url) {
+    const btn = wrap.querySelector('[data-linkedin-url]')
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (window.electronAPI && window.electronAPI.executeDesktopAction) {
+          window.electronAPI.executeDesktopAction({ type: 'open_url', target: enrich.linkedin_url })
+        }
+      })
+    }
+  }
+
+  chatMessages.scrollTop = chatMessages.scrollHeight
+}
+
 function showTyping() {
   const wrap = document.createElement('div')
   wrap.className = 'typing-wrap'
@@ -803,6 +880,15 @@ async function sendMessage(text) {
           console.error('[Search follow-up] Error:', err)
         }
         if (headerSparkle) headerSparkle.classList.remove('thinking')
+      }
+    }
+
+    // Handle enrich contact actions: show briefing card (LinkedIn searched in background on server)
+    if (data.enrichActions && data.enrichActions.length > 0) {
+      for (const enrich of data.enrichActions) {
+        if (enrich.briefing) {
+          addBriefingCard(enrich)
+        }
       }
     }
 
