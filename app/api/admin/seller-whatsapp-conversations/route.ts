@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
       .from('whatsapp_conversations')
       .select('contact_phone, contact_name, last_message_at, last_message_preview, unread_count, message_count, profile_pic_url')
       .eq('user_id', sellerId)
-      .order('last_message_at', { ascending: false })
-      .limit(50)
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .limit(100)
 
     if (error) {
       throw error

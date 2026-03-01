@@ -2542,9 +2542,9 @@ export default function MeetAnalysisView() {
                           {spinData.technical_feedback && (
                             <p className="text-gray-600 text-sm">{spinData.technical_feedback}</p>
                           )}
-                          {spinData.missed_opportunities && spinData.missed_opportunities.length > 0 && (
+                          {(spinData as any).missed_opportunities && (spinData as any).missed_opportunities.length > 0 && (
                             <ul className="mt-1 ml-4 text-sm text-amber-700 list-disc">
-                              {spinData.missed_opportunities.map((opp: string, i: number) => (
+                              {(spinData as any).missed_opportunities.map((opp: string, i: number) => (
                                 <li key={i}>{opp}</li>
                               ))}
                             </ul>
