@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp } from 'lucide-react'
+import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, Video, TrendingUp } from 'lucide-react'
 
 interface DashboardSidebarProps {
   userRole: string | null
@@ -28,7 +28,7 @@ export default function DashboardSidebar({
   const navItems = [
     { icon: Home, href: '/', label: 'Home', show: true },
     { icon: Users, href: '/roleplay', label: 'Simulação', show: true },
-    { icon: MessageSquare, href: '/followup', label: 'WhatsApp IA', show: true },
+    // WhatsApp IA removed — now handled exclusively by the Electron desktop app
     { icon: Video, href: '/meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, href: '/history', label: 'Histórico', show: true },
     { icon: User, href: '/profile', label: 'Meu Perfil', show: true },

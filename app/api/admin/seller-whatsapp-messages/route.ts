@@ -49,6 +49,9 @@ export async function GET(request: NextRequest) {
 
     const normalizedRequestPhone = normalizePhone(contactPhone)
     const isGroup = contactPhone.includes('@g.us')
+    // Desktop sync stores contact names as contact_phone (e.g., "Gabriel Lead")
+    // Detect this: if normalizing strips everything, it's a name, not a phone number
+    const isNameBased = normalizedRequestPhone.length === 0 || normalizedRequestPhone.length < 4
 
     let messages: any[] = []
 
@@ -62,7 +65,7 @@ export async function GET(request: NextRequest) {
         .limit(limit)
       messages = result.data || []
     } else {
-      // Step 1: Exact match
+      // Step 1: Exact match (works for both phone numbers and name-based keys)
       const exactResult = await supabaseAdmin
         .from('whatsapp_messages')
         .select(MESSAGE_COLUMNS)
@@ -72,8 +75,8 @@ export async function GET(request: NextRequest) {
         .limit(limit)
       messages = exactResult.data || []
 
-      // Step 2: Suffix match
-      if (messages.length === 0) {
+      // Step 2: Suffix match (only for phone numbers, NOT names)
+      if (messages.length === 0 && !isNameBased) {
         const suffixResult = await supabaseAdmin
           .from('whatsapp_messages')
           .select(MESSAGE_COLUMNS)
@@ -84,8 +87,8 @@ export async function GET(request: NextRequest) {
         messages = suffixResult.data || []
       }
 
-      // Step 3: LID contacts
-      if (messages.length === 0) {
+      // Step 3: LID contacts (only for phone numbers)
+      if (messages.length === 0 && !isNameBased) {
         const lidResult = await supabaseAdmin
           .from('whatsapp_messages')
           .select(MESSAGE_COLUMNS)

@@ -7,11 +7,11 @@
 // --- Selectors (multiple fallbacks for resilience) ---
 const SELECTORS = {
   conversationPanel: '#main',
-  // Contact name in header
+  // Contact name in header — specific data-testid first, generic last
   contactHeader: [
-    '#main header span[title]',
     '#main header [data-testid="conversation-info-header-chat-title"]',
     '#main header [data-testid="conversation-title"]',
+    '#main header span[title]',
   ],
   // Message containers — try class-based then data-testid
   messageRow: [
@@ -80,10 +80,65 @@ function trySelectAll(parent, selectors) {
 }
 
 // --- Contact name ---
+const GARBAGE_VALUES = [
+  'clique para mostrar os dados do contato',
+  'conta comercial',
+  'visto por último',
+  'online',
+  'digitando',
+  'gravando áudio',
+]
+
 function getContactName() {
-  const el = trySelect(document, SELECTORS.contactHeader)
-  if (!el) return null
-  return el.textContent?.trim() || el.getAttribute('title')?.trim() || null
+  const header = document.querySelector('#main header')
+  if (!header) return null
+
+  // Strategy 1: Try each selector and skip garbage matches
+  for (const sel of SELECTORS.contactHeader) {
+    // Remove '#main header ' prefix since we already have the header element
+    const localSel = sel.replace('#main header ', '').replace('#main header', '').trim()
+    const el = localSel ? header.querySelector(localSel) : header
+    if (el) {
+      const title = el.getAttribute('title')?.trim()
+      const text = el.textContent?.trim()
+      const value = title || text || null
+      if (!value) continue
+
+      const lower = value.toLowerCase()
+      if (GARBAGE_VALUES.some(g => lower.startsWith(g))) {
+        console.log(`[Ramppy Scraper] Skipped garbage from "${sel}": "${value}"`)
+        continue // Try next selector
+      }
+
+      console.log(`[Ramppy Scraper] Contact name from "${sel}": "${value}"`)
+      return value
+    }
+  }
+
+  // Strategy 2: Find ALL span[title] in header — pick first non-garbage
+  const allSpans = header.querySelectorAll('span[title]')
+  for (const span of allSpans) {
+    const title = span.getAttribute('title')?.trim()
+    if (!title) continue
+    const lower = title.toLowerCase()
+    if (GARBAGE_VALUES.some(g => lower.startsWith(g))) continue
+    console.log(`[Ramppy Scraper] Contact name from fallback span[title]: "${title}"`)
+    return title
+  }
+
+  // Strategy 3: First span[dir="auto"] text in header (usually the name)
+  const autoDirSpans = header.querySelectorAll('span[dir="auto"]')
+  for (const span of autoDirSpans) {
+    const text = span.textContent?.trim()
+    if (!text || text.length < 2) continue
+    const lower = text.toLowerCase()
+    if (GARBAGE_VALUES.some(g => lower.startsWith(g))) continue
+    console.log(`[Ramppy Scraper] Contact name from span[dir=auto]: "${text}"`)
+    return text
+  }
+
+  console.log('[Ramppy Scraper] Could not find contact name in header')
+  return null
 }
 
 // --- Contact phone ---
@@ -242,12 +297,15 @@ function extractMessages() {
     // Skip completely empty messages (usually system notifications)
     if (!body && type === 'text') continue
 
-    // Get timestamp
+    // Get timestamp from data-pre-plain-text
     const prePlainEl = row.querySelector(SELECTORS.messagePrePlain)
     const prePlainText = prePlainEl ? prePlainEl.getAttribute('data-pre-plain-text') : ''
     const { time, date, sender } = parseTimestamp(prePlainText)
 
     let timestamp = null
+    let displayTime = time || ''
+    let displayDate = date || ''
+
     if (date && time) {
       const parts = date.split('/')
       if (parts.length === 3) {
@@ -256,17 +314,88 @@ function extractMessages() {
         timestamp = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T${time}:00`).getTime()
       }
     }
-    if (!timestamp) timestamp = Date.now()
+
+    // Fallback: try to extract time from visible msg-time span
+    if (!timestamp) {
+      const timeSpan = row.querySelector('[data-testid="msg-time"] span, [data-testid="msg-time"]')
+      if (timeSpan) {
+        const t = timeSpan.textContent?.trim()
+        if (t && /^\d{1,2}:\d{2}$/.test(t)) {
+          displayTime = t
+        }
+      }
+      // Also check any small span that looks like a time
+      if (!displayTime) {
+        const allSpans = row.querySelectorAll('span')
+        for (const s of allSpans) {
+          const t = s.textContent?.trim()
+          if (t && /^\d{1,2}:\d{2}$/.test(t) && !s.querySelector('span')) {
+            displayTime = t
+            break
+          }
+        }
+      }
+    }
+
+    // Mark messages without real timestamps for post-processing
+    const hasRealTimestamp = !!timestamp
+    if (!timestamp) timestamp = 0 // placeholder, will be fixed below
 
     messages.push({
       body,
       fromMe: isOutgoing,
       timestamp,
-      time: time || '',
-      date: date || '',
+      time: displayTime,
+      date: displayDate,
       type,
       sender: sender || (isOutgoing ? 'Vendedor' : getContactName() || 'Cliente'),
+      _hasRealTimestamp: hasRealTimestamp,
     })
+  }
+
+  // Post-process: fix missing timestamps to preserve DOM order
+  // DOM order IS chronological order in WhatsApp
+  for (let i = 0; i < messages.length; i++) {
+    if (!messages[i]._hasRealTimestamp) {
+      // Find nearest previous message with a real timestamp
+      let prevTs = null
+      for (let j = i - 1; j >= 0; j--) {
+        if (messages[j]._hasRealTimestamp) { prevTs = messages[j].timestamp; break }
+      }
+      // Find nearest next message with a real timestamp
+      let nextTs = null
+      for (let j = i + 1; j < messages.length; j++) {
+        if (messages[j]._hasRealTimestamp) { nextTs = messages[j].timestamp; break }
+      }
+
+      if (prevTs && nextTs) {
+        // Interpolate between known timestamps
+        const prevIdx = messages.findIndex((m, idx) => idx < i && m._hasRealTimestamp && m.timestamp === prevTs)
+        const nextIdx = messages.findIndex((m, idx) => idx > i && m._hasRealTimestamp && m.timestamp === nextTs)
+        const fraction = (i - prevIdx) / (nextIdx - prevIdx)
+        messages[i].timestamp = Math.floor(prevTs + (nextTs - prevTs) * fraction)
+      } else if (prevTs) {
+        // After last known timestamp: add 1 minute per position
+        const prevIdx = [...messages].reverse().findIndex((m, idx) => (messages.length - 1 - idx) < i && m._hasRealTimestamp)
+        messages[i].timestamp = prevTs + ((i - (messages.length - 1 - prevIdx)) * 60000)
+      } else if (nextTs) {
+        // Before first known timestamp: subtract 1 minute per position
+        const nextIdx = messages.findIndex((m, idx) => idx > i && m._hasRealTimestamp)
+        messages[i].timestamp = nextTs - ((nextIdx - i) * 60000)
+      } else {
+        // No real timestamps at all: use Date.now() with offset
+        messages[i].timestamp = Date.now() - ((messages.length - i) * 60000)
+      }
+    }
+    // Clean up internal flag
+    delete messages[i]._hasRealTimestamp
+  }
+
+  // Final safety: ensure strictly increasing timestamps (DOM order = correct order)
+  for (let i = 1; i < messages.length; i++) {
+    if (messages[i].timestamp <= messages[i - 1].timestamp) {
+      messages[i].timestamp = messages[i - 1].timestamp + 1000
+    }
   }
 
   return messages
@@ -380,6 +509,85 @@ if (window.ramppy) {
   })
 }
 
+// --- Scrape ALL conversations from sidebar ---
+function scrapeConversationList() {
+  const paneEl = document.getElementById('pane-side')
+  if (!paneEl) return []
+
+  // Find conversation cells — try multiple selectors
+  let cells = paneEl.querySelectorAll('[role="row"]')
+  if (cells.length === 0) cells = paneEl.querySelectorAll('[data-testid="cell-frame-container"]')
+  if (cells.length === 0) cells = paneEl.querySelectorAll('[role="gridcell"]')
+  if (cells.length === 0) return []
+
+  const conversations = []
+  for (const cell of cells) {
+    try {
+      // Contact name: first span[title] in the cell
+      const spans = cell.querySelectorAll('span[title]')
+      if (spans.length === 0) continue
+
+      const name = spans[0]?.getAttribute('title')?.trim()
+      if (!name) continue
+
+      // Phone: if name looks like a phone number, use it; otherwise use name as identifier
+      let phone = name
+      if (/^[\d+\s()-]+$/.test(name.replace(/\s/g, ''))) {
+        phone = name.replace(/\s/g, '')
+      }
+
+      // Last message preview: second span[title] or last span with title
+      let lastMessage = ''
+      for (let i = 1; i < spans.length; i++) {
+        const title = spans[i]?.getAttribute('title')?.trim()
+        if (title && title !== name) {
+          lastMessage = title
+          break
+        }
+      }
+      // Fallback: look for message preview text in other elements
+      if (!lastMessage) {
+        const previewEl = cell.querySelector('[data-testid="last-msg-status"]')
+          || cell.querySelector('span[dir="ltr"]:not([title])')
+        if (previewEl) lastMessage = previewEl.textContent?.trim() || ''
+      }
+
+      // Unread count
+      const unreadEl = cell.querySelector('[data-testid="icon-unread-count"]')
+        || cell.querySelector('span[aria-label*="não lida"], span[aria-label*="unread"]')
+      const unread = parseInt(unreadEl?.textContent || '0') || 0
+
+      conversations.push({ name, phone, lastMessage, unread })
+    } catch (e) {
+      // Skip malformed cells
+    }
+  }
+  return conversations
+}
+
+// --- Periodic sidebar sync ---
+let sidebarSyncInterval = null
+
+function startSidebarSync() {
+  if (sidebarSyncInterval) return
+  sidebarSyncInterval = setInterval(() => {
+    const list = scrapeConversationList()
+    if (list.length > 0 && window.ramppy) {
+      console.log(`[Ramppy Scraper] Sidebar sync: ${list.length} conversations`)
+      window.ramppy.sendConversationList(list)
+    }
+  }, 15000) // every 15 seconds
+
+  // Also send immediately on start
+  setTimeout(() => {
+    const list = scrapeConversationList()
+    if (list.length > 0 && window.ramppy) {
+      console.log(`[Ramppy Scraper] Initial sidebar sync: ${list.length} conversations`)
+      window.ramppy.sendConversationList(list)
+    }
+  }, 2000)
+}
+
 // --- Initialize ---
 function init() {
   console.log('[Ramppy Scraper] Initializing WhatsApp Web scraper...')
@@ -392,6 +600,8 @@ function init() {
       setupObserver()
       setupConversationWatcher()
       sendUpdate()
+      // Start periodic sidebar conversation list sync
+      startSidebarSync()
     }
   }, 1000)
 

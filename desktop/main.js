@@ -23,6 +23,12 @@ const COPILOT_WIDTH = 400
 // WhatsApp scraper state (forwarded to copilot view)
 let whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
 
+// Desktop → Server message sync state
+let syncedMessageKeys = new Map()  // Map<contactPhone, Set<localKey>> — client-side dedup
+let syncQueue = []                 // Array of { contactPhone, contactName, messages }
+let syncTimer = null               // Periodic sync interval (10s)
+let isSyncing = false              // Prevent concurrent sync calls
+
 // Meet auto-detection state
 let meetDetectionInterval = null
 let isRecordingMeet = false
@@ -389,6 +395,13 @@ function createWhatsAppWindow() {
   waView.webContents.on('did-finish-load', injectScraper)
   waView.webContents.on('did-navigate-in-page', injectScraper)
 
+  // Forward WhatsApp WebView console logs to main process (for debugging scraper)
+  waView.webContents.on('console-message', (_event, level, message) => {
+    if (message.includes('[Ramppy Scraper]')) {
+      console.log(`[WA WebView] ${message}`)
+    }
+  })
+
   // --- Send initial WhatsApp state to copilot once it loads ---
   copilotView.webContents.on('did-finish-load', () => {
     console.log('[Copilot] View loaded, forwarding initial WhatsApp state:', whatsappContext.active ? whatsappContext.contactName : 'inactive')
@@ -418,9 +431,89 @@ function createWhatsAppWindow() {
     }
   })
 
+  // --- Desktop WhatsApp heartbeat: report connection status to server ---
+  let desktopWaHeartbeatInterval = null
+  let desktopWaAuthenticated = false
+
+  const checkWaAuth = async () => {
+    if (!waView || waView.webContents.isDestroyed()) return
+    try {
+      const isAuth = await waView.webContents.executeJavaScript(`
+        !!(document.querySelector('[data-testid="chatlist-header"]') ||
+           document.querySelector('div[aria-label="Lista de conversas"]') ||
+           document.querySelector('div[data-testid="chat-list"]') ||
+           document.querySelector('#pane-side'))
+      `)
+      if (isAuth && !desktopWaAuthenticated) {
+        desktopWaAuthenticated = true
+        console.log('[WhatsApp Desktop] User authenticated — starting heartbeats + sync')
+        sendDesktopWaHeartbeat('active')
+        desktopWaHeartbeatInterval = setInterval(() => sendDesktopWaHeartbeat('active'), 30000)
+        startSyncTimer()
+      } else if (!isAuth && desktopWaAuthenticated) {
+        desktopWaAuthenticated = false
+        console.log('[WhatsApp Desktop] User logged out — stopping heartbeats + sync')
+        if (desktopWaHeartbeatInterval) { clearInterval(desktopWaHeartbeatInterval); desktopWaHeartbeatInterval = null }
+        sendDesktopWaHeartbeat('disconnected')
+        stopSyncTimer()
+      }
+    } catch (_) { /* page not ready */ }
+  }
+
+  const waAuthCheckInterval = setInterval(checkWaAuth, 10000)
+  // First check after WhatsApp Web loads
+  waView.webContents.on('did-finish-load', () => setTimeout(checkWaAuth, 5000))
+
+  async function sendDesktopWaHeartbeat(status) {
+    try {
+      // Get auth token from main window
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      const authData = await mainWindow.webContents.executeJavaScript(`
+        (function() {
+          try {
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  if (parsed?.access_token) return parsed.access_token;
+                }
+              }
+            }
+          } catch(e) {}
+          return null;
+        })()
+      `)
+      if (!authData) return
+
+      const url = PLATFORM_URL + '/api/whatsapp/desktop-heartbeat'
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authData}`
+        },
+        body: JSON.stringify({ status })
+      })
+      const result = await response.json()
+      console.log(`[WhatsApp Desktop] Heartbeat sent: ${status}`, result.ok ? '✓' : result.error)
+    } catch (err) {
+      console.error('[WhatsApp Desktop] Heartbeat failed:', err.message)
+    }
+  }
+
   // --- Cleanup ---
   whatsappBaseWindow.on('closed', () => {
     clearInterval(stateSyncInterval)
+    clearInterval(waAuthCheckInterval)
+    if (desktopWaHeartbeatInterval) clearInterval(desktopWaHeartbeatInterval)
+    stopSyncTimer()
+    // Notify server that desktop WhatsApp is disconnected
+    if (desktopWaAuthenticated) {
+      sendDesktopWaHeartbeat('disconnected')
+      desktopWaAuthenticated = false
+    }
     whatsappBaseWindow = null
     waView = null
     copilotView = null
@@ -643,6 +736,29 @@ ipcMain.on('whatsapp-context-update', (_event, data) => {
   } else {
     console.log('[WhatsApp IPC] copilotView not available to forward')
   }
+
+  // Queue messages for server sync (so manager can view in "Modo Leitura")
+  // Use contactName as primary key — contactPhone from scraper is unreliable
+  // (can return UI text like "clique para mostrar os dados do contato")
+  if (data.active && data.messages?.length > 0 && data.contactName) {
+    // Normalize: if name looks like a phone number, strip spaces (matches sidebar scraper)
+    let syncKey = data.contactName
+    if (/^[\d+\s()-]+$/.test(syncKey.replace(/\s/g, ''))) {
+      syncKey = syncKey.replace(/\s/g, '')
+    }
+    queueForSync(syncKey, data.contactName, data.messages)
+    // Ensure sync timer is running (safety net if checkWaAuth didn't start it)
+    if (!syncTimer) startSyncTimer()
+    // Trigger immediate sync attempt (don't wait for next timer tick)
+    executeSync()
+  }
+})
+
+// WhatsApp scraper sends full conversation list from sidebar → sync to server
+ipcMain.on('whatsapp-conversation-list', (_event, list) => {
+  if (!list || list.length === 0) return
+  console.log(`[WhatsApp IPC] Conversation list received: ${list.length} conversations`)
+  syncConversationList(list)
 })
 
 // Copilot requests text injection into WhatsApp input
@@ -666,6 +782,201 @@ ipcMain.handle('get-whatsapp-state', async () => {
 ipcMain.handle('get-platform-url', () => {
   return PLATFORM_URL
 })
+
+// ============================================================
+// DESKTOP → SERVER MESSAGE SYNC (for manager "Modo Leitura")
+// ============================================================
+
+/**
+ * Queue scraped messages for server sync. Filters out already-synced messages
+ * and replaces any existing queue entry for the same contact.
+ */
+function queueForSync(contactPhone, contactName, messages) {
+  if (!contactPhone || !messages?.length) {
+    console.log('[Desktop Sync] queueForSync skipped: no phone or messages')
+    return
+  }
+
+  if (!syncedMessageKeys.has(contactPhone)) {
+    syncedMessageKeys.set(contactPhone, new Set())
+  }
+  const syncedKeys = syncedMessageKeys.get(contactPhone)
+
+  // Filter to only new messages (not yet synced)
+  const newMessages = messages.filter(msg => {
+    const key = `${msg.timestamp}_${msg.fromMe}_${(msg.body || '').substring(0, 50)}`
+    return !syncedKeys.has(key)
+  })
+
+  if (newMessages.length === 0) {
+    console.log(`[Desktop Sync] queueForSync: all ${messages.length} msgs for "${contactName}" already synced`)
+    return
+  }
+
+  console.log(`[Desktop Sync] queueForSync: ${newMessages.length} new msgs for "${contactName}" (${contactPhone}), queue size: ${syncQueue.length}`)
+
+  // Replace existing queue entry for this contact (latest scrape = most complete)
+  const existingIdx = syncQueue.findIndex(q => q.contactPhone === contactPhone)
+  if (existingIdx >= 0) {
+    syncQueue[existingIdx] = { contactPhone, contactName, messages: newMessages }
+  } else {
+    syncQueue.push({ contactPhone, contactName, messages: newMessages })
+  }
+}
+
+/**
+ * Process ALL items from the sync queue: POST messages to server API.
+ * Called every 10s by syncTimer + immediately on new messages.
+ */
+async function executeSync() {
+  if (isSyncing || syncQueue.length === 0) return
+  isSyncing = true
+
+  // Get auth token once for all items
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      console.warn('[Desktop Sync] mainWindow not available, skipping')
+      isSyncing = false
+      return
+    }
+    const authToken = await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.access_token) return parsed.access_token;
+              }
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    `)
+
+    if (!authToken) {
+      console.warn('[Desktop Sync] No auth token found in mainWindow, skipping')
+      isSyncing = false
+      return
+    }
+
+    // Process all items in queue
+    const items = [...syncQueue]
+    syncQueue = []
+
+    for (const item of items) {
+      try {
+        const url = PLATFORM_URL + '/api/whatsapp/desktop-sync'
+        console.log(`[Desktop Sync] Sending ${item.messages.length} msgs for "${item.contactName}" (${item.contactPhone}) to ${url}`)
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            contactPhone: item.contactPhone,
+            contactName: item.contactName,
+            messages: item.messages
+          })
+        })
+
+        const result = await response.json()
+
+        if (result.ok) {
+          // Mark messages as synced so they won't be re-queued
+          const syncedKeys = syncedMessageKeys.get(item.contactPhone) || new Set()
+          for (const msg of item.messages) {
+            const key = `${msg.timestamp}_${msg.fromMe}_${(msg.body || '').substring(0, 50)}`
+            syncedKeys.add(key)
+          }
+          syncedMessageKeys.set(item.contactPhone, syncedKeys)
+          console.log(`[Desktop Sync] ✓ ${item.contactName}: synced=${result.synced}, skipped=${result.skipped}`)
+        } else {
+          console.warn(`[Desktop Sync] ✗ API error for ${item.contactName}:`, result.error)
+          // Re-queue on API error (not network error)
+          syncQueue.push(item)
+        }
+      } catch (err) {
+        console.error(`[Desktop Sync] ✗ Network error for ${item.contactName}:`, err.message)
+        // Re-queue on network failure
+        syncQueue.push(item)
+      }
+    }
+  } catch (err) {
+    console.error('[Desktop Sync] Fatal error:', err.message)
+  }
+
+  isSyncing = false
+}
+
+/** Start the periodic sync timer (called when WhatsApp authenticates) */
+function startSyncTimer() {
+  if (syncTimer) return
+  syncTimer = setInterval(executeSync, 10000)
+  console.log('[Desktop Sync] Started sync timer (10s interval)')
+}
+
+/** Stop the sync timer and clear state (called on disconnect/close) */
+function stopSyncTimer() {
+  if (syncTimer) { clearInterval(syncTimer); syncTimer = null }
+  syncedMessageKeys.clear()
+  syncQueue = []
+  isSyncing = false
+}
+
+/**
+ * Sync the full conversation list from WhatsApp sidebar to server.
+ * Creates/updates whatsapp_conversations records for ALL visible conversations,
+ * so the manager can see the complete conversation list (not just the open one).
+ */
+async function syncConversationList(list) {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const authToken = await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.access_token) return parsed.access_token;
+              }
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    `)
+    if (!authToken) {
+      console.warn('[Desktop Sync] No auth token for conversation list sync')
+      return
+    }
+
+    const url = PLATFORM_URL + '/api/whatsapp/desktop-sync'
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ conversationList: list })
+    })
+    const result = await response.json()
+    if (result.ok) {
+      console.log(`[Desktop Sync] ✓ Conversation list synced: ${result.upserted} conversations`)
+    } else {
+      console.warn('[Desktop Sync] ✗ Conversation list error:', result.error)
+    }
+  } catch (err) {
+    console.error('[Desktop Sync] Conversation list sync failed:', err.message)
+  }
+}
 
 // ============================================================
 // BLACKHOLE AUDIO DRIVER — IPC handlers

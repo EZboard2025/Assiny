@@ -1,6 +1,6 @@
 'use client'
 
-import { Users, MessageSquareMore, Video, Target, Link2, BarChart3 } from 'lucide-react'
+import { Users, Video, Target, Link2, BarChart3 } from 'lucide-react'
 
 interface QuickNavProps {
   onNavigate: (view: string) => void
@@ -10,7 +10,7 @@ interface QuickNavProps {
 
 const ITEMS = [
   { key: 'roleplay', icon: Users, label: 'Simulação', always: true },
-  { key: 'followup', icon: MessageSquareMore, label: 'WhatsApp IA', always: true },
+  // WhatsApp IA removed — now handled exclusively by the Electron desktop app
   { key: 'meet-analysis', icon: Video, label: 'Análise Meet', always: true },
   { key: 'pdi', icon: Target, label: 'PDI', needsPDI: true },
   { key: 'roleplay-links', icon: Link2, label: 'Processo Seletivo', adminOnly: true },

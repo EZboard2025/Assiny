@@ -15,7 +15,7 @@ import QuickNav from './dashboard/QuickNav'
 import FeatureCard from './dashboard/FeatureCard'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
 import DashboardGrid, { type CardDef } from './dashboard/DashboardGrid'
-import { Users, Target, Clock, User, Lock, Link2, Video, MessageSquareMore, BarChart3, Bell, Activity, LayoutGrid } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, Link2, Video, BarChart3, Bell, Activity, LayoutGrid, Download } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
@@ -61,8 +61,7 @@ const RoleplayView = dynamic(() => import('./RoleplayView'), { ssr: false, loadi
 const HistoricoView = dynamic(() => import('./HistoricoView'), { ssr: false, loading: ViewLoadingSkeleton })
 const PerfilView = dynamic(() => import('./PerfilView'), { ssr: false, loading: ViewLoadingSkeleton })
 const PDIView = dynamic(() => import('./PDIView'), { ssr: false, loading: ViewLoadingSkeleton })
-const FollowUpView = dynamic(() => import('./FollowUpView'), { ssr: false, loading: ViewLoadingSkeleton })
-const FollowUpHistoryView = dynamic(() => import('./FollowUpHistoryView'), { ssr: false, loading: ViewLoadingSkeleton })
+// FollowUpView removed — WhatsApp now handled exclusively by Electron desktop app
 const MeetAnalysisView = dynamic(() => import('./MeetAnalysisView'), { ssr: false, loading: ViewLoadingSkeleton })
 const RepresentanteView = dynamic(() => import('./RepresentanteView'), { ssr: false, loading: ViewLoadingSkeleton })
 const ChallengeHistoryView = dynamic(() => import('./dashboard/ChallengeHistoryView'), { ssr: false, loading: ViewLoadingSkeleton })
@@ -79,10 +78,8 @@ const prefetchMap: Record<string, () => void> = {
   perfil: () => { import('./PerfilView') },
   historico: () => { import('./HistoricoView') },
   pdi: () => { import('./PDIView') },
-  followup: () => { import('./FollowUpView') },
   'meet-analysis': () => { import('./MeetAnalysisView') },
   'roleplay-links': () => { import('./RoleplayLinksView') },
-  'followup-history': () => { import('./FollowUpHistoryView') },
   'challenge-history': () => { import('./dashboard/ChallengeHistoryView') },
   chat: () => { import('./ChatInterface') },
   download: () => { import('./DownloadView') },
@@ -93,8 +90,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'followup' | 'followup-history' | 'meet-analysis' | 'challenge-history' | 'manager' | 'download'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'meet-analysis' | 'challenge-history' | 'manager' | 'download'>('home')
   const [mounted, setMounted] = useState(false)
+  const [isElectron, setIsElectron] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
@@ -102,6 +100,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [userId, setUserId] = useState<string | null>(null)
   const [activeChallenge, setActiveChallenge] = useState<any | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
+  const [showWhatsAppNotice, setShowWhatsAppNotice] = useState(false)
   const chatRef = useRef<ChatInterfaceHandle>(null)
   const bellRef = useRef<HTMLButtonElement>(null)
 
@@ -167,8 +166,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     trainingPlan,
     planUsage,
     checkChatIAAccess,
-    checkPDIAccess,
-    checkFollowUpAccess
+    checkPDIAccess
   } = usePlanLimits()
 
   // Hook para verificar configuração da empresa
@@ -183,7 +181,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Estados para controlar acesso às features
   const [hasChatIA, setHasChatIA] = useState(true)
   const [hasPDI, setHasPDI] = useState(true)
-  const [hasFollowUp, setHasFollowUp] = useState(true)
 
   // Scroll-based navigation
   const mainRef = useRef<HTMLElement>(null)
@@ -192,6 +189,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   useEffect(() => {
     setMounted(true)
+    setIsElectron(!!(window as any).electronAPI)
     checkUserRole()
 
     // Ler query string da URL para navegação direta
@@ -213,18 +211,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   // Verificar acesso às features baseado no plano
   useEffect(() => {
     const checkFeatureAccess = async () => {
-      if (checkChatIAAccess && checkPDIAccess && checkFollowUpAccess) {
+      if (checkChatIAAccess && checkPDIAccess) {
         const chatIA = await checkChatIAAccess()
         const pdi = await checkPDIAccess()
-        const followUp = await checkFollowUpAccess()
 
         setHasChatIA(chatIA)
         setHasPDI(pdi)
-        setHasFollowUp(followUp)
       }
     }
     checkFeatureAccess()
-  }, [checkChatIAAccess, checkPDIAccess, checkFollowUpAccess])
+  }, [checkChatIAAccess, checkPDIAccess])
 
   // Scroll-based page navigation (DISABLED)
   // const accumulatedScroll = useRef(0)
@@ -512,9 +508,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       router.push('/manager')
       return
     }
-    // Desktop app: open WhatsApp in Electron window instead of loading FollowUpView
-    if (newView === 'followup' && typeof window !== 'undefined' && (window as any).electronAPI?.openWhatsApp) {
-      ;(window as any).electronAPI.openWhatsApp()
+    // WhatsApp: open Electron window or show desktop-only notice
+    if (newView === 'whatsapp') {
+      if (isElectron) {
+        ;(window as any).electronAPI?.openWhatsApp()
+      } else {
+        setShowWhatsAppNotice(true)
+      }
       return
     }
     setCurrentView(newView as typeof currentView)
@@ -590,14 +590,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     if (currentView === 'roleplay-links') {
       return <RoleplayLinksView />
-    }
-
-    if (currentView === 'followup') {
-      return <FollowUpView />
-    }
-
-    if (currentView === 'followup-history') {
-      return <FollowUpHistoryView />
     }
 
     if (currentView === 'meet-analysis') {
@@ -811,7 +803,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   }
 
   return (
-    <div className={`min-h-screen text-gray-900 flex ${currentView === 'followup' ? 'bg-[#111b21]' : 'bg-white'}`}>
+    <div className="min-h-screen text-gray-900 flex bg-white">
       {/* Sidebar */}
       <Sidebar
         currentView={currentView}
@@ -857,7 +849,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       )}
 
       {/* Configuration Required Overlay */}
-      {!configLoading && !isConfigured && userRole !== null && currentView !== 'followup' && currentView !== 'followup-history' && (
+      {!configLoading && !isConfigured && userRole !== null && (
         userRole?.toLowerCase() === 'admin' ? (
           <ConfigurationRequired
             isLoading={configLoading}
@@ -910,6 +902,40 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           userId={userId}
           onClose={() => setSharedModalShareId(null)}
         />
+      )}
+
+      {/* WhatsApp Desktop-Only Notice */}
+      {showWhatsAppNotice && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowWhatsAppNotice(false)}>
+          <div className="bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Download className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">WhatsApp IA</h2>
+              <p className="text-gray-600 mb-6">
+                O WhatsApp IA funciona exclusivamente pelo <strong>aplicativo desktop</strong> da Ramppy. Baixe o app para usar essa funcionalidade.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowWhatsAppNotice(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowWhatsAppNotice(false)
+                    setCurrentView('download')
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium"
+                >
+                  Baixar App
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

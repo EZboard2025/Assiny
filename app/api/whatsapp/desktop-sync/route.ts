@@ -27,14 +27,17 @@ function generateMessageId(
   contactPhone: string,
   timestamp: number,
   fromMe: boolean,
-  body: string
+  body: string,
+  index: number
 ): string {
   const direction = fromMe ? 'out' : 'in'
-  const bodyHash = createHash('sha256')
-    .update(body || '')
+  // Use body hash + direction + index for stable dedup across re-scrapes
+  // (raw timestamp changes between scrapes for messages without data-pre-plain-text)
+  const contentHash = createHash('sha256')
+    .update(`${body || ''}_${direction}_${index}`)
     .digest('hex')
-    .substring(0, 8)
-  return `desktop_${userId}_${contactPhone}_${timestamp}_${direction}_${bodyHash}`
+    .substring(0, 12)
+  return `desktop_${userId}_${contactPhone}_${contentHash}`
 }
 
 /**
@@ -88,11 +91,16 @@ export async function POST(request: Request) {
       console.log(`[Desktop Sync] Conversation list: ${list.length} conversations for user ${user.id}`)
 
       let upserted = 0
-      for (const conv of list) {
+      const now = Date.now()
+      for (let i = 0; i < list.length; i++) {
+        const conv = list[i]
         if (!conv.phone && !conv.name) continue
 
         const contactPhone = conv.phone || conv.name
-        const now = new Date().toISOString()
+        // Preserve WhatsApp sidebar order: first item = most recent
+        // Each subsequent item gets a timestamp 1 second earlier
+        const positionBasedTime = new Date(now - (i * 1000)).toISOString()
+
         const { error } = await supabaseAdmin
           .from('whatsapp_conversations')
           .upsert({
@@ -102,9 +110,9 @@ export async function POST(request: Request) {
             contact_phone: contactPhone,
             contact_name: conv.name || null,
             last_message_preview: conv.lastMessage?.substring(0, 100) || null,
-            last_message_at: now,
+            last_message_at: positionBasedTime,
             unread_count: conv.unread || 0,
-            updated_at: now
+            updated_at: new Date().toISOString()
           }, { onConflict: 'connection_id,contact_phone', ignoreDuplicates: false })
 
         if (!error) upserted++
@@ -128,8 +136,8 @@ export async function POST(request: Request) {
     console.log(`[Desktop Sync] Messages: "${contactName}" (${contactPhone}), ${messages.length} msgs`)
 
     // Generate deterministic IDs for all messages
-    const generatedIds = messages.map(msg =>
-      generateMessageId(user.id, contactPhone, msg.timestamp, msg.fromMe, msg.body)
+    const generatedIds = messages.map((msg, i) =>
+      generateMessageId(user.id, contactPhone, msg.timestamp, msg.fromMe, msg.body, i)
     )
 
     // Bulk check existing messages

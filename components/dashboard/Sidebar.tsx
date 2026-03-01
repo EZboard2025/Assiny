@@ -34,7 +34,7 @@ export default function Sidebar({
     { icon: Home, view: 'home', label: 'Home', show: true },
     { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
     { icon: Users, view: 'roleplay', label: 'Simulação', show: true },
-    { icon: MessageSquare, view: 'followup', label: 'WhatsApp IA', show: true },
+    { icon: MessageSquare, view: 'whatsapp', label: 'WhatsApp IA', show: true },
     { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
     // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden
@@ -131,9 +131,7 @@ export default function Sidebar({
               onOpenConfig()
             }}
             title={!isExpanded ? 'Configurações' : undefined}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left relative z-10 ${
-              currentView === 'followup' ? 'hidden' : ''
-            }`}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left relative z-10"
           >
             <Settings className="w-5 h-5 flex-shrink-0" />
             <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${
