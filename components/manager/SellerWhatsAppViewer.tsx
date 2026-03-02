@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Search, Loader2, MessageCircle, Image as ImageIcon, FileText, Mic, Eye, X, User, Download } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Search, Loader2, MessageCircle, Image as ImageIcon, FileText, Mic, Eye, X, User, Download, RefreshCw } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -100,7 +100,9 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
   const [search, setSearch] = useState('')
   const [authToken, setAuthToken] = useState<string | null>(null)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+  const [scrapeStatus, setScrapeStatus] = useState<'idle' | 'requesting' | 'pending' | 'scraping' | 'done' | 'failed' | 'offline'>('idle')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrapePollingRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -142,6 +144,94 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
     }
   }
 
+  const reloadMessages = useCallback(async (contactPhone: string) => {
+    try {
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+      const companyId = await getCompanyId()
+      const res = await fetch(
+        `/api/admin/seller-whatsapp-messages?sellerId=${sellerId}&contactPhone=${encodeURIComponent(contactPhone)}`,
+        { headers: { 'x-company-id': companyId || '' } }
+      )
+      const data = await res.json()
+      setMessages(data.messages || [])
+    } catch (err) {
+      console.error('Erro ao recarregar mensagens:', err)
+    }
+  }, [sellerId])
+
+  const triggerScrape = useCallback(async (contactName: string, contactPhone: string) => {
+    // Clear any existing polling
+    if (scrapePollingRef.current) {
+      clearInterval(scrapePollingRef.current)
+      scrapePollingRef.current = null
+    }
+
+    setScrapeStatus('requesting')
+    try {
+      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+      const companyId = await getCompanyId()
+
+      const res = await fetch('/api/admin/request-scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-company-id': companyId || '' },
+        body: JSON.stringify({ sellerId, contactName, contactPhone })
+      })
+      const result = await res.json()
+
+      if (!result.ok) {
+        setScrapeStatus(result.error === 'desktop_offline' ? 'offline' : 'failed')
+        setTimeout(() => setScrapeStatus('idle'), 4000)
+        return
+      }
+
+      setScrapeStatus('pending')
+      const requestId = result.requestId
+      let attempts = 0
+
+      scrapePollingRef.current = setInterval(async () => {
+        attempts++
+        try {
+          const statusRes = await fetch(`/api/admin/scrape-status?requestId=${requestId}`)
+          const statusData = await statusRes.json()
+
+          if (statusData.status === 'in_progress') {
+            setScrapeStatus('scraping')
+          } else if (statusData.status === 'completed') {
+            if (scrapePollingRef.current) clearInterval(scrapePollingRef.current)
+            scrapePollingRef.current = null
+            setScrapeStatus('done')
+            reloadMessages(contactPhone)
+            setTimeout(() => setScrapeStatus('idle'), 3000)
+          } else if (statusData.status === 'failed' || statusData.status === 'expired') {
+            if (scrapePollingRef.current) clearInterval(scrapePollingRef.current)
+            scrapePollingRef.current = null
+            setScrapeStatus('failed')
+            setTimeout(() => setScrapeStatus('idle'), 4000)
+          }
+
+          if (attempts >= 30) {
+            if (scrapePollingRef.current) clearInterval(scrapePollingRef.current)
+            scrapePollingRef.current = null
+            setScrapeStatus('failed')
+            setTimeout(() => setScrapeStatus('idle'), 4000)
+          }
+        } catch {
+          // Network error, keep polling
+        }
+      }, 2000)
+    } catch {
+      setScrapeStatus('failed')
+      setTimeout(() => setScrapeStatus('idle'), 4000)
+    }
+  }, [sellerId, reloadMessages])
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (scrapePollingRef.current) clearInterval(scrapePollingRef.current)
+    }
+  }, [])
+
   const loadMessages = async (conv: Conversation) => {
     setSelectedConv(conv)
     setLoadingMsgs(true)
@@ -159,6 +249,10 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
     } finally {
       setLoadingMsgs(false)
     }
+
+    // Trigger on-demand scrape in background
+    const name = conv.contact_name || conv.contact_phone
+    triggerScrape(name, conv.contact_phone)
   }
 
   const filtered = conversations.filter(c => {
@@ -291,6 +385,23 @@ export default function SellerWhatsAppViewer({ sellerId, sellerName, onClose }: 
               <span className="text-[9px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                 {selectedConv.message_count} msgs
               </span>
+              {scrapeStatus !== 'idle' && (
+                <span className={`text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                  scrapeStatus === 'done' ? 'bg-green-100 text-green-600' :
+                  scrapeStatus === 'failed' || scrapeStatus === 'offline' ? 'bg-red-50 text-red-500' :
+                  'bg-yellow-50 text-yellow-700'
+                }`}>
+                  {(scrapeStatus === 'requesting' || scrapeStatus === 'pending' || scrapeStatus === 'scraping') && (
+                    <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                  )}
+                  {scrapeStatus === 'requesting' && 'Solicitando...'}
+                  {scrapeStatus === 'pending' && 'Aguardando desktop...'}
+                  {scrapeStatus === 'scraping' && 'Extraindo mensagens...'}
+                  {scrapeStatus === 'done' && 'Atualizado'}
+                  {scrapeStatus === 'failed' && 'Falha ao atualizar'}
+                  {scrapeStatus === 'offline' && 'Desktop offline'}
+                </span>
+              )}
             </div>
 
             {/* Messages */}

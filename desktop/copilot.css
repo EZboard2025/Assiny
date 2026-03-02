@@ -150,7 +150,13 @@ body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, Blin
   align-items: center;
   gap: 8px;
   margin-top: 8px;
+  background: #202c33;
+  border-radius: 12px;
+  padding: 4px 4px 4px 16px;
+  border: 1px solid #2a3942;
+  transition: border-color 0.15s;
 }
+.welcome-input-wrap:focus-within { border-color: #00a884; }
 
 .welcome-suggestions {
   width: 100%;

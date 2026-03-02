@@ -27,14 +27,15 @@ function generateMessageId(
   contactPhone: string,
   timestamp: number,
   fromMe: boolean,
-  body: string,
-  index: number
+  body: string
 ): string {
   const direction = fromMe ? 'out' : 'in'
-  // Use body hash + direction + index for stable dedup across re-scrapes
-  // (raw timestamp changes between scrapes for messages without data-pre-plain-text)
+  // Use body + direction + timestamp for stable dedup across re-scrapes.
+  // Timestamp comes from WhatsApp's data-pre-plain-text (stable across scrapes).
+  // Round to nearest minute to tolerate minor timestamp drift.
+  const tsMinute = Math.floor(timestamp / 60000) * 60000
   const contentHash = createHash('sha256')
-    .update(`${body || ''}_${direction}_${index}`)
+    .update(`${body || ''}_${direction}_${tsMinute}`)
     .digest('hex')
     .substring(0, 12)
   return `desktop_${userId}_${contactPhone}_${contentHash}`
@@ -136,8 +137,8 @@ export async function POST(request: Request) {
     console.log(`[Desktop Sync] Messages: "${contactName}" (${contactPhone}), ${messages.length} msgs`)
 
     // Generate deterministic IDs for all messages
-    const generatedIds = messages.map((msg, i) =>
-      generateMessageId(user.id, contactPhone, msg.timestamp, msg.fromMe, msg.body, i)
+    const generatedIds = messages.map((msg) =>
+      generateMessageId(user.id, contactPhone, msg.timestamp, msg.fromMe, msg.body)
     )
 
     // Bulk check existing messages

@@ -35,29 +35,32 @@ export async function GET(request: Request) {
     const allConnected = getAllConnectedClients()
     const connectedMap = new Map(allConnected.map(c => [c.userId, c.phone]))
 
-    // DB fallback: check active connections for sellers not found in-memory
-    // This handles cases where the manager panel runs on a different instance
-    // or when the client exists but the employee query didn't match
+    // DB: check ALL connections (active or disconnected) to know if seller ever connected
     const { data: dbConnections } = await supabaseAdmin
       .from('whatsapp_connections')
-      .select('user_id, display_phone_number')
+      .select('user_id, display_phone_number, status')
       .in('user_id', userIds)
-      .eq('status', 'active')
 
-    const dbConnMap = new Map(
-      (dbConnections || []).map(c => [c.user_id, c.display_phone_number])
-    )
+    const dbConnMap = new Map<string, { phone: string; active: boolean }>()
+    for (const c of dbConnections || []) {
+      // If multiple records exist, prefer active over disconnected
+      const existing = dbConnMap.get(c.user_id)
+      if (!existing || c.status === 'active') {
+        dbConnMap.set(c.user_id, { phone: c.display_phone_number, active: c.status === 'active' })
+      }
+    }
 
-    // Build map — prefer in-memory, fallback to DB
-    const connections: Record<string, { google: boolean; whatsapp: boolean; whatsappPhone: string | null }> = {}
+    // Build map: whatsapp = ever connected, whatsappOnline = currently active
+    const connections: Record<string, { google: boolean; whatsapp: boolean; whatsappOnline: boolean; whatsappPhone: string | null }> = {}
 
     for (const uid of userIds) {
       const inMemory = connectedMap.has(uid)
-      const inDb = dbConnMap.has(uid)
+      const dbEntry = dbConnMap.get(uid)
       connections[uid] = {
         google: false,
-        whatsapp: inMemory || inDb,
-        whatsappPhone: connectedMap.get(uid) || dbConnMap.get(uid) || null
+        whatsapp: inMemory || !!dbEntry,  // true if ever connected
+        whatsappOnline: inMemory || (dbEntry?.active ?? false),  // true only if currently active
+        whatsappPhone: connectedMap.get(uid) || dbEntry?.phone || null
       }
     }
 

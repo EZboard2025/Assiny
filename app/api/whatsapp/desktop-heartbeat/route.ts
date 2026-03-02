@@ -85,7 +85,49 @@ export async function POST(request: Request) {
         })
     }
 
-    return NextResponse.json({ ok: true, status: 'active' })
+    // Process scrape results reported by desktop
+    if (body.scrapeResults && Array.isArray(body.scrapeResults)) {
+      for (const result of body.scrapeResults) {
+        if (!result.requestId) continue
+        await supabaseAdmin
+          .from('scrape_requests')
+          .update({
+            status: result.status || 'failed',
+            error_message: result.error || null,
+            messages_found: result.messagesFound || 0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', result.requestId)
+      }
+    }
+
+    // Check for pending scrape requests for this seller
+    const { data: pendingRequests } = await supabaseAdmin
+      .from('scrape_requests')
+      .select('id, contact_name, contact_phone')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: true })
+      .limit(3)
+
+    // Mark fetched requests as in_progress
+    if (pendingRequests && pendingRequests.length > 0) {
+      await supabaseAdmin
+        .from('scrape_requests')
+        .update({ status: 'in_progress', updated_at: new Date().toISOString() })
+        .in('id', pendingRequests.map(r => r.id))
+    }
+
+    return NextResponse.json({
+      ok: true,
+      status: 'active',
+      scrapeCommands: (pendingRequests || []).map(r => ({
+        requestId: r.id,
+        contactName: r.contact_name,
+        contactPhone: r.contact_phone,
+      })),
+    })
   } catch (error: any) {
     console.error('[Desktop Heartbeat] Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

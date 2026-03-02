@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld('ramppy', {
   sendConversationList: (data) => ipcRenderer.send('whatsapp-conversation-list', data),
   // Receive text to inject into WhatsApp input
   onInjectText: (callback) => ipcRenderer.on('inject-whatsapp-text', (_event, text) => callback(text)),
+  // Report auto-scan progress to main process
+  sendAutoScanProgress: (progress) => ipcRenderer.send('auto-scan-progress', progress),
 })

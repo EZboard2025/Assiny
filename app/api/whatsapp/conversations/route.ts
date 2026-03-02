@@ -70,6 +70,8 @@ export async function GET(request: NextRequest) {
       let normalized = phone.replace(/^lid_/, '')
       // Remove all non-digits
       normalized = normalized.replace(/\D/g, '')
+      // If no digits found, this is a name-based contact (desktop scraper) — use raw value
+      if (normalized.length === 0) return phone
       // Remove Brazil country code (55) if present and number is long enough
       if (normalized.startsWith('55') && normalized.length > 11) {
         normalized = normalized.substring(2)

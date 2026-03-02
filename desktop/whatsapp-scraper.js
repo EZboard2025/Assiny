@@ -51,14 +51,15 @@ const SELECTORS = {
   ],
 }
 
-// --- State ---
-let lastContactName = null
-let lastMessageCount = 0
-let observer = null
-let debounceTimer = null
-let inactiveCount = 0       // consecutive times getContactName() returned null
-const DEBOUNCE_MS = 800
-const INACTIVE_THRESHOLD = 3 // require 3 consecutive nulls before declaring inactive
+// --- State (use var to allow safe re-injection via executeJavaScript) ---
+var lastContactName = lastContactName || null
+var lastMessageCount = lastMessageCount || 0
+var observer = observer || null
+var debounceTimer = debounceTimer || null
+var inactiveCount = inactiveCount || 0
+var DEBOUNCE_MS = 800
+var INACTIVE_THRESHOLD = 3
+var isAutoScanning = isAutoScanning || false
 
 // --- Helpers ---
 function trySelect(parent, selectors) {
@@ -566,7 +567,7 @@ function scrapeConversationList() {
 }
 
 // --- Periodic sidebar sync ---
-let sidebarSyncInterval = null
+var sidebarSyncInterval = sidebarSyncInterval || null
 
 function startSidebarSync() {
   if (sidebarSyncInterval) return
@@ -587,6 +588,131 @@ function startSidebarSync() {
     }
   }, 2000)
 }
+
+// --- Auto-scan: open top N conversations and scrape messages ---
+// This function is called from main.js via executeJavaScript.
+// It explicitly extracts messages and sends via IPC (does NOT rely on MutationObserver).
+async function autoScanConversations(maxConversations) {
+  maxConversations = maxConversations || 15
+  if (isAutoScanning) return { status: 'already_scanning' }
+  isAutoScanning = true
+
+  const paneEl = document.getElementById('pane-side')
+  if (!paneEl) {
+    isAutoScanning = false
+    return { status: 'no_sidebar' }
+  }
+
+  // Snapshot the cells ONCE before we start clicking
+  var cellList = paneEl.querySelectorAll('[role="row"]')
+  if (cellList.length === 0) cellList = paneEl.querySelectorAll('[data-testid="cell-frame-container"]')
+  if (cellList.length === 0) cellList = paneEl.querySelectorAll('[role="gridcell"]')
+
+  if (cellList.length === 0) {
+    isAutoScanning = false
+    return { status: 'no_conversations' }
+  }
+
+  var total = Math.min(cellList.length, maxConversations)
+  var scanned = 0
+
+  console.log('[Ramppy Auto-Scan] Starting scan of ' + total + ' conversations...')
+
+  for (var i = 0; i < total; i++) {
+    try {
+      // Re-query cells each iteration (DOM might update after clicks)
+      var freshCells = paneEl.querySelectorAll('[role="row"]')
+      if (freshCells.length === 0) freshCells = paneEl.querySelectorAll('[data-testid="cell-frame-container"]')
+      var cell = freshCells[i]
+      if (!cell) {
+        console.log('[Ramppy Auto-Scan] ' + (i + 1) + '/' + total + ': Cell not found, skipping')
+        continue
+      }
+
+      // Extract contact name for logging
+      var nameSpan = cell.querySelector('span[title]')
+      var name = nameSpan ? nameSpan.getAttribute('title') : '#' + i
+
+      console.log('[Ramppy Auto-Scan] ' + (i + 1) + '/' + total + ': Opening "' + name + '"...')
+
+      // Debug: log DOM structure of first cell to understand WhatsApp's layout
+      if (i === 0) {
+        var debugInfo = []
+        var walkDOM = function(el, depth) {
+          if (depth > 5) return
+          var tag = el.tagName ? el.tagName.toLowerCase() : '?'
+          var attrs = []
+          if (el.getAttribute) {
+            if (el.getAttribute('role')) attrs.push('role=' + el.getAttribute('role'))
+            if (el.getAttribute('data-testid')) attrs.push('testid=' + el.getAttribute('data-testid'))
+            if (el.getAttribute('tabindex')) attrs.push('tabindex=' + el.getAttribute('tabindex'))
+            if (el.getAttribute('aria-selected')) attrs.push('selected=' + el.getAttribute('aria-selected'))
+          }
+          debugInfo.push('  '.repeat(depth) + tag + (attrs.length ? '[' + attrs.join(',') + ']' : ''))
+          var children = el.children || []
+          for (var c = 0; c < Math.min(children.length, 6); c++) {
+            walkDOM(children[c], depth + 1)
+          }
+        }
+        walkDOM(cell, 0)
+        console.log('[Ramppy Auto-Scan] Cell DOM structure:\n' + debugInfo.join('\n'))
+      }
+
+      // Click strategy: simulate real mouse events (React needs pointer events)
+      var clickTarget = cell.querySelector('[data-testid="cell-frame-container"]')
+        || cell.querySelector('div[tabindex="-1"]')
+        || cell.querySelector('div[role="gridcell"]')
+        || cell
+      var rect = clickTarget.getBoundingClientRect()
+      var cx = rect.left + rect.width / 2
+      var cy = rect.top + rect.height / 2
+      var evtInit = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0 }
+      clickTarget.dispatchEvent(new PointerEvent('pointerdown', evtInit))
+      clickTarget.dispatchEvent(new MouseEvent('mousedown', evtInit))
+      clickTarget.dispatchEvent(new PointerEvent('pointerup', evtInit))
+      clickTarget.dispatchEvent(new MouseEvent('mouseup', evtInit))
+      clickTarget.dispatchEvent(new MouseEvent('click', evtInit))
+
+      // Wait for conversation panel (#main) to load
+      await new Promise(function(r) { setTimeout(r, 3000) })
+
+      // Directly extract messages and send via IPC (bypass MutationObserver)
+      var contactName = getContactName()
+      var contactPhone = getContactPhone()
+      var messages = extractMessages()
+
+      console.log('[Ramppy Auto-Scan] ' + (i + 1) + '/' + total + ': "' + (contactName || name) + '" → ' + messages.length + ' msgs, panel=' + (!!document.querySelector('#main')))
+
+      if (contactName && messages.length > 0 && window.ramppy) {
+        window.ramppy.sendContext({
+          active: true,
+          contactName: contactName,
+          contactPhone: contactPhone || name,
+          messages: messages,
+          conversationChanged: true,
+        })
+      }
+
+      // Buffer for sync pipeline to process
+      await new Promise(function(r) { setTimeout(r, 500) })
+
+      scanned++
+    } catch (e) {
+      console.log('[Ramppy Auto-Scan] Error on conversation ' + i + ': ' + e.message)
+    }
+  }
+
+  // Update scraper state to current conversation
+  lastContactName = getContactName()
+  lastMessageCount = 0
+
+  isAutoScanning = false
+  console.log('[Ramppy Auto-Scan] Complete: scanned ' + scanned + '/' + total + ' conversations')
+  return { status: 'done', scanned: scanned, total: total }
+}
+
+// Expose for main process to call via executeJavaScript
+window.__ramppyAutoScan = autoScanConversations
 
 // --- Initialize ---
 function init() {

@@ -1,6 +1,17 @@
 const { app, BrowserWindow, BaseWindow, WebContentsView, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu, Notification, globalShortcut, systemPreferences, dialog, powerSaveBlocker } = require('electron')
 const path = require('path')
+const fs = require('fs')
 const { isBlackHoleInstalled, installBlackHoleDriver, createMultiOutputDevice, destroyMultiOutputDevice } = require('./audio-devices')
+
+// File-based logging for auto-scan debugging
+const LOG_FILE = '/tmp/electron-debug.log'
+function debugLog(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`
+  fs.appendFileSync(LOG_FILE, line)
+  console.log(msg)
+}
+
+debugLog('=== Electron main.js loaded ===')
 
 // System audio loopback is handled via setDisplayMediaRequestHandler (see app.whenReady)
 
@@ -15,6 +26,7 @@ let recordingWindow = null
 let whatsappBaseWindow = null // Single window for WhatsApp + Copilot
 let waView = null             // WebContentsView: WhatsApp Web (left)
 let copilotView = null        // WebContentsView: Sales Copilot (right)
+let isAutoScanRunning = false // Prevents scraper re-injection during auto-scan
 let authTokenInterval = null
 let tray = null
 
@@ -22,6 +34,7 @@ const COPILOT_WIDTH = 400
 
 // WhatsApp scraper state (forwarded to copilot view)
 let whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
+let lastSidebarList = []  // Latest sidebar conversation list from scraper
 
 // Desktop → Server message sync state
 let syncedMessageKeys = new Map()  // Map<contactPhone, Set<localKey>> — client-side dedup
@@ -381,11 +394,19 @@ function createWhatsAppWindow() {
   // --- Inject scraper into WhatsApp view ---
   const injectScraper = () => {
     if (!waView || !whatsappBaseWindow || whatsappBaseWindow.isDestroyed()) return
+    // Skip re-injection during auto-scan (clicking conversations triggers did-navigate-in-page)
+    if (isAutoScanRunning) {
+      console.log('[WhatsApp] Skipping scraper re-injection (auto-scan active)')
+      return
+    }
     const fs = require('fs')
     const scraperPath = path.join(__dirname, 'whatsapp-scraper.js')
     try {
       const scraperCode = fs.readFileSync(scraperPath, 'utf-8')
-      waView.webContents.executeJavaScript(scraperCode)
+      waView.webContents.executeJavaScript(scraperCode).catch(err => {
+        console.warn('[WhatsApp] Scraper execution warning:', err.message)
+      })
+      scraperInjected = true
       console.log('[WhatsApp] Scraper injected successfully')
     } catch (err) {
       console.error('[WhatsApp] Failed to inject scraper:', err)
@@ -397,7 +418,7 @@ function createWhatsAppWindow() {
 
   // Forward WhatsApp WebView console logs to main process (for debugging scraper)
   waView.webContents.on('console-message', (_event, level, message) => {
-    if (message.includes('[Ramppy Scraper]')) {
+    if (message.includes('[Ramppy Scraper]') || message.includes('[Ramppy Auto-Scan]')) {
       console.log(`[WA WebView] ${message}`)
     }
   })
@@ -446,10 +467,13 @@ function createWhatsAppWindow() {
       `)
       if (isAuth && !desktopWaAuthenticated) {
         desktopWaAuthenticated = true
-        console.log('[WhatsApp Desktop] User authenticated — starting heartbeats + sync')
+        debugLog('[WhatsApp Desktop] User authenticated — starting heartbeats + sync')
         sendDesktopWaHeartbeat('active')
-        desktopWaHeartbeatInterval = setInterval(() => sendDesktopWaHeartbeat('active'), 30000)
+        desktopWaHeartbeatInterval = setInterval(() => sendDesktopWaHeartbeat('active'), 10000)
         startSyncTimer()
+        // Auto-scan: wait 2s for sidebar to populate, then scrape changed conversations
+        debugLog('[WhatsApp Desktop] Auto-scan scheduled in 2s...')
+        setTimeout(() => triggerAutoScan(), 2000)
       } else if (!isAuth && desktopWaAuthenticated) {
         desktopWaAuthenticated = false
         console.log('[WhatsApp Desktop] User logged out — stopping heartbeats + sync')
@@ -460,9 +484,11 @@ function createWhatsAppWindow() {
     } catch (_) { /* page not ready */ }
   }
 
-  const waAuthCheckInterval = setInterval(checkWaAuth, 10000)
-  // First check after WhatsApp Web loads
-  waView.webContents.on('did-finish-load', () => setTimeout(checkWaAuth, 5000))
+  const waAuthCheckInterval = setInterval(checkWaAuth, 3000)
+  // First check after WhatsApp Web loads (fast: 2s)
+  waView.webContents.on('did-finish-load', () => setTimeout(checkWaAuth, 2000))
+
+  let pendingScrapeResults = []
 
   async function sendDesktopWaHeartbeat(status) {
     try {
@@ -488,18 +514,184 @@ function createWhatsAppWindow() {
       if (!authData) return
 
       const url = PLATFORM_URL + '/api/whatsapp/desktop-heartbeat'
+      const bodyPayload = { status }
+      // Attach pending scrape results if any
+      if (pendingScrapeResults.length > 0) {
+        bodyPayload.scrapeResults = pendingScrapeResults.splice(0)
+      }
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authData}`
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify(bodyPayload)
       })
       const result = await response.json()
       console.log(`[WhatsApp Desktop] Heartbeat sent: ${status}`, result.ok ? '✓' : result.error)
+
+      // Process scrape commands from server
+      if (result.scrapeCommands && result.scrapeCommands.length > 0) {
+        debugLog(`[Targeted Scrape] Received ${result.scrapeCommands.length} command(s) from server`)
+        for (const cmd of result.scrapeCommands) {
+          await executeTargetedScrape(cmd)
+        }
+        // Send immediate heartbeat to report results
+        if (pendingScrapeResults.length > 0) {
+          sendDesktopWaHeartbeat('active')
+        }
+      }
     } catch (err) {
       console.error('[WhatsApp Desktop] Heartbeat failed:', err.message)
+    }
+  }
+
+  // --- Targeted Scrape (on-demand from manager) ---
+  async function executeTargetedScrape(cmd) {
+    const { requestId, contactName } = cmd
+    debugLog(`[Targeted Scrape] Starting for "${contactName}" (request: ${requestId})`)
+
+    if (!waView || waView.webContents.isDestroyed()) {
+      pendingScrapeResults.push({ requestId, status: 'failed', error: 'whatsapp_not_open' })
+      return
+    }
+
+    try {
+      // 1. Find conversation in sidebar by name
+      const cellInfo = await waView.webContents.executeJavaScript(`
+        (function() {
+          var targetName = ${JSON.stringify(contactName)};
+          var pane = document.getElementById('pane-side');
+          if (!pane) return null;
+          var spans = pane.querySelectorAll('span[title]');
+          var targetCell = null;
+          for (var i = 0; i < spans.length; i++) {
+            if (spans[i].getAttribute('title') === targetName) {
+              var el = spans[i];
+              while (el && el !== pane) {
+                if (el.getAttribute('role') === 'row' || el.getAttribute('role') === 'listitem' ||
+                    (el.dataset && el.dataset.testid === 'cell-frame-container')) {
+                  targetCell = el;
+                  break;
+                }
+                el = el.parentElement;
+              }
+              break;
+            }
+          }
+          if (!targetCell) return null;
+          var r = targetCell.getBoundingClientRect();
+          if (r.top < 0 || r.bottom > window.innerHeight) {
+            targetCell.scrollIntoView({ block: 'center' });
+          }
+          var clickTarget = targetCell.querySelector('div[tabindex="-1"]') || targetCell.querySelector('div[role="gridcell"]') || targetCell;
+          r = clickTarget.getBoundingClientRect();
+          return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+        })()
+      `)
+
+      if (!cellInfo) {
+        debugLog(`[Targeted Scrape] "${contactName}" not found in sidebar`)
+        pendingScrapeResults.push({ requestId, status: 'failed', error: 'contact_not_found' })
+        return
+      }
+
+      // 2. Show fully opaque overlay (hides conversation switch from seller)
+      await waView.webContents.executeJavaScript(`
+        (function() {
+          var existing = document.getElementById('ramppy-scrape-overlay');
+          if (existing) existing.remove();
+          var overlay = document.createElement('div');
+          overlay.id = 'ramppy-scrape-overlay';
+          overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#111b21;z-index:9999;display:flex;align-items:center;justify-content:center;pointer-events:all;';
+          document.body.appendChild(overlay);
+        })()
+      `)
+
+      // 3. Allow click through overlay (pointer-events:none) — overlay stays visible
+      await waView.webContents.executeJavaScript(`
+        document.getElementById('ramppy-scrape-overlay').style.pointerEvents = 'none';
+      `)
+      await new Promise(r => setTimeout(r, 50))
+
+      waView.webContents.sendInputEvent({ type: 'mouseDown', x: cellInfo.x, y: cellInfo.y, button: 'left', clickCount: 1 })
+      waView.webContents.sendInputEvent({ type: 'mouseUp', x: cellInfo.x, y: cellInfo.y, button: 'left', clickCount: 1 })
+
+      await new Promise(r => setTimeout(r, 50))
+      await waView.webContents.executeJavaScript(`
+        var ov = document.getElementById('ramppy-scrape-overlay');
+        if (ov) ov.style.pointerEvents = 'all';
+      `)
+
+      // 4. Wait for #main panel (conversation loaded)
+      const mainReady = await waView.webContents.executeJavaScript(`
+        new Promise(function(resolve) {
+          var checks = 0;
+          var iv = setInterval(function() {
+            checks++;
+            if (document.querySelector('#main') || checks >= 25) {
+              clearInterval(iv);
+              resolve(!!document.querySelector('#main'));
+            }
+          }, 200);
+        })
+      `)
+
+      if (!mainReady) {
+        debugLog(`[Targeted Scrape] #main panel not loaded for "${contactName}"`)
+        pendingScrapeResults.push({ requestId, status: 'failed', error: 'panel_not_loaded' })
+        await waView.webContents.executeJavaScript(`
+          var ov = document.getElementById('ramppy-scrape-overlay'); if (ov) ov.remove();
+        `).catch(() => {})
+        return
+      }
+
+      await new Promise(r => setTimeout(r, 500))
+
+      // 5. Extract messages using injected scraper functions
+      const data = await waView.webContents.executeJavaScript(`
+        (function() {
+          var contactName = typeof getContactName === 'function' ? getContactName() : null;
+          var contactPhone = typeof getContactPhone === 'function' ? getContactPhone() : null;
+          var messages = typeof extractMessages === 'function' ? extractMessages() : [];
+          return { contactName: contactName, contactPhone: contactPhone, msgCount: messages.length, messages: messages };
+        })()
+      `)
+
+      debugLog(`[Targeted Scrape] "${contactName}" → ${data.msgCount} msgs extracted`)
+
+      // 6. Queue for sync and execute immediately
+      if (data.contactName && data.msgCount > 0) {
+        let syncKey = data.contactName
+        if (/^[\d+\s()\-]+$/.test(syncKey.replace(/\s/g, ''))) {
+          syncKey = syncKey.replace(/\s/g, '')
+        }
+        queueForSync(syncKey, data.contactName, data.messages)
+        await executeSync()
+      }
+
+      // 7. Remove overlay
+      await waView.webContents.executeJavaScript(`
+        var ov = document.getElementById('ramppy-scrape-overlay'); if (ov) ov.remove();
+      `).catch(() => {})
+
+      // 8. Report success
+      pendingScrapeResults.push({
+        requestId,
+        status: 'completed',
+        messagesFound: data.msgCount || 0,
+      })
+      debugLog(`[Targeted Scrape] "${contactName}" completed: ${data.msgCount} msgs`)
+
+    } catch (err) {
+      debugLog(`[Targeted Scrape] Error for "${contactName}": ${err.message}`)
+      pendingScrapeResults.push({ requestId, status: 'failed', error: err.message })
+      // Clean overlay on error
+      if (waView && !waView.webContents.isDestroyed()) {
+        waView.webContents.executeJavaScript(`
+          var ov = document.getElementById('ramppy-scrape-overlay'); if (ov) ov.remove();
+        `).catch(() => {})
+      }
     }
   }
 
@@ -757,6 +949,7 @@ ipcMain.on('whatsapp-context-update', (_event, data) => {
 // WhatsApp scraper sends full conversation list from sidebar → sync to server
 ipcMain.on('whatsapp-conversation-list', (_event, list) => {
   if (!list || list.length === 0) return
+  lastSidebarList = list  // Store for smart re-sync comparison
   console.log(`[WhatsApp IPC] Conversation list received: ${list.length} conversations`)
   syncConversationList(list)
 })
@@ -767,6 +960,262 @@ ipcMain.on('inject-whatsapp-text', (_event, text) => {
     waView.webContents.send('inject-whatsapp-text', text)
   }
 })
+
+// Auto-scan progress reports from scraper
+ipcMain.on('auto-scan-progress', (_event, progress) => {
+  console.log(`[Auto-Scan] ${progress.scanned}/${progress.total}: ${progress.currentContact}`)
+})
+
+// ============================================================
+// AUTO-SCAN: Automatically scrape top conversations on WhatsApp connect
+// ============================================================
+
+async function triggerAutoScan() {
+  if (!waView || waView.webContents.isDestroyed()) return
+
+  const MAX_CONVERSATIONS = 30
+  debugLog('[Auto-Scan] Starting...')
+  isAutoScanRunning = true
+
+  try {
+    // Step 1: Get auth token to fetch stored conversations from API
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const authToken = await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              var raw = localStorage.getItem(key);
+              if (raw) { var p = JSON.parse(raw); if (p && p.access_token) return p.access_token; }
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    `)
+
+    // Step 2: Fetch stored conversations from database
+    let storedConversations = []
+    if (authToken) {
+      try {
+        const resp = await fetch(PLATFORM_URL + '/api/whatsapp/conversations', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+        const result = await resp.json()
+        storedConversations = result.conversations || []
+      } catch (e) {
+        debugLog('[Auto-Scan] Could not fetch stored conversations: ' + e.message)
+      }
+    }
+
+    // Daily scan: run full scan once per day, skip if already scanned today
+    const scannedCount = storedConversations.filter(c => (c.message_count || 0) > 0).length
+    const today = new Date().toDateString()
+    const lastScanDate = storedConversations.reduce((latest, c) => {
+      if (c.updated_at && new Date(c.updated_at) > latest) return new Date(c.updated_at)
+      return latest
+    }, new Date(0))
+    const scannedToday = lastScanDate.toDateString() === today && scannedCount >= Math.floor(MAX_CONVERSATIONS * 0.7)
+
+    debugLog(`[Auto-Scan] ${scannedCount} conversations with messages, scanned today: ${scannedToday}`)
+
+    if (scannedToday) {
+      debugLog('[Auto-Scan] Already scanned today, skipping. Manager can use on-demand scrape.')
+      return
+    }
+
+    // Wait for sidebar data
+    if (lastSidebarList.length === 0) {
+      debugLog('[Auto-Scan] Waiting for sidebar data...')
+      await new Promise(r => setTimeout(r, 3000))
+    }
+    if (lastSidebarList.length === 0) {
+      debugLog('[Auto-Scan] No sidebar data available, aborting')
+      return
+    }
+
+    // Build conversation list: top N from sidebar (deduplicated by name)
+    const conversationsToScan = []
+    const seenNames = new Set()
+    for (let i = 0; i < lastSidebarList.length && conversationsToScan.length < MAX_CONVERSATIONS; i++) {
+      const name = lastSidebarList[i].name || lastSidebarList[i].phone
+      if (name && !seenNames.has(name)) {
+        seenNames.add(name)
+        conversationsToScan.push({ name })
+      }
+    }
+    debugLog(`[Auto-Scan] Daily scan: will scan top ${conversationsToScan.length} conversations`)
+
+    // Show fully opaque loading overlay (never flashes — uses pointer-events toggle for clicks)
+    await waView.webContents.executeJavaScript(`
+      (function() {
+        if (document.getElementById('ramppy-scan-overlay')) return;
+        var overlay = document.createElement('div');
+        overlay.id = 'ramppy-scan-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#111b21;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:all;';
+        overlay.innerHTML = '<div style="text-align:center;color:#e9edef;font-family:Segoe UI,Helvetica,Arial,sans-serif;">'
+          + '<div style="width:48px;height:48px;border:3px solid rgba(0,168,132,0.3);border-top-color:#00a884;border-radius:50%;animation:ramppy-spin 1s linear infinite;margin:0 auto 20px;"></div>'
+          + '<div style="font-size:16px;font-weight:500;margin-bottom:20px;">Sincronizando conversas</div>'
+          + '<div style="width:240px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">'
+          + '<div id="ramppy-scan-bar" style="width:0%;height:100%;background:#00a884;border-radius:2px;transition:width 0.5s ease;"></div>'
+          + '</div>'
+          + '<div id="ramppy-scan-progress" style="font-size:12px;color:#667781;margin-top:8px;">0%</div>'
+          + '</div>';
+        var style = document.createElement('style');
+        style.textContent = '@keyframes ramppy-spin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+        document.body.appendChild(overlay);
+      })()
+    `)
+
+    // Step 6: Click and scrape each conversation BY NAME (not index)
+    // Finding by name avoids WhatsApp's virtualized sidebar reordering issues.
+    const total = conversationsToScan.length
+    for (let step = 0; step < total; step++) {
+      if (!waView || waView.webContents.isDestroyed()) break
+
+      const targetName = conversationsToScan[step].name
+
+      // Find cell by contact name in sidebar (robust against virtualized scrolling)
+      const cellInfo = await waView.webContents.executeJavaScript(`
+        (function() {
+          var targetName = ${JSON.stringify(targetName)};
+          var pane = document.getElementById('pane-side');
+          if (!pane) return null;
+
+          // Search all span[title] to find the matching contact
+          var spans = pane.querySelectorAll('span[title]');
+          var targetCell = null;
+          for (var i = 0; i < spans.length; i++) {
+            if (spans[i].getAttribute('title') === targetName) {
+              // Walk up DOM to find the row/listitem container
+              var el = spans[i];
+              while (el && el !== pane) {
+                if (el.getAttribute('role') === 'row' || el.getAttribute('role') === 'listitem' ||
+                    (el.dataset && el.dataset.testid === 'cell-frame-container')) {
+                  targetCell = el;
+                  break;
+                }
+                el = el.parentElement;
+              }
+              break;
+            }
+          }
+
+          if (!targetCell) return null;
+
+          // Scroll into view if off-screen
+          var r = targetCell.getBoundingClientRect();
+          if (r.top < 0 || r.bottom > window.innerHeight) {
+            targetCell.scrollIntoView({ block: 'center' });
+          }
+
+          // Get clickable target area
+          var clickTarget = targetCell.querySelector('div[tabindex="-1"]') || targetCell.querySelector('div[role="gridcell"]') || targetCell;
+          r = clickTarget.getBoundingClientRect();
+          return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+        })()
+      `)
+
+      if (!cellInfo) {
+        debugLog(`[Auto-Scan] ${step + 1}/${total}: "${targetName}" not found in sidebar, skipping`)
+        continue
+      }
+
+      // Update progress bar
+      const pct = Math.round(((step + 1) / total) * 100)
+      waView.webContents.executeJavaScript(`
+        (function() {
+          var bar = document.getElementById('ramppy-scan-bar');
+          if (bar) bar.style.width = '${pct}%';
+          var el = document.getElementById('ramppy-scan-progress');
+          if (el) el.textContent = '${pct}%';
+        })()
+      `).catch(function() {})
+
+      // Allow click to pass through overlay (pointer-events:none) — overlay stays fully visible
+      await waView.webContents.executeJavaScript(`
+        document.getElementById('ramppy-scan-overlay').style.pointerEvents = 'none';
+      `)
+      await new Promise(r => setTimeout(r, 50))
+
+      // Send real mouse click via Chromium input event
+      waView.webContents.sendInputEvent({ type: 'mouseDown', x: cellInfo.x, y: cellInfo.y, button: 'left', clickCount: 1 })
+      waView.webContents.sendInputEvent({ type: 'mouseUp', x: cellInfo.x, y: cellInfo.y, button: 'left', clickCount: 1 })
+
+      // Block pointer events again
+      await new Promise(r => setTimeout(r, 50))
+      await waView.webContents.executeJavaScript(`
+        document.getElementById('ramppy-scan-overlay').style.pointerEvents = 'all';
+      `)
+
+      // Wait for #main panel to appear (poll every 200ms, max 5s)
+      const mainReady = await waView.webContents.executeJavaScript(`
+        new Promise(function(resolve) {
+          var checks = 0;
+          var iv = setInterval(function() {
+            checks++;
+            if (document.querySelector('#main') || checks >= 25) {
+              clearInterval(iv);
+              resolve(!!document.querySelector('#main'));
+            }
+          }, 200);
+        })
+      `)
+
+      if (!mainReady) {
+        debugLog(`[Auto-Scan] ${step + 1}/${total}: "${targetName}" → #main not found, skipping`)
+        continue
+      }
+
+      // Small extra wait for messages to render in DOM
+      await new Promise(r => setTimeout(r, 500))
+
+      // Extract messages
+      if (!waView || waView.webContents.isDestroyed()) break
+      const data = await waView.webContents.executeJavaScript(`
+        (function() {
+          var contactName = typeof getContactName === 'function' ? getContactName() : null;
+          var contactPhone = typeof getContactPhone === 'function' ? getContactPhone() : null;
+          var messages = typeof extractMessages === 'function' ? extractMessages() : [];
+          return { contactName: contactName, contactPhone: contactPhone, msgCount: messages.length, messages: messages };
+        })()
+      `)
+
+      debugLog(`[Auto-Scan] ${step + 1}/${total}: "${data.contactName || targetName}" → ${data.msgCount} msgs`)
+
+      // Queue for sync
+      if (data.contactName && data.msgCount > 0) {
+        let syncKey = data.contactName
+        if (/^[\d+\s()-]+$/.test(syncKey.replace(/\s/g, ''))) {
+          syncKey = syncKey.replace(/\s/g, '')
+        }
+        queueForSync(syncKey, data.contactName, data.messages)
+      }
+
+      await new Promise(r => setTimeout(r, 500))
+    }
+
+    // Flush queued messages
+    await executeSync()
+
+    debugLog(`[Auto-Scan] Complete: scanned ${total} conversations`)
+  } catch (err) {
+    debugLog('[Auto-Scan] Error: ' + err.message)
+  } finally {
+    isAutoScanRunning = false
+    // Remove loading overlay
+    if (waView && !waView.webContents.isDestroyed()) {
+      waView.webContents.executeJavaScript(`
+        (function() {
+          var overlay = document.getElementById('ramppy-scan-overlay');
+          if (overlay) overlay.remove();
+        })()
+      `).catch(function() {})
+    }
+  }
+}
 
 // Open or focus WhatsApp window
 ipcMain.on('open-whatsapp', () => {
