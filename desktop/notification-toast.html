@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Nicole Notification</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: transparent;
+      overflow: hidden;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-app-region: no-drag;
+      user-select: none;
+    }
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 14px;
+      background: rgba(30, 30, 38, 0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      border-left: 3px solid #34d399;
+      border-radius: 14px;
+      color: #e2e8f0;
+      cursor: pointer;
+      animation: slideIn 0.3s ease-out;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 12px rgba(52,211,153,0.15);
+    }
+    .toast:hover { background: rgba(40, 40, 50, 0.95); }
+    .toast.exit { animation: slideOut 0.25s ease-in forwards; }
+
+    .icon {
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .icon.meeting  { background: rgba(96, 165, 250, 0.18); }
+    .icon.training { background: rgba(52, 211, 153, 0.18); }
+    .icon.leads    { background: rgba(251, 191, 36, 0.18); }
+    .icon.morning  { background: rgba(251, 191, 36, 0.18); }
+
+    .body { flex: 1; min-width: 0; }
+    .title {
+      font-size: 12.5px; font-weight: 600; color: #f1f5f9;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .text {
+      font-size: 11px; color: #94a3b8; margin-top: 2px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .dismiss {
+      flex-shrink: 0;
+      background: none; border: none; color: #64748b;
+      font-size: 18px; cursor: pointer; padding: 4px;
+      line-height: 1; border-radius: 6px;
+    }
+    .dismiss:hover { color: #e2e8f0; background: rgba(255,255,255,0.08); }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes slideOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(8px) scale(0.96); }
+    }
+  </style>
+</head>
+<body>
+  <div class="toast" id="toast">
+    <div class="icon" id="icon"></div>
+    <div class="body">
+      <div class="title" id="title"></div>
+      <div class="text" id="text"></div>
+    </div>
+    <button class="dismiss" id="dismiss">&times;</button>
+  </div>
+
+  <script>
+    const toast = document.getElementById('toast')
+    const iconEl = document.getElementById('icon')
+    const titleEl = document.getElementById('title')
+    const textEl = document.getElementById('text')
+    const dismissBtn = document.getElementById('dismiss')
+
+    let autoDismissTimer = null
+
+    // Receive notification data from main process
+    if (window.notifAPI) {
+      window.notifAPI.onData((data) => {
+        if (!data) return
+        iconEl.textContent = data.icon || '🔔'
+        iconEl.className = 'icon ' + (data.iconClass || '')
+        titleEl.textContent = data.title || 'Nicole'
+        textEl.textContent = data.text || ''
+
+        // Auto-dismiss after 6 seconds
+        clearTimeout(autoDismissTimer)
+        autoDismissTimer = setTimeout(() => {
+          doExit(() => window.notifAPI.dismiss())
+        }, 6000)
+      })
+    }
+
+    // Click toast → tell main process
+    toast.addEventListener('click', (e) => {
+      if (e.target === dismissBtn || dismissBtn.contains(e.target)) return
+      clearTimeout(autoDismissTimer)
+      doExit(() => window.notifAPI.click())
+    })
+
+    // Dismiss button
+    dismissBtn.addEventListener('click', () => {
+      clearTimeout(autoDismissTimer)
+      doExit(() => window.notifAPI.dismiss())
+    })
+
+    function doExit(callback) {
+      toast.classList.add('exit')
+      setTimeout(() => { if (callback) callback() }, 250)
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, screen, Tray, Menu, nativeImage, globalShortcut } = require('electron')
 const path = require('path')
 
 const PLATFORM_URL = 'http://localhost:3000'
@@ -16,6 +16,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 let mainWindow = null
 let bubbleWindow = null
+let notificationWindow = null
 let authTokenInterval = null
 let tray = null
 
@@ -83,6 +84,13 @@ function createMainWindow() {
     }
   })
 
+  // Nudge bubble to check notifications when user returns to app
+  mainWindow.on('focus', () => {
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+      bubbleWindow.webContents.send('notification-nudge')
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
     if (bubbleWindow && !bubbleWindow.isDestroyed()) {
@@ -93,6 +101,63 @@ function createMainWindow() {
       authTokenInterval = null
     }
   })
+}
+
+// ============================================================
+// MULTI-MONITOR: get combined bounds of all displays
+// ============================================================
+function getAllScreenBounds() {
+  const displays = screen.getAllDisplays()
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const d of displays) {
+    const { x, y, width, height } = d.workArea
+    if (x < minX) minX = x
+    if (y < minY) minY = y
+    if (x + width > maxX) maxX = x + width
+    if (y + height > maxY) maxY = y + height
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY, maxX, maxY }
+}
+
+// Get the display that contains the given point
+function getDisplayAt(px, py) {
+  const displays = screen.getAllDisplays()
+  for (const d of displays) {
+    const { x, y, width, height } = d.workArea
+    if (px >= x && px < x + width && py >= y && py < y + height) return d
+  }
+  return screen.getPrimaryDisplay()
+}
+
+// Check which edges of a display have an adjacent monitor (should NOT snap there)
+function getAdjacentEdges(display) {
+  const displays = screen.getAllDisplays()
+  const a = display.workArea
+  const GAP = 50 // tolerance for edge alignment
+  const result = { left: false, right: false, top: false, bottom: false }
+
+  for (const d of displays) {
+    if (d.id === display.id) continue
+    const b = d.workArea
+    // Vertical overlap check (monitors share Y range)
+    const vOverlap = b.y < a.y + a.height && b.y + b.height > a.y
+    // Horizontal overlap check (monitors share X range)
+    const hOverlap = b.x < a.x + a.width && b.x + b.width > a.x
+
+    if (vOverlap) {
+      // Left edge: another display's right edge touches our left
+      if (Math.abs((b.x + b.width) - a.x) < GAP) result.left = true
+      // Right edge: another display's left edge touches our right
+      if (Math.abs(b.x - (a.x + a.width)) < GAP) result.right = true
+    }
+    if (hOverlap) {
+      // Top edge: another display's bottom touches our top
+      if (Math.abs((b.y + b.height) - a.y) < GAP) result.top = true
+      // Bottom edge: another display's top touches our bottom
+      if (Math.abs(b.y - (a.y + a.height)) < GAP) result.bottom = true
+    }
+  }
+  return result
 }
 
 // ============================================================
@@ -112,6 +177,7 @@ function createBubbleWindow() {
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
+    focusable: true,
     hasShadow: false,
     title: 'Ramppy Assistant',
     icon: APP_ICON,
@@ -124,6 +190,16 @@ function createBubbleWindow() {
 
   bubbleWindow.loadFile('bubble.html')
   bubbleWindow.setMenuBarVisibility(false)
+
+  // Force highest always-on-top level so it stays above all windows
+  bubbleWindow.setAlwaysOnTop(true, 'screen-saver')
+
+  // Re-apply always-on-top periodically (some Windows apps can steal it)
+  setInterval(() => {
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+      bubbleWindow.setAlwaysOnTop(true, 'screen-saver')
+    }
+  }, 3000)
 
   // F12 for DevTools on bubble too
   bubbleWindow.webContents.on('before-input-event', (event, input) => {
@@ -192,7 +268,7 @@ function startAuthBridge() {
 // ============================================================
 let bubbleAnimationTimer = null
 
-function animateBubbleTo(targetX, targetY, duration = 200) {
+function animateBubbleTo(targetX, targetY, duration = 200, opts = {}) {
   if (!bubbleWindow || bubbleWindow.isDestroyed()) return
 
   // Cancel any ongoing animation
@@ -205,6 +281,8 @@ function animateBubbleTo(targetX, targetY, duration = 200) {
   const startX = bounds.x
   const startY = bounds.y
   const startTime = Date.now()
+  const fadeOut = opts.fadeOut || false
+  const fadeIn = opts.fadeIn || false
 
   bubbleAnimationTimer = setInterval(() => {
     if (!bubbleWindow || bubbleWindow.isDestroyed()) {
@@ -223,6 +301,13 @@ function animateBubbleTo(targetX, targetY, duration = 200) {
 
     bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
 
+    // Subtle opacity during hide/show
+    if (fadeOut) {
+      bubbleWindow.setOpacity(1 - eased * 0.6) // 1.0 → 0.4
+    } else if (fadeIn) {
+      bubbleWindow.setOpacity(0.4 + eased * 0.6) // 0.4 → 1.0
+    }
+
     if (progress >= 1) {
       clearInterval(bubbleAnimationTimer)
       bubbleAnimationTimer = null
@@ -239,33 +324,34 @@ ipcMain.handle('resize-bubble', async (_event, width, height) => {
   if (!bubbleWindow) return
 
   const bounds = bubbleWindow.getBounds()
-  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
+  const display = getDisplayAt(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  const { x: sX, y: sY, width: screenW, height: screenH } = display.workArea
 
   // Expand: anchor to bottom-right of current bubble position
   let x = bounds.x + bounds.width - width
   let y = bounds.y + bounds.height - height
 
-  // Clamp to screen bounds so the panel is always fully visible
-  if (x < 0) x = 0
-  if (y < 0) y = 0
-  if (x + width > screenW) x = screenW - width
-  if (y + height > screenH) y = screenH - height
+  // Clamp to current display bounds
+  if (x < sX) x = sX
+  if (y < sY) y = sY
+  if (x + width > sX + screenW) x = sX + screenW - width
+  if (y + height > sY + screenH) y = sY + screenH - height
 
   bubbleWindow.setBounds({ x, y, width, height }, true)
   bubbleWindow.setResizable(width > 100)
 })
 
-// Move bubble to absolute screen position (clamped to screen)
+// Move bubble to absolute screen position (clamped to combined display area)
 ipcMain.on('move-bubble', (_event, x, y) => {
   if (!bubbleWindow) return
   const bounds = bubbleWindow.getBounds()
-  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
+  const all = getAllScreenBounds()
 
-  // Clamp so window stays fully visible
-  if (x < 0) x = 0
-  if (y < 0) y = 0
-  if (x + bounds.width > screenW) x = screenW - bounds.width
-  if (y + bounds.height > screenH) y = screenH - bounds.height
+  // Clamp so window stays within multi-monitor area
+  if (x < all.x) x = all.x
+  if (y < all.y) y = all.y
+  if (x + bounds.width > all.maxX) x = all.maxX - bounds.width
+  if (y + bounds.height > all.maxY) y = all.maxY - bounds.height
 
   bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
 })
@@ -273,7 +359,6 @@ ipcMain.on('move-bubble', (_event, x, y) => {
 // Set bubble bounds (position + size) — used for expand, collapse, and edge resizing
 ipcMain.handle('set-bubble-bounds', async (_event, x, y, width, height) => {
   if (!bubbleWindow) return
-  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
 
   const isPanel = width > 200 // panel mode (≥280) vs bubble/bar mode
 
@@ -283,11 +368,14 @@ ipcMain.handle('set-bubble-bounds', async (_event, x, y, width, height) => {
     if (height < 400) height = 400
   }
 
-  // Clamp to screen
-  if (x < 0) x = 0
-  if (y < 0) y = 0
-  if (x + width > screenW) x = screenW - width
-  if (y + height > screenH) y = screenH - height
+  // Clamp to the display where the bubble center lands
+  const display = getDisplayAt(x + width / 2, y + height / 2)
+  const { x: sX, y: sY, width: screenW, height: screenH } = display.workArea
+
+  if (x < sX) x = sX
+  if (y < sY) y = sY
+  if (x + width > sX + screenW) x = sX + screenW - width
+  if (y + height > sY + screenH) y = sY + screenH - height
 
   bubbleWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) })
   bubbleWindow.setResizable(isPanel)
@@ -307,15 +395,21 @@ ipcMain.handle('get-bubble-pos', async () => {
 })
 
 // Animate bubble to position (allows off-screen for snap-to-edge)
-ipcMain.on('snap-bubble', (_event, x, y, duration) => {
+ipcMain.on('snap-bubble', (_event, x, y, duration, opts) => {
   if (!bubbleWindow) return
-  animateBubbleTo(x, y, duration || 200)
+  animateBubbleTo(x, y, duration || 200, opts || {})
 })
 
-// Get screen work area size
+// Get screen work area size (of display where bubble currently is)
 ipcMain.handle('get-screen-size', async () => {
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    const bounds = bubbleWindow.getBounds()
+    const display = getDisplayAt(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+    const adjacent = getAdjacentEdges(display)
+    return { width: display.workArea.width, height: display.workArea.height, x: display.workArea.x, y: display.workArea.y, adjacent }
+  }
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
-  return { width, height }
+  return { width, height, x: 0, y: 0, adjacent: { left: false, right: false, top: false, bottom: false } }
 })
 
 // Capture screenshot of primary display for AI vision
@@ -576,6 +670,124 @@ ipcMain.handle('execute-desktop-action', async (_event, action) => {
   }
 })
 
+// Navigate main window to a platform view (used by Nicole to guide users in-app)
+ipcMain.handle('navigate-platform', async (_event, viewPath) => {
+  console.log('[Navigate Platform]', viewPath)
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { success: false, error: 'Main window not available' }
+  }
+
+  try {
+    // Build the full URL: localhost:3000 + view path
+    const url = `${PLATFORM_URL}/${viewPath.replace(/^\//, '')}`
+    console.log('[Navigate Platform] Loading:', url)
+
+    mainWindow.loadURL(url)
+
+    // Show and focus the main window
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+
+    return { success: true }
+  } catch (err) {
+    console.error('[Navigate Platform] Error:', err)
+    return { success: false, error: err.message || 'Unknown error' }
+  }
+})
+
+// ============================================================
+// NOTIFICATION TOAST (separate window — avoids resizing bubble)
+// ============================================================
+
+const NOTIF_TOAST_W = 310
+const NOTIF_TOAST_H = 82
+const NOTIF_GAP = 10
+
+ipcMain.handle('show-notification-toast', async (_event, data) => {
+  // Close existing notification window if open
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.destroy()
+    notificationWindow = null
+  }
+
+  if (!bubbleWindow || bubbleWindow.isDestroyed()) return
+
+  // Position notification above the bubble, right-aligned
+  const bBounds = bubbleWindow.getBounds()
+  let nx = bBounds.x + bBounds.width - NOTIF_TOAST_W
+  let ny = bBounds.y - NOTIF_GAP - NOTIF_TOAST_H
+
+  // Clamp to display bounds
+  const display = getDisplayAt(bBounds.x + bBounds.width / 2, bBounds.y + bBounds.height / 2)
+  const wa = display.workArea
+  if (nx < wa.x) nx = wa.x
+  if (ny < wa.y) ny = wa.y + NOTIF_GAP
+  if (nx + NOTIF_TOAST_W > wa.x + wa.width) nx = wa.x + wa.width - NOTIF_TOAST_W
+
+  notificationWindow = new BrowserWindow({
+    width: NOTIF_TOAST_W,
+    height: NOTIF_TOAST_H,
+    x: nx,
+    y: ny,
+    resizable: false,
+    movable: false,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-notification.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  notificationWindow.setAlwaysOnTop(true, 'screen-saver')
+  notificationWindow.setMenuBarVisibility(false)
+
+  notificationWindow.loadFile('notification-toast.html')
+
+  // Send notification data after page loads
+  notificationWindow.webContents.once('did-finish-load', () => {
+    if (notificationWindow && !notificationWindow.isDestroyed()) {
+      notificationWindow.webContents.send('set-notification-data', data)
+    }
+  })
+
+  notificationWindow.on('closed', () => { notificationWindow = null })
+})
+
+ipcMain.handle('hide-notification-toast', async () => {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.destroy()
+    notificationWindow = null
+  }
+})
+
+// Forward click/dismiss from notification window to bubble
+ipcMain.on('notification-toast-click', () => {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.destroy()
+    notificationWindow = null
+  }
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.webContents.send('notification-clicked')
+  }
+})
+
+ipcMain.on('notification-toast-dismiss', () => {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.destroy()
+    notificationWindow = null
+  }
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.webContents.send('notification-dismissed')
+  }
+})
+
 // ============================================================
 // SYSTEM TRAY
 // ============================================================
@@ -642,6 +854,17 @@ app.whenReady().then(() => {
   createTray()
   startAuthBridge()
 
+  // NumLock → test Nicole notification (debounced — NumLock fires on key down + key up)
+  let lastNumLockTime = 0
+  globalShortcut.register('NumLock', () => {
+    if (Date.now() - lastNumLockTime < 2000) return
+    lastNumLockTime = Date.now()
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+      console.log('[Main] Sending test notification to bubble')
+      bubbleWindow.webContents.send('test-notification')
+    }
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow()
@@ -656,6 +879,7 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
+  globalShortcut.unregisterAll()
   if (authTokenInterval) clearInterval(authTokenInterval)
   if (process.platform !== 'darwin') app.quit()
 })

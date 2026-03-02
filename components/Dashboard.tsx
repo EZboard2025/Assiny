@@ -198,7 +198,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const view = params.get('view')
-      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links'].includes(view)) {
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links', 'followup', 'followup-history', 'meet-analysis', 'challenge-history', 'download', 'manager'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
 

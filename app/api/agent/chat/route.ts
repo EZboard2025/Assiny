@@ -51,6 +51,7 @@ ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Qual meu ponto mais fraco?" → get_performance_summary + get_challenge_effectiveness + get_roleplay_sessions(limit:5)
 - "Analise minha última reunião" → get_meet_evaluations(limit:1) + get_meet_evaluation_detail
 - "Compartilhar dados com a equipe" → get_meet_evaluations(limit:5) + get_roleplay_sessions(limit:5) → use {{eval_card}} para cada item
+- "Bom dia" / "Resumo do dia" / "Como está meu dia?" → get_calendar_events(days_ahead:1) + get_whatsapp_activity(days:2) + get_daily_challenges(limit:1) + get_performance_summary (reuniões + leads + desafio + streak)
 - "O que tenho na agenda?" → get_calendar_events + get_scheduled_bots
 - "Marca uma reunião..." → create_calendar_event (ou quick_add_event para texto livre)
 - "Move/reagenda a reunião..." → get_calendar_events (para achar o event_id) + update_calendar_event
@@ -82,20 +83,8 @@ BUSCA NO COMPUTADOR:
 - NUNCA chute caminhos como "C:\\Jogos\\Epic Games\\Fortnite" — SEMPRE busque primeiro com search_computer
 - Se a busca não retornar resultados, informe o vendedor e pergunte se sabe o caminho
 
-CONTEXTO ENRIQUECIDO PRÉ-REUNIÃO:
-- Quando o vendedor pedir para "preparar reunião", "briefing de", "me prepara pro call com", "quem é o [nome]" ou qualquer variação → use enrich_contact
-- SEMPRE passe o nome. Se souber empresa ou telefone, passe também — quanto mais dados, melhor o match
-- NUNCA gere briefing apenas com nome sem âncora adicional (empresa, cargo ou telefone). Se só tiver o nome, PERGUNTE "De qual empresa?" antes de chamar enrich_contact
-- A busca no LinkedIn/web roda automaticamente em segundo plano no servidor — NÃO use execute_desktop_action para abrir LinkedIn
-- Se confidence_level retornar "low" e não tiver web_profile, avise o vendedor: "Não encontrei informações sobre esse contato. Quer que eu gere o briefing mesmo assim?"
-- Se confidence_level for "high" (match por telefone), apresente o briefing direto sem pedir confirmação
-- Se confidence_level for "medium", apresente os dados encontrados e confirme: "Encontrei informações sobre [nome]. Aqui está o briefing:"
-- O briefing já vem pronto no resultado da tool — apresente-o de forma organizada ao vendedor
-- O briefing custa 1 crédito — avise se estiver perto do limite
-- Exemplo de fluxo:
-  "Preparar reunião com João da TechCorp" → enrich_contact(name:"João", company:"TechCorp") → apresenta briefing com dados do LinkedIn + WhatsApp + RAG
-
 IMPORTANTE: Chame 2-4 ferramentas por vez para cruzar dados e dar respostas completas. Nunca se limite a apenas 1 ferramenta.
+- Briefings de contato e busca de leads estão temporariamente desativados. Se o vendedor pedir briefing ou buscar um contato, diga: "A busca de contatos está sendo aprimorada e volta em breve! Por enquanto, posso ajudar com agenda, performance, desafios e outras tarefas."
 
 AÇÕES NO CALENDÁRIO:
 - Você pode CRIAR, ATUALIZAR e DELETAR eventos — use isso quando o vendedor pedir
@@ -506,47 +495,31 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
       }
     }
   },
-  {
-    type: 'function',
-    function: {
-      name: 'enrich_contact',
-      description: 'Busca informações de um contato/lead nos dados do sistema (WhatsApp, RAG, empresa) e gera briefing pré-reunião. Use quando o vendedor pedir para preparar reunião, briefing, ou quiser saber sobre um lead antes de um call.',
-      parameters: {
-        type: 'object',
-        properties: {
-          name: {
-            type: 'string',
-            description: 'Nome do contato/lead'
-          },
-          company: {
-            type: 'string',
-            description: 'Empresa do contato (se conhecida). Âncora importante para desambiguação.'
-          },
-          phone: {
-            type: 'string',
-            description: 'Telefone do contato (se conhecido). Âncora mais forte para match.'
-          }
-        },
-        required: ['name']
-      }
-    }
-  },
+  // DISABLED: search_contact and generate_briefing temporarily removed
+  // {
+  //   type: 'function',
+  //   function: { name: 'search_contact', ... }
+  // },
+  // {
+  //   type: 'function',
+  //   function: { name: 'generate_briefing', ... }
+  // },
   {
     type: 'function',
     function: {
       name: 'execute_desktop_action',
-      description: 'Executa uma ação no computador do vendedor (abrir aplicativo, URL ou pasta). Só funciona no app desktop Ramppy.',
+      description: 'Executa uma ação no computador do vendedor (abrir aplicativo, URL, pasta, ou navegar na plataforma Ramppy). Só funciona no app desktop Ramppy.',
       parameters: {
         type: 'object',
         properties: {
           action_type: {
             type: 'string',
-            enum: ['open_app', 'open_url', 'open_path'],
-            description: 'Tipo: open_app (abrir aplicativo), open_url (abrir URL no navegador), open_path (abrir arquivo ou pasta)'
+            enum: ['open_app', 'open_url', 'open_path', 'navigate_platform'],
+            description: 'Tipo: open_app (abrir aplicativo), open_url (abrir URL no navegador), open_path (abrir arquivo ou pasta), navigate_platform (navegar dentro do app Ramppy para uma página específica)'
           },
           target: {
             type: 'string',
-            description: 'Para open_app: nome do app (chrome, firefox, notepad, calculator, vscode, terminal, word, excel, etc). Para open_url: URL completa. Para open_path: caminho do arquivo/pasta.'
+            description: 'Para open_app: nome do app. Para open_url: URL completa. Para open_path: caminho do arquivo/pasta. Para navigate_platform: caminho da página (ex: "?view=roleplay", "?view=perfil", "?openConfigHub=true").'
           }
         },
         required: ['action_type', 'target']
@@ -1900,8 +1873,269 @@ async function executeFunction(
         return { sellers_compared: comparison }
       }
 
-      case 'enrich_contact': {
+      case 'search_contact': {
+        // ETAPA 1: Busca candidatos na web + WhatsApp (sem gerar briefing)
         const { name: contactName, company: contactCompany, phone: contactPhone } = params
+
+        if (!contactName || typeof contactName !== 'string') {
+          return { success: false, error: 'Nome do contato é obrigatório' }
+        }
+
+        // ── 0. Check if searching for internal team member ──────────────
+        // If company matches user's own company (Ramppy, Assiny, etc.), search employees first
+        let internalMatch: any = null
+        if (contactCompany) {
+          const { data: userCompany } = await supabaseAdmin
+            .from('companies')
+            .select('name, subdomain')
+            .eq('id', companyId)
+            .single()
+
+          const companyLower = contactCompany.toLowerCase().trim()
+          const isOwnCompany = userCompany && (
+            userCompany.name?.toLowerCase().includes(companyLower) ||
+            userCompany.subdomain?.toLowerCase().includes(companyLower) ||
+            companyLower.includes(userCompany.name?.toLowerCase() || '') ||
+            companyLower.includes(userCompany.subdomain?.toLowerCase() || '') ||
+            companyLower === 'ramppy'
+          )
+
+          if (isOwnCompany) {
+            const { data: teammates } = await supabaseAdmin
+              .from('employees')
+              .select('user_id, name, role')
+              .eq('company_id', companyId)
+              .ilike('name', `%${contactName}%`)
+
+            if (teammates && teammates.length > 0) {
+              // Found internal team member(s) — return them as candidates
+              const internalCandidates = teammates.map(t => ({
+                name: t.name || contactName,
+                title: t.role || 'Vendedor',
+                company: userCompany?.name || contactCompany,
+                location: '',
+                linkedin_url: '',
+                is_internal: true,
+                user_id: t.user_id,
+              }))
+
+              return {
+                success: true,
+                candidates: internalCandidates,
+                whatsapp_match: null,
+                whatsapp_matches_count: 0,
+                has_whatsapp: false,
+                has_web_results: false,
+                is_internal_search: true,
+                raw_linkedin_urls: [],
+              }
+            }
+          }
+        }
+
+        // ── 1. Search WhatsApp conversations ──────────────────────────────
+        let waConversations: any[] = []
+
+        if (contactPhone) {
+          const phoneSuffix = String(contactPhone).replace(/\D/g, '').slice(-9)
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_phone', `%${phoneSuffix}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        if (!waConversations.length) {
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_name', `%${contactName}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        // ── 2. Web search via Brave Search ────────────────────────────────
+        let rawLinkedinUrls: string[] = []
+        let candidates: Array<{ name: string; title: string; company: string; location: string; linkedin_url: string }> = []
+        let snippets = ''
+
+        try {
+          const searchQuery = contactCompany
+            ? `"${contactName}" "${contactCompany}" LinkedIn`
+            : `${contactName} LinkedIn`
+          const searchUrl = `https://search.brave.com/search?q=${encodeURIComponent(searchQuery)}&source=web`
+
+          const searchRes = await fetch(searchUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+              'Accept': 'text/html',
+            },
+            signal: AbortSignal.timeout(8000),
+          })
+
+          if (searchRes.ok) {
+            const html = await searchRes.text()
+            // Extract LinkedIn profile URLs from raw HTML
+            const profileMatches = html.match(/(?:https?:\/\/)?(?:[a-z]{2}\.)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/g)
+            if (profileMatches) {
+              const unique = [...new Set(profileMatches.map((u: string) => u.startsWith('http') ? u : `https://${u}`))]
+              rawLinkedinUrls.push(...unique)
+            }
+            snippets = html
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/&[a-z]+;/gi, ' ')
+              .replace(/\s+/g, ' ')
+              .slice(0, 6000)
+          }
+        } catch (_) { /* search failed */ }
+
+        // ── 3. Use GPT-4o-mini to extract structured candidates ───────────
+        if (snippets.length > 200) {
+          try {
+            const extractResponse = await openai.chat.completions.create({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'system',
+                  content: `Analise os resultados de busca e encontre perfis de LinkedIn de pessoas chamadas "${contactName}"${contactCompany ? ` que trabalham ou estão associadas à empresa "${contactCompany}"` : ''}.
+
+Retorne um JSON array com os candidatos encontrados (máximo 3). Para cada candidato:
+- name: nome completo da pessoa
+- title: cargo/título atual
+- company: empresa atual
+- location: cidade/país
+- linkedin_url: URL do perfil LinkedIn (se encontrado no texto)
+
+REGRAS ESTRITAS:
+- O PRIMEIRO NOME do candidato DEVE conter "${contactName}" (ou variação muito próxima). "Gabriela" NÃO é "Gabrielle", "João" NÃO é "John"${contactCompany ? `
+- A EMPRESA do candidato DEVE ser "${contactCompany}" ou muito similar. NÃO confunda nomes de empresa com sobrenomes de pessoas (ex: empresa "New Hack" NÃO é sobrenome "Hacker")
+- Se nenhum resultado mostra alguém que REALMENTE trabalha na "${contactCompany}", retorne []` : ''}
+- NÃO invente dados. Se não encontrar algum campo, use string vazia ""
+- Se não encontrar NENHUM candidato relevante, retorne []
+- Se o nome/empresa são muito genéricos e os resultados não parecem ser a pessoa certa, retorne []
+- Na DÚVIDA, retorne [] — é melhor não retornar nada do que retornar a pessoa errada
+- Retorne APENAS o JSON array, sem texto adicional`
+                },
+                { role: 'user', content: snippets }
+              ],
+              temperature: 0.1,
+              max_tokens: 500,
+            })
+
+            const rawCandidates = extractResponse.choices[0].message.content || '[]'
+            try {
+              const parsed = JSON.parse(rawCandidates.replace(/```json\n?/g, '').replace(/```/g, '').trim())
+              if (Array.isArray(parsed)) {
+                candidates = parsed.slice(0, 3).map((c: any) => ({
+                  name: c.name || contactName,
+                  title: c.title || '',
+                  company: c.company || '',
+                  location: c.location || '',
+                  linkedin_url: c.linkedin_url || '',
+                }))
+              }
+            } catch (_) { /* parse failed, continue */ }
+          } catch (_) { /* extraction failed */ }
+        }
+
+        // ── 4. Hard-filter: reject candidates whose company clearly doesn't match
+        if (contactCompany && candidates.length > 0) {
+          const targetCompany = contactCompany.toLowerCase().replace(/[^a-z0-9]/g, '')
+          candidates = candidates.filter(c => {
+            if (!c.company) return true // no company info, keep as possible
+            const candCompany = c.company.toLowerCase().replace(/[^a-z0-9]/g, '')
+            // Check if company names overlap meaningfully
+            return candCompany.includes(targetCompany) ||
+                   targetCompany.includes(candCompany) ||
+                   // Check individual words (e.g. "New Hack" vs "New Hack Tecnologia")
+                   targetCompany.split(/\s+/).filter(Boolean).some((w: string) =>
+                     w.length > 2 && candCompany.includes(w.replace(/[^a-z0-9]/g, ''))
+                   )
+          })
+        }
+
+        // Also hard-filter by first name similarity
+        if (contactName && candidates.length > 0) {
+          const targetFirst = contactName.toLowerCase().split(' ')[0]
+          candidates = candidates.filter(c => {
+            const candFirst = (c.name || '').toLowerCase().split(' ')[0]
+            // First names must be very similar (allow small typos)
+            return candFirst === targetFirst ||
+                   candFirst.startsWith(targetFirst) ||
+                   targetFirst.startsWith(candFirst)
+          })
+        }
+
+        // Fill linkedin_url from rawLinkedinUrls if candidates lack it
+        candidates.forEach((c, i) => {
+          if (!c.linkedin_url && rawLinkedinUrls[i]) {
+            c.linkedin_url = rawLinkedinUrls[i]
+          }
+        })
+
+        // If no candidates from GPT but we have LinkedIn URLs, DON'T blindly create entries
+        // Only create if we have no company filter (generic search)
+        if (candidates.length === 0 && rawLinkedinUrls.length > 0 && !contactCompany) {
+          candidates.push({
+            name: contactName,
+            title: '',
+            company: contactCompany || '',
+            location: '',
+            linkedin_url: rawLinkedinUrls[0],
+          })
+        }
+
+        // ── 5. Determine match quality ────────────────────────────────────
+        const hasWebResults = candidates.length > 0
+
+        // If no valid candidates after filtering, return clean "not found"
+        // Don't leak raw URLs or unrelated WhatsApp contacts to the agent
+        if (!hasWebResults && contactCompany) {
+          return {
+            success: true,
+            candidates: [],
+            whatsapp_match: null,
+            whatsapp_matches_count: 0,
+            has_whatsapp: false,
+            has_web_results: false,
+            raw_linkedin_urls: [],
+            search_note: `Nenhum perfil encontrado para "${contactName}" na empresa "${contactCompany}". Tente com mais detalhes (sobrenome completo, cargo, etc).`,
+          }
+        }
+
+        // WhatsApp match: only include if name closely matches a confirmed candidate
+        let bestWaMatch: any = null
+        if (waConversations.length > 0 && candidates.length > 0) {
+          const topCandidate = candidates[0].name.toLowerCase()
+          // Find a WA contact whose name matches the confirmed candidate well
+          bestWaMatch = waConversations.find(wa => {
+            const waName = (wa.contact_name || '').toLowerCase()
+            // Must share more than just first name - check full name or company hint
+            return topCandidate.includes(waName) || waName.includes(topCandidate) ||
+              (contactCompany && waName.toLowerCase().includes(contactCompany.toLowerCase()))
+          }) || null
+        }
+
+        return {
+          success: true,
+          candidates,
+          whatsapp_match: bestWaMatch,
+          whatsapp_matches_count: bestWaMatch ? 1 : 0,
+          has_whatsapp: !!bestWaMatch,
+          has_web_results: hasWebResults,
+          raw_linkedin_urls: candidates.map(c => c.linkedin_url).filter(Boolean),
+        }
+      }
+
+      case 'generate_briefing': {
+        // ETAPA 2: Gera briefing completo após confirmação do candidato
+        const { name: contactName, company: contactCompany, linkedin_url: confirmedLinkedinUrl, phone: contactPhone, web_profile: confirmedWebProfile } = params
 
         if (!contactName || typeof contactName !== 'string') {
           return { success: false, error: 'Nome do contato é obrigatório' }
@@ -1931,7 +2165,7 @@ async function executeFunction(
           waConversations = data || []
         }
 
-        // ── 2. Get recent messages for context ────────────────────────────
+        // ── 2. Get recent WhatsApp messages ───────────────────────────────
         let recentMessages: any[] = []
         if (waConversations.length > 0) {
           const { data: msgs } = await supabaseAdmin
@@ -1945,68 +2179,8 @@ async function executeFunction(
           recentMessages = (msgs || []).reverse()
         }
 
-        // ── 3. Web search for LinkedIn profile + public info (background) ─
-        let webProfile = ''
-        let rawLinkedinUrls: string[] = []
-        try {
-          const searchQuery = `${contactName} ${contactCompany || ''} LinkedIn`
-          // Brave Search returns server-rendered HTML with real results (no bot blocking)
-          const searchUrl = `https://search.brave.com/search?q=${encodeURIComponent(searchQuery)}&source=web`
-
-          let snippets = ''
-          try {
-              const searchRes = await fetch(searchUrl, {
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                  'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-                  'Accept': 'text/html',
-                },
-                signal: AbortSignal.timeout(8000),
-              })
-              if (searchRes.ok) {
-                const html = await searchRes.text()
-                // Extract LinkedIn profile URLs from raw HTML before stripping tags
-                const profileMatches = html.match(/(?:https?:\/\/)?(?:[a-z]{2}\.)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/g)
-                if (profileMatches) {
-                  const unique = [...new Set(profileMatches.map((u: string) => u.startsWith('http') ? u : `https://${u}`))]
-                  rawLinkedinUrls.push(...unique)
-                }
-                snippets = html
-                  .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                  .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-                  .replace(/<[^>]+>/g, ' ')
-                  .replace(/&[a-z]+;/gi, ' ')
-                  .replace(/\s+/g, ' ')
-                  .slice(0, 4000)
-              }
-          } catch (_) { /* search failed, continue without web data */ }
-
-          if (snippets.length > 200) {
-            // Use GPT-4o-mini to extract structured profile info from search snippets
-            const extractResponse = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
-              messages: [
-                {
-                  role: 'system',
-                  content: `Extraia informações profissionais da pessoa "${contactName}"${contactCompany ? ` da empresa "${contactCompany}"` : ''} a partir dos resultados de busca. Retorne APENAS o que encontrar de concreto (não invente):
-- Cargo/título atual
-- Empresa atual
-- Localização
-- Setor/indústria
-- Experiência relevante (breve)
-- URL do perfil LinkedIn (se encontrar)
-Se não encontrar alguma info, omita. Se não encontrar NADA sobre essa pessoa, diga "Nenhuma informação encontrada". Formato: texto corrido, máximo 100 palavras.`
-                },
-                { role: 'user', content: snippets }
-              ],
-              temperature: 0.2,
-              max_tokens: 300,
-            })
-            webProfile = extractResponse.choices[0].message.content || ''
-          }
-        } catch (err: unknown) {
-          console.log('[Enrich] Web search failed (non-blocking):', (err as Error).message)
-        }
+        // ── 3. Build web profile from confirmed data ──────────────────────
+        const webProfile = confirmedWebProfile || ''
 
         // ── 4. RAG - parallel queries for examples and company knowledge ──
         const embeddingText = `reunião vendas ${contactName} ${contactCompany || ''}`
@@ -2033,32 +2207,7 @@ Se não encontrar alguma info, omita. Se não encontrar NADA sobre essa pessoa, 
         const successExamples = successResult.status === 'fulfilled' ? successResult.value.data || [] : []
         const companyKnowledge = knowledgeResult.status === 'fulfilled' ? knowledgeResult.value.data || [] : []
 
-        // ── 5. Determine confidence ───────────────────────────────────────
-        let confidenceLevel: 'high' | 'medium' | 'low' = 'low'
-        let matchSource: 'whatsapp_phone' | 'whatsapp_name' | 'web_search' | 'manual' = 'manual'
-
-        if (contactPhone && waConversations.length > 0) {
-          confidenceLevel = 'high'
-          matchSource = 'whatsapp_phone'
-        } else if (waConversations.length > 0) {
-          confidenceLevel = 'medium'
-          matchSource = 'whatsapp_name'
-        } else if (webProfile) {
-          confidenceLevel = 'medium'
-          matchSource = 'web_search'
-        }
-
-        // Extract real LinkedIn profile URL: try GPT output first, then raw HTML, then fallback to search
-        const linkedinProfileRegex = /https?:\/\/(?:[a-z]{2}\.)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/
-        const linkedinProfileMatch = webProfile.match(linkedinProfileRegex)
-        const linkedinQuery = encodeURIComponent(`${contactName} ${contactCompany || ''}`.trim())
-        const linkedinUrl = linkedinProfileMatch
-          ? linkedinProfileMatch[0]
-          : rawLinkedinUrls.length > 0
-            ? rawLinkedinUrls[0]
-            : `https://www.linkedin.com/search/results/all/?keywords=${linkedinQuery}`
-
-        // ── 6. Generate briefing via GPT-4o (enriched with web data) ──────
+        // ── 5. Generate briefing via GPT-4o ───────────────────────────────
         const conversationSummary = recentMessages.length > 0
           ? recentMessages.map(m => `[${m.direction === 'outbound' ? 'Vendedor' : 'Lead'}]: ${m.content}`).join('\n')
           : 'Nenhuma conversa anterior encontrada.'
@@ -2094,7 +2243,7 @@ REGRAS:
               role: 'user',
               content: `CONTATO: ${contactName}${contactCompany ? ` | Empresa: ${contactCompany}` : ''}${contactPhone ? ` | Tel: ${contactPhone}` : ''}
 
-DADOS DO LINKEDIN / WEB (pesquisa automática):
+DADOS DO LINKEDIN / WEB:
 ${webProfile || 'Nenhuma informação pública encontrada.'}
 
 CONVERSAS WHATSAPP:
@@ -2113,7 +2262,7 @@ ${knowledgeContext || 'Não disponível.'}`
 
         const briefing = briefingResponse.choices[0].message.content || ''
 
-        // ── 7. Consume 1 credit ───────────────────────────────────────────
+        // ── 6. Consume 1 credit ───────────────────────────────────────────
         const { data: credits } = await supabaseAdmin
           .from('companies')
           .select('monthly_credits_used')
@@ -2127,12 +2276,11 @@ ${knowledgeContext || 'Não disponível.'}`
             .eq('id', companyId)
         }
 
+        const linkedinUrl = confirmedLinkedinUrl || `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(`${contactName} ${contactCompany || ''}`.trim())}`
+
         return {
           success: true,
-          confidence_level: confidenceLevel,
-          match_source: matchSource,
           whatsapp_match: waConversations[0] || null,
-          matches_found: waConversations.length,
           recent_messages_count: recentMessages.length,
           web_profile: webProfile || null,
           briefing,
@@ -2143,7 +2291,7 @@ ${knowledgeContext || 'Não disponível.'}`
 
       case 'execute_desktop_action': {
         const { action_type, target } = params
-        const validTypes = ['open_app', 'open_url', 'open_path']
+        const validTypes = ['open_app', 'open_url', 'open_path', 'navigate_platform']
         if (!validTypes.includes(action_type)) {
           return { success: false, error: 'Tipo de ação inválido' }
         }
@@ -2163,8 +2311,10 @@ ${knowledgeContext || 'Não disponível.'}`
         return {
           success: true,
           action_type,
-          target: action_type === 'open_path' ? target.trim() : target.trim().toLowerCase(),
-          message: `Ação ${action_type} para "${target}" será executada no app desktop.`
+          target: action_type === 'open_path' ? target.trim() : action_type === 'navigate_platform' ? target.trim() : target.trim().toLowerCase(),
+          message: action_type === 'navigate_platform'
+            ? `Navegando para "${target}" dentro do app Ramppy.`
+            : `Ação ${action_type} para "${target}" será executada no app desktop.`
         }
       }
 
@@ -2261,6 +2411,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 400 })
     }
 
+    // Get company subdomain for platform navigation
+    const { data: companyData } = await supabaseAdmin
+      .from('companies')
+      .select('subdomain')
+      .eq('id', companyId)
+      .single()
+    const companySubdomain = companyData?.subdomain || ''
+
     const userRole = (employeeData?.role || 'vendedor').toLowerCase()
     const isManager = userRole === 'admin' || userRole === 'gestor'
 
@@ -2293,7 +2451,34 @@ export async function POST(req: NextRequest) {
 
     // Build messages
     const sellerName = employeeData?.name || user.email || 'Vendedor'
-    let systemMessage = `${SYSTEM_PROMPT}\n\nVocê está conversando com: ${sellerName}\nData/hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
+    const platformBase = companySubdomain ? `https://${companySubdomain}.ramppy.site` : 'https://ramppy.site'
+    let systemMessage = `${SYSTEM_PROMPT}\n\nVocê está conversando com: ${sellerName}\nData/hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+
+NAVEGAÇÃO NA PLATAFORMA RAMPPY:
+Quando o vendedor perguntar QUALQUER coisa sobre a plataforma Ramppy, funcionalidades, ou onde encontrar algo — NAVEGUE para a página certa usando execute_desktop_action(navigate_platform, "caminho"). Isso abre a página DENTRO do app Ramppy (NÃO no navegador externo). Sempre guie ativamente, nunca apenas descreva.
+
+MAPA DE PÁGINAS (use navigate_platform com estes caminhos):
+- Painel Inicial: "?view=home" — Dashboard com resumo de performance, streak, evolução
+- Treinar Roleplay: "?view=roleplay" — Treino de vendas com IA (simulação de cliente)
+- Chat IA: "?view=chat" — Assistente de vendas com IA (perguntas sobre técnicas, SPIN, etc)
+- Meu PDI: "?view=pdi" — Plano de Desenvolvimento Individual (7 dias)
+- Histórico: "?view=historico" — Histórico de todos os roleplays e avaliações
+- Meu Perfil: "?view=perfil" — Performance detalhada, médias SPIN, gráfico de evolução
+- Follow-Up (WhatsApp): "?view=followup" — Chat WhatsApp integrado com Copilot IA
+- Análise de Reunião: "?view=meet-analysis" — Avaliação de reuniões Google Meet
+- Desafios: "?view=challenge-history" — Histórico de desafios diários
+- Configurações: "?openConfigHub=true" — Hub de configuração (personas, objeções, dados empresa)
+- Download App: "?view=download" — Baixar app desktop Ramppy
+- Gestão de Equipe: "?view=manager" — Visão de gestor (apenas admins)
+
+COMO GUIAR O USUÁRIO:
+- "Onde treino roleplay?" → execute_desktop_action(navigate_platform, "?view=roleplay") e diga "Abri o treino de roleplay pra você! Clique em Iniciar Sessão para começar."
+- "Quero ver meu desempenho" → execute_desktop_action(navigate_platform, "?view=perfil") e diga "Abri seu perfil! Lá você vê suas médias SPIN e gráfico de evolução."
+- "O que é o PDI?" → execute_desktop_action(navigate_platform, "?view=pdi") e explique brevemente
+- "Como configuro personas?" → execute_desktop_action(navigate_platform, "?openConfigHub=true") e guie
+- "Quero conectar meu WhatsApp" → execute_desktop_action(navigate_platform, "?view=followup") e guie o processo de QR code
+- SEMPRE navegue para a página E explique o que o usuário vai encontrar lá
+- IMPORTANTE: Para páginas da Ramppy, SEMPRE use navigate_platform (abre dentro do app). Use open_url APENAS para sites externos (Google, LinkedIn, etc).`
 
     if (isManager) {
       systemMessage += MANAGER_PROMPT_EXTENSION
@@ -2332,7 +2517,8 @@ export async function POST(req: NextRequest) {
     const toolsUsed: string[] = []
     const desktopActions: Array<{ type: string; target: string }> = []
     const searchActions: Array<{ search_type: string; name: string }> = []
-    const enrichActions: Array<{ confidence_level: string; match_source: string; contact: any; web_profile: string | null; briefing: string; linkedin_url: string }> = []
+    const contactCandidates: Array<{ candidates: any[]; whatsapp_match: any; has_whatsapp: boolean; search_name: string; search_company: string; is_internal_search?: boolean }> = []
+    const enrichActions: Array<{ contact: any; web_profile: string | null; briefing: string; linkedin_url: string }> = []
     const MAX_ROUNDS = 5
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -2354,6 +2540,7 @@ export async function POST(req: NextRequest) {
           isManager,
           ...(desktopActions.length > 0 ? { desktopActions } : {}),
           ...(searchActions.length > 0 ? { searchActions } : {}),
+          ...(contactCandidates.length > 0 ? { contactCandidates } : {}),
           ...(enrichActions.length > 0 ? { enrichActions } : {}),
         })
       }
@@ -2381,13 +2568,26 @@ export async function POST(req: NextRequest) {
             })
           }
 
-          // Collect enrich actions for client-side briefing card
-          if (tcFn.function.name === 'enrich_contact' && result && (result as Record<string, unknown>).success) {
+          // Collect search_contact candidates for client-side confirmation card
+          if (tcFn.function.name === 'search_contact' && result && (result as Record<string, unknown>).success) {
             const r = result as Record<string, unknown>
+            const args = JSON.parse(tcFn.function.arguments)
+            contactCandidates.push({
+              candidates: (r.candidates as any[]) || [],
+              whatsapp_match: r.whatsapp_match || null,
+              has_whatsapp: r.has_whatsapp as boolean,
+              search_name: args.name,
+              search_company: args.company || '',
+              is_internal_search: r.is_internal_search as boolean || false,
+            })
+          }
+
+          // Collect generate_briefing results for client-side briefing card
+          if (tcFn.function.name === 'generate_briefing' && result && (result as Record<string, unknown>).success) {
+            const r = result as Record<string, unknown>
+            const args = JSON.parse(tcFn.function.arguments)
             enrichActions.push({
-              confidence_level: r.confidence_level as string,
-              match_source: r.match_source as string,
-              contact: r.whatsapp_match || { name: JSON.parse(tcFn.function.arguments).name },
+              contact: r.whatsapp_match || { name: args.name, company: args.company },
               web_profile: (r.web_profile as string) || null,
               briefing: r.briefing as string,
               linkedin_url: r.linkedin_url as string,

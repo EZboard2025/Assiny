@@ -32,6 +32,18 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
       </div>
     </div>
+    <!-- Notification badge (red dot) -->
+    <div id="notification-badge" class="notification-badge" style="display:none;"></div>
+  </div>
+
+  <!-- Notification toast (appears near bubble) -->
+  <div id="notification-toast" class="notification-toast" style="display:none;">
+    <div class="notification-icon" id="notif-icon"></div>
+    <div class="notification-body">
+      <div class="notification-title" id="notif-title"></div>
+      <div class="notification-text" id="notif-text"></div>
+    </div>
+    <button class="notification-dismiss" id="notif-dismiss">&times;</button>
   </div>
 
   <!-- Expanded: chat panel -->
@@ -55,9 +67,14 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#aurora-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
       </div>
       <span class="header-title">Nicole</span>
-      <button id="btn-close" class="btn-close" title="Fechar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <div class="header-actions">
+        <button id="btn-home" class="btn-header-action" title="Voltar ao início">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3v-6h6v6h3a1 1 0 001-1V10"/></svg>
+        </button>
+        <button id="btn-close" class="btn-close" title="Fechar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- Messages area -->
