@@ -172,13 +172,155 @@ function getMessageType(msgEl) {
 }
 
 // --- Parse timestamp from data-pre-plain-text ---
+// WhatsApp Web formats vary by locale and version:
+//   PT-BR: "[15:30, 01/03/2026] Nome:"  or  "[15:30] Nome:"  (today's messages)
+//   EN:    "[3:30 PM, 1/3/2026] Name:"  or  "[3:30 PM] Name:"
+//   Some locales reverse date/time or use different separators
 function parseTimestamp(prePlainText) {
   if (!prePlainText) return { time: null, date: null, sender: null }
-  const match = prePlainText.match(/\[(\d{1,2}:\d{2}),?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.+?):\s*$/)
+
+  // Strip invisible Unicode characters that WhatsApp injects (LRM, RLM, bidi marks, isolates)
+  // These break regex matching but are invisible to users
+  const cleaned = prePlainText.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+
+  // Pattern 1: [time, date] sender:  (most common PT-BR)
+  let match = cleaned.match(/\[(\d{1,2}:\d{2}),?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.+?):\s*$/)
   if (match) return { time: match[1], date: match[2], sender: match[3].trim() }
-  const timeMatch = prePlainText.match(/\[(\d{1,2}:\d{2})/)
+
+  // Pattern 2: [time AM/PM, date] sender:  (12-hour format)
+  match = cleaned.match(/\[(\d{1,2}:\d{2}\s*[APap][Mm]),?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.+?):\s*$/)
+  if (match) return { time: match[1], date: match[2], sender: match[3].trim() }
+
+  // Pattern 3: [date, time] sender:  (reversed order)
+  match = cleaned.match(/\[(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s*(\d{1,2}:\d{2}(?:\s*[APap][Mm])?)\]\s*(.+?):\s*$/)
+  if (match) return { time: match[2], date: match[1], sender: match[3].trim() }
+
+  // Pattern 4: [time] sender:  (no date — today's messages or WhatsApp omits date)
+  match = cleaned.match(/\[(\d{1,2}:\d{2}(?:\s*[APap][Mm])?)\]\s*(.+?):\s*$/)
+  if (match) return { time: match[1], date: null, sender: match[2].trim() }
+
+  // Pattern 5: Just extract any time we can find
+  const timeMatch = cleaned.match(/\[(\d{1,2}:\d{2})/)
   if (timeMatch) return { time: timeMatch[1], date: null, sender: null }
+
   return { time: null, date: null, sender: null }
+}
+
+// --- Resolve date text to DD/MM/YYYY ---
+function resolveDateText(text) {
+  if (!text) return null
+  const upper = text.trim().toUpperCase()
+
+  // Direct date format: DD/MM/YYYY or D/M/YYYY
+  const directDate = upper.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/)
+  if (directDate) return directDate[1]
+
+  // "HOJE" = today
+  if (upper === 'HOJE' || upper === 'TODAY') {
+    const now = new Date()
+    return `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`
+  }
+
+  // "ONTEM" / "YESTERDAY"
+  if (upper === 'ONTEM' || upper === 'YESTERDAY') {
+    const yesterday = new Date(Date.now() - 86400000)
+    return `${yesterday.getDate().toString().padStart(2, '0')}/${(yesterday.getMonth() + 1).toString().padStart(2, '0')}/${yesterday.getFullYear()}`
+  }
+
+  // Day of week names (PT-BR and EN)
+  const weekdays = {
+    'DOMINGO': 0, 'SEGUNDA-FEIRA': 1, 'SEGUNDA': 1, 'TERÇA-FEIRA': 2, 'TERCA-FEIRA': 2, 'TERÇA': 2, 'TERCA': 2,
+    'QUARTA-FEIRA': 3, 'QUARTA': 3, 'QUINTA-FEIRA': 4, 'QUINTA': 4,
+    'SEXTA-FEIRA': 5, 'SEXTA': 5, 'SÁBADO': 6, 'SABADO': 6,
+    'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3,
+    'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6,
+  }
+  for (const [name, targetDay] of Object.entries(weekdays)) {
+    if (upper.includes(name)) {
+      const now = new Date()
+      const currentDay = now.getDay()
+      let daysBack = currentDay - targetDay
+      if (daysBack <= 0) daysBack += 7
+      const target = new Date(now.getTime() - daysBack * 86400000)
+      return `${target.getDate().toString().padStart(2, '0')}/${(target.getMonth() + 1).toString().padStart(2, '0')}/${target.getFullYear()}`
+    }
+  }
+
+  return null
+}
+
+// --- Extract date separators from WhatsApp's date header dividers ---
+// WhatsApp shows date headers between message groups: "HOJE", "ONTEM", "01/03/2026", etc.
+// Returns a Map of DOM element → date string (DD/MM/YYYY)
+function extractDateHeaders(panel) {
+  const dateMap = new Map()
+  const debugLog = []
+
+  // Strategy 1: Try specific WhatsApp selectors for date dividers
+  const dividerSelectors = [
+    '[data-testid="msg-date-divider"]',
+    '[data-testid="date-divider"]',
+    '.message-date-divider',
+  ]
+
+  for (const sel of dividerSelectors) {
+    const dividers = panel.querySelectorAll(sel)
+    if (dividers.length > 0) {
+      debugLog.push(`S1: "${sel}" found ${dividers.length} elements`)
+      for (const div of dividers) {
+        const text = (div.textContent || '').trim()
+        const dateStr = resolveDateText(text)
+        if (dateStr) dateMap.set(div, dateStr)
+        debugLog.push(`  text="${text}" → date=${dateStr || 'null'}`)
+      }
+      if (dateMap.size > 0) {
+        console.log('[Ramppy Scraper] DateHeaders:', debugLog.join('\n'))
+        return dateMap
+      }
+    }
+  }
+
+  // Strategy 2: Broad text-based search — find ANY element in the message area
+  // whose text looks like a date keyword, that is NOT inside a message bubble
+  // WhatsApp date headers are typically short text (< 30 chars) between message groups
+  const msgContainer = panel.querySelector('[role="application"]') || panel
+  const allElements = msgContainer.querySelectorAll('span, div')
+  const dateKeywords = /^(HOJE|ONTEM|TODAY|YESTERDAY|DOMINGO|SEGUNDA|TER[CÇ]A|QUARTA|QUINTA|SEXTA|S[AÁ]BADO|SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|\d{1,2}\/\d{1,2}\/\d{2,4})[-\s]*(FEIRA)?$/i
+
+  debugLog.push(`S2: Scanning ${allElements.length} elements for date text...`)
+  let foundCount = 0
+
+  for (const el of allElements) {
+    // Skip elements inside message bubbles
+    if (el.closest('.message-in, .message-out, [data-pre-plain-text]')) continue
+
+    const text = (el.textContent || '').trim()
+    // Must be short text (date labels are typically < 30 chars)
+    if (!text || text.length > 40 || text.length < 3) continue
+
+    if (dateKeywords.test(text)) {
+      const dateStr = resolveDateText(text)
+      if (dateStr) {
+        // Avoid duplicates — only add if this element isn't contained by one already added
+        let isDuplicate = false
+        for (const [existingEl] of dateMap) {
+          if (existingEl.contains(el) || el.contains(existingEl)) {
+            isDuplicate = true
+            break
+          }
+        }
+        if (!isDuplicate) {
+          dateMap.set(el, dateStr)
+          debugLog.push(`  MATCH: "${text}" → ${dateStr}`)
+          foundCount++
+        }
+      }
+    }
+  }
+
+  debugLog.push(`S2: Found ${foundCount} date headers via text search`)
+  console.log('[Ramppy Scraper] DateHeaders:', debugLog.join('\n'))
+  return dateMap
 }
 
 // --- Robust text extraction from a message element ---
@@ -256,10 +398,52 @@ function isOutgoingMessage(row) {
   return false
 }
 
+// --- Convert time string to 24h format ---
+function normalizeTime(timeStr) {
+  if (!timeStr) return null
+  // Handle 12-hour format (3:30 PM → 15:30)
+  const ampm = timeStr.match(/(\d{1,2}):(\d{2})\s*([APap][Mm])/)
+  if (ampm) {
+    let h = parseInt(ampm[1])
+    const m = ampm[2]
+    const period = ampm[3].toUpperCase()
+    if (period === 'PM' && h < 12) h += 12
+    if (period === 'AM' && h === 12) h = 0
+    return `${h.toString().padStart(2, '0')}:${m}`
+  }
+  // Already 24h format
+  const h24 = timeStr.match(/(\d{1,2}):(\d{2})/)
+  if (h24) return `${h24[1].padStart(2, '0')}:${h24[2]}`
+  return null
+}
+
+// --- Convert date string (DD/MM/YYYY) to timestamp ---
+function dateTimeToTimestamp(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null
+  const normalTime = normalizeTime(timeStr)
+  if (!normalTime) return null
+  const parts = dateStr.split('/')
+  if (parts.length !== 3) return null
+  let year = parts[2]
+  if (year.length === 2) year = '20' + year
+  const ts = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T${normalTime}:00`).getTime()
+  return isNaN(ts) ? null : ts
+}
+
 // --- Extract all messages from current conversation ---
 function extractMessages() {
   const panel = document.querySelector(SELECTORS.conversationPanel)
   if (!panel) return []
+
+  // Extract date separator headers FIRST (before processing messages)
+  const dateHeaders = extractDateHeaders(panel)
+
+  // Build ordered list of date headers by their DOM position
+  // We'll compare message elements' position relative to these headers
+  const dateHeaderEntries = []
+  for (const [el, dateStr] of dateHeaders) {
+    dateHeaderEntries.push({ el, dateStr })
+  }
 
   // Try to find message rows
   let rows = trySelectAll(panel, SELECTORS.messageRow)
@@ -284,6 +468,24 @@ function extractMessages() {
 
   const messages = []
 
+  // Helper: find the most recent date header that appears BEFORE a given element in DOM order
+  function getDateFromHeaders(msgEl) {
+    let lastDate = null
+    for (const entry of dateHeaderEntries) {
+      // compareDocumentPosition: PRECEDING (2) = entry.el comes BEFORE msgEl in DOM
+      const pos = msgEl.compareDocumentPosition(entry.el)
+      if (pos & Node.DOCUMENT_POSITION_PRECEDING) {
+        lastDate = entry.dateStr
+      } else if (pos & Node.DOCUMENT_POSITION_FOLLOWING) {
+        break // All subsequent headers are also after this message (querySelectorAll is ordered)
+      }
+    }
+    return lastDate
+  }
+
+  // Log first few data-pre-plain-text values for debugging
+  let debugSamples = []
+
   for (const row of rows) {
     const isOutgoing = isOutgoingMessage(row)
     const type = getMessageType(row)
@@ -303,16 +505,26 @@ function extractMessages() {
     const prePlainText = prePlainEl ? prePlainEl.getAttribute('data-pre-plain-text') : ''
     const { time, date, sender } = parseTimestamp(prePlainText)
 
+    // Collect debug samples (first 3 messages)
+    if (debugSamples.length < 3) {
+      debugSamples.push({ raw: prePlainText, time, date, sender })
+    }
+
     let timestamp = null
     let displayTime = time || ''
     let displayDate = date || ''
 
+    // Try to build timestamp from parsed time + date
     if (date && time) {
-      const parts = date.split('/')
-      if (parts.length === 3) {
-        let year = parts[2]
-        if (year.length === 2) year = '20' + year
-        timestamp = new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T${time}:00`).getTime()
+      timestamp = dateTimeToTimestamp(date, time)
+    }
+
+    // If we have time but no date, try to get date from WhatsApp's date header dividers
+    if (!timestamp && time) {
+      const headerDate = getDateFromHeaders(row)
+      if (headerDate) {
+        timestamp = dateTimeToTimestamp(headerDate, time)
+        if (timestamp) displayDate = headerDate
       }
     }
 
@@ -323,6 +535,12 @@ function extractMessages() {
         const t = timeSpan.textContent?.trim()
         if (t && /^\d{1,2}:\d{2}$/.test(t)) {
           displayTime = t
+          // Try with date header
+          const headerDate = getDateFromHeaders(row)
+          if (headerDate) {
+            timestamp = dateTimeToTimestamp(headerDate, t)
+            if (timestamp) displayDate = headerDate
+          }
         }
       }
       // Also check any small span that looks like a time
@@ -354,6 +572,18 @@ function extractMessages() {
     })
   }
 
+  // Attach debug info to the return value for copilot !debug command
+  messages._debugInfo = {
+    prePlainSamples: debugSamples,
+    dateHeadersFound: dateHeaderEntries.length,
+    dateHeaderDates: dateHeaderEntries.map(e => e.dateStr),
+  }
+
+  // Count how many messages have real timestamps
+  const realCount = messages.filter(m => m._hasRealTimestamp).length
+  const totalCount = messages.length
+  const hasAnyRealTimestamp = realCount > 0
+
   // Post-process: fix missing timestamps to preserve DOM order
   // DOM order IS chronological order in WhatsApp
   for (let i = 0; i < messages.length; i++) {
@@ -384,18 +614,39 @@ function extractMessages() {
         const nextIdx = messages.findIndex((m, idx) => idx > i && m._hasRealTimestamp)
         messages[i].timestamp = nextTs - ((nextIdx - i) * 60000)
       } else {
-        // No real timestamps at all: use Date.now() with offset
-        messages[i].timestamp = Date.now() - ((messages.length - i) * 60000)
+        // No real timestamps at all — DON'T use Date.now() (causes false "recent" detection)
+        // Instead mark as unknown: use 0 (epoch) so copilot knows timestamps are unreliable
+        messages[i].timestamp = 0
+        messages[i]._timestampUnknown = true
       }
     }
     // Clean up internal flag
     delete messages[i]._hasRealTimestamp
   }
 
+  // If ALL timestamps are unknown (epoch 0), flag the entire batch
+  const allUnknown = messages.every(m => m._timestampUnknown || m.timestamp === 0)
+  if (allUnknown && messages.length > 0) {
+    console.warn(`[Ramppy Scraper] WARNING: No real timestamps found for ${messages.length} messages. data-pre-plain-text may have changed format.`)
+    // Assign relative ordering timestamps (old but sequential) so messages have order
+    // Use a date far enough in the past to not trigger "recent" detection
+    // But preserve relative order
+    for (let i = 0; i < messages.length; i++) {
+      messages[i].timestamp = 0 // Will be handled by copilot as "unknown"
+      delete messages[i]._timestampUnknown
+    }
+  } else {
+    // Clean up unknown flags
+    for (const m of messages) delete m._timestampUnknown
+  }
+
   // Final safety: ensure strictly increasing timestamps (DOM order = correct order)
-  for (let i = 1; i < messages.length; i++) {
-    if (messages[i].timestamp <= messages[i - 1].timestamp) {
-      messages[i].timestamp = messages[i - 1].timestamp + 1000
+  // Only apply if we have at least some real timestamps
+  if (!allUnknown) {
+    for (let i = 1; i < messages.length; i++) {
+      if (messages[i].timestamp <= messages[i - 1].timestamp) {
+        messages[i].timestamp = messages[i - 1].timestamp + 1000
+      }
     }
   }
 
@@ -422,6 +673,7 @@ function sendUpdate() {
   inactiveCount = 0
 
   const messages = extractMessages()
+  const debugInfo = messages._debugInfo || null
   const contactPhone = getContactPhone()
   const conversationChanged = contactName !== lastContactName
   lastContactName = contactName
@@ -440,6 +692,7 @@ function sendUpdate() {
       contactPhone,
       messages,
       conversationChanged,
+      _debugInfo: debugInfo,
     })
   }
 }

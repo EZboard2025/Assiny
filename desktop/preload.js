@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWhatsAppState: () => ipcRenderer.invoke('get-whatsapp-state'),
   injectWhatsAppText: (text) => ipcRenderer.send('inject-whatsapp-text', text),
   openWhatsApp: () => ipcRenderer.send('open-whatsapp'),
+  // Copilot toggle (minimize/expand)
+  toggleCopilot: () => ipcRenderer.send('toggle-copilot'),
+  onCopilotToggled: (callback) => ipcRenderer.on('copilot-toggled', (_event, isOpen) => callback(isOpen)),
   // Platform URL (dev vs prod)
   getPlatformUrl: () => ipcRenderer.invoke('get-platform-url'),
   // BlackHole audio driver (seamless system audio capture)

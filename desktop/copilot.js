@@ -39,6 +39,12 @@ const chatInputBar = document.getElementById('chat-input-bar')
 const headerContact = document.getElementById('header-contact')
 const contactNameEl = document.getElementById('contact-name')
 const btnBack = document.getElementById('btn-back')
+const btnToggle = document.getElementById('btn-toggle')
+const collapsedBar = document.getElementById('collapsed-bar')
+const btnExpand = document.getElementById('btn-expand')
+const copilotHeader = document.querySelector('.copilot-header')
+
+let isCopilotExpanded = true
 
 // --- Auth ---
 if (window.electronAPI && window.electronAPI.onAuthToken) {
@@ -60,6 +66,7 @@ const AVATAR_HTML = `<div class="ai-avatar"><svg width="14" height="14" viewBox=
 function showWelcome() {
   // Never reset to welcome while sending or revealing a response
   if (isSending || revealTimer) return
+  messagesArea.style.display = 'flex'
   welcomeState.style.display = 'flex'
   noConversation.style.display = 'none'
   chatPills.style.display = 'none'
@@ -70,6 +77,7 @@ function showWelcome() {
 function showNoConversation() {
   // Never reset while sending or revealing a response
   if (isSending || revealTimer) return
+  messagesArea.style.display = 'none'
   welcomeState.style.display = 'none'
   noConversation.style.display = 'flex'
   chatPills.style.display = 'none'
@@ -80,6 +88,7 @@ function showNoConversation() {
 function switchToChatMode() {
   if (hasMessages) return
   hasMessages = true
+  messagesArea.style.display = 'flex'
   welcomeState.style.display = 'none'
   noConversation.style.display = 'none'
   chatPills.style.display = 'flex'
@@ -346,10 +355,13 @@ function formatConversationContext() {
     selected = [...selected.slice(0, 5), ...selected.slice(-25)]
   }
 
+  // Check if timestamps are reliable (0 = unknown/unparsed)
+  const hasReliableTimestamps = selected.some(m => m.timestamp > 1000000000000) // After year 2001 in ms
+
   // Build analysis header
   let analysis = `DATA E HORA ATUAL: ${now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\n`
 
-  if (selected.length > 0) {
+  if (selected.length > 0 && hasReliableTimestamps) {
     const lastMsg = selected[selected.length - 1]
     const lastMsgDate = new Date(lastMsg.timestamp)
     const diffMs = now.getTime() - lastMsgDate.getTime()
@@ -378,20 +390,64 @@ function formatConversationContext() {
     } else if (lastClientIdx !== -1 && (lastSellerIdx === -1 || lastClientIdx < lastSellerIdx)) {
       analysis += `SITUACAO: Cliente respondeu e aguarda resposta do vendedor (lead QUENTE).\n`
     }
+  } else if (selected.length > 0) {
+    // Timestamps unreliable — use display dates/times from scraper if available
+    const lastMsg = selected[selected.length - 1]
+    if (lastMsg.date) {
+      analysis += `ULTIMA MENSAGEM: ${lastMsg.fromMe ? 'Vendedor' : clientName}, data: ${lastMsg.date} ${lastMsg.time || ''}\n`
+
+      // Try to calculate time difference from display date
+      const dateParts = lastMsg.date.split('/')
+      if (dateParts.length === 3) {
+        let year = dateParts[2]
+        if (year.length === 2) year = '20' + year
+        const msgDate = new Date(`${year}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}`)
+        if (!isNaN(msgDate.getTime())) {
+          const diffDays = Math.floor((now.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24))
+          if (diffDays > 0) {
+            analysis += `SITUACAO: Ultima interacao ha ${diffDays} dia(s).\n`
+          }
+        }
+      }
+    } else {
+      analysis += `ULTIMA MENSAGEM: ${lastMsg.fromMe ? 'Vendedor' : clientName} (data exata indisponivel)\n`
+      analysis += `NOTA: As datas exatas das mensagens nao puderam ser extraidas. Analise o conteudo da conversa para inferir o contexto temporal.\n`
+    }
+
+    // Still try to detect who sent the last message
+    const reversed = [...selected].reverse()
+    const lastSellerIdx = reversed.findIndex(m => m.fromMe)
+    const lastClientIdx = reversed.findIndex(m => !m.fromMe)
+    if (lastSellerIdx !== -1 && (lastClientIdx === -1 || lastSellerIdx < lastClientIdx)) {
+      analysis += `SITUACAO: Vendedor mandou a ultima mensagem. Aguardando resposta do cliente.\n`
+    } else if (lastClientIdx !== -1 && (lastSellerIdx === -1 || lastClientIdx < lastSellerIdx)) {
+      analysis += `SITUACAO: Cliente respondeu e aguarda resposta do vendedor.\n`
+    }
   }
 
   // Format messages
   const lines = selected.map(m => {
     const sender = m.fromMe ? 'Vendedor' : clientName
-    const dateStr = m.date || new Date(m.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-    const timeStr = m.time || new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    let dateStr = m.date || ''
+    let timeStr = m.time || ''
+
+    // Only use timestamp-derived date/time if timestamp is reliable
+    if (!dateStr && m.timestamp > 1000000000000) {
+      dateStr = new Date(m.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    }
+    if (!timeStr && m.timestamp > 1000000000000) {
+      timeStr = new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    }
+
     let content = m.body
     if (!content && m.type !== 'text') {
       const labels = { image: '[Imagem]', audio: '[Audio]', video: '[Video]', document: '[Documento]', sticker: '[Sticker]' }
       content = labels[m.type] || `[${m.type}]`
     }
     if (!content) content = `[${m.type}]`
-    return `[${dateStr} ${timeStr}] ${sender}: ${content}`
+
+    const timeLabel = dateStr && timeStr ? `${dateStr} ${timeStr}` : timeStr || dateStr || '??'
+    return `[${timeLabel}] ${sender}: ${content}`
   })
 
   return analysis + '\n' + lines.join('\n')
@@ -439,22 +495,43 @@ async function sendMessage(text) {
     chatInput.value = ''
     addUserMessage('!debug')
     const msgs = waContext.messages || []
+    const reliableCount = msgs.filter(m => m.timestamp > 1000000000000).length
+    const dbg = waContext._debugInfo || {}
     let debugInfo = `**Contexto WhatsApp**\n`
     debugInfo += `- Ativo: ${waContext.active}\n`
     debugInfo += `- Contato: ${waContext.contactName || 'nenhum'}\n`
     debugInfo += `- Telefone: ${waContext.contactPhone || 'n/a'}\n`
-    debugInfo += `- Mensagens: ${msgs.length}\n\n`
+    debugInfo += `- Mensagens: ${msgs.length}\n`
+    debugInfo += `- Timestamps confiaveis: ${reliableCount}/${msgs.length}\n`
+    debugInfo += `- Date headers encontrados: ${dbg.dateHeadersFound || 0}\n`
+    if (dbg.dateHeaderDates?.length > 0) {
+      debugInfo += `- Datas dos headers: ${dbg.dateHeaderDates.join(', ')}\n`
+    }
+    debugInfo += `\n`
+
+    // Show raw data-pre-plain-text samples
+    if (dbg.prePlainSamples?.length > 0) {
+      debugInfo += `**data-pre-plain-text (primeiras ${dbg.prePlainSamples.length} msgs):**\n`
+      dbg.prePlainSamples.forEach((s, i) => {
+        debugInfo += `- raw: \`${s.raw || '[vazio]'}\`\n`
+        debugInfo += `  parsed: time=${s.time || 'null'}, date=${s.date || 'null'}, sender=${s.sender || 'null'}\n`
+      })
+      debugInfo += `\n`
+    }
+
     if (msgs.length > 0) {
-      debugInfo += `**Ultimas 15 mensagens:**\n`
-      const last15 = msgs.slice(-15)
-      last15.forEach((m, i) => {
+      debugInfo += `**Ultimas 10 mensagens:**\n`
+      const last10 = msgs.slice(-10)
+      last10.forEach((m, i) => {
         const dir = m.fromMe ? 'OUT' : 'IN'
-        const body = (m.body || '').substring(0, 80)
-        debugInfo += `- [${m.time || '??'}] ${dir} (${m.type}): ${body || '[vazio]'}\n`
+        const body = (m.body || '').substring(0, 60)
+        const tsInfo = m.timestamp > 1000000000000 ? new Date(m.timestamp).toLocaleString('pt-BR') : (m.timestamp === 0 ? 'DESCONHECIDO' : `ts=${m.timestamp}`)
+        debugInfo += `- [${m.date || '??'} ${m.time || '??'}] ${dir}: ${body || '[vazio]'}\n`
+        debugInfo += `  ts: ${tsInfo}\n`
       })
     }
-    debugInfo += `\n**Contexto formatado (primeiros 500 chars):**\n`
-    debugInfo += '`' + formatConversationContext().substring(0, 500) + '`'
+    debugInfo += `\n**Contexto formatado (primeiros 600 chars):**\n`
+    debugInfo += '`' + formatConversationContext().substring(0, 600) + '`'
     addAIMessage(debugInfo, null)
     return
   }
@@ -656,7 +733,7 @@ function formatInline(text) {
   return escaped
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`(.+?)`/g, '<code style="background:#1a2730;padding:1px 4px;border-radius:3px;font-size:12px;color:#00a884;">$1</code>')
+    .replace(/`(.+?)`/g, '<code style="background:#f0fdf9;padding:1px 4px;border-radius:3px;font-size:12px;color:#059669;">$1</code>')
 }
 
 // Process visual tags on already-escaped text (safe — no double-escaping)
@@ -671,7 +748,7 @@ function formatVisualTags(escaped) {
       const pct = Math.round((parseFloat(val) / parseFloat(max)) * 100)
       const s = parseFloat(val)
       const color = s >= 7 ? '#22c55e' : s >= 5 ? '#eab308' : '#ef4444'
-      return `<div style="margin:6px 0;"><div style="font-size:11px;color:#8696a0;margin-bottom:2px;">${label} (${val}/${max})</div><div style="height:6px;background:#2a3942;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div></div></div>`
+      return `<div style="margin:6px 0;"><div style="font-size:11px;color:#9ca3af;margin-bottom:2px;">${label} (${val}/${max})</div><div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div></div></div>`
     })
     .replace(/\{\{TENDENCIA:([^}]+)\}\}/g, (_, trend) => {
       const t = trend.toLowerCase()
@@ -763,3 +840,57 @@ document.querySelectorAll('.pill').forEach(btn => {
 btnBack.addEventListener('click', () => {
   resetChat()
 })
+
+// ============================================================
+// COPILOT TOGGLE (minimize/expand)
+// ============================================================
+
+function collapseCopilot() {
+  isCopilotExpanded = false
+  copilotHeader.style.display = 'none'
+  messagesArea.style.display = 'none'
+  chatPills.style.display = 'none'
+  chatInputBar.style.display = 'none'
+  noConversation.style.display = 'none'
+  collapsedBar.style.display = 'flex'
+}
+
+function expandCopilot() {
+  isCopilotExpanded = true
+  collapsedBar.style.display = 'none'
+  copilotHeader.style.display = 'flex'
+  // Restore correct content state
+  if (currentContact && hasMessages) {
+    messagesArea.style.display = 'flex'
+    chatPills.style.display = 'flex'
+    chatInputBar.style.display = 'block'
+  } else if (currentContact) {
+    messagesArea.style.display = 'flex'
+    welcomeState.style.display = 'flex'
+  } else {
+    noConversation.style.display = 'flex'
+  }
+}
+
+btnToggle.addEventListener('click', () => {
+  if (window.electronAPI && window.electronAPI.toggleCopilot) {
+    window.electronAPI.toggleCopilot()
+  }
+})
+
+btnExpand.addEventListener('click', () => {
+  if (window.electronAPI && window.electronAPI.toggleCopilot) {
+    window.electronAPI.toggleCopilot()
+  }
+})
+
+// Listen for toggle state from main process
+if (window.electronAPI && window.electronAPI.onCopilotToggled) {
+  window.electronAPI.onCopilotToggled((isOpen) => {
+    if (isOpen) {
+      expandCopilot()
+    } else {
+      collapseCopilot()
+    }
+  })
+}

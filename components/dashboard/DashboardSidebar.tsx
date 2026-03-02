@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, Video, TrendingUp } from 'lucide-react'
+import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp, Download } from 'lucide-react'
 
 interface DashboardSidebarProps {
   userRole: string | null
@@ -28,13 +28,14 @@ export default function DashboardSidebar({
   const navItems = [
     { icon: Home, href: '/', label: 'Home', show: true },
     { icon: Users, href: '/roleplay', label: 'Simulação', show: true },
-    // WhatsApp IA removed — now handled exclusively by the Electron desktop app
+    { icon: MessageSquare, href: '#whatsapp', label: 'WhatsApp IA', show: true, comingSoon: true },
     { icon: Video, href: '/meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, href: '/history', label: 'Histórico', show: true },
     { icon: User, href: '/profile', label: 'Meu Perfil', show: true },
     { icon: Target, href: '/pdi-page', label: 'PDI', show: hasPDI },
     { icon: TrendingUp, href: '/manager', label: 'Gestão', show: isAdmin || isGestor },
     { icon: Link2, href: '/roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
+    { icon: Download, href: '#download', label: 'Download', show: true, comingSoon: true },
   ]
 
   const isActive = (href: string) => {
@@ -82,21 +83,22 @@ export default function DashboardSidebar({
             if (!item.show) return null
 
             const active = isActive(item.href)
-            const isDisabled = 'disabled' in item && item.disabled
             const Icon = item.icon
+            const isComingSoon = 'comingSoon' in item && item.comingSoon
 
-            if (isDisabled) {
+            if (isComingSoon) {
               return (
                 <div
                   key={item.href}
-                  title={!isExpanded ? item.label : undefined}
+                  title={isExpanded ? 'Em desenvolvimento' : `${item.label} — Em desenvolvimento`}
                   className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg opacity-40 cursor-not-allowed text-gray-500"
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
-                  <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${
+                  <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 flex items-center gap-2 ${
                     isExpanded ? 'w-auto opacity-100' : 'w-0 opacity-0'
                   }`}>
                     {item.label}
+                    <span className="text-[9px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider">Em breve</span>
                   </span>
                 </div>
               )

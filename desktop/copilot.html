@@ -19,11 +19,21 @@
         <span class="header-badge">IA</span>
       </div>
       <div class="header-contact" id="header-contact" style="display:none;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span id="contact-name" class="contact-name">Cliente</span>
       </div>
       <button id="btn-back" class="btn-icon" title="Voltar" style="display:none;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+      <button id="btn-toggle" class="btn-icon btn-toggle" title="Minimizar copiloto">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
+      </button>
+    </div>
+
+    <!-- Collapsed state (shown when minimized) -->
+    <div id="collapsed-bar" class="collapsed-bar" style="display:none;">
+      <button id="btn-expand" class="btn-expand" title="Abrir copiloto">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00a884" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
       </button>
     </div>
 
@@ -73,8 +83,11 @@
 
     <!-- No conversation placeholder -->
     <div id="no-conversation" class="no-conversation" style="display:none;">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      <p>Abra uma conversa no WhatsApp para ativar o copiloto.</p>
+      <div class="no-conv-icon-wrap">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#00a884" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <h3 class="no-conv-title">Nenhuma conversa selecionada</h3>
+      <p class="no-conv-sub">Abra uma conversa no WhatsApp para ativar o copiloto.</p>
     </div>
   </div>
 

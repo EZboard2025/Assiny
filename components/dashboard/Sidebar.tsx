@@ -34,13 +34,13 @@ export default function Sidebar({
     { icon: Home, view: 'home', label: 'Home', show: true },
     { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
     { icon: Users, view: 'roleplay', label: 'Simulação', show: true },
-    { icon: MessageSquare, view: 'whatsapp', label: 'WhatsApp IA', show: true },
+    { icon: MessageSquare, view: 'whatsapp', label: 'WhatsApp IA', show: true, comingSoon: true },
     { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
     // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden
     { icon: TrendingUp, view: 'manager', label: 'Gestão', show: isAdmin || isGestor },
     { icon: Link2, view: 'roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
-    { icon: Download, view: 'download', label: 'Download', show: true },
+    { icon: Download, view: 'download', label: 'Download', show: true, comingSoon: true },
   ]
 
   return (
@@ -81,25 +81,40 @@ export default function Sidebar({
             if (!item.show) return null
 
             const isActive = currentView === item.view
-            const isDisabled = 'disabled' in item && (item as any).disabled
             const Icon = item.icon
+            const isComingSoon = 'comingSoon' in item && (item as any).comingSoon
+
+            if (isComingSoon) {
+              return (
+                <div
+                  key={item.view}
+                  title={isExpanded ? 'Em desenvolvimento' : `${item.label} — Em desenvolvimento`}
+                  className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg opacity-40 cursor-not-allowed text-gray-500"
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 flex items-center gap-2 ${
+                    isExpanded ? 'w-auto opacity-100' : 'w-0 opacity-0'
+                  }`}>
+                    {item.label}
+                    <span className="text-[9px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider">Em breve</span>
+                  </span>
+                </div>
+              )
+            }
 
             return (
               <button
                 key={item.view}
-                onClick={() => !isDisabled && onViewChange(item.view)}
+                onClick={() => onViewChange(item.view)}
                 title={!isExpanded ? item.label : undefined}
-                disabled={!!isDisabled}
                 className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 text-left ${
-                  isDisabled
-                    ? 'opacity-40 cursor-not-allowed text-gray-500'
-                    : isActive
-                      ? 'bg-green-500/20 text-white font-semibold'
-                      : 'text-gray-300 hover:text-white hover:bg-white/10'
+                  isActive
+                    ? 'bg-green-500/20 text-white font-semibold'
+                    : 'text-gray-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {/* Active indicator */}
-                {isActive && !isDisabled && (
+                {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-green-500 rounded-r-full" />
                 )}
                 <div className="relative flex-shrink-0">

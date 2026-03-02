@@ -31,6 +31,8 @@ let authTokenInterval = null
 let tray = null
 
 const COPILOT_WIDTH = 400
+const COPILOT_COLLAPSED_WIDTH = 48
+let copilotExpanded = true
 
 // WhatsApp scraper state (forwarded to copilot view)
 let whatsappContext = { active: false, contactName: null, contactPhone: null, messages: [] }
@@ -376,14 +378,16 @@ function createWhatsAppWindow() {
   waView.webContents.setUserAgent(chromeUA)
   waView.webContents.loadURL('https://web.whatsapp.com')
 
-  // --- Copilot view (right side) ---
+  // --- Copilot view (right side, overlaps WhatsApp for rounded corner effect) ---
   copilotView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      transparent: true,
     },
   })
+  copilotView.setBackgroundColor('#00000000')
   whatsappBaseWindow.contentView.addChildView(copilotView)
   copilotView.webContents.loadFile('copilot.html')
 
@@ -716,10 +720,21 @@ function createWhatsAppWindow() {
 function layoutWhatsAppViews() {
   if (!whatsappBaseWindow || whatsappBaseWindow.isDestroyed()) return
   const [w, h] = whatsappBaseWindow.getSize()
-  const waWidth = Math.max(500, w - COPILOT_WIDTH)
+  const copilotW = copilotExpanded ? COPILOT_WIDTH : COPILOT_COLLAPSED_WIDTH
+  const overlap = 16 // copilot overlaps WhatsApp for rounded corner effect
+  const waWidth = Math.max(500, w - copilotW + overlap)
   waView.setBounds({ x: 0, y: 0, width: waWidth, height: h })
-  copilotView.setBounds({ x: waWidth, y: 0, width: COPILOT_WIDTH, height: h })
+  copilotView.setBounds({ x: w - copilotW, y: 0, width: copilotW, height: h })
 }
+
+// Toggle copilot expand/collapse
+ipcMain.on('toggle-copilot', () => {
+  copilotExpanded = !copilotExpanded
+  layoutWhatsAppViews()
+  if (copilotView && !copilotView.webContents.isDestroyed()) {
+    copilotView.webContents.send('copilot-toggled', copilotExpanded)
+  }
+})
 
 // ============================================================
 // AUTH TOKEN BRIDGE (main window → bubble window + recording window)
