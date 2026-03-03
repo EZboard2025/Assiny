@@ -18,17 +18,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { userId, force_test } = await request.json()
+    const { userId, force_test, test_type } = await request.json()
     if (!userId) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 })
     }
 
-    // Force test mode — return a fake notification immediately
+    // Force test mode — return fake notification(s) immediately
     if (force_test) {
-      const testNotifications: NotificationResult[] = [{
-        type: 'training_gap',
-        data: { days_since_last: 3, has_any_session: true }
-      }]
+      const TEST_DATA: Record<string, NotificationResult> = {
+        training_gap: { type: 'training_gap', data: { days_since_last: 3, has_any_session: true } },
+        meeting_soon: { type: 'meeting_soon', data: { title: 'Reunião com Cliente Demo', start: new Date(Date.now() + 28 * 60000).toISOString(), meet_link: 'https://meet.google.com/test', attendees: ['cliente@empresa.com'], minutes_until: 28 } },
+        stale_leads: { type: 'stale_leads', data: { count: 3, contacts: [{ name: 'João Silva', phone: '5511999001122', hours_since: 52 }, { name: 'Maria Santos', phone: '5511999003344', hours_since: 72 }] } },
+      }
+
+      if (test_type && TEST_DATA[test_type]) {
+        return NextResponse.json({ notifications: [TEST_DATA[test_type]] })
+      }
+
+      // Default: return all test notifications
+      const testNotifications: NotificationResult[] = Object.values(TEST_DATA)
       return NextResponse.json({ notifications: testNotifications })
     }
 

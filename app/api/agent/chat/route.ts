@@ -41,7 +41,8 @@ CONTEXTO:
 - Você tem acesso a TODOS os dados do vendedor via ferramentas — use-as sempre que precisar de dados reais
 
 FERRAMENTAS DISPONÍVEIS:
-Você tem 15 ferramentas para consultar qualquer dado do vendedor. SEMPRE chame múltiplas ferramentas em paralelo para dar respostas ricas e completas.
+Você tem 16 ferramentas para consultar qualquer dado do vendedor. SEMPRE chame múltiplas ferramentas em paralelo para dar respostas ricas e completas.
+- configure_roleplay: Quando o vendedor pedir "configura pra mim", "monta um roleplay", "treina objeção de preço", etc. Use os parâmetros para buscar personas e objeções por nome.
 
 ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Como está minha performance?" → get_performance_summary + get_roleplay_sessions(limit:5) + get_daily_challenges(limit:3)
@@ -59,6 +60,7 @@ ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Ativa o bot na reunião..." → get_scheduled_bots (para achar o scheduled_bot_id) + toggle_meeting_bot
 - "Estou livre amanhã?" → get_calendar_freebusy
 - Perguntas gerais sobre empresa → get_company_info
+- "Configura um roleplay" / "Monta um treino" / "Treina objeção de preço" → configure_roleplay (busca personas e objeções por nome parcial, monta config e navega para roleplay)
 - "Abre o Chrome" / "Abre a calculadora" → execute_desktop_action(open_app, "chrome") ou (open_app, "calculator")
 - "Abre google.com" → execute_desktop_action(open_url, "https://google.com")
 - "Abre a pasta do Fortnite" → search_computer(installed_apps, "fortnite") → pega InstallLocation → execute_desktop_action(open_path, caminho_encontrado)
@@ -504,6 +506,25 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
   //   type: 'function',
   //   function: { name: 'generate_briefing', ... }
   // },
+  {
+    type: 'function',
+    function: {
+      name: 'configure_roleplay',
+      description: 'Configura uma sessão de roleplay para o vendedor. Busca personas e objeções do banco de dados por nome parcial e monta a configuração. Use quando o vendedor pedir para configurar, montar ou preparar um roleplay/simulação.',
+      parameters: {
+        type: 'object',
+        properties: {
+          persona_name: { type: 'string', description: 'Nome parcial ou completo da persona (cargo/profissão). Ex: "gerente", "diretor comercial"' },
+          objection_names: { type: 'array', items: { type: 'string' }, description: 'Nomes parciais de objeções. Ex: ["preço", "concorrente"]' },
+          objective_name: { type: 'string', description: 'Nome parcial do objetivo. Ex: "agendar", "fechar"' },
+          age: { type: 'number', description: 'Idade do cliente simulado (18-60). Padrão: 35' },
+          temperament: { type: 'string', enum: ['Analítico', 'Empático', 'Determinado', 'Indeciso', 'Sociável'], description: 'Temperamento do cliente simulado' },
+          auto_start: { type: 'boolean', description: 'Se true, inicia o roleplay automaticamente. Padrão: false.' }
+        },
+        required: []
+      }
+    }
+  },
   {
     type: 'function',
     function: {
@@ -2289,6 +2310,95 @@ ${knowledgeContext || 'Não disponível.'}`
         }
       }
 
+      case 'configure_roleplay': {
+        const { persona_name, objection_names, objective_name, age, temperament, auto_start } = params
+
+        // Get companyId from employee table
+        const { data: empData } = await supabaseAdmin
+          .from('employees')
+          .select('company_id')
+          .eq('user_id', userId)
+          .single()
+
+        const rpCompanyId = empData?.company_id || companyId
+
+        // Fetch personas, objections, and objectives for this company
+        const [personasRes, objectionsRes, objectivesRes] = await Promise.all([
+          supabaseAdmin.from('personas').select('id, cargo, job_title, profissao, profession').eq('company_id', rpCompanyId),
+          supabaseAdmin.from('objections').select('id, name').eq('company_id', rpCompanyId),
+          supabaseAdmin.from('roleplay_objectives').select('id, name').eq('company_id', rpCompanyId),
+        ])
+
+        const allPersonas = personasRes.data || []
+        const allObjections = objectionsRes.data || []
+        const allObjectives = objectivesRes.data || []
+
+        // Match persona by partial name (case-insensitive)
+        let matchedPersona: any = null
+        if (persona_name) {
+          const search = persona_name.toLowerCase()
+          const matches = allPersonas.filter((p: any) => {
+            const fields = [p.cargo, p.job_title, p.profissao, p.profession].filter(Boolean)
+            return fields.some((f: string) => f.toLowerCase().includes(search))
+          })
+          if (matches.length === 1) {
+            matchedPersona = matches[0]
+          } else if (matches.length > 1) {
+            return {
+              success: false,
+              multiple_personas: true,
+              matches: matches.map((p: any) => ({
+                id: p.id,
+                name: p.cargo || p.job_title || p.profissao || p.profession,
+              })),
+              message: `Encontrei ${matches.length} personas. Qual você quer?`,
+            }
+          } else {
+            return {
+              success: false,
+              no_persona: true,
+              available: allPersonas.map((p: any) => ({
+                id: p.id,
+                name: p.cargo || p.job_title || p.profissao || p.profession,
+              })),
+              message: `Nenhuma persona encontrada com "${persona_name}". Personas disponíveis listadas.`,
+            }
+          }
+        }
+
+        // Match objections by partial name (case-insensitive)
+        let matchedObjections: any[] = []
+        if (objection_names && Array.isArray(objection_names)) {
+          for (const objName of objection_names) {
+            const search = objName.toLowerCase()
+            const match = allObjections.find((o: any) => o.name?.toLowerCase().includes(search))
+            if (match) matchedObjections.push(match)
+          }
+        }
+
+        // Match objective by partial name (case-insensitive)
+        let matchedObjective: any = null
+        if (objective_name) {
+          const search = objective_name.toLowerCase()
+          matchedObjective = allObjectives.find((o: any) => o.name?.toLowerCase().includes(search)) || null
+        }
+
+        // Build roleplay config
+        const roleplayConfig: Record<string, any> = {}
+        if (matchedPersona) roleplayConfig.selectedPersona = matchedPersona
+        if (matchedObjections.length > 0) roleplayConfig.objections = matchedObjections
+        if (matchedObjective) roleplayConfig.selectedObjective = matchedObjective
+        roleplayConfig.age = age || 35
+        roleplayConfig.temperament = temperament || 'Analítico'
+        roleplayConfig.auto_start = auto_start || false
+
+        return {
+          success: true,
+          roleplayConfig,
+          message: `Roleplay configurado${matchedPersona ? ` com persona "${matchedPersona.cargo || matchedPersona.job_title || matchedPersona.profissao}"` : ''}${matchedObjections.length > 0 ? `, ${matchedObjections.length} objeção(ões)` : ''}${matchedObjective ? `, objetivo "${matchedObjective.name}"` : ''}.`,
+        }
+      }
+
       case 'execute_desktop_action': {
         const { action_type, target } = params
         const validTypes = ['open_app', 'open_url', 'open_path', 'navigate_platform']
@@ -2579,6 +2689,15 @@ COMO GUIAR O USUÁRIO:
               search_name: args.name,
               search_company: args.company || '',
               is_internal_search: r.is_internal_search as boolean || false,
+            })
+          }
+
+          // Collect configure_roleplay results → navigate to roleplay page with config
+          if (tcFn.function.name === 'configure_roleplay' && result && (result as Record<string, unknown>).success) {
+            const r = result as Record<string, unknown>
+            desktopActions.push({
+              type: 'navigate_platform',
+              target: `?view=roleplay&nicoleConfig=${encodeURIComponent(JSON.stringify(r.roleplayConfig))}`,
             })
           }
 

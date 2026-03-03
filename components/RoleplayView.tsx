@@ -72,6 +72,15 @@ interface MeetSimulationConfig {
   meeting_context: string
 }
 
+interface NicoleConfig {
+  persona_id?: string
+  objection_ids?: string[]
+  objective_id?: string
+  age?: number
+  temperament?: string
+  auto_start?: boolean
+}
+
 interface RoleplayViewProps {
   onNavigateToHistory?: (historyType?: string) => void
   challengeConfig?: ChallengeConfig
@@ -79,9 +88,11 @@ interface RoleplayViewProps {
   onChallengeComplete?: () => void
   meetSimulationConfig?: MeetSimulationConfig
   meetSimulationId?: string
+  nicoleConfig?: NicoleConfig
+  onNicoleConfigApplied?: () => void
 }
 
-export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete, meetSimulationConfig, meetSimulationId }: RoleplayViewProps = {}) {
+export default function RoleplayView({ onNavigateToHistory, challengeConfig, challengeId, onChallengeComplete, meetSimulationConfig, meetSimulationId, nicoleConfig, onNicoleConfigApplied }: RoleplayViewProps = {}) {
   const router = useRouter()
 
   // Hook para verificar limites do plano
@@ -313,12 +324,21 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   // Auto-start challenge (skip config screen — config is already locked by the challenge)
   // Must wait for dataLoading to finish so persona/objections/objective are set from challenge config
   const challengeAutoStarted = useRef(false)
+  const nicoleAutoStarted = useRef(false)
   useEffect(() => {
     if (challengeConfig && mounted && !planLoading && !dataLoading && !isSimulating && !challengeAutoStarted.current) {
       challengeAutoStarted.current = true
       handleStartSimulation()
     }
   }, [challengeConfig, mounted, planLoading, dataLoading])
+
+  // Auto-start Nicole AI suggested roleplay
+  useEffect(() => {
+    if (nicoleConfig?.auto_start && mounted && !planLoading && !dataLoading && !isSimulating && !nicoleAutoStarted.current) {
+      nicoleAutoStarted.current = true
+      handleStartSimulation()
+    }
+  }, [nicoleConfig, mounted, planLoading, dataLoading])
 
   // Verificar limite de créditos mensais
   useEffect(() => {
@@ -419,6 +439,23 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
         setTemperament(meetSimulationConfig.temperament)
         // Persona/objections/objective are passed inline in handleStartSimulation
         // No need to set selectedPersona/selectedObjections/selectedObjective by DB ID
+      }
+
+      // Apply Nicole AI config (user can still edit - NOT locked)
+      if (nicoleConfig) {
+        if (nicoleConfig.persona_id && personasData.some((p: any) => p.id === nicoleConfig.persona_id)) {
+          setSelectedPersona(nicoleConfig.persona_id)
+        }
+        if (nicoleConfig.objection_ids) {
+          const validIds = nicoleConfig.objection_ids.filter((id: string) => objectionsData.some((o: any) => o.id === id))
+          if (validIds.length > 0) setSelectedObjections(validIds)
+        }
+        if (nicoleConfig.objective_id && objectivesData.some((o: any) => o.id === nicoleConfig.objective_id)) {
+          setSelectedObjective(nicoleConfig.objective_id)
+        }
+        if (nicoleConfig.age) setAge(nicoleConfig.age)
+        if (nicoleConfig.temperament) setTemperament(nicoleConfig.temperament)
+        onNicoleConfigApplied?.()
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)

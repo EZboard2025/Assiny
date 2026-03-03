@@ -69,10 +69,13 @@ function createMainWindow() {
     return { action: 'deny' }
   })
 
-  // F12 to toggle DevTools
+  // F12 to toggle DevTools, F5/Ctrl+R to reload
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12') {
       mainWindow.webContents.toggleDevTools()
+    }
+    if (input.key === 'F5' || (input.control && input.key === 'r')) {
+      mainWindow.reload()
     }
   })
 
@@ -211,6 +214,13 @@ function createBubbleWindow() {
   // Block OS-level window dragging entirely — all moves are handled via IPC setBounds/moveBubble
   bubbleWindow.on('will-move', (e) => {
     e.preventDefault()
+  })
+
+  // Forward console.log from bubble renderer to main process stdout (for debugging)
+  bubbleWindow.webContents.on('console-message', (_event, _level, message) => {
+    if (message.startsWith('[Bubble]') || message.startsWith('[Nicole]')) {
+      console.log('[Bubble]', message)
+    }
   })
 
   bubbleWindow.on('closed', () => { bubbleWindow = null })
@@ -854,13 +864,10 @@ app.whenReady().then(() => {
   createTray()
   startAuthBridge()
 
-  // NumLock → test Nicole notification (debounced — NumLock fires on key down + key up)
-  let lastNumLockTime = 0
-  globalShortcut.register('NumLock', () => {
-    if (Date.now() - lastNumLockTime < 2000) return
-    lastNumLockTime = Date.now()
+  // Ctrl+Shift+N → test Nicole notification (cycles through types)
+  globalShortcut.register('CommandOrControl+Shift+N', () => {
     if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-      console.log('[Main] Sending test notification to bubble')
+      console.log('[Main] Test notification triggered (Ctrl+Shift+N)')
       bubbleWindow.webContents.send('test-notification')
     }
   })

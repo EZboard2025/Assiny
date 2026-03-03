@@ -26,6 +26,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [hasPDI, setHasPDI] = useState(true)
 
@@ -69,6 +70,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         await supabase.auth.signOut()
         router.push('/')
         return
+      }
+
+      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+        setIsDesktopApp(true)
       }
 
       setUser({
@@ -125,6 +130,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         className={`absolute top-0 bottom-0 right-0 overflow-y-auto overflow-x-hidden transition-all duration-300 ${
           isSidebarExpanded ? 'left-56' : 'left-16'
         }`}
+        style={isDesktopApp ? { zoom: 1.15 } : undefined}
       >
         {children}
       </main>

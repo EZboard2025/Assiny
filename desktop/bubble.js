@@ -116,27 +116,36 @@ if (window.electronAPI && window.electronAPI.onNotificationNudge) {
   })
 }
 
-// Listen for test notification trigger — shows toast directly, no auth needed
-let lastTestNotifTime = 0
+// Listen for test notification trigger — cycles through all 4 types on each press
+let testNotifIndex = 0
+const TEST_NOTIFICATION_TYPES = ['training_gap', 'meeting_soon', 'stale_leads', 'morning_summary']
+const TEST_NOTIFICATION_DATA = {
+  training_gap: { days_since_last: 3, has_any_session: true },
+  meeting_soon: { title: 'Reunião com Cliente Demo', minutes_until: 28, meet_link: 'https://meet.google.com/test', attendees: ['cliente@empresa.com'] },
+  stale_leads: { count: 3, contacts: [{ name: 'João Silva', phone: '5511999001122', hours_since: 52 }, { name: 'Maria Santos', phone: '5511999003344', hours_since: 72 }] },
+  morning_summary: { meetings: [], tasks: [] },
+}
+
 if (window.electronAPI && window.electronAPI.onTestNotification) {
   window.electronAPI.onTestNotification(() => {
-    // Debounce — NumLock fires on keydown + keyup, ignore rapid triggers
-    if (Date.now() - lastTestNotifTime < 2000) return
-    lastTestNotifTime = Date.now()
+    const type = TEST_NOTIFICATION_TYPES[testNotifIndex % TEST_NOTIFICATION_TYPES.length]
+    testNotifIndex++
 
-    console.log('[Nicole] Test notification triggered')
-    // If auth available, use the real endpoint
-    if (accessToken && userId) {
-      checkNotifications(true)
-    } else {
-      // No auth yet — inject a fake notification directly into the queue
-      notificationQueue.push({
-        type: 'training_gap',
-        data: { days_since_last: 3, has_any_session: true },
-        dedupKey: `test_${Date.now()}`
-      })
-      if (!activeNotification) showNextNotification()
+    console.log(`[Nicole] Test notification: ${type} (press Ctrl+Shift+N again for next type)`)
+
+    // Force-dismiss current notification and clear queue for instant cycling
+    if (activeNotification) {
+      dismissNotification()
     }
+    notificationQueue.length = 0
+
+    // Inject fake notification directly
+    notificationQueue.push({
+      type,
+      data: TEST_NOTIFICATION_DATA[type],
+      dedupKey: `test_${Date.now()}`
+    })
+    showNextNotification()
   })
 }
 
@@ -285,34 +294,42 @@ function dismissNotification(skipHide) {
   }
 }
 
-function handleNotificationClick() {
+async function handleNotificationClick() {
   const notif = activeNotification
+  console.log('[Nicole] handleNotificationClick called, notif type:', notif?.type, ', activeNotification exists:', !!activeNotification)
   dismissNotification(true) // skipHide — main already closed the notification window
   notificationBadge.style.display = 'none'
 
   // Expand and auto-send contextual message
   if (!isExpanded) {
-    expand()
+    console.log('[Nicole] Expanding panel...')
+    await expand()
+    console.log('[Nicole] Panel expanded')
+    // Small delay to let UI settle after expansion
+    await new Promise(r => setTimeout(r, 300))
   }
 
-  // Morning summary just opens panel — no need to send message
-  if (notif?.type === 'morning_summary') return
+  let msg = ''
+  switch (notif?.type) {
+    case 'meeting_soon':
+      msg = 'O que tenho daqui a pouco na agenda?'
+      break
+    case 'training_gap':
+      msg = 'Faz tempo que nao treino, me sugere um roleplay'
+      break
+    case 'stale_leads':
+      msg = 'Quais leads estao sem responder?'
+      break
+    case 'morning_summary':
+      msg = 'Me da um resumo do meu dia'
+      break
+  }
 
-  setTimeout(() => {
-    let msg = ''
-    switch (notif?.type) {
-      case 'meeting_soon':
-        msg = 'O que tenho daqui a pouco na agenda?'
-        break
-      case 'training_gap':
-        msg = 'Faz tempo que nao treino, me sugere um roleplay'
-        break
-      case 'stale_leads':
-        msg = 'Quais leads estao sem responder?'
-        break
-    }
-    if (msg) sendMessage(msg)
-  }, 500)
+  console.log('[Nicole] Notification msg to send:', JSON.stringify(msg), ', isSending:', isSending, ', hasAuth:', ensureAuth())
+  if (msg && !isSending && ensureAuth()) {
+    console.log('[Nicole] Auto-sending from notification click:', JSON.stringify(msg))
+    sendMessage(msg)
+  }
 }
 
 // Listen for notification click/dismiss from the separate notification window (via main process IPC)
