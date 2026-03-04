@@ -858,6 +858,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             onOpenConfig={() => setShowConfigHub(true)}
             onLogout={async () => {
               const { supabase } = await import('@/lib/supabase')
+              const { clearCompanyIdCache } = await import('@/lib/utils/getCompanyFromSubdomain')
+              clearCompanyIdCache()
               await supabase.auth.signOut()
               window.location.href = '/'
             }}

@@ -19,7 +19,7 @@ export default function Home() {
   const checkSession = async () => {
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+      const { getCompanyId, clearCompanyIdCache } = await import('@/lib/utils/getCompanyFromSubdomain')
 
       const { data: { user } } = await supabase.auth.getUser()
 
@@ -38,6 +38,7 @@ export default function Home() {
           setIsLoggedIn(true)
         } else {
           // Company_id não corresponde, deslogar
+          clearCompanyIdCache()
           await supabase.auth.signOut()
           setIsLoggedIn(false)
         }
@@ -62,6 +63,8 @@ export default function Home() {
   const handleLogout = async () => {
     console.log('Logout clicked')
     const { supabase } = await import('@/lib/supabase')
+    const { clearCompanyIdCache } = await import('@/lib/utils/getCompanyFromSubdomain')
+    clearCompanyIdCache()
     await supabase.auth.signOut()
     setIsLoggedIn(false)
   }

@@ -50,7 +50,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
       if (data.user) {
         // Verificar se o usuário pertence à empresa do subdomínio
-        const { getCompanyId } = await import('@/lib/utils/getCompanyFromSubdomain')
+        const { getCompanyId, clearCompanyIdCache } = await import('@/lib/utils/getCompanyFromSubdomain')
+        clearCompanyIdCache() // Clear stale cache from previous user session
         const subdomainCompanyId = await getCompanyId()
 
         // Buscar company_id do usuário

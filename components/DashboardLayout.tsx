@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
+import { getCompanyId, clearCompanyIdCache } from '@/lib/utils/getCompanyFromSubdomain'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar'
 import ConfigHub from '@/components/ConfigHub'
@@ -66,6 +66,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         .single()
 
       if (!employee || employee.company_id !== companyId) {
+        clearCompanyIdCache()
         await supabase.auth.signOut()
         router.push('/')
         return
@@ -87,6 +88,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   const handleLogout = async () => {
+    clearCompanyIdCache()
     await supabase.auth.signOut()
     router.push('/')
   }

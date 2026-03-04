@@ -31,46 +31,71 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadCompanyFromSubdomain()
+    loadCompany()
   }, [])
 
-  const loadCompanyFromSubdomain = async () => {
+  const loadCompany = async () => {
     try {
       setLoading(true)
       setError(null)
 
       if (typeof window === 'undefined') return
 
+      const USE_UNIFIED_SYSTEM = process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true'
+
+      if (USE_UNIFIED_SYSTEM) {
+        // Sistema unificado: buscar empresa do usuário logado
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setCurrentCompany(null)
+          return
+        }
+
+        const { data: employee } = await supabase
+          .from('employees')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single()
+
+        if (!employee?.company_id) {
+          setCurrentCompany(null)
+          return
+        }
+
+        const { data: company, error: fetchError } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', employee.company_id)
+          .single()
+
+        if (fetchError || !company) {
+          setCurrentCompany(null)
+        } else {
+          setCurrentCompany(company)
+        }
+        return
+      }
+
+      // SISTEMA LEGADO: subdomínios
       const hostname = window.location.hostname
       let subdomain = ''
 
-      // Detectar subdomínio baseado no ambiente
       if (hostname === 'localhost' || hostname.startsWith('127.0.0.1')) {
-        // Localhost puro sem subdomínio - usar query param ou padrão
         const params = new URLSearchParams(window.location.search)
-        subdomain = params.get('company') || 'assiny' // Default para desenvolvimento
+        subdomain = params.get('company') || 'assiny'
       } else if (hostname.includes('.ramppy.local')) {
-        // Formato: assiny.ramppy.local:3000 -> "assiny"
         subdomain = hostname.split('.')[0]
       } else if (hostname.includes('.ramppy.site')) {
-        // Formato: assiny.ramppy.site -> "assiny"
         subdomain = hostname.split('.')[0]
       } else {
-        // Fallback
         subdomain = hostname.split('.')[0]
       }
 
-      console.log('[CompanyContext] Hostname:', hostname)
-      console.log('[CompanyContext] Buscando empresa com subdomain:', subdomain)
-
-      // Se for domínio principal (ramppy), não buscar empresa
       if (subdomain === 'ramppy' || subdomain === 'www' || !subdomain) {
-        console.log('[CompanyContext] Domínio principal detectado, sem empresa específica')
         setCurrentCompany(null)
         return
       }
 
-      // Buscar empresa pelo subdomínio
       const { data, error: fetchError } = await supabase
         .from('companies')
         .select('*')
@@ -78,11 +103,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (fetchError) {
-        console.error('[CompanyContext] Erro ao buscar empresa:', fetchError)
         setError(`Empresa não encontrada: ${subdomain}`)
         setCurrentCompany(null)
       } else {
-        console.log('[CompanyContext] Empresa encontrada:', data)
         setCurrentCompany(data)
       }
     } catch (err) {
@@ -94,7 +117,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   }
 
   const refreshCompany = async () => {
-    await loadCompanyFromSubdomain()
+    await loadCompany()
   }
 
   return (
