@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAutoStart: (callback) => ipcRenderer.on('auto-start-recording', (_event) => callback()),
   onAutoStop: (callback) => ipcRenderer.on('auto-stop-recording', (_event) => callback()),
   notifyRecordingFinished: () => ipcRenderer.send('recording-finished'),
+  notifyRecordingError: (errorMsg) => ipcRenderer.send('recording-error', errorMsg),
   // Recording state (bubble indicator)
   onRecordingState: (callback) => ipcRenderer.on('recording-state', (_event, isRecording) => callback(isRecording)),
   // WhatsApp copilot IPC
@@ -35,6 +36,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkBlackHole: () => ipcRenderer.invoke('check-blackhole'),
   setupAudioRouting: () => ipcRenderer.invoke('setup-audio-routing'),
   teardownAudioRouting: () => ipcRenderer.invoke('teardown-audio-routing'),
+  // Meeting start confirmation (main ↔ bubble)
+  onAskMeetingStart: (callback) => ipcRenderer.on('ask-meeting-start', (_event, meetTitle) => callback(meetTitle)),
+  confirmMeetingStart: () => ipcRenderer.send('confirm-meeting-start'),
+  dismissMeetingStart: () => ipcRenderer.send('dismiss-meeting-start'),
+  onHideMeetingStart: (callback) => ipcRenderer.on('hide-meeting-start', () => callback()),
   // Meeting end confirmation (recorder ↔ main ↔ bubble)
   notifyMeetingMaybeEnded: () => ipcRenderer.send('meeting-maybe-ended'),
   onAskMeetingEnded: (callback) => ipcRenderer.on('ask-meeting-ended', () => callback()),

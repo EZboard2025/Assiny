@@ -1,13 +1,13 @@
 // ============================================================
 // Ramppy Recorder — Meeting Audio Capture
 // Auth via IPC bridge (no separate login)
-// System Audio + Mic → Deepgram → SPIN Evaluation
+// System Audio + Mic → OpenAI gpt-4o-transcribe → SPIN Evaluation
 // ============================================================
 
 // --- Config ---
 // Detect dev vs prod: file:// means running via `npm start` (dev), http means packaged app
 const BASE_URL = (window.location.protocol === 'file:') ? 'http://localhost:3000' : 'https://ramppy.site'
-const DEEPGRAM_WS_URL = 'wss://api.deepgram.com/v1/listen'
+const OPENAI_REALTIME_URL = 'wss://api.openai.com/v1/realtime?intent=transcription'
 
 // --- DOM ---
 const $ = (id) => document.getElementById(id)
@@ -45,7 +45,7 @@ let userId = null
 let companyId = null
 let userName = null
 let audioContext = null
-let deepgramWs = null
+let realtimeWs = null
 let processorNode = null
 let systemStream = null
 let micStream = null
@@ -151,17 +151,17 @@ function showError(message) {
 }
 
 // ============================================================
-// DEEPGRAM TOKEN (fetched from backend)
+// OPENAI REALTIME TOKEN (fetched from backend)
 // ============================================================
 
-async function fetchDeepgramKey() {
-  const res = await fetch(`${BASE_URL}/api/meet/deepgram-token`, {
+async function fetchOpenAIKey() {
+  const res = await fetch(`${BASE_URL}/api/meet/openai-realtime-token`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Erro ao buscar chave Deepgram' }))
-    throw new Error(err.error || 'Erro ao buscar chave Deepgram')
+    const err = await res.json().catch(() => ({ error: 'Erro ao buscar chave OpenAI' }))
+    throw new Error(err.error || 'Erro ao buscar chave OpenAI')
   }
 
   const data = await res.json()
@@ -174,7 +174,7 @@ async function fetchDeepgramKey() {
 // 2. ScreenCaptureKit fallback (shows picker) — if no BlackHole
 // ============================================================
 
-async function startAudioCapture(deepgramKey) {
+async function startAudioCapture(openaiKey) {
   usingBlackHole = false
 
   // Check if BlackHole is available for seamless capture
@@ -200,9 +200,9 @@ async function startAudioCapture(deepgramKey) {
     throw new Error('Nenhuma fonte de audio disponivel. Verifique permissoes de microfone e gravacao de tela.')
   }
 
-  // Build the audio pipeline and connect to Deepgram
+  // Build the audio pipeline and connect to OpenAI Realtime
   const numChannels = await buildAudioPipeline()
-  await connectToDeepgram(deepgramKey, numChannels)
+  await connectToOpenAI(openaiKey, numChannels)
 
   console.log('[Recorder] Audio capture started successfully!')
 }
@@ -248,10 +248,16 @@ async function startAudioCaptureViaBlackHole() {
   }
 
   // 5. Capture microphone separately
-  console.log('[Recorder] Capturing microphone...')
+  // With BlackHole, system audio is on a separate channel — disable echo cancellation
+  // and noise suppression to avoid WebRTC stripping words from the mic signal
+  console.log('[Recorder] Capturing microphone (raw, no echo cancellation)...')
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true }
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true,
+      }
     })
     console.log('[Recorder] Microphone captured! Tracks:', micStream.getAudioTracks().length)
   } catch (micErr) {
@@ -326,26 +332,29 @@ async function startAudioCaptureViaScreenCapture() {
 // --- Shared: Build audio pipeline (ScriptProcessor for PCM) ---
 async function buildAudioPipeline() {
   console.log('[Recorder] Creating audio pipeline...')
-  audioContext = new AudioContext()
+  // Force 24kHz — OpenAI Realtime API requires 24000Hz PCM16 mono
+  audioContext = new AudioContext({ sampleRate: 24000 })
   if (audioContext.state === 'suspended') await audioContext.resume()
 
   const hasSys = !!systemStream && systemStream.getAudioTracks().some(t => t.readyState === 'live')
   const hasMic = !!micStream
 
-  let numChannels
+  // Always use MONO — mix all sources into a single channel for best transcription quality.
+  // Multichannel/stereo caused speaker confusion and degraded audio per-channel.
+  const numChannels = 1
+
   if (hasSys && hasMic) {
-    // STEREO: left=system (participants), right=mic (you)
+    // Mix system audio + mic into one mono stream for transcription
     const sysAudioOnly = new MediaStream(systemStream.getAudioTracks())
     const sysSource = audioContext.createMediaStreamSource(sysAudioOnly)
     const micSource = audioContext.createMediaStreamSource(micStream)
     const merger = audioContext.createChannelMerger(2)
     sysSource.connect(merger, 0, 0)
     micSource.connect(merger, 0, 1)
-    numChannels = 2
-    console.log(`[Recorder] Stereo: L=system audio${usingBlackHole ? ' (BlackHole)' : ' (ScreenCaptureKit)'}, R=microphone`)
+    // Merge stereo to mono via a single-channel processor
+    console.log(`[Recorder] Mono mix: system audio${usingBlackHole ? ' (BlackHole)' : ' (ScreenCaptureKit)'} + microphone → single channel`)
 
-    // Use 8192 buffer to reduce frame drops in hidden/background windows
-    const scriptProcessor = audioContext.createScriptProcessor(8192, numChannels, 1)
+    const scriptProcessor = audioContext.createScriptProcessor(8192, 2, 1)
     const silentGain = audioContext.createGain()
     silentGain.gain.value = 0
     merger.connect(scriptProcessor)
@@ -353,12 +362,10 @@ async function buildAudioPipeline() {
     silentGain.connect(audioContext.destination)
     processorNode = scriptProcessor
   } else if (hasMic) {
-    // MIC-ONLY: mono, use diarization to distinguish speakers
     const micSource = audioContext.createMediaStreamSource(micStream)
-    numChannels = 1
-    console.log('[Recorder] Mic-only mode (system audio unavailable). Using diarization.')
+    console.log('[Recorder] Mic-only mode (system audio unavailable)')
 
-    const scriptProcessor = audioContext.createScriptProcessor(8192, numChannels, 1)
+    const scriptProcessor = audioContext.createScriptProcessor(8192, 1, 1)
     const silentGain = audioContext.createGain()
     silentGain.gain.value = 0
     micSource.connect(scriptProcessor)
@@ -366,13 +373,11 @@ async function buildAudioPipeline() {
     silentGain.connect(audioContext.destination)
     processorNode = scriptProcessor
   } else {
-    // SYSTEM-ONLY
     const sysAudioOnly = new MediaStream(systemStream.getAudioTracks())
     const sysSource = audioContext.createMediaStreamSource(sysAudioOnly)
-    numChannels = 1
     console.log('[Recorder] System audio only (no microphone)')
 
-    const scriptProcessor = audioContext.createScriptProcessor(8192, numChannels, 1)
+    const scriptProcessor = audioContext.createScriptProcessor(8192, 1, 1)
     const silentGain = audioContext.createGain()
     silentGain.gain.value = 0
     sysSource.connect(scriptProcessor)
@@ -386,155 +391,261 @@ async function buildAudioPipeline() {
   return numChannels
 }
 
-// --- Shared: Connect to Deepgram and wire audio ---
-function connectToDeepgram(deepgramKey, numChannels) {
-  console.log('[Recorder] Connecting to Deepgram...')
+// --- Shared: Connect to OpenAI Realtime API and wire audio ---
+function connectToOpenAI(openaiKey, numChannels) {
+  console.log('[Recorder] Connecting to OpenAI Realtime (gpt-4o-transcribe)...')
   const sampleRate = audioContext.sampleRate
 
-  const deepgramParams = new URLSearchParams({
-    model: 'nova-3',
-    language: 'pt-BR',
-    encoding: 'linear16',
-    sample_rate: sampleRate.toString(),
-    channels: numChannels.toString(),
-    smart_format: 'true',
-    punctuate: 'true',
-    interim_results: 'true',
-    utterance_end_ms: '1000',
-    vad_events: 'true',
-    ...(numChannels === 2 ? { multichannel: 'true' } : { diarize: 'true' }),
-  })
-
-  deepgramWs = new WebSocket(`${DEEPGRAM_WS_URL}?${deepgramParams}`, ['token', deepgramKey])
+  // Connect with subprotocol auth (browser WebSocket can't set custom headers)
+  realtimeWs = new WebSocket(OPENAI_REALTIME_URL, [
+    'realtime',
+    `openai-insecure-api-key.${openaiKey}`,
+    'openai-beta.realtime-v1'
+  ])
 
   let chunkCount = 0
   let diagCount = 0
+  let sessionConfigured = false
   const DIAG_EVERY = Math.floor(10 * sampleRate / 8192) // Log audio levels every ~10s
 
-  deepgramWs.onopen = () => {
-    console.log(`[Recorder] Deepgram connected! Streaming raw PCM: linear16, ${sampleRate}Hz, ${numChannels}ch${numChannels === 2 ? ', multichannel' : ', diarize'}${usingBlackHole ? ' (BlackHole)' : ''}`)
+  realtimeWs.onopen = () => {
+    console.log(`[Recorder] OpenAI Realtime connected! Configuring transcription session...`)
 
-    // Wire ScriptProcessor output to Deepgram WebSocket
-    processorNode.onaudioprocess = (event) => {
-      if (!deepgramWs || deepgramWs.readyState !== WebSocket.OPEN) return
-
-      const inputBuffer = event.inputBuffer
-      const numSamples = inputBuffer.length
-      const numCh = inputBuffer.numberOfChannels
-      const pcm = new Int16Array(numSamples * numCh)
-
-      for (let i = 0; i < numSamples; i++) {
-        for (let ch = 0; ch < numCh; ch++) {
-          const s = Math.max(-1, Math.min(1, inputBuffer.getChannelData(ch)[i]))
-          pcm[i * numCh + ch] = s < 0 ? s * 0x8000 : s * 0x7FFF
-        }
-      }
-
-      deepgramWs.send(pcm.buffer)
-      chunkCount++
-      if (chunkCount <= 3 || chunkCount % 500 === 0) {
-        console.log(`[Recorder] Audio chunk #${chunkCount}, size: ${pcm.buffer.byteLength} bytes`)
-      }
-
-      // Diagnostic: log audio levels every ~10s
-      diagCount++
-      if (diagCount % DIAG_EVERY === 0) {
-        const levels = []
-        for (let ch = 0; ch < numCh; ch++) {
-          const data = inputBuffer.getChannelData(ch)
-          let sum = 0
-          for (let i = 0; i < data.length; i++) sum += data[i] * data[i]
-          levels.push(Math.sqrt(sum / data.length).toFixed(4))
-        }
-        console.log(`[Recorder] Audio levels — ${numCh > 1 ? `System(L): ${levels[0]}, Mic(R): ${levels[1]}` : `Level: ${levels[0]}`}`)
-      }
-
-      // Track system audio energy for meeting-end detection (stereo + auto mode only)
-      if (numCh >= 2 && isAutoMode) {
-        const sysData = inputBuffer.getChannelData(0)
-        let sysSum = 0
-        for (let j = 0; j < sysData.length; j++) sysSum += sysData[j] * sysData[j]
-        trackSystemAudioEnergy(Math.sqrt(sysSum / sysData.length))
+    // Configure transcription-only session
+    const sessionConfig = {
+      type: 'transcription_session.update',
+      session: {
+        input_audio_format: 'pcm16',
+        input_audio_transcription: {
+          model: 'gpt-4o-transcribe',
+          language: 'pt',
+        },
+        turn_detection: {
+          type: 'server_vad',
+          threshold: 0.4,           // Slightly more sensitive for meeting audio
+          prefix_padding_ms: 500,   // Keep 500ms before detected speech
+          silence_duration_ms: 600, // 600ms silence = end of turn (natural PT-BR pauses)
+        },
+        input_audio_noise_reduction: {
+          type: 'near_field',
+        },
       }
     }
+    realtimeWs.send(JSON.stringify(sessionConfig))
+    console.log('[Recorder] Transcription session config sent')
   }
 
-  deepgramWs.onmessage = (event) => {
+  realtimeWs.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data)
-      if (data.type === 'Results') {
-        handleDeepgramResult(data)
+      const msgType = data.type || ''
+
+      if (msgType === 'transcription_session.created' || msgType === 'transcription_session.updated') {
+        sessionConfigured = true
+        console.log(`[Recorder] OpenAI session ready! Streaming mono PCM16 at ${sampleRate}Hz${usingBlackHole ? ' (BlackHole)' : ''}`)
+        wireAudioProcessor()
+      }
+      else if (msgType === 'conversation.item.input_audio_transcription.delta') {
+        // Real-time incremental transcription
+        const delta = data.delta || ''
+        if (delta) {
+          handleTranscriptionDelta(delta)
+        }
+      }
+      else if (msgType === 'conversation.item.input_audio_transcription.completed') {
+        // Final transcription for a turn
+        const transcript = data.transcript || ''
+        if (transcript) {
+          handleTranscriptionCompleted(transcript)
+        }
+      }
+      else if (msgType === 'input_audio_buffer.speech_started') {
+        // VAD detected speech start
+        lastTranscriptTime = Date.now()
+      }
+      else if (msgType === 'error') {
+        console.error('[Recorder] OpenAI Realtime error:', JSON.stringify(data.error || data))
+      }
+      else if (msgType !== 'input_audio_buffer.speech_stopped' &&
+               msgType !== 'input_audio_buffer.committed' &&
+               msgType !== 'input_audio_buffer.cleared') {
+        // Log other events for debugging (skip noisy ones)
+        if (chunkCount < 5) {
+          console.log(`[Recorder] OpenAI event: ${msgType}`)
+        }
       }
     } catch (err) {
       console.error('[Recorder] Parse error:', err)
     }
   }
 
-  // Send keepalive every 10s to prevent Deepgram from closing idle connections
-  const keepAliveInterval = setInterval(() => {
-    if (deepgramWs && deepgramWs.readyState === WebSocket.OPEN) {
-      deepgramWs.send(JSON.stringify({ type: 'KeepAlive' }))
-    } else {
-      clearInterval(keepAliveInterval)
-    }
-  }, 10000)
-
-  deepgramWs.onerror = (err) => {
-    console.error('[Recorder] Deepgram error:', err)
-    clearInterval(keepAliveInterval)
+  realtimeWs.onerror = (err) => {
+    console.error('[Recorder] OpenAI Realtime error:', err)
   }
 
-  deepgramWs.onclose = (event) => {
-    clearInterval(keepAliveInterval)
-    console.log('[Recorder] Deepgram disconnected. Code:', event.code, 'Reason:', event.reason || '(none)')
-    // Unexpected close during auto-recording (e.g. no audio timeout) = meeting ended
+  realtimeWs.onclose = (event) => {
+    console.log('[Recorder] OpenAI Realtime disconnected. Code:', event.code, 'Reason:', event.reason || '(none)')
     if (isRecording && isAutoMode && event.code !== 1000) {
-      console.log('[Recorder] Deepgram unexpected close during auto-recording — stopping')
+      console.log('[Recorder] OpenAI unexpected close during auto-recording — stopping')
       triggerAutoStop()
+    }
+  }
+
+  // --- Wire audio processor (called after session is configured) ---
+  function wireAudioProcessor() {
+    // Adaptive mix: detect which channels are active in the first ~2s
+    let ch0Active = true  // system audio (BlackHole)
+    let ch1Active = true  // microphone
+    let calibrationDone = false
+    let calibrationSamples = 0
+    let ch0Energy = 0
+    let ch1Energy = 0
+    const CALIBRATION_CHUNKS = Math.ceil(2 * sampleRate / 8192) // ~2 seconds
+
+    processorNode.onaudioprocess = (event) => {
+      if (!realtimeWs || realtimeWs.readyState !== WebSocket.OPEN) return
+
+      const inputBuffer = event.inputBuffer
+      const numSamples = inputBuffer.length
+      const numInputCh = inputBuffer.numberOfChannels
+      const pcm = new Int16Array(numSamples) // Always mono output
+
+      if (numInputCh >= 2) {
+        const ch0 = inputBuffer.getChannelData(0)
+        const ch1 = inputBuffer.getChannelData(1)
+
+        // Calibration: measure energy on each channel for first ~2s
+        if (!calibrationDone) {
+          calibrationSamples++
+          for (let i = 0; i < numSamples; i++) {
+            ch0Energy += ch0[i] * ch0[i]
+            ch1Energy += ch1[i] * ch1[i]
+          }
+          if (calibrationSamples >= CALIBRATION_CHUNKS) {
+            const ch0Rms = Math.sqrt(ch0Energy / (calibrationSamples * numSamples))
+            const ch1Rms = Math.sqrt(ch1Energy / (calibrationSamples * numSamples))
+            ch0Active = ch0Rms > 0.001
+            ch1Active = ch1Rms > 0.001
+            calibrationDone = true
+            console.log(`[Recorder] Audio calibration: ch0(system)=${ch0Rms.toFixed(4)} ${ch0Active ? 'ACTIVE' : 'SILENT'}, ch1(mic)=${ch1Rms.toFixed(4)} ${ch1Active ? 'ACTIVE' : 'SILENT'}`)
+            if (!ch0Active && ch1Active) {
+              console.log('[Recorder] System audio silent — using mic at FULL volume (no 0.5x mix)')
+            } else if (ch0Active && !ch1Active) {
+              console.log('[Recorder] Mic silent — using system audio at FULL volume')
+            }
+          }
+        }
+
+        // Adaptive mixing: use full volume for the active channel(s)
+        if (!ch0Active && ch1Active) {
+          for (let i = 0; i < numSamples; i++) {
+            const s = Math.max(-1, Math.min(1, ch1[i]))
+            pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+          }
+        } else if (ch0Active && !ch1Active) {
+          for (let i = 0; i < numSamples; i++) {
+            const s = Math.max(-1, Math.min(1, ch0[i]))
+            pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+          }
+        } else {
+          for (let i = 0; i < numSamples; i++) {
+            const mixed = (ch0[i] + ch1[i]) * 0.5
+            const s = Math.max(-1, Math.min(1, mixed))
+            pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+          }
+        }
+      } else {
+        const ch0 = inputBuffer.getChannelData(0)
+        for (let i = 0; i < numSamples; i++) {
+          const s = Math.max(-1, Math.min(1, ch0[i]))
+          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+        }
+      }
+
+      // OpenAI Realtime expects base64-encoded PCM16
+      const base64Audio = arrayBufferToBase64(pcm.buffer)
+      realtimeWs.send(JSON.stringify({
+        type: 'input_audio_buffer.append',
+        audio: base64Audio
+      }))
+
+      chunkCount++
+      if (chunkCount <= 3 || chunkCount % 500 === 0) {
+        console.log(`[Recorder] Audio chunk #${chunkCount}, size: ${pcm.buffer.byteLength} bytes → base64 (mono, ${sampleRate}Hz)`)
+      }
+
+      // Diagnostic: log audio levels every ~10s
+      diagCount++
+      if (diagCount % DIAG_EVERY === 0) {
+        if (numInputCh >= 2) {
+          const d0 = inputBuffer.getChannelData(0)
+          const d1 = inputBuffer.getChannelData(1)
+          let sum0 = 0, sum1 = 0
+          for (let i = 0; i < d0.length; i++) {
+            sum0 += d0[i] * d0[i]
+            sum1 += d1[i] * d1[i]
+          }
+          console.log(`[Recorder] Audio levels — system: ${Math.sqrt(sum0 / d0.length).toFixed(4)}, mic: ${Math.sqrt(sum1 / d1.length).toFixed(4)}`)
+        } else {
+          const d0 = inputBuffer.getChannelData(0)
+          let sum0 = 0
+          for (let i = 0; i < d0.length; i++) sum0 += d0[i] * d0[i]
+          console.log(`[Recorder] Audio level: ${Math.sqrt(sum0 / d0.length).toFixed(4)}`)
+        }
+      }
     }
   }
 }
 
-function handleDeepgramResult(data) {
-  const alt = data.channel?.alternatives?.[0]
-  if (!alt?.transcript) return
+// --- Base64 encoding for ArrayBuffer ---
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
 
-  // Track last speech time for meeting-end detection
+// --- Current interim text accumulator ---
+let currentInterimText = ''
+
+function handleTranscriptionDelta(delta) {
+  // Accumulate interim text for real-time display
+  currentInterimText += delta
   lastTranscriptTime = Date.now()
 
-  // Track meaningful transcripts (>= N words) — ambient noise produces short fragments
-  if (data.is_final) {
-    const wc = alt.transcript.trim().split(/\s+/).length
-    if (wc >= MEANINGFUL_WORD_MIN) {
-      lastMeaningfulTranscriptTime = Date.now()
-    }
+  // Show as interim segment
+  const segment = {
+    text: currentInterimText,
+    timestamp: (Date.now() - (startTime || Date.now())) / 1000,
+    is_final: false,
   }
+  addSegmentToUI(segment, false)
+}
 
-  // Multichannel: channel 0 = system audio (participants), channel 1 = mic (you)
-  // Fallback to diarization speaker number if not multichannel
-  let speaker
-  const channelIndex = data.channel_index?.[0]
-  if (channelIndex !== undefined) {
-    speaker = channelIndex === 0 ? 'Participante' : (userName || 'Voce')
-  } else {
-    const speakerNum = alt.words?.[0]?.speaker ?? 0
-    speaker = `Speaker ${speakerNum}`
+function handleTranscriptionCompleted(transcript) {
+  // Reset interim accumulator
+  currentInterimText = ''
+  lastTranscriptTime = Date.now()
+
+  if (!transcript.trim()) return
+
+  // Track meaningful transcripts
+  const wc = transcript.trim().split(/\s+/).length
+  if (wc >= MEANINGFUL_WORD_MIN) {
+    lastMeaningfulTranscriptTime = Date.now()
   }
 
   const segment = {
-    speaker,
-    text: alt.transcript,
-    timestamp: data.start || 0,
-    is_final: data.is_final,
-    channel: channelIndex ?? null,
+    text: transcript.trim(),
+    timestamp: (Date.now() - (startTime || Date.now())) / 1000,
+    is_final: true,
   }
 
-  if (data.is_final) {
-    segments.push(segment)
-    markLiveDirty()
-  }
-
-  addSegmentToUI(segment, data.is_final)
+  segments.push(segment)
+  markLiveDirty()
+  addSegmentToUI(segment, true)
 }
 
 function stopAudioCapture() {
@@ -546,9 +657,9 @@ function stopAudioCapture() {
     processorNode = null
   }
 
-  if (deepgramWs) {
-    if (deepgramWs.readyState === WebSocket.OPEN) deepgramWs.close()
-    deepgramWs = null
+  if (realtimeWs) {
+    if (realtimeWs.readyState === WebSocket.OPEN) realtimeWs.close()
+    realtimeWs = null
   }
 
   if (audioContext) {
@@ -576,32 +687,24 @@ function stopAudioCapture() {
 //
 // Signal 1: System audio channel (ch0/BlackHole) drops to near-zero
 //           → WebRTC voices stopped → meeting ended
-// Signal 2: No meaningful Deepgram transcript (>= 3 words) for 90s
+// Signal 2: No meaningful transcript (>= 3 words) for 90s
 //           → ambient noise may trigger short fragments, but not real speech
-// Signal 3: No Deepgram transcript at all for 2 min (ultimate fallback)
+// Signal 3: No transcript at all for 2 min (ultimate fallback)
 // ============================================================
 
 function startMeetingEndDetector() {
-  const now = Date.now()
-  lastTranscriptTime = now
-  lastMeaningfulTranscriptTime = now
-  systemAudioSilentSince = null
-  systemEnergyReadings = []
-
-  if (meetingEndCheckInterval) clearInterval(meetingEndCheckInterval)
-  meetingEndCheckInterval = setInterval(checkMeetingEnd, 10_000) // Every 10s
-  console.log('[MeetEnd] Detector started (system-audio-silence + transcript-gap + absolute-silence)')
+  // Heuristic detection DISABLED — too many false positives during presentations,
+  // moments of silence, reading, etc. Meeting end is now detected ONLY by main.js
+  // via definitive signals: "You left" in window title or Meet window disappeared.
+  console.log('[MeetEnd] Detector started (window-based only, no heuristic)')
 }
 
 function stopMeetingEndDetector() {
+  // Cleanup (kept for compatibility even though heuristic is disabled)
   if (meetingEndCheckInterval) {
     clearInterval(meetingEndCheckInterval)
     meetingEndCheckInterval = null
   }
-  systemEnergyReadings = []
-  systemAudioSilentSince = null
-  lastMeaningfulTranscriptTime = null
-  lastTranscriptTime = null
   meetEndPromptPending = false
 }
 
@@ -633,9 +736,12 @@ function trackSystemAudioEnergy(rms) {
 }
 
 let meetEndPromptPending = false // Prevent spamming the prompt
+let meetEndCooldownUntil = 0 // Cooldown after user dismisses (prevents repeated prompts)
 
 function checkMeetingEnd() {
   if (!isRecording || !isAutoMode || meetEndPromptPending) return
+  // Respect cooldown after user dismissed the prompt
+  if (Date.now() < meetEndCooldownUntil) return
   const now = Date.now()
 
   let shouldAsk = false
@@ -660,7 +766,7 @@ function checkMeetingEnd() {
     }
   }
 
-  // Signal 3: Absolute silence — no Deepgram transcript at all
+  // Signal 3: Absolute silence — no transcript at all
   if (!shouldAsk && lastTranscriptTime) {
     const absMs = now - lastTranscriptTime
     if (absMs > ABSOLUTE_SILENCE_TIMEOUT) {
@@ -707,11 +813,7 @@ function addSegmentToUI(segment, isFinal) {
 
     const div = document.createElement('div')
     div.className = 'transcript-segment'
-    const spNum = parseInt(segment.speaker.replace('Speaker ', '')) || 0
-    div.innerHTML = `
-      <div class="segment-speaker ${spNum > 0 ? 'speaker-1' : ''}">${escapeHtml(segment.speaker)}</div>
-      <div class="segment-text">${escapeHtml(segment.text)}</div>
-    `
+    div.innerHTML = `<div class="segment-text">${escapeHtml(segment.text)}</div>`
     els.transcriptList.appendChild(div)
 
     segmentCount++
@@ -724,11 +826,7 @@ function addSegmentToUI(segment, isFinal) {
       interimElement.className = 'transcript-segment'
       els.transcriptList.appendChild(interimElement)
     }
-    const spNum = parseInt(segment.speaker.replace('Speaker ', '')) || 0
-    interimElement.innerHTML = `
-      <div class="segment-speaker ${spNum > 0 ? 'speaker-1' : ''}">${escapeHtml(segment.speaker)}</div>
-      <div class="segment-text interim">${escapeHtml(segment.text)}</div>
-    `
+    interimElement.innerHTML = `<div class="segment-text interim">${escapeHtml(segment.text)}</div>`
   }
 
   els.transcriptContainer.scrollTop = els.transcriptContainer.scrollHeight
@@ -864,47 +962,138 @@ async function cleanupLiveSession() {
 }
 
 // ============================================================
+// DEDUPLICATION (stereo echo removal)
+// ============================================================
+
+/**
+ * When recording stereo (system audio L + mic R), the seller's voice
+ * gets captured on BOTH channels — once direct from mic and once as
+ * WebRTC echo on system audio. This creates duplicate segments with
+ * different speaker labels but similar text and close timestamps.
+ *
+ * This function detects and removes those duplicates:
+ * - Compares segments within 2s of each other on different channels
+ * - Uses word overlap (Jaccard similarity) to detect duplicates
+ * - Keeps the mic version (channel 1) for seller speech
+ */
+function deduplicateSegments(segs) {
+  if (!segs.length) return segs
+
+  // Only deduplicate if we have multichannel data
+  const hasChannels = segs.some(s => s.channel !== null && s.channel !== undefined)
+  if (!hasChannels) return segs
+
+  const normalizeText = (t) => (t || '').toLowerCase().replace(/[.,!?;:]/g, '').trim()
+  const getWords = (t) => normalizeText(t).split(/\s+/).filter(w => w.length > 0)
+
+  function jaccardSimilarity(textA, textB) {
+    const wordsA = getWords(textA)
+    const wordsB = getWords(textB)
+    if (!wordsA.length || !wordsB.length) return 0
+    const setA = new Set(wordsA)
+    const setB = new Set(wordsB)
+    let intersection = 0
+    for (const w of setA) { if (setB.has(w)) intersection++ }
+    const union = new Set([...wordsA, ...wordsB]).size
+    return union > 0 ? intersection / union : 0
+  }
+
+  const skipIndices = new Set()
+
+  for (let i = 0; i < segs.length; i++) {
+    if (skipIndices.has(i)) continue
+    const a = segs[i]
+
+    // Look ahead for potential duplicates (within ~3s window, different channel)
+    for (let j = i + 1; j < segs.length; j++) {
+      if (skipIndices.has(j)) continue
+      const b = segs[j]
+
+      // Stop looking if too far ahead in time
+      if (Math.abs(b.timestamp - a.timestamp) > 3) break
+
+      // Must be different channels to be a cross-channel duplicate
+      if (a.channel === b.channel) continue
+
+      const sim = jaccardSimilarity(a.text, b.text)
+      if (sim >= 0.5) {
+        // Duplicate found — keep mic channel (1) for seller, system (0) for others
+        // If both are same priority, keep the longer text
+        const keepI = a.channel === 1 ? i : j
+        const dropI = a.channel === 1 ? j : i
+        skipIndices.add(dropI)
+        console.log(`[Dedup] Removed duplicate (sim=${sim.toFixed(2)}): "${segs[dropI].text.substring(0, 50)}..." (ch${segs[dropI].channel})`)
+      }
+    }
+  }
+
+  const result = segs.filter((_, idx) => !skipIndices.has(idx))
+  if (skipIndices.size > 0) {
+    console.log(`[Dedup] Removed ${skipIndices.size} duplicate segments (${segs.length} → ${result.length})`)
+  }
+  return result
+}
+
+// ============================================================
 // EVALUATION + SAVE
 // ============================================================
 
 async function evaluateAndSave() {
-  const transcriptText = segments
-    .map(s => `${s.speaker}: ${s.text}`)
+  // Build plain text transcript (no speaker labels — mono audio, no attribution)
+  const cleanSegments = segments // No dedup needed for mono
+  const transcriptText = cleanSegments
+    .map(s => s.text)
     .join('\n')
 
-  if (transcriptText.length < 100) {
-    throw new Error('Transcricao muito curta para avaliar (minimo 100 caracteres)')
+  if (transcriptText.length < 50) {
+    throw new Error(`Transcricao muito curta para avaliar (${transcriptText.length} chars, minimo 50)`)
   }
 
   const meetingId = `desktop_${Date.now()}`
 
-  // 1. Call evaluate API
-  const evalRes = await fetch(`${BASE_URL}/api/meet/evaluate`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      transcript: transcriptText,
-      meetingId,
-      companyId,
-      sellerName: userName,
-    }),
-  })
+  // 1. Call evaluate API (5 min timeout for long transcripts)
+  console.log(`[Recorder] Evaluating transcript: ${transcriptText.length} chars, ${cleanSegments.length} segments (${segments.length} before dedup), ${wordCount} words`)
+  const evalController = new AbortController()
+  const evalTimeout = setTimeout(() => evalController.abort(), 5 * 60 * 1000)
+
+  let evalRes
+  try {
+    evalRes = await fetch(`${BASE_URL}/api/meet/evaluate`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      signal: evalController.signal,
+      body: JSON.stringify({
+        transcript: transcriptText,
+        meetingId,
+        companyId,
+        sellerName: userName,
+      }),
+    })
+  } catch (fetchErr) {
+    clearTimeout(evalTimeout)
+    if (fetchErr.name === 'AbortError') {
+      throw new Error('Avaliacao demorou mais de 5 minutos. Tente novamente ou grave uma reuniao menor.')
+    }
+    throw fetchErr
+  }
+  clearTimeout(evalTimeout)
 
   if (!evalRes.ok) {
     const err = await evalRes.json().catch(() => ({ error: 'Erro na avaliacao' }))
-    throw new Error(err.error || 'Erro na avaliacao')
+    console.error('[Recorder] Evaluate API error:', evalRes.status, err)
+    throw new Error(err.error || `Erro na avaliacao (status ${evalRes.status})`)
   }
 
   const evalData = await evalRes.json()
   lastSmartNotes = evalData.smartNotes || null
 
-  // 2. Save to database
+  // 2. Save to database (use cleaned transcript from nano if available)
   try {
     const saveRes = await fetch(`${BASE_URL}/api/meet/save-desktop-recording`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        transcript: segments,
+        transcript: evalData.cleanedTranscript || transcriptText,
         evaluation: evalData.evaluation,
         smartNotes: lastSmartNotes,
         meetingId,
@@ -1003,11 +1192,11 @@ els.btnStart.addEventListener('click', async () => {
     lastEvaluationId = null
     lastSmartNotes = null
 
-    // Fetch Deepgram key from backend
-    const deepgramKey = await fetchDeepgramKey()
+    // Fetch OpenAI key from backend
+    const openaiKey = await fetchOpenAIKey()
 
     // Start audio capture
-    await startAudioCapture(deepgramKey)
+    await startAudioCapture(openaiKey)
     isRecording = true
 
     // Switch to recording screen
@@ -1113,8 +1302,8 @@ async function triggerAutoStart() {
     lastEvaluationId = null
     lastSmartNotes = null
 
-    const deepgramKey = await fetchDeepgramKey()
-    await startAudioCapture(deepgramKey)
+    const openaiKey = await fetchOpenAIKey()
+    await startAudioCapture(openaiKey)
     isRecording = true
     console.log('[Recorder] Audio capture started successfully!')
 
@@ -1167,7 +1356,12 @@ async function triggerAutoStop() {
     await stopLiveSession('error')
     cleanupLiveSession()
 
-    // Notify main process even on error
+    // Notify main process of error (shows native notification)
+    if (window.electronAPI.notifyRecordingError) {
+      window.electronAPI.notifyRecordingError(err.message || 'Erro desconhecido na avaliação')
+    }
+
+    // Notify main process even on error (cleanup + close window)
     if (window.electronAPI.notifyRecordingFinished) {
       window.electronAPI.notifyRecordingFinished()
     }
@@ -1179,9 +1373,14 @@ async function triggerAutoStop() {
 // Listen for meeting detection reset (user said "Nao, continua")
 if (window.electronAPI.onResetMeetingDetection) {
   window.electronAPI.onResetMeetingDetection(() => {
-    console.log('[MeetEnd] User dismissed prompt — resetting detection timers')
+    console.log('[MeetEnd] User dismissed prompt — cooldown 3 min before next check')
     meetEndPromptPending = false
-    // Restart detector with fresh timers
+    meetEndCooldownUntil = Date.now() + 3 * 60 * 1000 // 3 min cooldown
+    // Reset silence trackers so they start fresh after cooldown
+    systemAudioSilentSince = null
+    lastMeaningfulTranscriptTime = Date.now()
+    lastTranscriptTime = Date.now()
+    // Restart detector (will skip checks until cooldown expires)
     if (isRecording && isAutoMode) {
       startMeetingEndDetector()
     }

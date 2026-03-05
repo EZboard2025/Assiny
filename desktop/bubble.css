@@ -84,7 +84,9 @@ body {
   font-weight: 700;
   padding: 2px 6px 2px 4px;
   border-radius: 9999px;
-  pointer-events: none;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  cursor: pointer;
   box-shadow: 0 2px 6px rgba(220, 38, 38, 0.5);
   animation: recBadgeIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
   z-index: 10;
@@ -111,6 +113,56 @@ body {
 @keyframes recBadgeIn {
   from { opacity: 0; transform: scale(0.5); }
   to { opacity: 1; transform: scale(1); }
+}
+
+.rec-badge:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.7);
+}
+
+/* Recording bar (top of chat panel when recording) */
+.rec-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #dc2626;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  border-radius: 16px 16px 0 0;
+}
+
+.rec-bar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+  animation: recPulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.rec-bar-text {
+  flex: 1;
+}
+
+.rec-bar-stop {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.rec-bar-stop:hover {
+  background: rgba(255,255,255,0.35);
 }
 
 /* When recording, change bubble ring to red */
@@ -754,4 +806,116 @@ body {
 .meet-btn-no:hover {
   background: #e5e7eb;
   transform: scale(1.02);
+}
+
+/* ============================================================
+   MEETING START PROMPT (overlay on bubble)
+   ============================================================ */
+.meet-start-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 20px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  min-width: 250px;
+  animation: meetPromptIn 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.meet-start-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.meet-start-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f0fdf4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.meet-start-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.meet-start-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.meet-start-subtitle {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: left;
+  font-family: -apple-system, BlinkMacSystemFont, monospace;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.meet-start-label {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.meet-start-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meet-btn-start-yes {
+  background: #111827;
+  color: white;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  width: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  border: none;
+  -webkit-app-region: no-drag;
+}
+
+.meet-btn-start-yes:hover {
+  background: #1f2937;
+  transform: none;
+}
+
+.meet-btn-start-no {
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  padding: 6px 16px;
+  border: none;
+  width: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.meet-btn-start-no:hover {
+  color: #374151;
+  background: #f9fafb;
+  transform: none;
 }

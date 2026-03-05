@@ -34,13 +34,13 @@ export default function Sidebar({
     { icon: Home, view: 'home', label: 'Home', show: true },
     { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
     { icon: Users, view: 'roleplay', label: 'Simulação', show: true },
-    { icon: MessageSquare, view: 'whatsapp', label: 'WhatsApp IA', show: true, comingSoon: true },
+    { icon: MessageSquare, view: 'whatsapp', label: 'WhatsApp IA', show: true },
     { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
     // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden
     { icon: TrendingUp, view: 'manager', label: 'Gestão', show: isAdmin || isGestor },
     { icon: Link2, view: 'roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
-    { icon: Download, view: 'download', label: 'Download', show: true, comingSoon: true },
+    { icon: Download, view: 'download', label: 'Download', show: true },
   ]
 
   return (

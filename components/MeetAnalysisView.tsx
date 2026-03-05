@@ -1537,8 +1537,36 @@ export default function MeetAnalysisView() {
           </div>
         )}
 
+        {/* Waiting room / joining banner (shown above calendar) */}
+        {session && (session.status === 'sending' || session.status === 'joining' || session.status === 'waiting_room') && (
+          <div className="mb-4">
+            {/* Status Bar */}
+            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm mb-4">
+              <div className="flex items-center gap-4">
+                {getStatusDisplay()}
+                {session.startTime && (
+                  <span className="text-sm text-gray-500">
+                    Iniciado às {session.startTime.toLocaleTimeString('pt-BR')}
+                  </span>
+                )}
+              </div>
+            </div>
+            {session.status === 'waiting_room' && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-6">
+                <div className="flex flex-col items-center justify-center">
+                  <AlertTriangle className="w-8 h-8 mb-3 text-amber-600" />
+                  <p className="text-amber-800 font-semibold">O Ramppy está na sala de espera</p>
+                  <p className="text-sm text-amber-700 mt-2 text-center">
+                    Abra o Google Meet, vá em <strong>Pessoas</strong> → <strong>Sala de espera</strong> e clique em <strong>Admitir</strong> para o Ramppy entrar na reunião.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Content Section */}
-        {!session && (
+        {(!session || session.status === 'sending' || session.status === 'joining' || session.status === 'waiting_room') && (
           <>
             {/* Google Calendar Connection Card (not connected) — Enhanced onboarding */}
             {!calendarConnected && !calendarLoading && (
@@ -2221,8 +2249,8 @@ export default function MeetAnalysisView() {
           </>
         )}
 
-        {/* Session Active */}
-        {session && (
+        {/* Session Active (only for in_meeting, transcribing, evaluating, ended, error) */}
+        {session && session.status !== 'sending' && session.status !== 'joining' && session.status !== 'waiting_room' && (
           <div className="space-y-6">
             {/* Status Bar */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -2250,7 +2278,7 @@ export default function MeetAnalysisView() {
             </div>
 
             {/* Background processing notice */}
-            {session.status !== 'ended' && session.status !== 'error' && session.status !== 'sending' && session.status !== 'waiting_room' && (
+            {session.status !== 'ended' && session.status !== 'error' && (
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <div>
@@ -2264,33 +2292,7 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {/* Status indicator while waiting/in meeting */}
-            {session.transcript.length === 0 && (session.status === 'joining' || session.status === 'sending') && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <div className="flex flex-col items-center justify-center text-gray-500">
-                  <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-600" />
-                  <p className="text-gray-600">Aguardando bot entrar na reunião...</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Isso geralmente leva de 10 a 30 segundos
-                  </p>
-                  <p className="text-sm text-amber-600 mt-2 font-medium">
-                    Lembre-se de aceitar o &quot;Ramppy&quot; quando ele pedir para entrar!
-                  </p>
-                </div>
-              </div>
-            )}
-            {/* Waiting room alert */}
-            {session.status === 'waiting_room' && (
-              <div className="bg-amber-50 border border-amber-300 rounded-xl p-6">
-                <div className="flex flex-col items-center justify-center">
-                  <AlertTriangle className="w-8 h-8 mb-3 text-amber-600" />
-                  <p className="text-amber-800 font-semibold">O Ramppy está na sala de espera</p>
-                  <p className="text-sm text-amber-700 mt-2 text-center">
-                    Abra o Google Meet, vá em <strong>Pessoas</strong> → <strong>Sala de espera</strong> e clique em <strong>Admitir</strong> para o Ramppy entrar na reunião.
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* Note: sending/joining/waiting_room status indicators are shown above the calendar */}
             {session.transcript.length === 0 && session.status === 'in_meeting' && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                 <div className="flex flex-col items-center justify-center text-gray-500">

@@ -11,7 +11,7 @@
   <div id="bubble" class="bubble">
     <svg class="bubble-sparkle" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
     <span class="bubble-ping"></span>
-    <span id="rec-badge" class="rec-badge" style="display:none;">
+    <span id="rec-badge" class="rec-badge" style="display:none;" title="Parar gravacao">
       <span class="rec-dot"></span>
       <span class="rec-label">REC</span>
     </span>
@@ -29,6 +29,13 @@
     <div class="resize-handle resize-nw" data-dir="nw"></div>
     <div class="resize-handle resize-se" data-dir="se"></div>
     <div class="resize-handle resize-sw" data-dir="sw"></div>
+
+    <!-- Recording bar (visible when recording + chat expanded) -->
+    <div id="rec-bar" class="rec-bar" style="display:none;">
+      <span class="rec-bar-dot"></span>
+      <span class="rec-bar-text">Gravando reuniao</span>
+      <button id="btn-stop-rec" class="rec-bar-stop">Parar</button>
+    </div>
 
     <!-- Header -->
     <div class="chat-header">
@@ -92,7 +99,27 @@
     </div>
   </div>
 
-  <!-- Meeting end prompt (overlays bubble when heuristic triggers fire) -->
+  <!-- Meeting START prompt (overlays bubble when Meet is detected) -->
+  <div id="meet-start-prompt" class="meet-prompt" style="display:none;">
+    <div class="meet-start-card">
+      <div class="meet-start-header">
+        <div class="meet-start-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        </div>
+        <div class="meet-start-header-text">
+          <p class="meet-start-title">Reuniao detectada</p>
+          <p id="meet-start-subtitle" class="meet-start-subtitle"></p>
+        </div>
+      </div>
+      <p class="meet-start-label">Deseja gravar e transcrever esta reuniao?</p>
+      <div class="meet-start-actions">
+        <button id="btn-meet-start-yes" class="meet-btn meet-btn-start-yes">Iniciar gravacao</button>
+        <button id="btn-meet-start-no" class="meet-btn meet-btn-start-no">Ignorar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meeting END prompt (overlays bubble when heuristic triggers fire) -->
   <div id="meet-prompt" class="meet-prompt" style="display:none;">
     <div class="meet-prompt-card">
       <div class="meet-prompt-icon">

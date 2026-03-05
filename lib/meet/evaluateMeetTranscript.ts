@@ -338,8 +338,8 @@ export interface EvaluateMeetResult {
 export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promise<EvaluateMeetResult> {
   const { transcript, meetingId, sellerName, companyId } = params
 
-  if (!transcript || transcript.length < 100) {
-    return { success: false, error: 'Transcrição muito curta para avaliação' }
+  if (!transcript || transcript.length < 50) {
+    return { success: false, error: `Transcrição muito curta para avaliação (${transcript?.length || 0} chars)` }
   }
 
   console.log(`[MeetBG] Avaliando reunião: ${meetingId || 'sem ID'}`)
@@ -394,10 +394,16 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
     }
   }
 
-  const maxChars = 50000
+  // gpt-4.1 handles up to 1M tokens — allow up to 100K chars (~25K tokens)
+  // For very long meetings, keep beginning + end to capture opening and closing
+  const maxChars = 100000
   let processedTranscript = transcript
   if (transcript.length > maxChars) {
-    processedTranscript = transcript.substring(0, maxChars) + '\n\n[... transcrição truncada ...]'
+    const halfLimit = Math.floor(maxChars / 2)
+    const beginning = transcript.substring(0, halfLimit)
+    const ending = transcript.substring(transcript.length - halfLimit)
+    processedTranscript = beginning + '\n\n[... parte central da transcrição omitida por tamanho ...]\n\n' + ending
+    console.log(`[MeetBG] Transcript truncado: ${transcript.length} → ${processedTranscript.length} chars (inicio + fim)`)
   }
 
   let userPrompt = `Avalie esta reunião de vendas com precisão. Identifique o vendedor${sellerName ? ` (provavelmente ${sellerName})` : ''} e analise sua performance.
@@ -425,18 +431,31 @@ Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSO
     ],
     response_format: { type: 'json_object' },
     temperature: 0.3,
-    max_tokens: 10000
+    max_tokens: 32768
   })
 
   const content = response.choices[0].message.content
+  const finishReason = response.choices[0].finish_reason
 
   if (!content) {
     return { success: false, error: 'OpenAI retornou resposta vazia' }
   }
 
-  console.log('[MeetBG] Resposta OpenAI recebida')
+  if (finishReason === 'length') {
+    console.error('[MeetBG] AVISO: Resposta truncada por max_tokens! Tamanho do transcript:', transcript.length)
+    return { success: false, error: 'Resposta da avaliação foi truncada (reunião muito longa). Tente novamente.' }
+  }
 
-  const evaluation = JSON.parse(content)
+  console.log('[MeetBG] Resposta OpenAI recebida (finish_reason:', finishReason, ')')
+
+  let evaluation: any
+  try {
+    evaluation = JSON.parse(content)
+  } catch (parseErr) {
+    console.error('[MeetBG] Erro ao parsear JSON da avaliação:', parseErr)
+    console.error('[MeetBG] Content (primeiros 500 chars):', content.substring(0, 500))
+    return { success: false, error: 'Erro ao processar resposta da avaliação' }
+  }
 
   if (evaluation.overall_score > 10) {
     evaluation.overall_score = evaluation.overall_score / 10

@@ -72,6 +72,8 @@ function expand() {
   isExpanded = true
   bubble.style.display = 'none'
   chatPanel.style.display = 'flex'
+  // Show rec bar if recording
+  if (isBubbleRecording) recBar.style.display = 'flex'
   enableMouseCapture()
   window.electronAPI.resizeBubble(380, 520)
   if (hasMessages) {
@@ -84,9 +86,15 @@ function expand() {
 function collapse() {
   isExpanded = false
   chatPanel.style.display = 'none'
+  recBar.style.display = 'none'
   bubble.style.display = 'flex'
   disableMouseCapture()
-  window.electronAPI.resizeBubble(72, 72)
+  // Slightly larger when recording so REC badge is clickable
+  if (isBubbleRecording) {
+    window.electronAPI.resizeBubble(90, 80)
+  } else {
+    window.electronAPI.resizeBubble(72, 72)
+  }
 }
 
 // --- Global shortcut toggle (Cmd+Shift+R) ---
@@ -415,15 +423,106 @@ document.querySelectorAll('.resize-handle').forEach(handle => {
 
 // --- Recording state indicator (Meet auto-detection) ---
 const recBadge = document.getElementById('rec-badge')
+const recBar = document.getElementById('rec-bar')
+const btnStopRec = document.getElementById('btn-stop-rec')
+let isBubbleRecording = false
 
 if (window.electronAPI && window.electronAPI.onRecordingState) {
   window.electronAPI.onRecordingState((isRecording) => {
+    isBubbleRecording = isRecording
     if (isRecording) {
       bubble.classList.add('recording')
       recBadge.style.display = 'flex'
+      // Show rec bar in expanded chat panel
+      if (isExpanded) recBar.style.display = 'flex'
+      // Expand window slightly so REC badge (positioned outside bubble) is clickable
+      if (!isExpanded && !meetPromptVisible && !meetStartPromptVisible) {
+        window.electronAPI.resizeBubble(90, 80)
+      }
     } else {
       bubble.classList.remove('recording')
       recBadge.style.display = 'none'
+      recBar.style.display = 'none'
+      // Restore normal size if collapsed
+      if (!isExpanded && !meetPromptVisible && !meetStartPromptVisible) {
+        window.electronAPI.resizeBubble(72, 72)
+      }
+    }
+  })
+}
+
+// Clicking REC badge (collapsed) or Stop button (expanded) → show end card
+recBadge.addEventListener('click', (e) => {
+  e.stopPropagation()
+  if (isBubbleRecording) showMeetPrompt()
+})
+
+btnStopRec.addEventListener('click', (e) => {
+  e.stopPropagation()
+  if (isBubbleRecording) showMeetPrompt()
+})
+
+// --- Meeting Start Prompt ---
+const meetStartPrompt = document.getElementById('meet-start-prompt')
+const meetStartSubtitle = document.getElementById('meet-start-subtitle')
+const btnMeetStartYes = document.getElementById('btn-meet-start-yes')
+const btnMeetStartNo = document.getElementById('btn-meet-start-no')
+let meetStartPromptVisible = false
+
+function showMeetStartPrompt(meetTitle) {
+  if (meetStartPromptVisible) return
+  meetStartPromptVisible = true
+
+  // Extract meeting code from title (e.g. "abc-defg-hij")
+  const codeMatch = meetTitle && meetTitle.match(/[a-z]{3}-[a-z]{4}-[a-z]{3}/)
+  meetStartSubtitle.textContent = codeMatch ? codeMatch[0] : ''
+
+  // Hide bubble and chat panel, show start prompt
+  bubble.style.display = 'none'
+  chatPanel.style.display = 'none'
+  meetStartPrompt.style.display = 'block'
+
+  enableMouseCapture()
+  window.electronAPI.resizeBubble(300, 240)
+}
+
+function hideMeetStartPrompt() {
+  meetStartPromptVisible = false
+  meetStartPrompt.style.display = 'none'
+
+  // Restore bubble (collapsed state)
+  if (isExpanded) {
+    chatPanel.style.display = 'flex'
+    window.electronAPI.resizeBubble(380, 520)
+  } else {
+    bubble.style.display = 'flex'
+    disableMouseCapture()
+    window.electronAPI.resizeBubble(72, 72)
+  }
+}
+
+btnMeetStartYes.addEventListener('click', () => {
+  hideMeetStartPrompt()
+  window.electronAPI.confirmMeetingStart()
+})
+
+btnMeetStartNo.addEventListener('click', () => {
+  hideMeetStartPrompt()
+  window.electronAPI.dismissMeetingStart()
+})
+
+// Listen for start prompt request from main process
+if (window.electronAPI && window.electronAPI.onAskMeetingStart) {
+  window.electronAPI.onAskMeetingStart((meetTitle) => {
+    showMeetStartPrompt(meetTitle)
+  })
+}
+
+// Listen for hide signal (meeting disappeared before user responded)
+if (window.electronAPI && window.electronAPI.onHideMeetingStart) {
+  window.electronAPI.onHideMeetingStart(() => {
+    if (meetStartPromptVisible) {
+      hideMeetStartPrompt()
     }
   })
 }
