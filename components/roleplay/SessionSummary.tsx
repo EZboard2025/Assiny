@@ -1,7 +1,7 @@
 'use client'
 
 import { Target, Users, ShieldAlert, UserCircle2, Phone, Lock, Shuffle, Eye, EyeOff, CheckCircle } from 'lucide-react'
-import type { Persona, PersonaB2B, PersonaB2C, RoleplayObjective } from '@/lib/config'
+import type { Persona, PersonaB2B, PersonaB2C, RoleplayObjective, Objection } from '@/lib/config'
 
 interface SessionSummaryProps {
   // Config state
@@ -24,6 +24,9 @@ interface SessionSummaryProps {
   onToggleHidden: () => void
   // Persona eval score for difficulty
   personaEvalScore?: number | null
+  // Desktop app
+  objections?: Objection[]
+  isDesktopApp?: boolean
 }
 
 function getPersonaTitle(persona: Persona): string {
@@ -50,6 +53,8 @@ export default function SessionSummary({
   onRandomize,
   onToggleHidden,
   personaEvalScore,
+  objections: objectionsList,
+  isDesktopApp,
 }: SessionSummaryProps) {
   const objective = objectives.find(o => o.id === selectedObjective)
   const persona = personas.find(p => p.id === selectedPersona)
@@ -75,7 +80,11 @@ export default function SessionSummary({
     {
       icon: ShieldAlert,
       label: 'Objeções',
-      value: selectedObjections.length > 0 ? `${selectedObjections.length} selecionada${selectedObjections.length !== 1 ? 's' : ''}` : null,
+      value: selectedObjections.length > 0
+        ? (isDesktopApp && objectionsList
+          ? objectionsList.filter(o => selectedObjections.includes(o.id)).map(o => o.name).join(', ')
+          : `${selectedObjections.length} selecionada${selectedObjections.length !== 1 ? 's' : ''}`)
+        : null,
       configured: selectedObjections.length > 0,
       color: 'bg-amber-50 text-amber-600',
     },
@@ -100,22 +109,22 @@ export default function SessionSummary({
 
   return (
     <div className="sticky top-8">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <div className={`bg-white rounded-xl border border-gray-200 shadow-sm ${isDesktopApp ? 'p-8' : 'p-6'}`}>
         {/* Title */}
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-5">Resumo da Sessão</h3>
+        <h3 className={`font-bold text-gray-400 uppercase tracking-wider ${isDesktopApp ? 'text-sm mb-6' : 'text-xs mb-5'}`}>Resumo da Sessão</h3>
 
         {/* Summary items */}
         <div className="space-y-0">
           {items.map((item, idx) => {
             const Icon = item.icon
             return (
-              <div key={item.label} className={`flex items-start gap-3.5 py-4 ${idx < items.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${item.color}`}>
-                  <Icon className="w-4 h-4" />
+              <div key={item.label} className={`flex items-start gap-3.5 ${isDesktopApp ? 'py-5' : 'py-4'} ${idx < items.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className={`rounded-lg flex items-center justify-center flex-shrink-0 ${item.color} ${isDesktopApp ? 'w-11 h-11' : 'w-9 h-9'}`}>
+                  <Icon className={isDesktopApp ? 'w-5 h-5' : 'w-4 h-4'} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{item.label}</p>
-                  <p className={`text-sm font-medium truncate ${
+                  <p className={`font-bold text-gray-400 uppercase tracking-wider mb-0.5 ${isDesktopApp ? 'text-[11px]' : 'text-[10px]'}`}>{item.label}</p>
+                  <p className={`font-medium truncate ${isDesktopApp ? 'text-base' : 'text-sm'} ${
                     hiddenMode ? 'text-gray-400' : item.configured ? 'text-gray-900' : 'text-gray-400'
                   }`}>
                     {hiddenMode ? '•••••••' : item.value || '—'}
@@ -141,7 +150,7 @@ export default function SessionSummary({
           <button
             onClick={onStart}
             disabled={!canStart}
-            className={`w-full py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2.5 transition-all duration-300 ${
+            className={`w-full rounded-xl font-semibold flex items-center justify-center gap-2.5 transition-all duration-300 ${isDesktopApp ? 'py-5 text-lg' : 'py-4 text-base'} ${
               canStart
                 ? 'bg-green-600 hover:bg-green-500 text-white hover:shadow-lg hover:shadow-green-500/20 hover:scale-[1.02]'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -149,12 +158,12 @@ export default function SessionSummary({
           >
             {roleplayLimitReached ? (
               <>
-                <Lock className="w-5 h-5" />
+                <Lock className={isDesktopApp ? 'w-6 h-6' : 'w-5 h-5'} />
                 Limite Atingido
               </>
             ) : (
               <>
-                <Phone className="w-5 h-5" />
+                <Phone className={isDesktopApp ? 'w-6 h-6' : 'w-5 h-5'} />
                 Iniciar Simulação
               </>
             )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Target, ChevronDown, ChevronUp, Lightbulb, Lock, Loader2, Phone } from 'lucide-react'
 import ObjectiveSelector from './ObjectiveSelector'
 import PersonaSelector from './PersonaSelector'
@@ -100,13 +101,21 @@ export default function RoleplayConfigScreen(props: RoleplayConfigScreenProps) {
     cleanSpinText, extractSpinLetter, formatSpinLetter,
   } = props
 
+  // Detect Electron desktop app
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      setIsDesktopApp(true)
+    }
+  }, [])
+
   // Get persona eval score for difficulty indicator
   const selectedPersonaObj = personas.find(p => p.id === selectedPersona)
   const personaEvalScore = selectedPersonaObj?.evaluation_score
 
   return (
-    <div className="relative z-10 py-8 pl-20 pr-6">
-      <div className="max-w-6xl">
+    <div className={`relative z-10 py-8 pl-20 ${isDesktopApp ? 'pr-8' : 'pr-6'}`}>
+      <div className={isDesktopApp ? 'max-w-[1400px]' : 'max-w-6xl'}>
 
         {/* Challenge Banner */}
         {challengeConfig && (
@@ -262,13 +271,14 @@ export default function RoleplayConfigScreen(props: RoleplayConfigScreenProps) {
             </div>
 
             {/* Sidebar (right) - hidden on mobile */}
-            <div className="hidden lg:block w-[340px] flex-shrink-0 ml-[70px]">
+            <div className={`hidden lg:block flex-shrink-0 ${isDesktopApp ? 'w-[500px] ml-8' : 'w-[340px] ml-[70px]'}`}>
               <SessionSummary
                 selectedObjective={selectedObjective}
                 objectives={objectives}
                 selectedPersona={selectedPersona}
                 personas={personas}
                 selectedObjections={selectedObjections}
+                objections={objections}
                 age={age}
                 temperament={temperament}
                 businessType={businessType}
@@ -280,6 +290,7 @@ export default function RoleplayConfigScreen(props: RoleplayConfigScreenProps) {
                 onRandomize={onRandomize}
                 onToggleHidden={onToggleHidden}
                 personaEvalScore={personaEvalScore}
+                isDesktopApp={isDesktopApp}
               />
             </div>
           </div>

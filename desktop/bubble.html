@@ -2,20 +2,53 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://ramppy.site https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
-  <title>Ramppy Assistant</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://ramppy.site https://*.ramppy.site http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; media-src 'self' blob:;">
+  <title>Nicole — Assistente Ramppy</title>
   <link rel="stylesheet" href="bubble.css">
 </head>
 <body>
-  <!-- Collapsed: floating bubble -->
-  <div id="bubble" class="bubble">
-    <svg class="bubble-sparkle" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
-    <span class="bubble-ping"></span>
+  <!-- SVG gradient definitions (reusable) -->
+  <svg style="position:absolute;width:0;height:0;" aria-hidden="true">
+    <defs>
+      <linearGradient id="aurora-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#34d399"/>
+        <stop offset="33%" stop-color="#06b6d4"/>
+        <stop offset="66%" stop-color="#10b981"/>
+        <stop offset="100%" stop-color="#059669"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- Collapsed: Orb made of colored blobs -->
+  <div id="bubble" class="bubble" title="Nicole — Assistente Ramppy">
+    <div class="siri-orb">
+      <div class="siri-blob b1"></div>
+      <div class="siri-blob b2"></div>
+      <div class="siri-blob b3"></div>
+      <div class="siri-blob b4"></div>
+      <div class="siri-blob b5"></div>
+      <div class="siri-glow"></div>
+      <div class="siri-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+      </div>
+    </div>
+    <!-- Recording indicator badge (from HEAD) -->
     <span id="rec-badge" class="rec-badge" style="display:none;" title="Parar gravacao">
       <span class="rec-dot"></span>
       <span class="rec-label">REC</span>
     </span>
-    <span class="bubble-tooltip">Assistente Ramppy <kbd>&#8984;&#8679;R</kbd></span>
+    <!-- Notification badge (red dot) -->
+    <div id="notification-badge" class="notification-badge" style="display:none;"></div>
+  </div>
+
+  <!-- Notification toast (appears near bubble) -->
+  <div id="notification-toast" class="notification-toast" style="display:none;">
+    <div class="notification-icon" id="notif-icon"></div>
+    <div class="notification-body">
+      <div class="notification-title" id="notif-title"></div>
+      <div class="notification-text" id="notif-text"></div>
+    </div>
+    <button class="notification-dismiss" id="notif-dismiss">&times;</button>
   </div>
 
   <!-- Expanded: chat panel -->
@@ -37,44 +70,57 @@
       <button id="btn-stop-rec" class="rec-bar-stop">Parar</button>
     </div>
 
-    <!-- Header -->
+    <!-- Aurora decorative line at top -->
+    <div class="aurora-line"></div>
+
+    <!-- Header with sparkle indicator + close button -->
     <div class="chat-header">
-      <div class="chat-header-center">
-        <svg class="header-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
-        <span class="header-title">Assistente Ramppy</span>
-        <span class="header-badge">IA</span>
+      <div id="header-sparkle" class="header-sparkle">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#aurora-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
       </div>
-      <button id="btn-close" class="btn-close" title="Fechar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <span class="header-title">Nicole</span>
+      <div class="header-actions">
+        <button id="btn-home" class="btn-header-action" title="Voltar ao inicio">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3v-6h6v6h3a1 1 0 001-1V10"/></svg>
+        </button>
+        <button id="btn-close" class="btn-close" title="Fechar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- Messages area -->
     <div id="chat-messages" class="chat-messages">
       <!-- Welcome state -->
       <div id="welcome-state" class="welcome-state">
-        <svg class="welcome-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
-        <p class="welcome-title" id="welcome-title">Sou seu assistente pessoal.</p>
-        <p class="welcome-sub">Performance, reunioes, treinos, agenda e gestao da equipe</p>
+        <div class="welcome-icon-wrap">
+          <svg class="welcome-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="url(#aurora-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+        </div>
+        <p class="welcome-title" id="welcome-title">Ola! Sou a Nicole</p>
+        <p class="welcome-sub">Sua assistente pessoal de vendas da Ramppy</p>
+
+        <!-- Input inline (welcome state) -->
         <div class="welcome-input-wrap">
-          <input type="text" id="welcome-input" class="welcome-input" placeholder="Pergunte qualquer coisa..." autocomplete="off">
+          <input type="text" id="welcome-input" class="welcome-input" placeholder="Me pergunte qualquer coisa..." autocomplete="off">
+          <button id="btn-mic-welcome" class="btn-mic" title="Falar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
           <button id="btn-send-welcome" class="btn-send-small" title="Enviar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
-        <div class="welcome-suggestions">
-          <button class="suggestion-card" data-msg="Quem precisa de atencao?">
-            <svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-            <span>Quem precisa de atencao?</span>
-          </button>
-          <button class="suggestion-card" data-msg="Compare os vendedores">
-            <svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="12" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg>
-            <span>Compare os vendedores</span>
-          </button>
-          <button class="suggestion-card" data-msg="Como esta minha performance?">
-            <svg class="sug-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            <span>Como esta minha performance?</span>
-          </button>
+
+        <!-- Suggestion cards (welcome state) — dynamically generated -->
+        <div id="welcome-suggestions" class="welcome-suggestions">
+          <div class="suggestion-skeleton">
+            <div class="skeleton-line"></div>
+          </div>
+          <div class="suggestion-skeleton">
+            <div class="skeleton-line"></div>
+          </div>
+          <div class="suggestion-skeleton">
+            <div class="skeleton-line"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -89,13 +135,31 @@
     <!-- Input bar -->
     <div id="chat-input-bar" class="chat-input-bar" style="display:none;">
       <div class="input-wrap">
-        <input type="text" id="chat-input" class="chat-input" placeholder="Pergunte qualquer coisa..." autocomplete="off">
+        <input type="text" id="chat-input" class="chat-input" placeholder="Fale com a Nicole..." autocomplete="off">
         <div class="input-actions">
+          <button id="btn-mic" class="btn-mic" title="Falar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
           <button id="btn-send" class="btn-send-small" title="Enviar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Call mode overlay (phone call experience) -->
+    <div id="call-overlay" class="call-overlay" style="display:none;">
+      <div class="call-name">Nicole</div>
+      <div class="call-status" id="call-status">Conectando...</div>
+      <div class="call-orb-wrap">
+        <div class="call-orb-ring" id="call-orb-ring"></div>
+        <div class="call-orb" id="call-orb">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+        </div>
+      </div>
+      <button id="btn-hangup" class="btn-hangup" title="Encerrar chamada">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 011.72 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.11 2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
     </div>
   </div>
 

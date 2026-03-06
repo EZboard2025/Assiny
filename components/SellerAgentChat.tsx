@@ -800,8 +800,8 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-green-600" />
-                <span className="text-gray-900 text-sm font-medium">Assistente Ramppy</span>
-                <span className="text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">IA</span>
+                <span className="text-gray-900 text-sm font-medium">Nicole</span>
+                <span className="text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">IA Ramppy</span>
               </div>
             </div>
             <div className="ml-auto flex items-center gap-1 relative z-10">
@@ -819,7 +819,7 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
                   <Sparkles className="w-12 h-12 text-green-600" />
                 </div>
                 <h2 className="text-gray-900 text-lg font-semibold mb-1 text-center">
-                  Olá{displayName ? <>, <span>{displayName.split(' ')[0]}</span></> : ''}! Sou seu assistente pessoal.
+                  Olá{displayName ? <>, <span>{displayName.split(' ')[0]}</span></> : ''}! Sou a Nicole, sua assistente pessoal.
                 </h2>
                 <p className="text-gray-400 text-xs text-center mb-6">{isManager ? 'Performance, reuniões, treinos, agenda e gestão da equipe' : 'Performance, reuniões, treinos e agenda'}</p>
 
@@ -830,7 +830,7 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Pergunte qualquer coisa..."
+                    placeholder="Fale com a Nicole..."
                     disabled={isLoading}
                     className="w-full bg-transparent text-gray-900 text-sm outline-none placeholder-gray-400"
                   />
@@ -926,7 +926,7 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Pergunte qualquer coisa..."
+                    placeholder="Fale com a Nicole..."
                     disabled={isLoading}
                     className="flex-1 bg-transparent text-gray-900 text-sm outline-none placeholder-gray-400"
                   />

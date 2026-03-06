@@ -92,7 +92,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'meet-analysis' | 'challenge-history' | 'manager' | 'download'>('home')
   const [mounted, setMounted] = useState(false)
-  const [isElectron, setIsElectron] = useState(false)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
+  const [nicoleRoleplayConfig, setNicoleRoleplayConfig] = useState<any | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
@@ -193,14 +194,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   useEffect(() => {
     setMounted(true)
-    setIsElectron(!!(window as any).electronAPI)
+    setIsDesktopApp(!!(window as any).electronAPI)
     checkUserRole()
+
+    if (typeof window !== 'undefined' && (window as any).electronAPI) setIsDesktopApp(true)
 
     // Ler query string da URL para navegação direta
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const view = params.get('view')
-      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links'].includes(view)) {
+      if (view && ['home', 'chat', 'roleplay', 'pdi', 'historico', 'perfil', 'roleplay-links', 'followup', 'followup-history', 'meet-analysis', 'challenge-history', 'download', 'manager'].includes(view)) {
         setCurrentView(view as typeof currentView)
       }
 
@@ -208,6 +211,17 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       const openConfigHub = params.get('openConfigHub')
       if (openConfigHub === 'true') {
         setShowConfigHub(true)
+      }
+
+      // Parse Nicole AI roleplay config from URL params
+      const nicoleConfigParam = params.get('nicoleConfig')
+      if (nicoleConfigParam) {
+        try {
+          const config = JSON.parse(decodeURIComponent(nicoleConfigParam))
+          setNicoleRoleplayConfig(config)
+          setCurrentView('roleplay')
+          window.history.replaceState({}, '', window.location.pathname)
+        } catch (e) { console.error('[Dashboard] Failed to parse nicoleConfig:', e) }
       }
     }
   }, [])
@@ -514,7 +528,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
     // WhatsApp: open Electron window or show desktop-only notice
     if (newView === 'whatsapp') {
-      if (isElectron) {
+      if (isDesktopApp) {
         ;(window as any).electronAPI?.openWhatsApp()
       } else {
         setShowWhatsAppNotice(true)
@@ -560,6 +574,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           challengeConfig={activeChallenge?.challenge_config}
           challengeId={activeChallenge?.id}
           onChallengeComplete={() => setActiveChallenge(null)}
+          nicoleConfig={nicoleRoleplayConfig}
+          onNicoleConfigApplied={() => setNicoleRoleplayConfig(null)}
         />
       )
     }
@@ -833,6 +849,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           transition: 'margin 300ms ease-in-out, opacity 150ms ease-out',
           opacity: isTransitioning ? 0 : 1,
           scrollbarWidth: 'none',
+          ...(isDesktopApp ? { zoom: 1.15 } : {}),
         }}
       >
         {renderContent()}
@@ -847,8 +864,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         }} />
       )}
 
-      {/* Seller Agent Chat - home, profile, roleplay and historico */}
-      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay' || currentView === 'historico') && (
+      {/* Seller Agent Chat - home, profile, roleplay and historico (hidden in Electron desktop app) */}
+      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay' || currentView === 'historico') && typeof window !== 'undefined' && !(window as any).electronAPI && (
         <SellerAgentChat userName={userName || undefined} currentView={currentView} meetContext={meetAgentContext} onOpenChange={handleAssistantChange} />
       )}
 

@@ -28,6 +28,8 @@
       "recording.html",
       "recording.css",
       "recording.js",
+      "notification-toast.html",
+      "preload-notification.js",
       "assets/**/*"
     ],
     "win": {
@@ -83,7 +85,8 @@
   },
   "devDependencies": {
     "electron": "^40.6.1",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "rcedit": "^5.0.2"
   },
   "dependencies": {
     "macos-audio-devices": "^1.4.0"

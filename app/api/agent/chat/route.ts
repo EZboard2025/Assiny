@@ -12,11 +12,19 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 // ─── System Prompt ───────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `Você é o assistente pessoal de vendas da plataforma Ramppy. Você é um coach de vendas experiente, motivacional e direto.
+const SYSTEM_PROMPT = `Você é a **Nicole**, a assistente pessoal de vendas da plataforma Ramppy. Você é uma coach de vendas experiente, motivacional, inteligente e direta — como uma Jarvis feminina dedicada a vendas.
+
+SUA IDENTIDADE:
+- Seu nome é Nicole. Quando se referir a si mesma, SEMPRE use o feminino ("eu estou preparada", "fiquei feliz", "estou analisando")
+- Você é calorosa mas profissional — como uma colega senior que realmente se importa com o sucesso do vendedor
+- Tem personalidade: pode fazer observações leves, elogiar conquistas com entusiasmo genuíno, e ser honesta sobre pontos fracos sem ser dura
+- Trate o vendedor pelo primeiro nome quando souber (ex: "Gabriel, olha só seus números!")
+- Nunca diga "como assistente de IA" ou "como inteligência artificial" — você é a Nicole, ponto
+- ORTOGRAFIA CRÍTICA: O nome da plataforma é **Ramppy** (com dois P e Y no final). NUNCA escreva "Ramply", "Rampy", "Rampii" ou qualquer variação. É sempre **Ramppy**
 
 REGRAS:
-- Fale em português brasileiro, tom profissional mas acessível
-- Seja direto e prático — dê conselhos acionáveis baseados nos dados reais do vendedor
+- Fale em português brasileiro, tom profissional mas acessível e humano
+- Seja direta e prática — dê conselhos acionáveis baseados nos dados reais do vendedor
 - Use a metodologia SPIN Selling como referência (Situação, Problema, Implicação, Necessidade de Solução)
 - Quando o vendedor perguntar sobre performance, SEMPRE busque os dados antes de responder — nunca invente números
 - Compare evolução ao longo do tempo quando relevante
@@ -24,7 +32,7 @@ REGRAS:
 - Se o vendedor perguntar sobre agenda/reuniões e o calendário não estiver conectado, informe gentilmente
 - Formate respostas com markdown quando útil (negrito, listas, etc.)
 - Não use emojis excessivos — no máximo 1-2 por mensagem quando apropriado
-- Seja conciso — respostas de 2-4 parágrafos no máximo, a menos que peçam detalhes
+- Seja concisa — respostas de 2-4 parágrafos no máximo, a menos que peçam detalhes
 
 CONTEXTO:
 - A plataforma tem: Roleplay (simulação de vendas), Google Meet (análise de reuniões reais), WhatsApp IA (copiloto de vendas), Desafios Diários, PDI (plano de desenvolvimento), Follow-up (análise de mensagens)
@@ -33,7 +41,8 @@ CONTEXTO:
 - Você tem acesso a TODOS os dados do vendedor via ferramentas — use-as sempre que precisar de dados reais
 
 FERRAMENTAS DISPONÍVEIS:
-Você tem 15 ferramentas para consultar qualquer dado do vendedor. SEMPRE chame múltiplas ferramentas em paralelo para dar respostas ricas e completas.
+Você tem 16 ferramentas para consultar qualquer dado do vendedor. SEMPRE chame múltiplas ferramentas em paralelo para dar respostas ricas e completas.
+- configure_roleplay: Quando o vendedor pedir "configura pra mim", "monta um roleplay", "treina objeção de preço", etc. Use os parâmetros para buscar personas e objeções por nome.
 
 ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Como está minha performance?" → get_performance_summary + get_roleplay_sessions(limit:5) + get_daily_challenges(limit:3)
@@ -43,6 +52,7 @@ ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Qual meu ponto mais fraco?" → get_performance_summary + get_challenge_effectiveness + get_roleplay_sessions(limit:5)
 - "Analise minha última reunião" → get_meet_evaluations(limit:1) + get_meet_evaluation_detail
 - "Compartilhar dados com a equipe" → get_meet_evaluations(limit:5) + get_roleplay_sessions(limit:5) → use {{eval_card}} para cada item
+- "Bom dia" / "Resumo do dia" / "Como está meu dia?" → get_calendar_events(days_ahead:1) + get_whatsapp_activity(days:2) + get_daily_challenges(limit:1) + get_performance_summary (reuniões + leads + desafio + streak)
 - "O que tenho na agenda?" → get_calendar_events + get_scheduled_bots
 - "Marca uma reunião..." → create_calendar_event (ou quick_add_event para texto livre)
 - "Move/reagenda a reunião..." → get_calendar_events (para achar o event_id) + update_calendar_event
@@ -50,8 +60,33 @@ ESTRATÉGIA POR TIPO DE PERGUNTA:
 - "Ativa o bot na reunião..." → get_scheduled_bots (para achar o scheduled_bot_id) + toggle_meeting_bot
 - "Estou livre amanhã?" → get_calendar_freebusy
 - Perguntas gerais sobre empresa → get_company_info
+- "Configura um roleplay" / "Monta um treino" / "Treina objeção de preço" → configure_roleplay (busca personas e objeções por nome parcial, monta config e navega para roleplay)
+- "Abre o Chrome" / "Abre a calculadora" → execute_desktop_action(open_app, "chrome") ou (open_app, "calculator")
+- "Abre google.com" → execute_desktop_action(open_url, "https://google.com")
+- "Abre a pasta do Fortnite" → search_computer(installed_apps, "fortnite") → pega InstallLocation → execute_desktop_action(open_path, caminho_encontrado)
+- "Onde está minha planilha?" → search_computer(find_file, "planilha") → retorna caminhos → execute_desktop_action(open_path, caminho_encontrado)
+
+AÇÕES NO DESKTOP:
+- Quando o vendedor pedir para abrir aplicativos, URLs ou pastas, use execute_desktop_action
+- Sempre responda de forma natural e confirme a ação: "Claro! Abrindo o Chrome para você..."
+- Se a ação falhar, informe gentilmente e sugira alternativas
+- Apps suportados: chrome, firefox, edge, notepad, calculadora (calculator/calc), vscode (code), terminal, cmd, powershell, explorer, paint, word, excel, powerpoint, outlook, teams, spotify, slack, whatsapp
+- Para URLs: use open_url com a URL completa (inclua https://)
+- Para pastas: use open_path com o caminho completo
+- NUNCA execute ações perigosas — apenas abrir apps/URLs/pastas
+- NUNCA INVENTE URLs ou caminhos que você não tem certeza que existem
+- Site institucional da Ramppy: https://ramppy.com (NÃO ramppy.site — esse é a plataforma de vendas)
+- Plataforma Ramppy (app de vendas): https://ramppy.site
+- Para qualquer sub-página que você NÃO tem certeza da URL exata, pesquise no Google: execute_desktop_action(open_url, "https://www.google.com/search?q=ramppy+founders")
+
+BUSCA NO COMPUTADOR:
+- Quando o vendedor pedir pra encontrar algo no PC (pastas, programas, arquivos), PRIMEIRO use search_computer para achar o caminho real
+- search_computer retorna os caminhos encontrados — depois use execute_desktop_action(open_path, caminho) para abrir
+- NUNCA chute caminhos como "C:\\Jogos\\Epic Games\\Fortnite" — SEMPRE busque primeiro com search_computer
+- Se a busca não retornar resultados, informe o vendedor e pergunte se sabe o caminho
 
 IMPORTANTE: Chame 2-4 ferramentas por vez para cruzar dados e dar respostas completas. Nunca se limite a apenas 1 ferramenta.
+- Briefings de contato e busca de leads estão temporariamente desativados. Se o vendedor pedir briefing ou buscar um contato, diga: "A busca de contatos está sendo aprimorada e volta em breve! Por enquanto, posso ajudar com agenda, performance, desafios e outras tarefas."
 
 AÇÕES NO CALENDÁRIO:
 - Você pode CRIAR, ATUALIZAR e DELETAR eventos — use isso quando o vendedor pedir
@@ -461,6 +496,78 @@ const toolDefinitions: OpenAI.ChatCompletionTool[] = [
         required: ['evaluation_id', 'teammate_user_ids']
       }
     }
+  },
+  // DISABLED: search_contact and generate_briefing temporarily removed
+  // {
+  //   type: 'function',
+  //   function: { name: 'search_contact', ... }
+  // },
+  // {
+  //   type: 'function',
+  //   function: { name: 'generate_briefing', ... }
+  // },
+  {
+    type: 'function',
+    function: {
+      name: 'configure_roleplay',
+      description: 'Configura uma sessão de roleplay para o vendedor. Busca personas e objeções do banco de dados por nome parcial e monta a configuração. Use quando o vendedor pedir para configurar, montar ou preparar um roleplay/simulação.',
+      parameters: {
+        type: 'object',
+        properties: {
+          persona_name: { type: 'string', description: 'Nome parcial ou completo da persona (cargo/profissão). Ex: "gerente", "diretor comercial"' },
+          objection_names: { type: 'array', items: { type: 'string' }, description: 'Nomes parciais de objeções. Ex: ["preço", "concorrente"]' },
+          objective_name: { type: 'string', description: 'Nome parcial do objetivo. Ex: "agendar", "fechar"' },
+          age: { type: 'number', description: 'Idade do cliente simulado (18-60). Padrão: 35' },
+          temperament: { type: 'string', enum: ['Analítico', 'Empático', 'Determinado', 'Indeciso', 'Sociável'], description: 'Temperamento do cliente simulado' },
+          auto_start: { type: 'boolean', description: 'Se true, inicia o roleplay automaticamente. Padrão: false.' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'execute_desktop_action',
+      description: 'Executa uma ação no computador do vendedor (abrir aplicativo, URL, pasta, ou navegar na plataforma Ramppy). Só funciona no app desktop Ramppy.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action_type: {
+            type: 'string',
+            enum: ['open_app', 'open_url', 'open_path', 'navigate_platform'],
+            description: 'Tipo: open_app (abrir aplicativo), open_url (abrir URL no navegador), open_path (abrir arquivo ou pasta), navigate_platform (navegar dentro do app Ramppy para uma página específica)'
+          },
+          target: {
+            type: 'string',
+            description: 'Para open_app: nome do app. Para open_url: URL completa. Para open_path: caminho do arquivo/pasta. Para navigate_platform: caminho da página (ex: "?view=roleplay", "?view=perfil", "?openConfigHub=true").'
+          }
+        },
+        required: ['action_type', 'target']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_computer',
+      description: 'Busca no computador do vendedor: programas instalados, pastas ou arquivos. Use ANTES de execute_desktop_action quando não souber o caminho exato. A busca retorna caminhos reais encontrados no PC. Só funciona no app desktop.',
+      parameters: {
+        type: 'object',
+        properties: {
+          search_type: {
+            type: 'string',
+            enum: ['installed_apps', 'find_folder', 'find_file'],
+            description: 'installed_apps: busca no registro do Windows por programas instalados. find_folder: busca pastas por nome. find_file: busca arquivos por nome.'
+          },
+          name: {
+            type: 'string',
+            description: 'Nome do programa, pasta ou arquivo para buscar (ex: "fortnite", "planilha vendas", "proposta.pdf")'
+          }
+        },
+        required: ['search_type', 'name']
+      }
+    }
   }
 ]
 
@@ -525,7 +632,7 @@ const teamToolDefinitions: OpenAI.ChatCompletionTool[] = [
 const MANAGER_PROMPT_EXTENSION = `
 
 VOCÊ ESTÁ CONVERSANDO COM UM GESTOR/ADMIN.
-Além de ser coach pessoal, você também é o Assistente de Gestão da equipe.
+Além de ser coach pessoal, você também é a assistente de gestão da equipe.
 Você pode consultar dados de QUALQUER vendedor da empresa, rankings, comparações e sugerir coaching.
 
 FERRAMENTAS DE GESTÃO ADICIONAIS:
@@ -1788,6 +1895,557 @@ async function executeFunction(
         return { sellers_compared: comparison }
       }
 
+      case 'search_contact': {
+        // ETAPA 1: Busca candidatos na web + WhatsApp (sem gerar briefing)
+        const { name: contactName, company: contactCompany, phone: contactPhone } = params
+
+        if (!contactName || typeof contactName !== 'string') {
+          return { success: false, error: 'Nome do contato é obrigatório' }
+        }
+
+        // ── 0. Check if searching for internal team member ──────────────
+        // If company matches user's own company (Ramppy, Assiny, etc.), search employees first
+        let internalMatch: any = null
+        if (contactCompany) {
+          const { data: userCompany } = await supabaseAdmin
+            .from('companies')
+            .select('name, subdomain')
+            .eq('id', companyId)
+            .single()
+
+          const companyLower = contactCompany.toLowerCase().trim()
+          const isOwnCompany = userCompany && (
+            userCompany.name?.toLowerCase().includes(companyLower) ||
+            userCompany.subdomain?.toLowerCase().includes(companyLower) ||
+            companyLower.includes(userCompany.name?.toLowerCase() || '') ||
+            companyLower.includes(userCompany.subdomain?.toLowerCase() || '') ||
+            companyLower === 'ramppy'
+          )
+
+          if (isOwnCompany) {
+            const { data: teammates } = await supabaseAdmin
+              .from('employees')
+              .select('user_id, name, role')
+              .eq('company_id', companyId)
+              .ilike('name', `%${contactName}%`)
+
+            if (teammates && teammates.length > 0) {
+              // Found internal team member(s) — return them as candidates
+              const internalCandidates = teammates.map(t => ({
+                name: t.name || contactName,
+                title: t.role || 'Vendedor',
+                company: userCompany?.name || contactCompany,
+                location: '',
+                linkedin_url: '',
+                is_internal: true,
+                user_id: t.user_id,
+              }))
+
+              return {
+                success: true,
+                candidates: internalCandidates,
+                whatsapp_match: null,
+                whatsapp_matches_count: 0,
+                has_whatsapp: false,
+                has_web_results: false,
+                is_internal_search: true,
+                raw_linkedin_urls: [],
+              }
+            }
+          }
+        }
+
+        // ── 1. Search WhatsApp conversations ──────────────────────────────
+        let waConversations: any[] = []
+
+        if (contactPhone) {
+          const phoneSuffix = String(contactPhone).replace(/\D/g, '').slice(-9)
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_phone', `%${phoneSuffix}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        if (!waConversations.length) {
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_name', `%${contactName}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        // ── 2. Web search via Brave Search ────────────────────────────────
+        let rawLinkedinUrls: string[] = []
+        let candidates: Array<{ name: string; title: string; company: string; location: string; linkedin_url: string }> = []
+        let snippets = ''
+
+        try {
+          const searchQuery = contactCompany
+            ? `"${contactName}" "${contactCompany}" LinkedIn`
+            : `${contactName} LinkedIn`
+          const searchUrl = `https://search.brave.com/search?q=${encodeURIComponent(searchQuery)}&source=web`
+
+          const searchRes = await fetch(searchUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+              'Accept': 'text/html',
+            },
+            signal: AbortSignal.timeout(8000),
+          })
+
+          if (searchRes.ok) {
+            const html = await searchRes.text()
+            // Extract LinkedIn profile URLs from raw HTML
+            const profileMatches = html.match(/(?:https?:\/\/)?(?:[a-z]{2}\.)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/g)
+            if (profileMatches) {
+              const unique = [...new Set(profileMatches.map((u: string) => u.startsWith('http') ? u : `https://${u}`))]
+              rawLinkedinUrls.push(...unique)
+            }
+            snippets = html
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/&[a-z]+;/gi, ' ')
+              .replace(/\s+/g, ' ')
+              .slice(0, 6000)
+          }
+        } catch (_) { /* search failed */ }
+
+        // ── 3. Use GPT-4o-mini to extract structured candidates ───────────
+        if (snippets.length > 200) {
+          try {
+            const extractResponse = await openai.chat.completions.create({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'system',
+                  content: `Analise os resultados de busca e encontre perfis de LinkedIn de pessoas chamadas "${contactName}"${contactCompany ? ` que trabalham ou estão associadas à empresa "${contactCompany}"` : ''}.
+
+Retorne um JSON array com os candidatos encontrados (máximo 3). Para cada candidato:
+- name: nome completo da pessoa
+- title: cargo/título atual
+- company: empresa atual
+- location: cidade/país
+- linkedin_url: URL do perfil LinkedIn (se encontrado no texto)
+
+REGRAS ESTRITAS:
+- O PRIMEIRO NOME do candidato DEVE conter "${contactName}" (ou variação muito próxima). "Gabriela" NÃO é "Gabrielle", "João" NÃO é "John"${contactCompany ? `
+- A EMPRESA do candidato DEVE ser "${contactCompany}" ou muito similar. NÃO confunda nomes de empresa com sobrenomes de pessoas (ex: empresa "New Hack" NÃO é sobrenome "Hacker")
+- Se nenhum resultado mostra alguém que REALMENTE trabalha na "${contactCompany}", retorne []` : ''}
+- NÃO invente dados. Se não encontrar algum campo, use string vazia ""
+- Se não encontrar NENHUM candidato relevante, retorne []
+- Se o nome/empresa são muito genéricos e os resultados não parecem ser a pessoa certa, retorne []
+- Na DÚVIDA, retorne [] — é melhor não retornar nada do que retornar a pessoa errada
+- Retorne APENAS o JSON array, sem texto adicional`
+                },
+                { role: 'user', content: snippets }
+              ],
+              temperature: 0.1,
+              max_tokens: 500,
+            })
+
+            const rawCandidates = extractResponse.choices[0].message.content || '[]'
+            try {
+              const parsed = JSON.parse(rawCandidates.replace(/```json\n?/g, '').replace(/```/g, '').trim())
+              if (Array.isArray(parsed)) {
+                candidates = parsed.slice(0, 3).map((c: any) => ({
+                  name: c.name || contactName,
+                  title: c.title || '',
+                  company: c.company || '',
+                  location: c.location || '',
+                  linkedin_url: c.linkedin_url || '',
+                }))
+              }
+            } catch (_) { /* parse failed, continue */ }
+          } catch (_) { /* extraction failed */ }
+        }
+
+        // ── 4. Hard-filter: reject candidates whose company clearly doesn't match
+        if (contactCompany && candidates.length > 0) {
+          const targetCompany = contactCompany.toLowerCase().replace(/[^a-z0-9]/g, '')
+          candidates = candidates.filter(c => {
+            if (!c.company) return true // no company info, keep as possible
+            const candCompany = c.company.toLowerCase().replace(/[^a-z0-9]/g, '')
+            // Check if company names overlap meaningfully
+            return candCompany.includes(targetCompany) ||
+                   targetCompany.includes(candCompany) ||
+                   // Check individual words (e.g. "New Hack" vs "New Hack Tecnologia")
+                   targetCompany.split(/\s+/).filter(Boolean).some((w: string) =>
+                     w.length > 2 && candCompany.includes(w.replace(/[^a-z0-9]/g, ''))
+                   )
+          })
+        }
+
+        // Also hard-filter by first name similarity
+        if (contactName && candidates.length > 0) {
+          const targetFirst = contactName.toLowerCase().split(' ')[0]
+          candidates = candidates.filter(c => {
+            const candFirst = (c.name || '').toLowerCase().split(' ')[0]
+            // First names must be very similar (allow small typos)
+            return candFirst === targetFirst ||
+                   candFirst.startsWith(targetFirst) ||
+                   targetFirst.startsWith(candFirst)
+          })
+        }
+
+        // Fill linkedin_url from rawLinkedinUrls if candidates lack it
+        candidates.forEach((c, i) => {
+          if (!c.linkedin_url && rawLinkedinUrls[i]) {
+            c.linkedin_url = rawLinkedinUrls[i]
+          }
+        })
+
+        // If no candidates from GPT but we have LinkedIn URLs, DON'T blindly create entries
+        // Only create if we have no company filter (generic search)
+        if (candidates.length === 0 && rawLinkedinUrls.length > 0 && !contactCompany) {
+          candidates.push({
+            name: contactName,
+            title: '',
+            company: contactCompany || '',
+            location: '',
+            linkedin_url: rawLinkedinUrls[0],
+          })
+        }
+
+        // ── 5. Determine match quality ────────────────────────────────────
+        const hasWebResults = candidates.length > 0
+
+        // If no valid candidates after filtering, return clean "not found"
+        // Don't leak raw URLs or unrelated WhatsApp contacts to the agent
+        if (!hasWebResults && contactCompany) {
+          return {
+            success: true,
+            candidates: [],
+            whatsapp_match: null,
+            whatsapp_matches_count: 0,
+            has_whatsapp: false,
+            has_web_results: false,
+            raw_linkedin_urls: [],
+            search_note: `Nenhum perfil encontrado para "${contactName}" na empresa "${contactCompany}". Tente com mais detalhes (sobrenome completo, cargo, etc).`,
+          }
+        }
+
+        // WhatsApp match: only include if name closely matches a confirmed candidate
+        let bestWaMatch: any = null
+        if (waConversations.length > 0 && candidates.length > 0) {
+          const topCandidate = candidates[0].name.toLowerCase()
+          // Find a WA contact whose name matches the confirmed candidate well
+          bestWaMatch = waConversations.find(wa => {
+            const waName = (wa.contact_name || '').toLowerCase()
+            // Must share more than just first name - check full name or company hint
+            return topCandidate.includes(waName) || waName.includes(topCandidate) ||
+              (contactCompany && waName.toLowerCase().includes(contactCompany.toLowerCase()))
+          }) || null
+        }
+
+        return {
+          success: true,
+          candidates,
+          whatsapp_match: bestWaMatch,
+          whatsapp_matches_count: bestWaMatch ? 1 : 0,
+          has_whatsapp: !!bestWaMatch,
+          has_web_results: hasWebResults,
+          raw_linkedin_urls: candidates.map(c => c.linkedin_url).filter(Boolean),
+        }
+      }
+
+      case 'generate_briefing': {
+        // ETAPA 2: Gera briefing completo após confirmação do candidato
+        const { name: contactName, company: contactCompany, linkedin_url: confirmedLinkedinUrl, phone: contactPhone, web_profile: confirmedWebProfile } = params
+
+        if (!contactName || typeof contactName !== 'string') {
+          return { success: false, error: 'Nome do contato é obrigatório' }
+        }
+
+        // ── 1. Search WhatsApp conversations ──────────────────────────────
+        let waConversations: any[] = []
+
+        if (contactPhone) {
+          const phoneSuffix = String(contactPhone).replace(/\D/g, '').slice(-9)
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_phone', `%${phoneSuffix}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        if (!waConversations.length) {
+          const { data } = await supabaseAdmin
+            .from('whatsapp_conversations')
+            .select('contact_name, contact_phone, last_message_at, last_message_preview, profile_pic_url')
+            .eq('user_id', userId)
+            .ilike('contact_name', `%${contactName}%`)
+            .limit(5)
+          waConversations = data || []
+        }
+
+        // ── 2. Get recent WhatsApp messages ───────────────────────────────
+        let recentMessages: any[] = []
+        if (waConversations.length > 0) {
+          const { data: msgs } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .select('content, direction, message_timestamp')
+            .eq('user_id', userId)
+            .eq('contact_phone', waConversations[0].contact_phone)
+            .not('content', 'is', null)
+            .order('message_timestamp', { ascending: false })
+            .limit(20)
+          recentMessages = (msgs || []).reverse()
+        }
+
+        // ── 3. Build web profile from confirmed data ──────────────────────
+        const webProfile = confirmedWebProfile || ''
+
+        // ── 4. RAG - parallel queries for examples and company knowledge ──
+        const embeddingText = `reunião vendas ${contactName} ${contactCompany || ''}`
+        const embeddingResponse = await openai.embeddings.create({
+          model: 'text-embedding-3-small',
+          input: embeddingText.slice(0, 8000)
+        })
+        const embedding = embeddingResponse.data[0].embedding
+
+        const [successResult, knowledgeResult] = await Promise.allSettled([
+          supabaseAdmin.rpc('match_followup_success', {
+            query_embedding: embedding,
+            company_id_filter: companyId,
+            match_threshold: 0.4,
+            match_count: 3
+          }),
+          supabaseAdmin.rpc('match_company_knowledge', {
+            query_embedding: embedding,
+            match_threshold: 0.5,
+            match_count: 3
+          })
+        ])
+
+        const successExamples = successResult.status === 'fulfilled' ? successResult.value.data || [] : []
+        const companyKnowledge = knowledgeResult.status === 'fulfilled' ? knowledgeResult.value.data || [] : []
+
+        // ── 5. Generate briefing via GPT-4o ───────────────────────────────
+        const conversationSummary = recentMessages.length > 0
+          ? recentMessages.map(m => `[${m.direction === 'outbound' ? 'Vendedor' : 'Lead'}]: ${m.content}`).join('\n')
+          : 'Nenhuma conversa anterior encontrada.'
+
+        const examplesContext = successExamples.length > 0
+          ? successExamples.map((e: any) => e.content?.slice(0, 300)).join('\n---\n')
+          : 'Nenhum exemplo disponível.'
+
+        const knowledgeContext = companyKnowledge.length > 0
+          ? companyKnowledge.map((k: any) => k.content?.slice(0, 300)).join('\n')
+          : ''
+
+        const briefingResponse = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: `Gere um briefing pré-reunião conciso em português BR com estas seções:
+- **Perfil do Prospect**: Nome, cargo, empresa, setor, localização (use dados reais da busca web/LinkedIn)
+- **Histórico de Interação**: Resumo das conversas anteriores no WhatsApp (tom, interesses, objeções levantadas). Se não houver histórico, diga explicitamente
+- **Inteligência Competitiva**: O que sabemos sobre a empresa/setor do prospect que pode ser útil
+- **Pontos de Atenção**: Objeções prováveis baseadas no perfil e histórico
+- **Estratégia de Abordagem**: 2-3 táticas específicas baseadas nos exemplos de sucesso e perfil do prospect
+- **Perguntas SPIN Recomendadas**: 1 pergunta situacional + 1 de problema personalizadas para este prospect
+
+REGRAS:
+- Use APENAS informações reais encontradas. NUNCA invente dados sobre o prospect
+- Se não tiver informação sobre algo, diga "Não identificado" em vez de inventar
+- Seja direto e prático. Máximo 300 palavras
+- Personalize as perguntas SPIN com base no cargo/empresa real do prospect`
+            },
+            {
+              role: 'user',
+              content: `CONTATO: ${contactName}${contactCompany ? ` | Empresa: ${contactCompany}` : ''}${contactPhone ? ` | Tel: ${contactPhone}` : ''}
+
+DADOS DO LINKEDIN / WEB:
+${webProfile || 'Nenhuma informação pública encontrada.'}
+
+CONVERSAS WHATSAPP:
+${conversationSummary}
+
+ABORDAGENS BEM-SUCEDIDAS (RAG):
+${examplesContext}
+
+CONHECIMENTO DA NOSSA EMPRESA:
+${knowledgeContext || 'Não disponível.'}`
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 1000,
+        })
+
+        const briefing = briefingResponse.choices[0].message.content || ''
+
+        // ── 6. Consume 1 credit ───────────────────────────────────────────
+        const { data: credits } = await supabaseAdmin
+          .from('companies')
+          .select('monthly_credits_used')
+          .eq('id', companyId)
+          .single()
+
+        if (credits) {
+          await supabaseAdmin
+            .from('companies')
+            .update({ monthly_credits_used: (credits.monthly_credits_used || 0) + 1 })
+            .eq('id', companyId)
+        }
+
+        const linkedinUrl = confirmedLinkedinUrl || `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(`${contactName} ${contactCompany || ''}`.trim())}`
+
+        return {
+          success: true,
+          whatsapp_match: waConversations[0] || null,
+          recent_messages_count: recentMessages.length,
+          web_profile: webProfile || null,
+          briefing,
+          linkedin_url: linkedinUrl,
+          success_examples_count: successExamples.length,
+        }
+      }
+
+      case 'configure_roleplay': {
+        const { persona_name, objection_names, objective_name, age, temperament, auto_start } = params
+
+        // Get companyId from employee table
+        const { data: empData } = await supabaseAdmin
+          .from('employees')
+          .select('company_id')
+          .eq('user_id', userId)
+          .single()
+
+        const rpCompanyId = empData?.company_id || companyId
+
+        // Fetch personas, objections, and objectives for this company
+        const [personasRes, objectionsRes, objectivesRes] = await Promise.all([
+          supabaseAdmin.from('personas').select('id, cargo, job_title, profissao, profession').eq('company_id', rpCompanyId),
+          supabaseAdmin.from('objections').select('id, name').eq('company_id', rpCompanyId),
+          supabaseAdmin.from('roleplay_objectives').select('id, name').eq('company_id', rpCompanyId),
+        ])
+
+        const allPersonas = personasRes.data || []
+        const allObjections = objectionsRes.data || []
+        const allObjectives = objectivesRes.data || []
+
+        // Match persona by partial name (case-insensitive)
+        let matchedPersona: any = null
+        if (persona_name) {
+          const search = persona_name.toLowerCase()
+          const matches = allPersonas.filter((p: any) => {
+            const fields = [p.cargo, p.job_title, p.profissao, p.profession].filter(Boolean)
+            return fields.some((f: string) => f.toLowerCase().includes(search))
+          })
+          if (matches.length === 1) {
+            matchedPersona = matches[0]
+          } else if (matches.length > 1) {
+            return {
+              success: false,
+              multiple_personas: true,
+              matches: matches.map((p: any) => ({
+                id: p.id,
+                name: p.cargo || p.job_title || p.profissao || p.profession,
+              })),
+              message: `Encontrei ${matches.length} personas. Qual você quer?`,
+            }
+          } else {
+            return {
+              success: false,
+              no_persona: true,
+              available: allPersonas.map((p: any) => ({
+                id: p.id,
+                name: p.cargo || p.job_title || p.profissao || p.profession,
+              })),
+              message: `Nenhuma persona encontrada com "${persona_name}". Personas disponíveis listadas.`,
+            }
+          }
+        }
+
+        // Match objections by partial name (case-insensitive)
+        let matchedObjections: any[] = []
+        if (objection_names && Array.isArray(objection_names)) {
+          for (const objName of objection_names) {
+            const search = objName.toLowerCase()
+            const match = allObjections.find((o: any) => o.name?.toLowerCase().includes(search))
+            if (match) matchedObjections.push(match)
+          }
+        }
+
+        // Match objective by partial name (case-insensitive)
+        let matchedObjective: any = null
+        if (objective_name) {
+          const search = objective_name.toLowerCase()
+          matchedObjective = allObjectives.find((o: any) => o.name?.toLowerCase().includes(search)) || null
+        }
+
+        // Build roleplay config
+        const roleplayConfig: Record<string, any> = {}
+        if (matchedPersona) roleplayConfig.selectedPersona = matchedPersona
+        if (matchedObjections.length > 0) roleplayConfig.objections = matchedObjections
+        if (matchedObjective) roleplayConfig.selectedObjective = matchedObjective
+        roleplayConfig.age = age || 35
+        roleplayConfig.temperament = temperament || 'Analítico'
+        roleplayConfig.auto_start = auto_start || false
+
+        return {
+          success: true,
+          roleplayConfig,
+          message: `Roleplay configurado${matchedPersona ? ` com persona "${matchedPersona.cargo || matchedPersona.job_title || matchedPersona.profissao}"` : ''}${matchedObjections.length > 0 ? `, ${matchedObjections.length} objeção(ões)` : ''}${matchedObjective ? `, objetivo "${matchedObjective.name}"` : ''}.`,
+        }
+      }
+
+      case 'execute_desktop_action': {
+        const { action_type, target } = params
+        const validTypes = ['open_app', 'open_url', 'open_path', 'navigate_platform']
+        if (!validTypes.includes(action_type)) {
+          return { success: false, error: 'Tipo de ação inválido' }
+        }
+        if (!target || typeof target !== 'string' || target.trim().length === 0) {
+          return { success: false, error: 'Alvo da ação não especificado' }
+        }
+        if (action_type === 'open_url') {
+          try {
+            const url = new URL(target)
+            if (!['http:', 'https:'].includes(url.protocol)) {
+              return { success: false, error: 'Apenas URLs http/https são permitidas' }
+            }
+          } catch {
+            return { success: false, error: 'URL inválida' }
+          }
+        }
+        return {
+          success: true,
+          action_type,
+          target: action_type === 'open_path' ? target.trim() : action_type === 'navigate_platform' ? target.trim() : target.trim().toLowerCase(),
+          message: action_type === 'navigate_platform'
+            ? `Navegando para "${target}" dentro do app Ramppy.`
+            : `Ação ${action_type} para "${target}" será executada no app desktop.`
+        }
+      }
+
+      case 'search_computer': {
+        const { search_type, name: searchName } = params
+        const validSearchTypes = ['installed_apps', 'find_folder', 'find_file']
+        if (!validSearchTypes.includes(search_type)) {
+          return { success: false, error: 'Tipo de busca inválido' }
+        }
+        if (!searchName || typeof searchName !== 'string') {
+          return { success: false, error: 'Nome para busca não especificado' }
+        }
+        return {
+          success: true,
+          search_type,
+          name: searchName.trim(),
+          message: `Busca "${searchName}" será executada no app desktop. Os resultados serão retornados automaticamente.`
+        }
+      }
+
       default:
         return { error: `Função desconhecida: ${name}` }
     }
@@ -1864,6 +2522,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 400 })
     }
 
+    // Get company subdomain for platform navigation
+    const { data: companyData } = await supabaseAdmin
+      .from('companies')
+      .select('subdomain')
+      .eq('id', companyId)
+      .single()
+    const companySubdomain = companyData?.subdomain || ''
+
     const userRole = (employeeData?.role || 'vendedor').toLowerCase()
     const isManager = userRole === 'admin' || userRole === 'gestor'
 
@@ -1896,7 +2562,34 @@ export async function POST(req: NextRequest) {
 
     // Build messages
     const sellerName = employeeData?.name || user.email || 'Vendedor'
-    let systemMessage = `${SYSTEM_PROMPT}\n\nVocê está conversando com: ${sellerName}\nData/hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
+    const platformBase = companySubdomain ? `https://${companySubdomain}.ramppy.site` : 'https://ramppy.site'
+    let systemMessage = `${SYSTEM_PROMPT}\n\nVocê está conversando com: ${sellerName}\nData/hora atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+
+NAVEGAÇÃO NA PLATAFORMA RAMPPY:
+Quando o vendedor perguntar QUALQUER coisa sobre a plataforma Ramppy, funcionalidades, ou onde encontrar algo — NAVEGUE para a página certa usando execute_desktop_action(navigate_platform, "caminho"). Isso abre a página DENTRO do app Ramppy (NÃO no navegador externo). Sempre guie ativamente, nunca apenas descreva.
+
+MAPA DE PÁGINAS (use navigate_platform com estes caminhos):
+- Painel Inicial: "?view=home" — Dashboard com resumo de performance, streak, evolução
+- Treinar Roleplay: "?view=roleplay" — Treino de vendas com IA (simulação de cliente)
+- Chat IA: "?view=chat" — Assistente de vendas com IA (perguntas sobre técnicas, SPIN, etc)
+- Meu PDI: "?view=pdi" — Plano de Desenvolvimento Individual (7 dias)
+- Histórico: "?view=historico" — Histórico de todos os roleplays e avaliações
+- Meu Perfil: "?view=perfil" — Performance detalhada, médias SPIN, gráfico de evolução
+- Follow-Up (WhatsApp): "?view=followup" — Chat WhatsApp integrado com Copilot IA
+- Análise de Reunião: "?view=meet-analysis" — Avaliação de reuniões Google Meet
+- Desafios: "?view=challenge-history" — Histórico de desafios diários
+- Configurações: "?openConfigHub=true" — Hub de configuração (personas, objeções, dados empresa)
+- Download App: "?view=download" — Baixar app desktop Ramppy
+- Gestão de Equipe: "?view=manager" — Visão de gestor (apenas admins)
+
+COMO GUIAR O USUÁRIO:
+- "Onde treino roleplay?" → execute_desktop_action(navigate_platform, "?view=roleplay") e diga "Abri o treino de roleplay pra você! Clique em Iniciar Sessão para começar."
+- "Quero ver meu desempenho" → execute_desktop_action(navigate_platform, "?view=perfil") e diga "Abri seu perfil! Lá você vê suas médias SPIN e gráfico de evolução."
+- "O que é o PDI?" → execute_desktop_action(navigate_platform, "?view=pdi") e explique brevemente
+- "Como configuro personas?" → execute_desktop_action(navigate_platform, "?openConfigHub=true") e guie
+- "Quero conectar meu WhatsApp" → execute_desktop_action(navigate_platform, "?view=followup") e guie o processo de QR code
+- SEMPRE navegue para a página E explique o que o usuário vai encontrar lá
+- IMPORTANTE: Para páginas da Ramppy, SEMPRE use navigate_platform (abre dentro do app). Use open_url APENAS para sites externos (Google, LinkedIn, etc).`
 
     if (isManager) {
       systemMessage += MANAGER_PROMPT_EXTENSION
@@ -1933,6 +2626,10 @@ export async function POST(req: NextRequest) {
 
     // Tool calling loop (max 5 rounds to prevent infinite loops)
     const toolsUsed: string[] = []
+    const desktopActions: Array<{ type: string; target: string }> = []
+    const searchActions: Array<{ search_type: string; name: string }> = []
+    const contactCandidates: Array<{ candidates: any[]; whatsapp_match: any; has_whatsapp: boolean; search_name: string; search_company: string; is_internal_search?: boolean }> = []
+    const enrichActions: Array<{ contact: any; web_profile: string | null; briefing: string; linkedin_url: string }> = []
     const MAX_ROUNDS = 5
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -1952,15 +2649,71 @@ export async function POST(req: NextRequest) {
           response: choice.message.content || 'Desculpe, não consegui processar sua pergunta.',
           toolsUsed,
           isManager,
+          ...(desktopActions.length > 0 ? { desktopActions } : {}),
+          ...(searchActions.length > 0 ? { searchActions } : {}),
+          ...(contactCandidates.length > 0 ? { contactCandidates } : {}),
+          ...(enrichActions.length > 0 ? { enrichActions } : {}),
         })
       }
 
       // Execute tool calls in parallel
       const toolResults = await Promise.all(
         choice.message.tool_calls.map(async (tc) => {
-          const tcFn = tc as { function: { name: string }; id: string }
+          const tcFn = tc as { function: { name: string; arguments: string }; id: string }
           toolsUsed.push(tcFn.function.name)
           const result = await executeFunction(tc, user.id, companyId, isManager)
+
+          // Collect desktop actions for client-side execution
+          if (tcFn.function.name === 'execute_desktop_action' && result && (result as Record<string, unknown>).success) {
+            desktopActions.push({
+              type: (result as Record<string, unknown>).action_type as string,
+              target: (result as Record<string, unknown>).target as string,
+            })
+          }
+
+          // Collect search actions for client-side execution
+          if (tcFn.function.name === 'search_computer' && result && (result as Record<string, unknown>).success) {
+            searchActions.push({
+              search_type: (result as Record<string, unknown>).search_type as string,
+              name: (result as Record<string, unknown>).name as string,
+            })
+          }
+
+          // Collect search_contact candidates for client-side confirmation card
+          if (tcFn.function.name === 'search_contact' && result && (result as Record<string, unknown>).success) {
+            const r = result as Record<string, unknown>
+            const args = JSON.parse(tcFn.function.arguments)
+            contactCandidates.push({
+              candidates: (r.candidates as any[]) || [],
+              whatsapp_match: r.whatsapp_match || null,
+              has_whatsapp: r.has_whatsapp as boolean,
+              search_name: args.name,
+              search_company: args.company || '',
+              is_internal_search: r.is_internal_search as boolean || false,
+            })
+          }
+
+          // Collect configure_roleplay results → navigate to roleplay page with config
+          if (tcFn.function.name === 'configure_roleplay' && result && (result as Record<string, unknown>).success) {
+            const r = result as Record<string, unknown>
+            desktopActions.push({
+              type: 'navigate_platform',
+              target: `?view=roleplay&nicoleConfig=${encodeURIComponent(JSON.stringify(r.roleplayConfig))}`,
+            })
+          }
+
+          // Collect generate_briefing results for client-side briefing card
+          if (tcFn.function.name === 'generate_briefing' && result && (result as Record<string, unknown>).success) {
+            const r = result as Record<string, unknown>
+            const args = JSON.parse(tcFn.function.arguments)
+            enrichActions.push({
+              contact: r.whatsapp_match || { name: args.name, company: args.company },
+              web_profile: (r.web_profile as string) || null,
+              briefing: r.briefing as string,
+              linkedin_url: r.linkedin_url as string,
+            })
+          }
+
           const resultStr = JSON.stringify(result)
           return {
             role: 'tool' as const,
@@ -1987,6 +2740,9 @@ export async function POST(req: NextRequest) {
       response: finalResponse.choices[0].message.content || 'Desculpe, ocorreu um erro.',
       toolsUsed,
       isManager,
+      ...(desktopActions.length > 0 ? { desktopActions } : {}),
+      ...(searchActions.length > 0 ? { searchActions } : {}),
+      ...(enrichActions.length > 0 ? { enrichActions } : {}),
     })
 
   } catch (error) {

@@ -81,10 +81,16 @@ export default function NotificationPanel({
     }
   }, [tab, onFetchAll])
 
-  // Calculate position from anchor button
+  // Calculate position from anchor button (account for ViewportScaler CSS zoom)
   const rect = anchorRef.current?.getBoundingClientRect()
-  const top = rect ? rect.bottom + 8 : 0
-  const right = rect ? window.innerWidth - rect.right : 0
+  const zoom = parseFloat(document.documentElement.style.zoom) || 1
+  const panelWidth = 384 // w-96
+  let top = rect ? rect.bottom / zoom + 8 : 0
+  let right = rect ? (window.innerWidth - rect.right) / zoom : 0
+  // Clamp so panel never overflows the viewport
+  const maxRight = (window.innerWidth / zoom) - panelWidth
+  if (right > maxRight) right = Math.max(0, maxRight)
+  if (right < 0) right = 0
 
   const unreadNotifs = notifications.filter(n => !n.is_read)
   const displayList = tab === 'new' ? unreadNotifs : allNotifications

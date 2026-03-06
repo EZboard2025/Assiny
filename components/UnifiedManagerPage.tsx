@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import SellerGrid from './manager/SellerGrid'
@@ -16,9 +16,16 @@ export default function UnifiedManagerPage() {
   const router = useRouter()
   const [view, setView] = useState<ViewState>({ type: 'grid' })
   const [meetAgentContext, setMeetAgentContext] = useState<{ meetId: string; title: string; date: string } | null>(null)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
 
   const handleOpenMeetAgent = useCallback((meetId: string, title: string, date: string) => {
     setMeetAgentContext({ meetId, title, date })
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      setIsDesktopApp(true)
+    }
   }, [])
 
   return (
@@ -66,8 +73,8 @@ export default function UnifiedManagerPage() {
         )}
       </div>
 
-      {/* Unified AI Assistant - context-aware */}
-      <SellerAgentChat
+      {/* Unified AI Assistant - context-aware (hidden in desktop app, Nicole is in bubble) */}
+      {!isDesktopApp && <SellerAgentChat
         currentView={view.type === 'detail' ? 'seller_detail' : 'manager'}
         viewingContext={view.type === 'detail' ? {
           sellerName: view.seller.user_name,
@@ -82,7 +89,7 @@ export default function UnifiedManagerPage() {
           trend: view.seller.trend,
         } : null}
         meetContext={meetAgentContext}
-      />
+      />}
     </div>
   )
 }
