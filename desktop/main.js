@@ -881,6 +881,7 @@ function startAuthBridge() {
 
       if (authData) {
         const parsed = JSON.parse(authData)
+        if (!hasUserAuth) console.log('[AuthBridge] Got auth token! userId:', parsed.userId)
         hasUserAuth = true
         bubbleWindow.webContents.send('auth-token', parsed)
         // Show bubble once user is authenticated
@@ -897,15 +898,20 @@ function startAuthBridge() {
           copilotView.webContents.send('auth-token', parsed)
         }
       }
-    } catch (_) {
+    } catch (err) {
       // Main window may not be ready yet
+      console.log('[AuthBridge] Error:', err.message)
     }
   }
 
   // Check every 3 seconds
+  console.log('[AuthBridge] Starting interval...')
   authTokenInterval = setInterval(extractAndForward, 3000)
   // Also run immediately after a short delay (wait for page to load)
-  setTimeout(extractAndForward, 2000)
+  setTimeout(() => {
+    console.log('[AuthBridge] First check... mainWindow:', !!mainWindow, 'bubbleWindow:', !!bubbleWindow)
+    extractAndForward()
+  }, 2000)
 }
 
 // ============================================================
@@ -2625,6 +2631,7 @@ app.on('certificate-error', (event, _webContents, url, _error, _cert, callback) 
 })
 
 app.whenReady().then(() => {
+  console.log('[Main] app.whenReady fired')
   // Grant media permissions
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(true)
@@ -2650,9 +2657,12 @@ app.whenReady().then(() => {
     }
   }, { useSystemPicker: true })
 
+  console.log('[Main] Creating main window...')
   createMainWindow()
+  console.log('[Main] Main window created')
 
   // BlackHole driver: prompt installation on first launch (non-blocking)
+  console.log('[Main] Checking BlackHole...')
   ensureBlackHoleInstalled().catch(err => {
     console.error('[BlackHole] First-launch check failed:', err)
   })
@@ -2677,10 +2687,12 @@ app.whenReady().then(() => {
     app.dock.hide()
   }
 
+  console.log('[Main] Creating bubble, tray, auth, meet...')
   createBubbleWindow()
   createTray()
   startAuthBridge()
   startMeetDetection()
+  console.log('[Main] All init complete')
 
   // macOS: restore dock icon after bubble settings are applied
   if (process.platform === 'darwin') {
