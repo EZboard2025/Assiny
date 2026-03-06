@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
   // Edge snapping after drag
   snapToEdge: () => ipcRenderer.send('snap-to-edge'),
-  // Global shortcut toggle (Cmd+Shift+R)
+  // Global shortcut toggle (Cmd+Shift+Space)
   onToggleBubble: (callback) => ipcRenderer.on('toggle-bubble', () => callback()),
   // Meet auto-detection IPC
   onAutoStart: (callback) => ipcRenderer.on('auto-start-recording', (_event) => callback()),

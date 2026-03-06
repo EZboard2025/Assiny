@@ -904,7 +904,7 @@ async function hideAtEdge() {
   setTimeout(() => { isAnimating = false }, 250)
 }
 
-// --- Global shortcut toggle (Cmd+Shift+R) ---
+// --- Global shortcut toggle (Cmd+Shift+Space) ---
 if (window.electronAPI && window.electronAPI.onToggleBubble) {
   window.electronAPI.onToggleBubble(() => {
     if (isExpanded) {

@@ -2687,8 +2687,8 @@ app.whenReady().then(() => {
     setTimeout(() => { app.dock.show() }, 1500)
   }
 
-  // Global shortcut: Cmd+Shift+R (macOS) / Ctrl+Shift+R (others) toggles bubble
-  globalShortcut.register('CommandOrControl+Shift+R', () => {
+  // Global shortcut: Cmd+Shift+Space (macOS) / Ctrl+Shift+Space (others) toggles bubble
+  globalShortcut.register('CommandOrControl+Shift+Space', () => {
     if (!bubbleWindow || bubbleWindow.isDestroyed()) return
 
     // Move bubble to the display where the cursor currently is
@@ -2716,8 +2716,8 @@ app.whenReady().then(() => {
     if (!bubbleWindow.isVisible()) bubbleWindow.show()
   })
 
-  // Ctrl+Shift+N → test Nicole notification (cycles through types)
-  globalShortcut.register('CommandOrControl+Shift+N', () => {
+  // Ctrl+Shift+F12 → test Nicole notification (cycles through types)
+  globalShortcut.register('CommandOrControl+Shift+F12', () => {
     if (bubbleWindow && !bubbleWindow.isDestroyed()) {
       console.log('[Main] Test notification triggered (Ctrl+Shift+N)')
       bubbleWindow.webContents.send('test-notification')
