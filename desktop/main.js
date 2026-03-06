@@ -1557,41 +1557,80 @@ function stopPowerSaveBlocker() {
 // This detects "Você saiu da reunião" INSTANTLY (desktopCapturer can't see inactive tabs)
 function checkChromeMeetState() {
   return new Promise((resolve) => {
+    // Two-phase detection:
+    // 1. Try JavaScript execution (instant — checks page content for "Você saiu da reunião")
+    //    Requires Chrome > View > Developer > "Allow JavaScript from Apple Events" (one-time setting)
+    // 2. Fallback to URL-only (checks for /landing redirect — takes ~60s after leaving)
     const script = `
 tell application "Google Chrome"
+  set meetResults to ""
   repeat with w in windows
     repeat with t in tabs of w
       if URL of t contains "meet.google.com/" then
         set meetUrl to URL of t
-        if meetUrl contains "/" then
-          try
-            set pageState to execute t javascript "(() => { const b = document.body ? document.body.innerText : ''; return (b.includes('Você saiu da reunião') || b.includes('You left the meeting') || b.includes('Voltando à tela inicial') || b.includes('Return to home screen') || b.includes('reunião foi encerrada') || b.includes('The meeting has ended')) ? 'LEFT' : 'ACTIVE'; })()"
-            return meetUrl & "|" & pageState
-          on error
-            return meetUrl & "|UNKNOWN"
-          end try
-        end if
+        set meetTitle to title of t
+        set pageState to "UNKNOWN"
+        try
+          set pageState to execute t javascript "(() => { const b = document.body ? document.body.innerText : ''; const leftTexts = ['saiu da reunião', 'left the meeting', 'Voltando à tela inicial', 'Return to home screen', 'reunião foi encerrada', 'meeting has ended', 'Saliste de la reunión', 'La reunión finalizó']; if (leftTexts.some(t => b.includes(t))) return 'LEFT'; return 'ACTIVE'; })()"
+        end try
+        set meetResults to meetResults & meetUrl & "|||" & meetTitle & "|||" & pageState & ":::"
       end if
     end repeat
   end repeat
-  return "NONE"
+  if meetResults is "" then return "NONE"
+  return meetResults
 end tell`
     exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { timeout: 3000 }, (err, stdout) => {
       if (err) {
+        debugLog(`[MeetDetect] AppleScript error: ${err.message}`)
         resolve({ available: false })
         return
       }
       const result = stdout.trim()
       if (result === 'NONE' || !result) {
-        resolve({ available: true, hasMeetTab: false })
+        resolve({ available: true, hasMeetTab: false, state: 'NONE' })
         return
       }
-      const [url, state] = result.split('|')
-      const hasCode = MEET_CODE_PATTERN.test(url || '')
-      resolve({ available: true, hasMeetTab: hasCode, url, state, raw: result })
+      // Parse all Meet tabs: url|||title|||pageState:::
+      const tabs = result.split(':::').filter(Boolean).map(entry => {
+        const parts = entry.split('|||')
+        return { url: parts[0] || '', title: parts[1] || '', pageState: parts[2] || 'UNKNOWN' }
+      })
+      debugLog(`[MeetDetect] AppleScript: ${tabs.map(t => `${t.pageState} ${t.url}`).join(' | ')}`)
+
+      // Phase 1: JavaScript-based detection (instant & reliable)
+      const jsLeftTab = tabs.find(t => t.pageState === 'LEFT')
+      const jsActiveTab = tabs.find(t => t.pageState === 'ACTIVE')
+      if (jsLeftTab) {
+        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: jsLeftTab.url, title: jsLeftTab.title })
+        return
+      }
+      if (jsActiveTab) {
+        resolve({ available: true, hasMeetTab: true, state: 'ACTIVE', url: jsActiveTab.url, title: jsActiveTab.title })
+        return
+      }
+
+      // Phase 2: URL-only fallback (when JS execution is disabled in Chrome)
+      // Note: authuser= is present during AND after meeting, so we can't use it as a signal
+      const landingTab = tabs.find(t => t.url.includes('/landing'))
+      const meetCodeTab = tabs.find(t => MEET_CODE_PATTERN.test(t.url))
+      const titleLeftTab = tabs.find(t => MEET_LEFT_PATTERNS.some(p => t.title.toLowerCase().includes(p)))
+
+      if (landingTab || titleLeftTab) {
+        const lt = landingTab || titleLeftTab
+        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: lt.url, title: lt.title })
+      } else if (meetCodeTab) {
+        resolve({ available: true, hasMeetTab: true, state: 'ACTIVE', url: meetCodeTab.url, title: meetCodeTab.title })
+      } else {
+        resolve({ available: true, hasMeetTab: tabs.length > 0, state: 'UNKNOWN' })
+      }
     })
   })
 }
+
+// Track consecutive NO_CONTROLS detections for debounce
+let noControlsCount = 0
+const NO_CONTROLS_THRESHOLD = 3 // 3 consecutive checks = definitive end
 
 // Chrome shows 🔊 when the tab is producing audio (WebRTC call active)
 // When user leaves the meeting, 🔊 disappears because audio stops
@@ -1694,21 +1733,39 @@ async function checkForMeetWindow() {
         noActiveMeetCount = 0
       }
 
-      // PRIMARY DETECTION: AppleScript checks Chrome page content for "saiu"/"left" (instant, macOS only)
-      if (!waitingForMeetReactivation && activeMeet) {
+      // PRIMARY DETECTION: AppleScript checks Chrome tab URL (no JS execution needed)
+      if (!waitingForMeetReactivation) {
         try {
           const chromeState = await checkChromeMeetState()
-          if (chromeState.available && chromeState.state === 'LEFT') {
-            debugLog('[MeetDetect] AppleScript detected meeting LEFT state — asking confirmation immediately')
-            debugLog(`[MeetDetect] Chrome tab: ${chromeState.url} | state: ${chromeState.state}`)
-            meetWindowGoneCount = 0
-            noActiveMeetCount = 0
-            if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-              bubbleWindow.webContents.send('ask-meeting-ended')
+          if (chromeState.available) {
+            if (chromeState.state === 'LEFT') {
+              // DEFINITIVE: URL changed to landing page or has authuser redirect
+              debugLog(`[MeetDetect] AppleScript: LEFT detected — URL: ${chromeState.url} title: ${chromeState.title}`)
+              noControlsCount = 0
+              meetWindowGoneCount = 0
+              noActiveMeetCount = 0
+              if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+                bubbleWindow.webContents.send('ask-meeting-ended')
+              }
+              return
+            } else if (chromeState.state === 'ACTIVE') {
+              noControlsCount = 0 // Reset — meeting is active
+            } else if (!chromeState.hasMeetTab) {
+              // Meet tab completely gone from Chrome
+              noControlsCount++
+              debugLog(`[MeetDetect] AppleScript: Meet tab gone (${noControlsCount}/${NO_CONTROLS_THRESHOLD})`)
+              if (noControlsCount >= NO_CONTROLS_THRESHOLD) {
+                debugLog('[MeetDetect] Meet tab gone for 3 checks — asking confirmation')
+                noControlsCount = 0
+                if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+                  bubbleWindow.webContents.send('ask-meeting-ended')
+                }
+                return
+              }
             }
-            return // Skip other checks
           }
         } catch (e) {
+          debugLog(`[MeetDetect] AppleScript exception: ${e.message}`)
           // AppleScript not available — fall through to desktopCapturer-based detection
         }
       }
@@ -1731,11 +1788,12 @@ async function checkForMeetWindow() {
         }
       } else if (!meetTabAny) {
         // Meet window gone — user closed the tab or Chrome
+        // AppleScript should have caught this already, but fallback just in case
         meetWindowGoneCount++
         noActiveMeetCount = 0
-        debugLog(`[MeetDetect] Meet window not found (${meetWindowGoneCount}/2)`)
-        if (meetWindowGoneCount >= 2) { // 2 × 3s = 6s debounce
-          debugLog('[MeetDetect] Meet window gone for 6s — asking confirmation...')
+        debugLog(`[MeetDetect] Meet window not found (${meetWindowGoneCount}/3)`)
+        if (meetWindowGoneCount >= 3) { // 3 × 1.5s = 4.5s debounce
+          debugLog('[MeetDetect] Meet window gone — asking confirmation')
           meetWindowGoneCount = 0
           if (bubbleWindow && !bubbleWindow.isDestroyed()) {
             bubbleWindow.webContents.send('ask-meeting-ended')
@@ -1745,22 +1803,22 @@ async function checkForMeetWindow() {
         // Meet code exists but activeMeet is null (left pattern matched, or title changed)
         noActiveMeetCount++
         meetWindowGoneCount = 0
-        debugLog(`[MeetDetect] meetTabAny but no activeMeet (${noActiveMeetCount}/3)`)
-        if (noActiveMeetCount >= 3) { // 3 × 3s = 9s
-          debugLog('[MeetDetect] No active meeting for 9s — asking confirmation...')
+        debugLog(`[MeetDetect] meetTabAny but no activeMeet (${noActiveMeetCount}/4)`)
+        if (noActiveMeetCount >= 4) { // 4 × 1.5s = 6s
+          debugLog('[MeetDetect] No active meeting for 6s — asking confirmation')
           noActiveMeetCount = 0
           if (bubbleWindow && !bubbleWindow.isDestroyed()) {
             bubbleWindow.webContents.send('ask-meeting-ended')
           }
         }
       } else if (activeMeet && meetHadAudioIndicator && !meetWithAudio) {
-        // 🔊 disappeared — meeting might have ended (Google Meet PT-BR doesn't change tab title)
-        // Long debounce to avoid false positives from tab going to background or screen sharing
+        // 🔊 disappeared — meeting might have ended
+        // Longer debounce since this is less reliable (tab background, screen sharing)
         noActiveMeetCount++
         meetWindowGoneCount = 0
-        debugLog(`[MeetDetect] Audio indicator lost (${noActiveMeetCount}/8)`)
-        if (noActiveMeetCount >= 10) { // 10 × 3s = 30s
-          debugLog('[MeetDetect] Audio gone for 30s — asking confirmation...')
+        debugLog(`[MeetDetect] Audio indicator lost (${noActiveMeetCount}/12)`)
+        if (noActiveMeetCount >= 12) { // 12 × 1.5s = 18s
+          debugLog('[MeetDetect] Audio gone for 18s — asking confirmation')
           noActiveMeetCount = 0
           if (bubbleWindow && !bubbleWindow.isDestroyed()) {
             bubbleWindow.webContents.send('ask-meeting-ended')
@@ -1785,10 +1843,25 @@ async function checkForMeetWindow() {
   }
 }
 
+const MEET_CHECK_IDLE = 3000    // 3s when not recording
+const MEET_CHECK_RECORDING = 1500 // 1.5s when recording (faster end detection)
+let currentMeetCheckInterval = MEET_CHECK_IDLE
+
 function startMeetDetection() {
   if (meetDetectionInterval) return
-  meetDetectionInterval = setInterval(checkForMeetWindow, 3000) // Check every 3s
+  currentMeetCheckInterval = MEET_CHECK_IDLE
+  meetDetectionInterval = setInterval(checkForMeetWindow, currentMeetCheckInterval)
   debugLog('[MeetDetect] Started monitoring for Google Meet windows')
+}
+
+function setMeetCheckSpeed(fast) {
+  if (!meetDetectionInterval) return
+  const newInterval = fast ? MEET_CHECK_RECORDING : MEET_CHECK_IDLE
+  if (newInterval === currentMeetCheckInterval) return
+  clearInterval(meetDetectionInterval)
+  currentMeetCheckInterval = newInterval
+  meetDetectionInterval = setInterval(checkForMeetWindow, newInterval)
+  debugLog(`[MeetDetect] Check interval → ${newInterval}ms (${fast ? 'recording' : 'idle'})`)
 }
 
 function stopMeetDetection() {
@@ -1802,6 +1875,27 @@ function stopMeetDetection() {
 // MEETING START CONFIRMATION (bubble asks user before recording)
 // ============================================================
 
+// Auto-stop meeting recording (no confirmation needed — definitive signal)
+function autoStopMeeting() {
+  debugLog('[MeetDetect] AUTO-STOP: Meeting ended definitively')
+  isRecordingMeet = false
+  detectedMeetTitle = null
+  meetHadAudioIndicator = false
+  noActiveMeetCount = 0
+  meetWindowGoneCount = 0
+  noControlsCount = 0
+  waitingForMeetReactivation = false
+  stopPowerSaveBlocker()
+  setMeetCheckSpeed(false) // Back to idle speed
+
+  if (recordingWindow && !recordingWindow.isDestroyed()) {
+    recordingWindow.webContents.send('auto-stop-recording')
+  }
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.webContents.send('recording-state', false)
+  }
+}
+
 // User confirmed → start recording
 ipcMain.on('confirm-meeting-start', () => {
   debugLog('[MeetDetect] User confirmed → starting recording')
@@ -1814,7 +1908,9 @@ ipcMain.on('confirm-meeting-start', () => {
   detectedMeetTitle = meetTitle
   lastRecordedMeetCode = meetCode
   declinedMeetCode = null
+  noControlsCount = 0
   startPowerSaveBlocker()
+  setMeetCheckSpeed(true) // Faster polling during recording
 
   createRecordingWindow(true)
   if (bubbleWindow && !bubbleWindow.isDestroyed()) {
@@ -1837,10 +1933,15 @@ ipcMain.on('dismiss-meeting-start', () => {
 
 // Heuristic signal from recording.js (DISABLED — only window-based detection now)
 ipcMain.on('meeting-maybe-ended', () => {
-  debugLog('[MeetDetect] Heuristic signal ignored — only window-based detection is active')
+  if (!isRecordingMeet) return
+  if (waitingForMeetReactivation) return // User already dismissed, don't re-ask from heuristic
+  debugLog('[MeetDetect] Audio heuristic: system audio silent + no transcript → asking confirmation')
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.webContents.send('ask-meeting-ended')
+  }
 })
 
-// User confirmed meeting ended → stop recording
+// User confirmed meeting ended → stop recording (fallback path — auto-stop is preferred)
 ipcMain.on('confirm-meeting-ended', () => {
   debugLog('[MeetDetect] User confirmed meeting ended → stopping')
   isRecordingMeet = false
@@ -1848,8 +1949,10 @@ ipcMain.on('confirm-meeting-ended', () => {
   meetHadAudioIndicator = false
   noActiveMeetCount = 0
   meetWindowGoneCount = 0
+  noControlsCount = 0
   waitingForMeetReactivation = false
   stopPowerSaveBlocker()
+  setMeetCheckSpeed(false)
 
   if (recordingWindow && !recordingWindow.isDestroyed()) {
     recordingWindow.webContents.send('auto-stop-recording')
@@ -1865,6 +1968,7 @@ ipcMain.on('dismiss-meeting-ended', () => {
   waitingForMeetReactivation = true
   meetWindowGoneCount = 0
   noActiveMeetCount = 0
+  noControlsCount = 0
   if (recordingWindow && !recordingWindow.isDestroyed()) {
     recordingWindow.webContents.send('reset-meeting-detection')
   }

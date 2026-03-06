@@ -72,7 +72,7 @@ let systemEnergyReadings = []
 let systemAudioSilentSince = null
 let meetingEndCheckInterval = null
 const SYSTEM_AUDIO_SILENT_THRESHOLD = 0.003 // RMS below this = no meeting audio on system channel
-const SYSTEM_AUDIO_SILENT_TIMEOUT = 20_000  // 20s of quiet system audio (user confirms, so aggressive)
+const SYSTEM_AUDIO_SILENT_TIMEOUT = 12_000  // 12s of quiet system audio → likely left meeting
 const NO_MEANINGFUL_TRANSCRIPT_TIMEOUT = 30_000 // 30s no meaningful transcript (user confirms)
 const ABSOLUTE_SILENCE_TIMEOUT = 45_000 // 45s no transcript at all (user confirms)
 const MEANINGFUL_WORD_MIN = 3 // Minimum words to count as meaningful speech
@@ -574,6 +574,14 @@ function connectToOpenAI(openaiKey, numChannels) {
         console.log(`[Recorder] Audio chunk #${chunkCount}, size: ${pcm.buffer.byteLength} bytes → base64 (mono, ${sampleRate}Hz)`)
       }
 
+      // Track system audio energy for meeting-end detection (every buffer)
+      if (isAutoMode && numInputCh >= 2) {
+        const sysCh = inputBuffer.getChannelData(0)
+        let sysSum = 0
+        for (let i = 0; i < sysCh.length; i++) sysSum += sysCh[i] * sysCh[i]
+        trackSystemAudioEnergy(Math.sqrt(sysSum / sysCh.length))
+      }
+
       // Diagnostic: log audio levels every ~10s
       diagCount++
       if (diagCount % DIAG_EVERY === 0) {
@@ -693,10 +701,18 @@ function stopAudioCapture() {
 // ============================================================
 
 function startMeetingEndDetector() {
-  // Heuristic detection DISABLED — too many false positives during presentations,
-  // moments of silence, reading, etc. Meeting end is now detected ONLY by main.js
-  // via definitive signals: "You left" in window title or Meet window disappeared.
-  console.log('[MeetEnd] Detector started (window-based only, no heuristic)')
+  // Audio-based fallback: detects when system audio (BlackHole/WebRTC) goes silent
+  // Primary detection is AppleScript in main.js; this covers the case where
+  // Chrome JS is not enabled (no "Allow JavaScript from Apple Events")
+  // All signals show confirmation card — false positives just get dismissed by user
+  console.log('[MeetEnd] Detector started (audio-based fallback, checks every 5s)')
+  systemEnergyReadings = []
+  systemAudioSilentSince = null
+  lastTranscriptTime = Date.now()
+  lastMeaningfulTranscriptTime = Date.now()
+  meetEndPromptPending = false
+  if (meetingEndCheckInterval) clearInterval(meetingEndCheckInterval)
+  meetingEndCheckInterval = setInterval(checkMeetingEnd, 5000)
 }
 
 function stopMeetingEndDetector() {
