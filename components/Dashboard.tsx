@@ -132,8 +132,12 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [pendingEvaluationId, setPendingEvaluationId] = useState<string | null>(null)
   const [pendingHistoryTab, setPendingHistoryTab] = useState<string | null>(null)
   const [assistantWidth, setAssistantWidth] = useState(0)
+  const [meetAgentContext, setMeetAgentContext] = useState<{ meetId: string; title: string; date: string } | null>(null)
   const handleAssistantChange = useCallback((open: boolean, width: number) => {
     setAssistantWidth(open ? width : 0)
+  }, [])
+  const handleOpenMeetAgent = useCallback((meetId: string, title: string, date: string) => {
+    setMeetAgentContext({ meetId, title, date })
   }, [])
 
   // Count meet-specific notifications for sidebar badge
@@ -581,7 +585,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'historico') {
-      return <HistoricoView onStartChallenge={handleStartChallenge} initialMeetEvaluationId={pendingEvaluationId} initialHistoryTab={pendingHistoryTab} onMeetEvaluationLoaded={() => { setPendingEvaluationId(null); setPendingHistoryTab(null) }} />
+      return <HistoricoView onStartChallenge={handleStartChallenge} initialMeetEvaluationId={pendingEvaluationId} initialHistoryTab={pendingHistoryTab} onMeetEvaluationLoaded={() => { setPendingEvaluationId(null); setPendingHistoryTab(null) }} onOpenMeetAgent={handleOpenMeetAgent} />
     }
 
     if (currentView === 'perfil') {
@@ -843,9 +847,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         }} />
       )}
 
-      {/* Seller Agent Chat - home, profile and roleplay */}
-      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay') && (
-        <SellerAgentChat userName={userName || undefined} currentView={currentView} onOpenChange={handleAssistantChange} />
+      {/* Seller Agent Chat - home, profile, roleplay and historico */}
+      {(currentView === 'home' || currentView === 'perfil' || currentView === 'roleplay' || currentView === 'historico') && (
+        <SellerAgentChat userName={userName || undefined} currentView={currentView} meetContext={meetAgentContext} onOpenChange={handleAssistantChange} />
       )}
 
       {/* Configuration Required Overlay */}

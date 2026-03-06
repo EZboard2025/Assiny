@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import SellerGrid from './manager/SellerGrid'
@@ -15,6 +15,11 @@ type ViewState =
 export default function UnifiedManagerPage() {
   const router = useRouter()
   const [view, setView] = useState<ViewState>({ type: 'grid' })
+  const [meetAgentContext, setMeetAgentContext] = useState<{ meetId: string; title: string; date: string } | null>(null)
+
+  const handleOpenMeetAgent = useCallback((meetId: string, title: string, date: string) => {
+    setMeetAgentContext({ meetId, title, date })
+  }, [])
 
   return (
     <div className="min-h-screen py-8 px-6">
@@ -56,6 +61,7 @@ export default function UnifiedManagerPage() {
             seller={view.seller}
             whatsappSummary={view.whatsappSummary}
             onBack={() => setView({ type: 'grid' })}
+            onOpenMeetAgent={handleOpenMeetAgent}
           />
         )}
       </div>
@@ -75,6 +81,7 @@ export default function UnifiedManagerPage() {
           spinN: view.seller.spin_n_average,
           trend: view.seller.trend,
         } : null}
+        meetContext={meetAgentContext}
       />
     </div>
   )

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target, MessageCircle, CheckCheck, Shield, ScrollText, Settings, Building, DollarSign, CreditCard, TrendingDown, Zap, Award, Heart, Star, Flag, Bookmark, Package, Truck, ShoppingCart, Percent, PieChart, Activity, Layers, Database, Lock, Unlock, Eye, Search, Filter, Tag, Hash, ArrowUpRight, ArrowDownRight, Globe, Phone, Mail, MessageSquare, HelpCircle, BarChart, Briefcase, XCircle, Share2, X, Users as UsersIcon, Copy, Check } from 'lucide-react'
+import { Video, Clock, TrendingUp, Calendar, ChevronDown, ChevronUp, User, AlertTriangle, Lightbulb, CheckCircle, Trash2, AlertCircle, FileText, Play, Target, MessageCircle, CheckCheck, Shield, ScrollText, Settings, Building, DollarSign, CreditCard, TrendingDown, Zap, Award, Heart, Star, Flag, Bookmark, Package, Truck, ShoppingCart, Percent, PieChart, Activity, Layers, Database, Lock, Unlock, Eye, Search, Filter, Tag, Hash, ArrowUpRight, ArrowDownRight, Globe, Phone, Mail, MessageSquare, HelpCircle, BarChart, Briefcase, XCircle, Share2, X, Users as UsersIcon, Copy, Check, Sparkles } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { ConfirmModal } from '@/components/ConfirmModal'
 
@@ -130,11 +130,12 @@ interface MeetHistoryContentProps {
   newEvaluationIds?: string[]
   initialEvaluationId?: string | null
   onInitialEvaluationLoaded?: () => void
+  onOpenMeetAgent?: (meetId: string, title: string, date: string) => void
   /** When provided, fetches data via admin API (manager view, read-only) */
   sellerId?: string
 }
 
-export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded, sellerId }: MeetHistoryContentProps) {
+export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded, onOpenMeetAgent, sellerId }: MeetHistoryContentProps) {
   const isManagerView = !!sellerId
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
@@ -787,6 +788,20 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     )}
                   </div>
                 </div>
+                {onOpenMeetAgent && (
+                  <button
+                    onClick={() => {
+                      const title = selectedEvaluation.calendar_event_title || selectedEvaluation.seller_name
+                      const date = selectedEvaluation.created_at ? new Date(selectedEvaluation.created_at).toLocaleDateString('pt-BR') : ''
+                      onOpenMeetAgent(selectedEvaluation.id, title, date)
+                    }}
+                    title="Analisar com Agente de IA"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Agente IA
+                  </button>
+                )}
                 {!isManagerView && (
                 <div className="flex items-center gap-1">
                   <button

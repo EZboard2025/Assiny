@@ -24,11 +24,18 @@ interface ViewingContext {
   trend: string
 }
 
+interface MeetAgentContext {
+  meetId: string
+  title: string
+  date: string
+}
+
 interface SellerAgentChatProps {
   userName?: string
   userRole?: string
   currentView?: ViewContext
   viewingContext?: ViewingContext | null
+  meetContext?: MeetAgentContext | null
   onOpenChange?: (open: boolean, width: number) => void
 }
 
@@ -50,6 +57,11 @@ const SELLER_SUGGESTIONS: Record<string, Suggestion[]> = {
     { text: 'Dicas para esta simulação', icon: Dumbbell, color: 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100' },
     { text: 'Como lidar com objeções?', icon: Target, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
     { text: 'Meus pontos fracos no SPIN', icon: UserCircle2, color: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100' },
+  ],
+  historico: [
+    { text: 'Compare minhas últimas reuniões', icon: BarChart3, color: 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100' },
+    { text: 'Onde devo melhorar no SPIN?', icon: Target, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
+    { text: 'Resuma minha evolução', icon: TrendingUp, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
   ],
 }
 
@@ -85,8 +97,8 @@ const MIN_PANEL_W = 340
 const MAX_PANEL_W = 700
 const DEFAULT_PANEL_W = 380
 
-export default function SellerAgentChat({ userName, userRole, currentView = 'home', viewingContext, onOpenChange }: SellerAgentChatProps) {
-  const [isOpen, setIsOpen] = useState(true)
+export default function SellerAgentChat({ userName, userRole, currentView = 'home', viewingContext, meetContext, onOpenChange }: SellerAgentChatProps) {
+  const [isOpen, setIsOpen] = useState(currentView !== 'historico')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -200,7 +212,29 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
     }
   }, [isOpen])
 
-  const sendMessage = async (text: string) => {
+  // Auto-open and send contextual message when meetContext changes
+  const lastMeetContextId = useRef<string | null>(null)
+  useEffect(() => {
+    if (meetContext && meetContext.meetId !== lastMeetContextId.current) {
+      lastMeetContextId.current = meetContext.meetId
+      // Open panel, clear previous conversation
+      setIsOpen(true)
+      setMessages([])
+      setInput('')
+      // Auto-send after a brief delay (so panel is open and state is clean)
+      const timer = setTimeout(() => {
+        // Show clean message, agent loads context and asks what user wants
+        const displayText = `Reunião do dia ${meetContext.date}`
+        const apiPrompt = `[CONTEXTO DO SISTEMA] O usuário clicou no botão "Agente IA" em uma avaliação de reunião. Use OBRIGATORIAMENTE a tool get_meet_evaluation_detail com evaluation_id="${meetContext.meetId}" para carregar os dados dessa reunião. Depois de carregar os dados, NÃO faça análise automática. Apenas diga brevemente que carregou a reunião (mencione o nome do vendedor e a nota geral) e pergunte o que o usuário gostaria de saber. Seja breve (2-3 linhas).`
+        sendMessageWithDisplayRef.current?.(displayText, apiPrompt)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [meetContext])
+
+  const sendMessageWithDisplayRef = useRef<((display: string, apiText: string) => Promise<void>) | null>(null)
+
+  const sendMessage = async (text: string, apiOverride?: string) => {
     if (!text.trim() || isLoading) return
 
     const userMessage: Message = { role: 'user', content: text.trim() }
@@ -214,6 +248,12 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
         return
       }
 
+      // When a meeting is selected, prepend evaluation ID to every message so agent remembers context
+      let apiMessage = (apiOverride || text).trim()
+      if (!apiOverride && meetContext && lastMeetContextId.current) {
+        apiMessage = `[Contexto: o usuário está perguntando sobre a reunião com evaluation_id="${lastMeetContextId.current}". Use get_meet_evaluation_detail com esse ID se precisar de dados. Use a transcrição e avaliação completa para responder.] ${apiMessage}`
+      }
+
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: {
@@ -221,7 +261,7 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
           'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
-          message: text.trim(),
+          message: apiMessage,
           conversationHistory: messages,
           ...(viewingContext ? { viewingContext } : {}),
         }),
@@ -240,6 +280,9 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
       setIsLoading(false)
     }
   }
+
+  // Keep ref in sync for useEffect access
+  sendMessageWithDisplayRef.current = (display: string, apiText: string) => sendMessage(display, apiText)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

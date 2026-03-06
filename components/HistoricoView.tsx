@@ -26,9 +26,10 @@ interface HistoricoViewProps {
   initialMeetEvaluationId?: string | null
   initialHistoryTab?: string | null
   onMeetEvaluationLoaded?: () => void
+  onOpenMeetAgent?: (meetId: string, title: string, date: string) => void
 }
 
-export default function HistoricoView({ onStartChallenge, initialMeetEvaluationId, initialHistoryTab, onMeetEvaluationLoaded }: HistoricoViewProps) {
+export default function HistoricoView({ onStartChallenge, initialMeetEvaluationId, initialHistoryTab, onMeetEvaluationLoaded, onOpenMeetAgent }: HistoricoViewProps) {
   const searchParams = useSearchParams()
   const urlTab = searchParams.get('tab')
   const urlEvaluationId = searchParams.get('evaluationId')
@@ -456,7 +457,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
 
         ) : historyType === 'meet' ? (
           <Suspense fallback={<LazySpinner />}>
-            <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={initialMeetEvaluationId || urlEvaluationId} onInitialEvaluationLoaded={onMeetEvaluationLoaded} />
+            <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={initialMeetEvaluationId || urlEvaluationId} onInitialEvaluationLoaded={onMeetEvaluationLoaded} onOpenMeetAgent={onOpenMeetAgent} />
           </Suspense>
         ) : historyType === 'correcoes' ? (
           <Suspense fallback={<LazySpinner />}>

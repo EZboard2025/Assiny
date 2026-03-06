@@ -45,6 +45,7 @@ interface SellerDetailViewProps {
   seller: SellerPerformance
   whatsappSummary: { count: number; avg: number }
   onBack: () => void
+  onOpenMeetAgent?: (meetId: string, title: string, date: string) => void
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ function getWeekStart(date: Date): Date {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SellerDetailView({ seller, whatsappSummary, onBack }: SellerDetailViewProps) {
+export default function SellerDetailView({ seller, whatsappSummary, onBack, onOpenMeetAgent }: SellerDetailViewProps) {
   const [loading, setLoading] = useState(true)
   const [connection, setConnection] = useState<CalendarConnection>({ connected: false, googleEmail: null })
   const [whatsappConn, setWhatsappConn] = useState<WhatsAppConnection>({ connected: false, phone: null })
@@ -518,7 +519,7 @@ export default function SellerDetailView({ seller, whatsappSummary, onBack }: Se
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-            <MeetHistoryContent sellerId={seller.user_id} />
+            <MeetHistoryContent sellerId={seller.user_id} onOpenMeetAgent={onOpenMeetAgent} />
           </div>
         ) : allMeetingsOpen ? (
           <div className="bg-white rounded-xl border border-blue-100 overflow-hidden">

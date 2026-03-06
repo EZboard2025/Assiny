@@ -578,7 +578,8 @@ function parseEvaluation(evaluation: any): any {
 async function executeFunction(
   toolCall: OpenAI.ChatCompletionMessageToolCall,
   userId: string,
-  companyId: string
+  companyId: string,
+  isManager = false
 ): Promise<unknown> {
   const fn = toolCall as { function: { name: string; arguments: string }; id: string }
   const name = fn.function.name
@@ -826,12 +827,12 @@ async function executeFunction(
       }
 
       case 'get_meet_evaluation_detail': {
-        const { data } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('meet_evaluations')
           .select('*')
           .eq('id', params.evaluation_id)
-          .eq('user_id', userId)
-          .single()
+        if (!isManager) query = query.eq('user_id', userId)
+        const { data } = await query.single()
         if (!data) return { error: 'Avaliação não encontrada' }
 
         // Get calendar data
@@ -1959,7 +1960,7 @@ export async function POST(req: NextRequest) {
         choice.message.tool_calls.map(async (tc) => {
           const tcFn = tc as { function: { name: string }; id: string }
           toolsUsed.push(tcFn.function.name)
-          const result = await executeFunction(tc, user.id, companyId)
+          const result = await executeFunction(tc, user.id, companyId, isManager)
           const resultStr = JSON.stringify(result)
           return {
             role: 'tool' as const,
