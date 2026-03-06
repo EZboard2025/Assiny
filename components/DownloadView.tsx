@@ -34,7 +34,7 @@ export default function DownloadView() {
       name: 'macOS',
       subtitle: 'macOS 10.12 ou superior (Apple Silicon)',
       file: '/downloads/Ramppy-1.0.0-arm64.dmg',
-      size: '~92 MB',
+      size: '~111 MB',
       icon: <Apple className="w-6 h-6 text-gray-800" />,
       steps: [
         { number: '1', title: 'Baixar', description: 'Clique no botão para baixar o arquivo .dmg' },
@@ -52,8 +52,8 @@ export default function DownloadView() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-[#0D4A3A] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Monitor className="w-8 h-8 text-white" />
+          <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto mb-4 shadow-lg">
+            <img src="/images/logo-desktop-download.png" alt="Ramppy" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Ramppy Desktop</h1>
           <p className="text-gray-500">
