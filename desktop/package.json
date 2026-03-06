@@ -6,6 +6,7 @@
   "scripts": {
     "postinstall": "node patch-electron-cli.js",
     "start": "electron .",
+    "prebuild:win": "node scripts/fetch-vcredist.js",
     "build:win": "electron-builder --win",
     "prebuild:mac": "bash scripts/fetch-blackhole.sh",
     "build:mac": "electron-builder --mac"
@@ -30,6 +31,9 @@
       "recording.js",
       "notification-toast.html",
       "preload-notification.js",
+      "copilot.html",
+      "copilot.css",
+      "copilot.js",
       "assets/**/*"
     ],
     "win": {
