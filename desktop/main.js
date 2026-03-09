@@ -108,6 +108,11 @@ function createMainWindow() {
   mainWindow.webContents.setZoomFactor(1.2)
   mainWindow.setMenuBarVisibility(false)
 
+  // Force taskbar icon on Windows
+  if (process.platform === 'win32') {
+    mainWindow.setIcon(APP_ICON)
+  }
+
   // Open external links in system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
@@ -323,8 +328,8 @@ function createRecordingWindow(autoStart = false) {
     }
   }
 
-  // When BlackHole is installed + auto-start, window can be hidden (no picker needed)
-  const canBeHidden = autoStart && isBlackHoleInstalled()
+  // Hide window when auto-starting: macOS needs BlackHole, Windows uses loopback natively
+  const canBeHidden = autoStart && (process.platform === 'win32' || isBlackHoleInstalled())
 
   const { width: screenW } = screen.getPrimaryDisplay().workAreaSize
 
