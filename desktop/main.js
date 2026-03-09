@@ -138,12 +138,12 @@ function createMainWindow() {
     }
   })
 
-  // Nudge bubble to check notifications when user returns to app
-  mainWindow.on('focus', () => {
-    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-      bubbleWindow.webContents.send('notification-nudge')
-    }
-  })
+  // Proactive notifications disabled — too intrusive
+  // mainWindow.on('focus', () => {
+  //   if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+  //     bubbleWindow.webContents.send('notification-nudge')
+  //   }
+  // })
 
   mainWindow.on('closed', () => {
     mainWindow = null
