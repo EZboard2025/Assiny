@@ -16,22 +16,30 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Buscar todos os usuários que têm sessões completadas
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('roleplay_sessions')
-      .select('user_id')
-      .eq('status', 'completed')
-      .not('evaluation', 'is', null)
+    // Buscar todos os usuários de todas as fontes (roleplay + meet)
+    const [sessionsResult, meetResult] = await Promise.all([
+      supabase
+        .from('roleplay_sessions')
+        .select('user_id')
+        .not('evaluation', 'is', null),
+      supabase
+        .from('meet_evaluations')
+        .select('user_id')
+    ])
 
-    if (sessionsError) {
+    if (sessionsResult.error) {
       return NextResponse.json(
-        { error: 'Failed to fetch sessions' },
+        { error: 'Failed to fetch roleplay sessions' },
         { status: 500 }
       )
     }
 
-    // Obter IDs únicos de usuários
-    const uniqueUserIds = Array.from(new Set(sessions.map(s => s.user_id)))
+    // Obter IDs únicos de usuários (roleplay + meet)
+    const allUserIds = [
+      ...(sessionsResult.data || []).map(s => s.user_id),
+      ...(meetResult.data || []).map(m => m.user_id)
+    ]
+    const uniqueUserIds = Array.from(new Set(allUserIds))
 
     console.log(`📊 Encontrados ${uniqueUserIds.length} usuários com sessões completadas`)
 
