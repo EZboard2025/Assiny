@@ -1903,8 +1903,25 @@ function isLeftMeetWindow(title) {
 
 async function checkForMeetWindow() {
   if (!hasUserAuth) {
-    debugLog('[MeetDetect] Skipping — no auth yet')
+    if (!checkForMeetWindow._noAuthLog || Date.now() - checkForMeetWindow._noAuthLog > 30000) {
+      checkForMeetWindow._noAuthLog = Date.now()
+      debugLog('[MeetDetect] Skipping — no auth yet')
+    }
     return
+  }
+
+  // On macOS, check Screen Recording permission BEFORE calling desktopCapturer
+  // This prevents the annoying permission popup every 3 seconds
+  if (process.platform === 'darwin') {
+    const screenStatus = systemPreferences.getMediaAccessStatus('screen')
+    if (screenStatus !== 'granted') {
+      // No permission — skip desktopCapturer entirely, use calendar fallback
+      if (!checkForMeetWindow._noPermLog || Date.now() - checkForMeetWindow._noPermLog > 60000) {
+        checkForMeetWindow._noPermLog = Date.now()
+        debugLog(`[MeetDetect] Screen Recording not granted (${screenStatus}) — using calendar detection only`)
+      }
+      return
+    }
   }
 
   try {
@@ -1913,16 +1930,7 @@ async function checkForMeetWindow() {
       thumbnailSize: { width: 0, height: 0 },
     })
 
-    // Debug: log source count periodically to detect permission issues
-    if (sources.length <= 2 && process.platform === 'darwin') {
-      // On macOS, ≤2 sources usually means only Electron's own windows (no Screen Recording permission)
-      if (!checkForMeetWindow._permWarnTime || Date.now() - checkForMeetWindow._permWarnTime > 60000) {
-        checkForMeetWindow._permWarnTime = Date.now()
-        debugLog(`[MeetDetect] WARNING: Only ${sources.length} sources — Screen Recording permission likely missing`)
-        checkScreenPermission()
-      }
-      return
-    } else if (!checkForMeetWindow._lastLog || Date.now() - checkForMeetWindow._lastLog > 30000) {
+    if (!checkForMeetWindow._lastLog || Date.now() - checkForMeetWindow._lastLog > 30000) {
       checkForMeetWindow._lastLog = Date.now()
       debugLog(`[MeetDetect] Scanning ${sources.length} windows`)
     }
@@ -2135,8 +2143,6 @@ function startMeetDetection() {
   currentMeetCheckInterval = MEET_CHECK_IDLE
   meetDetectionInterval = setInterval(checkForMeetWindow, currentMeetCheckInterval)
   debugLog('[MeetDetect] Started monitoring for Google Meet windows')
-  // Check permission after a delay (wait for windows to be ready)
-  setTimeout(checkScreenPermission, 5000)
 }
 
 function setMeetCheckSpeed(fast) {
@@ -2153,6 +2159,85 @@ function stopMeetDetection() {
   if (meetDetectionInterval) {
     clearInterval(meetDetectionInterval)
     meetDetectionInterval = null
+  }
+}
+
+// ============================================================
+// CALENDAR-BASED MEET DETECTION (no Screen Recording needed)
+// ============================================================
+let calendarCheckInterval = null
+let lastCalendarMeetingId = null  // Prevents re-asking for same meeting
+
+async function getAuthToken() {
+  if (!mainWindow || mainWindow.isDestroyed()) return null
+  try {
+    return await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              var raw = localStorage.getItem(key);
+              if (raw) {
+                var parsed = JSON.parse(raw);
+                if (parsed && parsed.access_token) return parsed.access_token;
+              }
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    `)
+  } catch { return null }
+}
+
+async function checkCalendarForMeeting() {
+  if (!hasUserAuth || isRecordingMeet || pendingMeetConfirmation) return
+
+  try {
+    const token = await getAuthToken()
+    if (!token) return
+
+    const res = await fetch(`${PLATFORM_URL}/api/calendar/next-meeting?minutes=3`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+
+    if (!res.ok) return
+
+    const data = await res.json()
+    if (!data.meeting) return
+
+    // Don't ask again for same meeting
+    if (data.meeting.id === lastCalendarMeetingId) return
+    if (data.meeting.id === declinedMeetCode) return
+
+    debugLog(`[CalendarDetect] Meeting starting soon: "${data.meeting.title}" in ${data.meeting.minutesUntil}min`)
+
+    lastCalendarMeetingId = data.meeting.id
+    pendingMeetConfirmation = true
+    pendingMeetTitle = data.meeting.title
+
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+      bubbleWindow.webContents.send('ask-meeting-start', data.meeting.title)
+    }
+  } catch (err) {
+    // Silent — don't spam logs for network errors
+  }
+}
+
+function startCalendarDetection() {
+  if (calendarCheckInterval) return
+  // Check every 30s (lightweight API call, no permissions needed)
+  calendarCheckInterval = setInterval(checkCalendarForMeeting, 30000)
+  // First check after 10s
+  setTimeout(checkCalendarForMeeting, 10000)
+  debugLog('[CalendarDetect] Started calendar-based meeting detection (every 30s)')
+}
+
+function stopCalendarDetection() {
+  if (calendarCheckInterval) {
+    clearInterval(calendarCheckInterval)
+    calendarCheckInterval = null
   }
 }
 
@@ -2787,6 +2872,7 @@ app.whenReady().then(() => {
   createTray()
   startAuthBridge()
   startMeetDetection()
+  startCalendarDetection()
   console.log('[Main] All init complete')
 
   // macOS: restore dock icon after bubble settings are applied
