@@ -200,6 +200,8 @@ export default function MeetAnalysisView() {
   const [calendarNotice, setCalendarNotice] = useState<string | null>(null)
   const [calendarNoticeType, setCalendarNoticeType] = useState<'success' | 'error' | 'warning'>('success')
   const [hasWriteAccess, setHasWriteAccess] = useState(false)
+  const [autoRecordEnabled, setAutoRecordEnabled] = useState(true)
+  const [togglingAutoRecord, setTogglingAutoRecord] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
   const [showCreateEventModal, setShowCreateEventModal] = useState(false)
   const [createEventDate, setCreateEventDate] = useState<Date | undefined>(undefined)
@@ -1113,6 +1115,7 @@ export default function MeetAnalysisView() {
         setCalendarConnected(data.connected)
         setCalendarEmail(data.email || '')
         setHasWriteAccess(data.hasWriteAccess || false)
+        if (data.autoRecordEnabled !== undefined) setAutoRecordEnabled(data.autoRecordEnabled)
         if (data.connected) {
           loadCalendarEvents(authSession.access_token)
         } else if (activeTab === 'calendar') {
@@ -1192,6 +1195,33 @@ export default function MeetAnalysisView() {
       setCalendarEvents([])
     } catch (e) {
       console.error('Failed to disconnect calendar:', e)
+    }
+  }
+
+  const toggleAutoRecord = async () => {
+    try {
+      setTogglingAutoRecord(true)
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      if (!authSession?.access_token) return
+
+      const newValue = !autoRecordEnabled
+      const res = await fetch('/api/calendar/toggle-auto-record', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ enabled: newValue })
+      })
+
+      if (res.ok) {
+        setAutoRecordEnabled(newValue)
+        loadCalendarEvents()
+      }
+    } catch (e) {
+      console.error('Failed to toggle auto-record:', e)
+    } finally {
+      setTogglingAutoRecord(false)
     }
   }
 
@@ -1678,6 +1708,23 @@ export default function MeetAnalysisView() {
                         <span className="text-xs text-gray-400">{calendarEmail}</span>
                       </div>
                     )}
+
+                    <button
+                      onClick={toggleAutoRecord}
+                      disabled={togglingAutoRecord}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                        autoRecordEnabled
+                          ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                          : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200'
+                      } ${togglingAutoRecord ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={autoRecordEnabled ? 'Bot ativo — clique para desativar' : 'Bot inativo — clique para ativar'}
+                    >
+                      <Mic className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{autoRecordEnabled ? 'Bot Ativo' : 'Bot Inativo'}</span>
+                      <div className={`w-7 h-4 rounded-full relative transition-colors ${autoRecordEnabled ? 'bg-green-400' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${autoRecordEnabled ? 'left-3.5' : 'left-0.5'}`} />
+                      </div>
+                    </button>
 
                     {hasWriteAccess && (
                       <button
