@@ -112,18 +112,31 @@ export default function DownloadView() {
             </div>
           </div>
 
-          <a
-            href={current.file}
-            download
-            className="w-full flex items-center justify-center gap-2 bg-[#0D4A3A] hover:bg-[#0a3d30] text-white font-medium py-3 px-6 rounded-xl transition-colors"
-          >
-            <Download className="w-5 h-5" />
-            Baixar Ramppy Desktop para {current.name}
-          </a>
-
-          <p className="text-xs text-gray-400 text-center mt-3">
-            {current.file.split('/').pop()} — {current.size}
-          </p>
+          {selectedPlatform === 'windows' ? (
+            <>
+              <div className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-500 font-medium py-3 px-6 rounded-xl cursor-not-allowed">
+                <Download className="w-5 h-5" />
+                Em breve para Windows
+              </div>
+              <p className="text-xs text-gray-400 text-center mt-3">
+                O instalador para Windows estará disponível em breve.
+              </p>
+            </>
+          ) : (
+            <>
+              <a
+                href={current.file}
+                download
+                className="w-full flex items-center justify-center gap-2 bg-[#0D4A3A] hover:bg-[#0a3d30] text-white font-medium py-3 px-6 rounded-xl transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                Baixar Ramppy Desktop para {current.name}
+              </a>
+              <p className="text-xs text-gray-400 text-center mt-3">
+                {current.file.split('/').pop()} — {current.size}
+              </p>
+            </>
+          )}
         </div>
 
         {/* Steps */}
