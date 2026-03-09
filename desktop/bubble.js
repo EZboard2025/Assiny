@@ -3,12 +3,13 @@
 // Design: matches SellerAgentChat.tsx from website
 // ============================================================
 
-const API_URL = 'http://localhost:3000/api/agent/chat'
-const SUGGESTIONS_URL = 'http://localhost:3000/api/agent/suggestions'
-const TRANSCRIBE_URL = 'http://localhost:3000/api/roleplay/transcribe'
-const TTS_URL = 'http://localhost:3000/api/agent/tts'
-const NOTIFICATION_CHECK_URL = 'http://localhost:3000/api/agent/notifications/check'
-const MORNING_SUMMARY_URL = 'http://localhost:3000/api/agent/morning-summary'
+const BASE_URL = (window.location.protocol === 'file:') ? 'http://localhost:3000' : 'https://ramppy.site'
+const API_URL = BASE_URL + '/api/agent/chat'
+const SUGGESTIONS_URL = BASE_URL + '/api/agent/suggestions'
+const TRANSCRIBE_URL = BASE_URL + '/api/roleplay/transcribe'
+const TTS_URL = BASE_URL + '/api/agent/tts'
+const NOTIFICATION_CHECK_URL = BASE_URL + '/api/agent/notifications/check'
+const MORNING_SUMMARY_URL = BASE_URL + '/api/agent/morning-summary'
 
 // --- State ---
 let accessToken = null
