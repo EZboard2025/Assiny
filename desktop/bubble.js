@@ -624,7 +624,8 @@ async function expand() {
   // Show rec bar if recording
   if (isBubbleRecording) recBar.style.display = 'flex'
   await window.electronAPI.setBubbleBounds(px, py, panelW, panelH)
-  void chatPanel.offsetWidth // force reflow
+  // Wait a frame for the resize to settle, then animate
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
   chatPanel.classList.add('panel-animate')
   await window.electronAPI.setBubbleOpacity(1)
 

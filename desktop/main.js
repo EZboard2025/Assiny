@@ -103,6 +103,7 @@ if (!gotTheLock) {
     // Focus existing main window when user tries to open a second instance
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
       mainWindow.focus()
     }
   })
@@ -2627,7 +2628,16 @@ function createTray() {
 
   tray.setContextMenu(contextMenu)
 
-  // Double-click on tray icon opens the main window
+  // Single-click on tray icon opens the main window (Windows expects single-click)
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+
+  // Double-click also opens (fallback)
   tray.on('double-click', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
