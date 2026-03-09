@@ -243,18 +243,30 @@ export async function POST(request: NextRequest) {
     const priorityImprovements = allImprovements.slice(0, 10)
 
     // ===== CALCULAR EVOLUÇÃO RECENTE =====
+    // Calcula score como média das 4 notas SPIN (sempre 0-10), pois overall_score
+    // do N8N é inconsistente (às vezes 0-10, às vezes 0-100)
+    const getSpinAverage = (e: UnifiedEvaluation): number | null => {
+      const scores: number[] = []
+      if (e.spin_s != null && !isNaN(Number(e.spin_s))) scores.push(Number(e.spin_s))
+      if (e.spin_p != null && !isNaN(Number(e.spin_p))) scores.push(Number(e.spin_p))
+      if (e.spin_i != null && !isNaN(Number(e.spin_i))) scores.push(Number(e.spin_i))
+      if (e.spin_n != null && !isNaN(Number(e.spin_n))) scores.push(Number(e.spin_n))
+      return scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : null
+    }
+
     let latestScore = null
     let scoreImprovement = null
     let trend = 'stable'
 
     if (unifiedEvaluations.length > 0) {
       const latest = unifiedEvaluations[unifiedEvaluations.length - 1]
-      latestScore = latest.overall_score
+      latestScore = getSpinAverage(latest)
 
       if (unifiedEvaluations.length > 1) {
         const previous = unifiedEvaluations[unifiedEvaluations.length - 2]
-        if (latestScore != null && previous.overall_score != null) {
-          scoreImprovement = latestScore - previous.overall_score
+        const previousScore = getSpinAverage(previous)
+        if (latestScore != null && previousScore != null) {
+          scoreImprovement = latestScore - previousScore
 
           if (scoreImprovement > 0.5) trend = 'improving'
           else if (scoreImprovement < -0.5) trend = 'declining'

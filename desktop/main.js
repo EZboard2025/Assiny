@@ -14,6 +14,29 @@ function debugLog(msg) {
 
 debugLog('=== Electron main.js loaded ===')
 
+// Persisted scan state (survives app restarts)
+const SCAN_STATE_FILE = path.join(app.getPath('userData'), 'scan-state.json')
+
+function getLastAutoScanDate() {
+  try {
+    if (fs.existsSync(SCAN_STATE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SCAN_STATE_FILE, 'utf8'))
+      return data.lastAutoScanDate || null
+    }
+  } catch (e) {
+    debugLog('[Scan State] Error reading: ' + e.message)
+  }
+  return null
+}
+
+function setLastAutoScanDate(dateString) {
+  try {
+    fs.writeFileSync(SCAN_STATE_FILE, JSON.stringify({ lastAutoScanDate: dateString }))
+  } catch (e) {
+    debugLog('[Scan State] Error writing: ' + e.message)
+  }
+}
+
 // System audio loopback is handled via setDisplayMediaRequestHandler (see app.whenReady)
 
 // DEV: use localhost | PROD: use ramppy.site
@@ -1240,19 +1263,10 @@ async function triggerAutoScan() {
       }
     }
 
-    // Daily scan: run full scan once per day, skip if already scanned today
-    const scannedCount = storedConversations.filter(c => (c.message_count || 0) > 0).length
+    // Daily scan: run full scan once per day (persisted to file so it survives app restarts)
     const today = new Date().toDateString()
-    const lastScanDate = storedConversations.reduce((latest, c) => {
-      if (c.updated_at && new Date(c.updated_at) > latest) return new Date(c.updated_at)
-      return latest
-    }, new Date(0))
-    const scannedToday = lastScanDate.toDateString() === today && scannedCount >= Math.floor(MAX_CONVERSATIONS * 0.7)
-
-    debugLog(`[Auto-Scan] ${scannedCount} conversations with messages, scanned today: ${scannedToday}`)
-
-    if (scannedToday) {
-      debugLog('[Auto-Scan] Already scanned today, skipping. Manager can use on-demand scrape.')
+    if (getLastAutoScanDate() === today) {
+      debugLog('[Auto-Scan] Already scanned today, skipping.')
       return
     }
 
@@ -1431,6 +1445,7 @@ async function triggerAutoScan() {
     // Flush queued messages
     await executeSync()
 
+    setLastAutoScanDate(new Date().toDateString())
     debugLog(`[Auto-Scan] Complete: scanned ${total} conversations`)
   } catch (err) {
     debugLog('[Auto-Scan] Error: ' + err.message)

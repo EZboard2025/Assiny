@@ -75,9 +75,9 @@ body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, Blin
 }
 
 .contact-name {
-  font-size: 12px;
+  font-size: 11px;
   color: #6b7280;
-  max-width: 120px;
+  max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
