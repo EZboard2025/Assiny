@@ -64,19 +64,15 @@ export default function DownloadView() {
         {/* Platform Selector */}
         <div className="flex gap-3 mb-8">
           <button
-            onClick={() => setSelectedPlatform('windows')}
-            className={`flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl border-2 transition-all ${
-              selectedPlatform === 'windows'
-                ? 'border-[#0D4A3A] bg-[#0D4A3A]/5'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
+            disabled
+            className="flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl border-2 border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
           >
-            <Monitor className={`w-5 h-5 ${selectedPlatform === 'windows' ? 'text-[#0D4A3A]' : 'text-gray-400'}`} />
+            <Monitor className="w-5 h-5 text-gray-400" />
             <div className="text-left">
-              <p className={`font-semibold text-sm ${selectedPlatform === 'windows' ? 'text-[#0D4A3A]' : 'text-gray-600'}`}>
+              <p className="font-semibold text-sm text-gray-400">
                 Windows
               </p>
-              <p className="text-xs text-gray-400">Windows 10+</p>
+              <p className="text-xs text-gray-400">Em breve</p>
             </div>
           </button>
 
