@@ -1159,8 +1159,7 @@ ipcMain.handle('get-screen-size', async () => {
 // Capture screenshot of primary display for AI vision
 ipcMain.handle('capture-screenshot', async () => {
   try {
-    // Skip if screen recording was already denied this session
-    if (screenPermissionDenied) return null
+    if (!hasScreenPermission()) return null
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: 1280, height: 720 },
@@ -1182,7 +1181,7 @@ ipcMain.on('open-recording-window', () => {
 // Handle desktopCapturer for Meet feature
 ipcMain.handle('get-sources', async () => {
   try {
-    if (screenPermissionDenied) return []
+    if (!hasScreenPermission()) return []
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: 0, height: 0 },
@@ -1906,6 +1905,19 @@ function isLeftMeetWindow(title) {
 
 let screenPermissionDenied = false // Set to true after first denial — stops retrying
 
+// Check screen recording permission WITHOUT triggering the popup
+function hasScreenPermission() {
+  if (process.platform !== 'darwin') return true // Windows/Linux don't need this
+  if (screenPermissionDenied) return false
+  const status = systemPreferences.getMediaAccessStatus('screen')
+  if (status !== 'granted') {
+    screenPermissionDenied = true
+    debugLog(`[Permission] Screen Recording not granted (${status}) — blocking all desktopCapturer calls`)
+    return false
+  }
+  return true
+}
+
 async function checkForMeetWindow() {
   if (!hasUserAuth) {
     if (!checkForMeetWindow._noAuthLog || Date.now() - checkForMeetWindow._noAuthLog > 30000) {
@@ -1931,22 +1943,12 @@ async function checkForMeetWindow() {
     }
 
     // ─── FALLBACK: desktopCapturer-based detection (Windows/Linux, or Chrome not running) ───
-    if (screenPermissionDenied) return
+    if (!hasScreenPermission()) return
 
     const sources = await desktopCapturer.getSources({
       types: ['window'],
       thumbnailSize: { width: 0, height: 0 },
     })
-
-    // If we only see Electron's own windows, permission was denied
-    if (sources.length <= 3 && process.platform === 'darwin') {
-      const screenStatus = systemPreferences.getMediaAccessStatus('screen')
-      if (screenStatus !== 'granted') {
-        screenPermissionDenied = true
-        debugLog(`[MeetDetect] Screen Recording denied (${screenStatus}) — desktopCapturer disabled.`)
-        return
-      }
-    }
 
     if (!checkForMeetWindow._lastLog || Date.now() - checkForMeetWindow._lastLog > 30000) {
       checkForMeetWindow._lastLog = Date.now()
@@ -2795,7 +2797,7 @@ app.whenReady().then(() => {
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
     console.log('[AudioLoopback] System picker was cancelled — falling back to manual source')
     try {
-      if (screenPermissionDenied) { callback({}); return }
+      if (!hasScreenPermission()) { callback({}); return }
       const sources = await desktopCapturer.getSources({ types: ['screen'] })
       if (sources.length > 0) {
         callback({ video: sources[0], audio: 'loopback' })

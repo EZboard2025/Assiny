@@ -2240,7 +2240,6 @@ function hideMeetStartPrompt() {
     }
   } else {
     bubble.style.display = 'flex'
-    disableMouseCapture()
     if (savedBubblePos) {
       window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, BUBBLE_SIZE, BUBBLE_SIZE)
     } else {
@@ -2315,7 +2314,6 @@ function hideMeetPrompt() {
     }
   } else {
     bubble.style.display = 'flex'
-    disableMouseCapture()
     if (savedBubblePos) {
       window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, BUBBLE_SIZE, BUBBLE_SIZE)
     } else {
