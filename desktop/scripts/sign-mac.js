@@ -5,6 +5,21 @@ const { execSync } = require('child_process')
 const path = require('path')
 
 exports.default = async function (context) {
+  // Windows: patch exe with correct icon and metadata (since signAndEditExecutable is disabled)
+  if (context.electronPlatformName === 'win32') {
+    const exePath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.exe`)
+    const iconPath = path.join(__dirname, '..', 'assets', 'icon.ico')
+    const rceditPath = path.join(__dirname, '..', 'node_modules', 'rcedit', 'bin', 'rcedit-x64.exe')
+    console.log(`[patch-win] Patching ${exePath} with icon and metadata`)
+    try {
+      execSync(`"${rceditPath}" "${exePath}" --set-icon "${iconPath}" --set-version-string ProductName "Ramppy" --set-version-string FileDescription "Ramppy" --set-version-string CompanyName "Ramppy" --set-version-string InternalName "ramppy" --set-version-string OriginalFilename "Ramppy.exe"`, { stdio: 'inherit' })
+      console.log('[patch-win] Icon and metadata patched successfully')
+    } catch (err) {
+      console.error('[patch-win] Failed:', err.message)
+    }
+    return
+  }
+
   // Only run on macOS builds
   if (context.electronPlatformName !== 'darwin') return
 
