@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Read(//c/Users/ADM/AppData/Local//**)",
+      "Bash(npm run dev)",
+      "WebFetch(domain:ramppy.site)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -sI \"http://localhost:3000/downloads/Ramppy%20Setup%201.0.0.exe\")",
+      "Bash(where magick)",
+      "Bash(pip install Pillow)",
+      "Bash(python -c \"from PIL import Image; print\\(''Pillow OK''\\)\")",
+      "Bash(python3 -c \"from PIL import Image; print\\(''Pillow OK''\\)\")",
+      "Bash(npm run build:win)",
+      "Bash(powershell -Command \"Get-Process | Where-Object { $_.ProcessName -match ''ramppy|Ramppy'' } | Select-Object ProcessName, Id\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"c:\\\\Users\\\\ADM\\\\OneDrive\\\\Documentos\\\\Ramppy plataforma dev gabriel\\\\Assiny\\\\kill-ramppy.ps1\")",
+      "Bash(rm -rf \"/c/Users/ADM/AppData/Local/ramppy-updater\" \"/c/Users/ADM/AppData/Roaming/ramppy\" \"/c/Users/ADM/AppData/Roaming/ramppy-meet\")",
+      "Bash(npx electron .)",
+      "Bash(curl -sI http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(for i in 1 2 3 4 5 6 7 8 9 10)",
+      "Bash(do curl -sI http://localhost:3000)",
+      "Bash(break)",
+      "Bash(done)",
+      "Bash(npx rcedit --help)",
+      "Bash(npm ls rcedit)",
+      "Bash(node_modules/rcedit/bin/rcedit-x64.exe node_modules/electron/dist/electron.exe --set-icon assets/icon.ico)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"c:\\\\Users\\\\ADM\\\\OneDrive\\\\Documentos\\\\Ramppy plataforma dev gabriel\\\\Assiny\\\\clear-icon-cache.ps1\")",
+      "Bash(rm \"c:\\\\Users\\\\ADM\\\\OneDrive\\\\Documentos\\\\Ramppy plataforma dev gabriel\\\\Assiny\\\\clear-icon-cache.ps1\")",
+      "Bash(rm \"c:\\\\Users\\\\ADM\\\\OneDrive\\\\Documentos\\\\Ramppy plataforma dev gabriel\\\\Assiny\\\\kill-ramppy.ps1\")",
+      "Bash(cp node_modules/electron/dist/electron.exe node_modules/electron/dist/Ramppy.exe)",
+      "Bash(node_modules/electron/dist/Ramppy.exe .)",
+      "Bash(node_modules/rcedit/bin/rcedit-x64.exe node_modules/electron/dist/electron.exe --get-version-string ProductName)",
+      "Bash(node_modules/rcedit/bin/rcedit-x64.exe node_modules/electron/dist/electron.exe --get-version-string FileDescription)",
+      "Bash(node_modules/rcedit/bin/rcedit-x64.exe release/win-unpacked/Ramppy.exe --set-icon assets/icon.ico --set-version-string ProductName \"Ramppy\" --set-version-string FileDescription \"Ramppy\" --set-version-string CompanyName \"Ramppy\" --set-version-string InternalName \"ramppy\" --set-version-string OriginalFilename \"Ramppy.exe\")",
+      "Bash(node_modules/rcedit/bin/rcedit-x64.exe release/win-unpacked/Ramppy.exe --get-version-string ProductName)",
+      "Bash(\"/c/Users/ADM/OneDrive/Documentos/Ramppy plataforma dev gabriel/Assiny/desktop/release/win-unpacked/Ramppy.exe\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
+      "C:\\Users\\ADM\\AppData\\Roaming\\ramppy",
+      "C:\\Users\\ADM\\AppData\\Roaming",
+      "C:\\Users\\ADM\\AppData\\Local\\Programs"
+    ]
+  }
+}
