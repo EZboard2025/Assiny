@@ -163,6 +163,10 @@ function createMainWindow() {
     if (!app.isQuitting) {
       e.preventDefault()
       mainWindow.hide()
+      // Hide bubble and other windows too
+      if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.hide()
+      if (whatsappBaseWindow && !whatsappBaseWindow.isDestroyed()) whatsappBaseWindow.hide()
+      if (notificationWindow && !notificationWindow.isDestroyed()) notificationWindow.hide()
     }
   })
 
@@ -2762,6 +2766,10 @@ app.whenReady().then(() => {
       createMainWindow()
       createBubbleWindow()
       startAuthBridge()
+    } else {
+      // Restore hidden windows (from close-to-tray)
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
+      if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.show()
     }
   })
 })
