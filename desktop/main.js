@@ -1159,6 +1159,10 @@ ipcMain.handle('get-screen-size', async () => {
 // Capture screenshot of primary display for AI vision
 ipcMain.handle('capture-screenshot', async () => {
   try {
+    // Skip on macOS if Screen Recording permission is not granted (avoids repeated popup)
+    if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
+      return null
+    }
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: 1280, height: 720 },
@@ -1180,6 +1184,9 @@ ipcMain.on('open-recording-window', () => {
 // Handle desktopCapturer for Meet feature
 ipcMain.handle('get-sources', async () => {
   try {
+    if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
+      return []
+    }
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: 0, height: 0 },
@@ -2825,6 +2832,11 @@ app.whenReady().then(() => {
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
     console.log('[AudioLoopback] System picker was cancelled — falling back to manual source')
     try {
+      if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
+        console.log('[AudioLoopback] Screen Recording not granted — skipping fallback')
+        callback({})
+        return
+      }
       const sources = await desktopCapturer.getSources({ types: ['screen'] })
       if (sources.length > 0) {
         callback({ video: sources[0], audio: 'loopback' })
