@@ -258,8 +258,9 @@ function createBubbleWindow() {
   bubbleWindow.loadFile('bubble.html')
   bubbleWindow.setMenuBarVisibility(false)
 
-  // Forward mouse events through transparent areas
-  bubbleWindow.setIgnoreMouseEvents(true, { forward: true })
+  // Start with mouse events enabled — the window is small (72x72) so it doesn't block much.
+  // setIgnoreMouseEvents(true, {forward:true}) is unreliable on macOS with transparent windows.
+  // When expanded, the bubble.js handles enabling/disabling via IPC as needed.
 
   // Re-assert on blur (other apps stealing z-order)
   bubbleWindow.on('blur', () => {
