@@ -152,11 +152,9 @@ if (window.electronAPI && window.electronAPI.onTestNotification) {
 // ─── Notification System ────────────────────────────────────────────────────
 
 function startNotificationChecker() {
-  if (notificationCheckInterval) return
-  // First check after 5 seconds
-  setTimeout(() => checkNotifications(), 5000)
-  // Then every 5 minutes
-  notificationCheckInterval = setInterval(() => checkNotifications(), 5 * 60 * 1000)
+  // Proactive notifications disabled — leads sem resposta, dias sem treinar, etc.
+  // were too intrusive. Keep the function for manual/test triggers only.
+  return
 }
 
 async function checkNotifications(forceTest = false) {
