@@ -22,7 +22,7 @@ export default function DownloadView() {
       name: 'Windows',
       subtitle: 'Windows 10 ou superior',
       file: '/downloads/Ramppy.exe',
-      size: '~98 MB',
+      size: '~99 MB',
       icon: <Monitor className="w-6 h-6 text-blue-600" />,
       steps: [
         { number: '1', title: 'Baixar', description: 'Clique no botão para baixar o instalador .exe' },

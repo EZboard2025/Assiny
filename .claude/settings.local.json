@@ -34,7 +34,11 @@
       "Bash(node_modules/rcedit/bin/rcedit-x64.exe node_modules/electron/dist/electron.exe --get-version-string FileDescription)",
       "Bash(node_modules/rcedit/bin/rcedit-x64.exe release/win-unpacked/Ramppy.exe --set-icon assets/icon.ico --set-version-string ProductName \"Ramppy\" --set-version-string FileDescription \"Ramppy\" --set-version-string CompanyName \"Ramppy\" --set-version-string InternalName \"ramppy\" --set-version-string OriginalFilename \"Ramppy.exe\")",
       "Bash(node_modules/rcedit/bin/rcedit-x64.exe release/win-unpacked/Ramppy.exe --get-version-string ProductName)",
-      "Bash(\"/c/Users/ADM/OneDrive/Documentos/Ramppy plataforma dev gabriel/Assiny/desktop/release/win-unpacked/Ramppy.exe\")"
+      "Bash(\"/c/Users/ADM/OneDrive/Documentos/Ramppy plataforma dev gabriel/Assiny/desktop/release/win-unpacked/Ramppy.exe\")",
+      "Bash(git push:*)",
+      "Bash(ssh root@31.97.84.130 'export NVM_DIR=\"\"$HOME/.nvm\"\" && [ -s \"\"$NVM_DIR/nvm.sh\"\" ] && . \"\"$NVM_DIR/nvm.sh\"\" && cd /var/www/assiny && git pull origin main && export NODE_OPTIONS=\"\"--max-old-space-size=4096\"\" && npm run build && pm2 restart assiny')",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
