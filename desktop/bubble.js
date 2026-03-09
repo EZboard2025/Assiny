@@ -433,7 +433,8 @@ function renderMorningSummary(data) {
     html += `<div class="morning-section"><div class="morning-section-header"><span class="morning-section-icon">📅</span><span>Reunioes Hoje (${data.meetings.length})</span></div>`
     for (const m of data.meetings) {
       const time = m.time || new Date(m.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      html += `<div class="morning-item"><span class="morning-item-title">${time}</span> — ${m.title || 'Reuniao'}${m.attendees ? ` <span class="morning-item-meta">com ${Array.isArray(m.attendees) ? m.attendees.join(', ') : m.attendees}</span>` : ''}</div>`
+      const attendeeNames = Array.isArray(m.attendees) ? m.attendees.map(a => typeof a === 'object' ? (a.displayName || a.email || '') : a).filter(Boolean).join(', ') : (m.attendees || '')
+      html += `<div class="morning-item"><span class="morning-item-title">${time}</span> — ${m.title || 'Reuniao'}${attendeeNames ? ` <span class="morning-item-meta">com ${attendeeNames}</span>` : ''}</div>`
     }
     html += `</div>`
   }
@@ -477,8 +478,35 @@ function renderMorningSummary(data) {
   }
   html += `</div></div>`
 
+  // Add input field at the bottom of morning summary
+  html += `<div class="welcome-input-wrap" style="margin-top:12px;">
+    <input type="text" id="morning-input" class="welcome-input" placeholder="Me pergunte qualquer coisa..." autocomplete="off">
+    <button id="btn-mic-morning" class="btn-mic" title="Falar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <button id="btn-send-morning" class="btn-send-small" title="Enviar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>`
+
   // Replace welcome state content
   welcomeState.innerHTML = html
+
+  // Wire morning input
+  const morningInput = document.getElementById('morning-input')
+  const btnSendMorning = document.getElementById('btn-send-morning')
+  const btnMicMorning = document.getElementById('btn-mic-morning')
+  if (morningInput) {
+    morningInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(morningInput.value) }
+    })
+  }
+  if (btnSendMorning) {
+    btnSendMorning.addEventListener('click', () => sendMessage(morningInput.value))
+  }
+  if (btnMicMorning) {
+    btnMicMorning.addEventListener('click', () => toggleRecording(btnMicMorning))
+  }
 
   // Wire action buttons
   welcomeState.querySelectorAll('[data-morning-action]').forEach(btn => {
