@@ -886,19 +886,26 @@ ipcMain.on('toggle-copilot', () => {
 function startAuthBridge() {
   // Extract Supabase auth token from main window and forward to bubble
   const extractAndForward = async () => {
-    if (!mainWindow || mainWindow.isDestroyed() || !bubbleWindow || bubbleWindow.isDestroyed()) return
+    if (!mainWindow || mainWindow.isDestroyed() || !bubbleWindow || bubbleWindow.isDestroyed()) {
+      debugLog(`[AuthBridge] Skipping — mainWindow=${!!mainWindow && !mainWindow?.isDestroyed()} bubbleWindow=${!!bubbleWindow && !bubbleWindow?.isDestroyed()}`)
+      return
+    }
 
     try {
       const authData = await mainWindow.webContents.executeJavaScript(`
         (function() {
           try {
             // Supabase stores session in localStorage with key pattern: sb-<ref>-auth-token
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
+            var keys = [];
+            for (var i = 0; i < localStorage.length; i++) {
+              keys.push(localStorage.key(i));
+            }
+            for (var j = 0; j < keys.length; j++) {
+              var key = keys[j];
               if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                const raw = localStorage.getItem(key);
+                var raw = localStorage.getItem(key);
                 if (raw) {
-                  const parsed = JSON.parse(raw);
+                  var parsed = JSON.parse(raw);
                   if (parsed && parsed.access_token) {
                     return JSON.stringify({
                       accessToken: parsed.access_token,
@@ -908,14 +915,24 @@ function startAuthBridge() {
                 }
               }
             }
-          } catch(e) {}
-          return null;
+            return JSON.stringify({ debug: true, totalKeys: keys.length, keyNames: keys.filter(function(k) { return k.startsWith('sb-'); }) });
+          } catch(e) {
+            return JSON.stringify({ error: e.message });
+          }
         })()
       `)
 
       if (authData) {
         const parsed = JSON.parse(authData)
-        if (!hasUserAuth) console.log('[AuthBridge] Got auth token! userId:', parsed.userId)
+        if (parsed.debug) {
+          if (!hasUserAuth) debugLog(`[AuthBridge] No token found. localStorage keys: ${parsed.totalKeys}, sb-keys: ${JSON.stringify(parsed.keyNames)}`)
+          return
+        }
+        if (parsed.error) {
+          debugLog(`[AuthBridge] JS error: ${parsed.error}`)
+          return
+        }
+        if (!hasUserAuth) debugLog(`[AuthBridge] Got auth token! userId: ${parsed.userId}`)
         hasUserAuth = true
         bubbleWindow.webContents.send('auth-token', parsed)
         // Show bubble once user is authenticated
@@ -934,7 +951,7 @@ function startAuthBridge() {
       }
     } catch (err) {
       // Main window may not be ready yet
-      console.log('[AuthBridge] Error:', err.message)
+      debugLog('[AuthBridge] Error: ' + err.message)
     }
   }
 
@@ -1473,6 +1490,12 @@ ipcMain.on('open-whatsapp', () => {
   createWhatsAppWindow()
 })
 
+ipcMain.on('open-screen-permission-settings', () => {
+  if (process.platform === 'darwin') {
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+  }
+})
+
 // Bubble asks for current WhatsApp state
 ipcMain.handle('get-whatsapp-state', async () => {
   return whatsappContext
@@ -1890,6 +1913,20 @@ async function checkForMeetWindow() {
       thumbnailSize: { width: 0, height: 0 },
     })
 
+    // Debug: log source count periodically to detect permission issues
+    if (sources.length <= 2 && process.platform === 'darwin') {
+      // On macOS, ≤2 sources usually means only Electron's own windows (no Screen Recording permission)
+      if (!checkForMeetWindow._permWarnTime || Date.now() - checkForMeetWindow._permWarnTime > 60000) {
+        checkForMeetWindow._permWarnTime = Date.now()
+        debugLog(`[MeetDetect] WARNING: Only ${sources.length} sources — Screen Recording permission likely missing`)
+        checkScreenPermission()
+      }
+      return
+    } else if (!checkForMeetWindow._lastLog || Date.now() - checkForMeetWindow._lastLog > 30000) {
+      checkForMeetWindow._lastLog = Date.now()
+      debugLog(`[MeetDetect] Scanning ${sources.length} windows`)
+    }
+
     // Categorize Meet windows
     // Don't require 🔊 — Chrome hides it when tab is in background or sharing screen
     const activeMeet = sources.find(s => hasMeetCode(s.name) && !isLeftMeetWindow(s.name))
@@ -2072,11 +2109,34 @@ const MEET_CHECK_IDLE = 3000    // 3s when not recording
 const MEET_CHECK_RECORDING = 1500 // 1.5s when recording (faster end detection)
 let currentMeetCheckInterval = MEET_CHECK_IDLE
 
+let screenPermissionWarned = false
+
+function checkScreenPermission() {
+  if (process.platform !== 'darwin') return true
+  const status = systemPreferences.getMediaAccessStatus('screen')
+  debugLog(`[MeetDetect] Screen recording permission: ${status}`)
+  if (status !== 'granted') {
+    if (!screenPermissionWarned) {
+      screenPermissionWarned = true
+      debugLog('[MeetDetect] Screen recording NOT granted — prompting user')
+      // Tell bubble to show permission message
+      if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+        bubbleWindow.webContents.send('screen-permission-needed')
+      }
+    }
+    return false
+  }
+  screenPermissionWarned = false
+  return true
+}
+
 function startMeetDetection() {
   if (meetDetectionInterval) return
   currentMeetCheckInterval = MEET_CHECK_IDLE
   meetDetectionInterval = setInterval(checkForMeetWindow, currentMeetCheckInterval)
   debugLog('[MeetDetect] Started monitoring for Google Meet windows')
+  // Check permission after a delay (wait for windows to be ready)
+  setTimeout(checkScreenPermission, 5000)
 }
 
 function setMeetCheckSpeed(fast) {
