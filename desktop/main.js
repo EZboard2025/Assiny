@@ -51,6 +51,14 @@ const APP_ICON = nativeImage.createFromPath(ICON_PATH)
 // Force Windows taskbar to use our icon instead of default Electron icon
 app.setAppUserModelId('com.ramppy.app')
 
+// Auto-start: open Ramppy when user logs in to the computer
+if (app.isPackaged) {
+  app.setLoginItemSettings({
+    openAtLogin: true,
+    name: 'Ramppy'
+  })
+}
+
 // Allow audio autoplay without user gesture (needed for TTS in bubble window)
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 

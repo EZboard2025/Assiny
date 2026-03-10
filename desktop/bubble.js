@@ -2191,29 +2191,32 @@ function showMeetStartPrompt(meetTitle) {
   window.electronAPI.resizeBubble(300, 240)
 }
 
-function hideMeetStartPrompt() {
+async function hideMeetStartPrompt() {
   meetStartPromptVisible = false
   if (meetStartPrompt) meetStartPrompt.style.display = 'none'
 
   // Restore to expanded or collapsed state
   if (isExpanded) {
     chatPanel.style.display = 'flex'
-    // Re-expand to panel size
+    enableMouseCapture()
     const panelW = 420
     const panelH = 780
     if (savedBubblePos) {
-      window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, panelW, panelH)
+      await window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, panelW, panelH)
     } else {
-      window.electronAPI.resizeBubble(panelW, panelH)
+      await window.electronAPI.resizeBubble(panelW, panelH)
     }
   } else {
+    // Hide window → resize → show bubble (same pattern as collapse)
+    await window.electronAPI.setBubbleOpacity(0)
     bubble.style.display = 'flex'
-    disableMouseCapture()
     if (savedBubblePos) {
-      window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, BUBBLE_SIZE, BUBBLE_SIZE)
+      await window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, BUBBLE_SIZE, BUBBLE_SIZE)
     } else {
-      window.electronAPI.resizeBubble(BUBBLE_SIZE, BUBBLE_SIZE)
+      await window.electronAPI.resizeBubble(BUBBLE_SIZE, BUBBLE_SIZE)
     }
+    disableMouseCapture()
+    await window.electronAPI.setBubbleOpacity(1)
   }
 }
 
@@ -2267,28 +2270,32 @@ function showMeetPrompt() {
   window.electronAPI.resizeBubble(240, 180)
 }
 
-function hideMeetPrompt() {
+async function hideMeetPrompt() {
   meetPromptVisible = false
   if (meetPrompt) meetPrompt.style.display = 'none'
 
   // Restore to expanded or collapsed state
   if (isExpanded) {
     chatPanel.style.display = 'flex'
+    enableMouseCapture()
     const panelW = 420
     const panelH = 780
     if (savedBubblePos) {
-      window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, panelW, panelH)
+      await window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, panelW, panelH)
     } else {
-      window.electronAPI.resizeBubble(panelW, panelH)
+      await window.electronAPI.resizeBubble(panelW, panelH)
     }
   } else {
+    // Hide window → resize → show bubble (same pattern as collapse)
+    await window.electronAPI.setBubbleOpacity(0)
     bubble.style.display = 'flex'
-    disableMouseCapture()
     if (savedBubblePos) {
-      window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, BUBBLE_SIZE, BUBBLE_SIZE)
+      await window.electronAPI.setBubbleBounds(savedBubblePos.x, savedBubblePos.y, BUBBLE_SIZE, BUBBLE_SIZE)
     } else {
-      window.electronAPI.resizeBubble(BUBBLE_SIZE, BUBBLE_SIZE)
+      await window.electronAPI.resizeBubble(BUBBLE_SIZE, BUBBLE_SIZE)
     }
+    disableMouseCapture()
+    await window.electronAPI.setBubbleOpacity(1)
   }
 }
 
