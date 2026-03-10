@@ -46,8 +46,7 @@ desktop/release/
 desktop/build/vc_redist.x64.exe
 desktop/drivers/
 
-# download files (served locally)
-public/downloads/
+# download files — tracked in git so deploy updates the installer automatically
 
 # source art files
 logo para dowload/
