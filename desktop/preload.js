@@ -64,4 +64,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Screen recording permission
   onScreenPermissionNeeded: (callback) => ipcRenderer.on('screen-permission-needed', () => callback()),
   openScreenPermissionSettings: () => ipcRenderer.send('open-screen-permission-settings'),
+  // Audio diagnostic
+  testAudio: () => ipcRenderer.invoke('test-audio-diagnostic'),
 })

@@ -5,7 +5,7 @@ const nextConfig = {
     domains: [],
   },
   // Pacotes que NÃO devem ser bundlados pelo webpack (usam require dinâmico)
-  serverExternalPackages: ['pdf-parse', 'mammoth'],
+  serverExternalPackages: ['pdf-parse', 'mammoth', 'googleapis'],
   // Aumentar limite de tamanho de body para uploads (100MB)
   experimental: {
     serverActions: {

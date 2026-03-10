@@ -61,6 +61,12 @@ if (app.isPackaged) {
 
 // Allow audio autoplay without user gesture (needed for TTS in bubble window)
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+// Force Wave audio backend (bypasses WASAPI routing issues on Windows)
+app.commandLine.appendSwitch('force-wave-audio')
+// Disable audio sandboxing that can block output on Windows
+app.commandLine.appendSwitch('disable-features', 'AudioServiceSandbox,AudioServiceOutOfProcess')
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
+app.commandLine.appendSwitch('no-sandbox')
 
 let mainWindow = null
 let bubbleWindow = null
@@ -133,7 +139,47 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
+      sandbox: false, // Required for audio playback on Windows
     },
+  })
+
+  // Garantir que áudio não está mutado
+  mainWindow.webContents.setAudioMuted(false)
+
+  // Force audio session initialization on Windows — play test tone on load
+  mainWindow.webContents.on('did-finish-load', async () => {
+    mainWindow.webContents.setAudioMuted(false)
+    console.log('[Audio] Window audio muted:', mainWindow.webContents.isAudioMuted())
+
+    // Play a silent then audible test tone to initialize Windows audio session
+    try {
+      const result = await mainWindow.webContents.executeJavaScript(`
+        (async () => {
+          try {
+            const ctx = new AudioContext();
+            if (ctx.state === 'suspended') await ctx.resume();
+            // Play a very short 440Hz tone to force Windows to create the audio session
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 440;
+            gain.gain.value = 0.01; // nearly silent
+            osc.start();
+            await new Promise(r => setTimeout(r, 100));
+            osc.stop();
+            await ctx.close();
+            return { ok: true, state: 'initialized', sampleRate: ctx.sampleRate };
+          } catch (e) {
+            return { ok: false, error: e.message };
+          }
+        })()
+      `)
+      console.log('[Audio] Init result:', JSON.stringify(result))
+    } catch (e) {
+      console.error('[Audio] Init failed:', e.message)
+    }
   })
 
   mainWindow.loadURL(PLATFORM_URL)
@@ -871,7 +917,8 @@ function createWhatsAppWindow() {
 
 function layoutWhatsAppViews() {
   if (!whatsappBaseWindow || whatsappBaseWindow.isDestroyed()) return
-  const [w, h] = whatsappBaseWindow.getSize()
+  // Use getContentSize (not getSize) — getSize includes window frame/borders on Windows
+  const [w, h] = whatsappBaseWindow.getContentSize()
   const copilotW = copilotExpanded ? COPILOT_WIDTH : COPILOT_COLLAPSED_WIDTH
   const overlap = 16 // copilot overlaps WhatsApp for rounded corner effect
   const waWidth = Math.max(500, w - copilotW + overlap)
@@ -1150,6 +1197,38 @@ ipcMain.on('snap-to-edge', () => {
 ipcMain.on('snap-bubble', (_event, x, y, duration, opts) => {
   if (!bubbleWindow) return
   animateBubbleTo(x, y, duration || 200, opts || {})
+})
+
+// Audio diagnostic: test if audio can play in the renderer
+ipcMain.handle('test-audio-diagnostic', async () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { error: 'no window' }
+  const muted = mainWindow.webContents.isAudioMuted()
+  const audible = mainWindow.webContents.isCurrentlyAudible()
+  // Try playing a test tone via the renderer
+  const result = await mainWindow.webContents.executeJavaScript(`
+    (async () => {
+      try {
+        const ctx = new AudioContext();
+        const state = ctx.state;
+        if (ctx.state === 'suspended') await ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 440;
+        gain.gain.value = 0.3;
+        osc.start();
+        await new Promise(r => setTimeout(r, 500));
+        osc.stop();
+        ctx.close();
+        return { success: true, state, sampleRate: ctx.sampleRate, destination: ctx.destination.channelCount };
+      } catch (e) {
+        return { error: e.message };
+      }
+    })()
+  `)
+  console.log('[Audio Diagnostic] muted:', muted, 'audible:', audible, 'test:', JSON.stringify(result))
+  return { muted, audible, result }
 })
 
 // Get screen work area size (of display where bubble currently is)
@@ -2747,6 +2826,37 @@ function createTray() {
     },
     { type: 'separator' },
     {
+      label: '🔊 Testar Áudio',
+      click: async () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return
+        mainWindow.webContents.setAudioMuted(false)
+        const result = await mainWindow.webContents.executeJavaScript(`
+          (async () => {
+            try {
+              const ctx = new AudioContext();
+              if (ctx.state === 'suspended') await ctx.resume();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.frequency.value = 440;
+              gain.gain.value = 0.5;
+              osc.start();
+              await new Promise(r => setTimeout(r, 1000));
+              osc.stop();
+              await ctx.close();
+              return 'Audio test completed - you should have heard a beep';
+            } catch (e) {
+              return 'Audio test FAILED: ' + e.message;
+            }
+          })()
+        `)
+        console.log('[Audio Test]', result)
+        dialog.showMessageBox(mainWindow, { type: 'info', title: 'Audio Test', message: result })
+      },
+    },
+    { type: 'separator' },
+    {
       label: 'Sair',
       click: () => {
         app.isQuitting = true
@@ -2799,24 +2909,24 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler(() => true)
 
   // System audio loopback via macOS native ScreenCaptureKit picker
-  // useSystemPicker: true shows macOS native picker which properly initializes
-  // audio loopback (avoids the readyState=ended bug with manual source selection).
-  // The handler below is only called if the user cancels the system picker.
-  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    console.log('[AudioLoopback] System picker was cancelled — falling back to manual source')
-    try {
-      if (!hasScreenPermission()) { callback({}); return }
-      const sources = await desktopCapturer.getSources({ types: ['screen'] })
-      if (sources.length > 0) {
-        callback({ video: sources[0], audio: 'loopback' })
-      } else {
+  // Only on macOS — on Windows this can interfere with normal audio playback
+  if (process.platform === 'darwin') {
+    session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+      console.log('[AudioLoopback] System picker was cancelled — falling back to manual source')
+      try {
+        if (!hasScreenPermission()) { callback({}); return }
+        const sources = await desktopCapturer.getSources({ types: ['screen'] })
+        if (sources.length > 0) {
+          callback({ video: sources[0], audio: 'loopback' })
+        } else {
+          callback({})
+        }
+      } catch (err) {
+        console.error('[AudioLoopback] Fallback error:', err)
         callback({})
       }
-    } catch (err) {
-      console.error('[AudioLoopback] Fallback error:', err)
-      callback({})
-    }
-  }, { useSystemPicker: true })
+    }, { useSystemPicker: true })
+  }
 
   console.log('[Main] Creating main window...')
   createMainWindow()

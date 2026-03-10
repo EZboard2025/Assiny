@@ -1008,7 +1008,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     // Parar áudio se estiver tocando
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
+      audioRef.current.src = '';
     }
 
     // Limpar visualizador de áudio
@@ -1188,7 +1188,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     // Parar áudio se estiver tocando
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
+      audioRef.current.src = '';
     }
 
     // Limpar visualizador de áudio
@@ -1769,53 +1769,51 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         throw new Error('Áudio recebido está vazio')
       }
 
+      // Tocar via HTML Audio element (compatível com Electron + Browser)
       const audioUrl = URL.createObjectURL(audioBlob)
-
-      // Criar e tocar o áudio
-      if (audioRef.current) {
-        audioRef.current.pause()
-      }
-
       const audio = new Audio(audioUrl)
+      audio.volume = 1.0
       audioRef.current = audio
 
-      // Configurar visualizador de áudio (não bloqueia reprodução se falhar)
-      try {
-        await setupAudioVisualizer(audio)
-      } catch (vizError) {
-        console.warn('⚠️ Visualizador de áudio falhou, continuando sem visualização:', vizError)
+      // Forçar dispositivo de saída padrão (fix para Electron no Windows)
+      if (typeof (audio as any).setSinkId === 'function') {
+        try {
+          await (audio as any).setSinkId('default')
+          console.log('🔊 Audio output device set to default')
+        } catch (e) {
+          console.warn('⚠️ setSinkId failed:', e)
+        }
       }
+
+      console.log('🔊 Tocando áudio via Audio element, src:', audioUrl)
 
       // Função para limpar estado do áudio
       const cleanupAudio = () => {
         setIsPlayingAudio(false)
         setAudioVolume(0)
-        URL.revokeObjectURL(audioUrl)
 
-        // Limpar animação
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current)
           animationFrameRef.current = null
         }
 
-        // Fechar AudioContext para evitar conflito com microfone
-        if (audioContextRef.current) {
-          audioContextRef.current.close().catch(() => {})
-          audioContextRef.current = null
+        if (audioRef.current) {
+          audioRef.current.pause()
+          audioRef.current.src = ''
+          audioRef.current = null
         }
+
+        URL.revokeObjectURL(audioUrl)
       }
 
-      // Quando o áudio terminar, limpar visualizador e possivelmente finalizar
+      // Quando o áudio terminar
       audio.onended = () => {
         cleanupAudio()
         console.log('🔊 Áudio do cliente finalizado')
 
-        // Se for mensagem de finalização, finalizar automaticamente
         if (isFinalizationMessage) {
           console.log('🎯 Finalizando roleplay automaticamente...')
           setShowFinalizingMessage(true)
-
-          // Aguardar 2 segundos após o áudio terminar
           setTimeout(() => {
             handleEndSession()
           }, 2000)
@@ -1824,20 +1822,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         }
       }
 
-      // Tratar erros de áudio
       audio.onerror = (e) => {
-        console.error('❌ Erro no elemento de áudio:', e)
+        console.error('❌ Audio element error:', e)
         cleanupAudio()
       }
 
-      // Tocar o áudio
-      try {
-        await audio.play()
-        console.log('🔊 Áudio tocando')
-      } catch (playError) {
-        console.error('❌ Erro ao reproduzir áudio (autoplay blocked?):', playError)
-        cleanupAudio()
-      }
+      await audio.play()
+      console.log('🔊 Audio playing, duration:', audio.duration)
     } catch (error) {
       console.error('❌ Erro ao converter texto em áudio:', error)
       setIsPlayingAudio(false)
@@ -1865,9 +1856,16 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       analyser.fftSize = 128 // Menor FFT = mais responsivo aos picos
       analyser.smoothingTimeConstant = 0.3 // Menos suavização = mais reativo
 
-      const source = audioContext.createMediaElementSource(audio)
+      // Usar captureStream para não redirecionar o áudio pelo Web Audio API
+      // Assim o som sai normalmente pelo elemento <audio> e o analyser apenas observa
+      const stream = (audio as any).captureStream?.() || (audio as any).mozCaptureStream?.()
+      if (!stream) {
+        console.warn('captureStream not supported, skipping visualizer')
+        throw new Error('captureStream not supported')
+      }
+      const source = audioContext.createMediaStreamSource(stream)
       source.connect(analyser)
-      analyser.connect(audioContext.destination)
+      // NÃO conectar ao destination — o áudio já toca pelo elemento
 
       audioAnalyserRef.current = analyser
 
@@ -1907,7 +1905,6 @@ Interprete este personagem de forma realista e consistente com todas as caracter
           {/* Header minimalista */}
           <div className="flex justify-between items-center px-6 py-3 border-b border-gray-800">
             <div className="flex items-center gap-3">
-              <span className="text-white/60 text-sm">Roleplay em andamento</span>
               {roleplayConfig?.objective?.name && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-lg border border-green-500/30">
                   <Target size={14} className="text-green-400" />
@@ -2143,10 +2140,8 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               {/* Avatar do Cliente Virtual (gerado por IA) */}
               <div className="flex-1 max-w-[600px] aspect-video bg-gray-800 rounded-xl flex items-center justify-center relative overflow-hidden">
                 {isLoadingAvatar ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-700">
-                    <Loader2 className="w-16 h-16 text-green-400 animate-spin mb-4" />
-                    <span className="text-gray-300 text-sm font-medium">Gerando avatar com IA...</span>
-                    <span className="text-gray-500 text-xs mt-1">Aguarde ~10 segundos</span>
+                  <div className="w-full h-full flex items-center justify-center bg-gray-700">
+                    <Loader2 className="w-16 h-16 text-green-400 animate-spin" />
                   </div>
                 ) : (
                   <img
