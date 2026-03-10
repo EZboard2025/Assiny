@@ -2136,6 +2136,38 @@ const recBar = document.getElementById('rec-bar')
 const btnStopRec = document.getElementById('btn-stop-rec')
 let isBubbleRecording = false
 
+// Screen recording permission needed (macOS)
+if (window.electronAPI && window.electronAPI.onScreenPermissionNeeded) {
+  window.electronAPI.onScreenPermissionNeeded(() => {
+    // Show permission message in chat
+    switchToChatMode()
+    const html = `<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #e94560;border-radius:12px;padding:14px;margin:4px 0;">
+      <div style="color:#e94560;font-weight:600;font-size:13px;margin-bottom:8px;">⚠️ Permissao de Gravacao de Tela</div>
+      <div style="color:#ccc;font-size:12px;line-height:1.5;margin-bottom:10px;">Para detectar reunioes do Google Meet, o Ramppy precisa de permissao de gravacao de tela.<br><br>
+      <b>Como resolver:</b><br>
+      1. Clique no botao abaixo<br>
+      2. Desative e remova o Ramppy da lista (clique -)<br>
+      3. Feche e reabra o Ramppy<br>
+      4. Autorize quando solicitado</div>
+      <button id="btn-open-screen-perm" style="background:#e94560;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;font-weight:600;">Abrir Configuracoes</button>
+    </div>`
+    const wrapper = document.createElement('div')
+    wrapper.className = 'msg-ai-wrap'
+    wrapper.innerHTML = `<div class="msg-ai">${html}</div>`
+    chatMessages.appendChild(wrapper)
+    chatMessages.scrollTop = chatMessages.scrollHeight
+    // Wire button
+    const btn = document.getElementById('btn-open-screen-perm')
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (window.electronAPI.openScreenPermissionSettings) {
+          window.electronAPI.openScreenPermissionSettings()
+        }
+      })
+    }
+  })
+}
+
 if (window.electronAPI && window.electronAPI.onRecordingState) {
   window.electronAPI.onRecordingState((isRec) => {
     isBubbleRecording = isRec

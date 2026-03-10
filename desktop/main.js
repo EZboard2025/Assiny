@@ -894,19 +894,26 @@ ipcMain.on('toggle-copilot', () => {
 function startAuthBridge() {
   // Extract Supabase auth token from main window and forward to bubble
   const extractAndForward = async () => {
-    if (!mainWindow || mainWindow.isDestroyed() || !bubbleWindow || bubbleWindow.isDestroyed()) return
+    if (!mainWindow || mainWindow.isDestroyed() || !bubbleWindow || bubbleWindow.isDestroyed()) {
+      debugLog(`[AuthBridge] Skipping — mainWindow=${!!mainWindow && !mainWindow?.isDestroyed()} bubbleWindow=${!!bubbleWindow && !bubbleWindow?.isDestroyed()}`)
+      return
+    }
 
     try {
       const authData = await mainWindow.webContents.executeJavaScript(`
         (function() {
           try {
             // Supabase stores session in localStorage with key pattern: sb-<ref>-auth-token
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
+            var keys = [];
+            for (var i = 0; i < localStorage.length; i++) {
+              keys.push(localStorage.key(i));
+            }
+            for (var j = 0; j < keys.length; j++) {
+              var key = keys[j];
               if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                const raw = localStorage.getItem(key);
+                var raw = localStorage.getItem(key);
                 if (raw) {
-                  const parsed = JSON.parse(raw);
+                  var parsed = JSON.parse(raw);
                   if (parsed && parsed.access_token) {
                     return JSON.stringify({
                       accessToken: parsed.access_token,
@@ -916,14 +923,24 @@ function startAuthBridge() {
                 }
               }
             }
-          } catch(e) {}
-          return null;
+            return JSON.stringify({ debug: true, totalKeys: keys.length, keyNames: keys.filter(function(k) { return k.startsWith('sb-'); }) });
+          } catch(e) {
+            return JSON.stringify({ error: e.message });
+          }
         })()
       `)
 
       if (authData) {
         const parsed = JSON.parse(authData)
-        if (!hasUserAuth) console.log('[AuthBridge] Got auth token! userId:', parsed.userId)
+        if (parsed.debug) {
+          if (!hasUserAuth) debugLog(`[AuthBridge] No token found. localStorage keys: ${parsed.totalKeys}, sb-keys: ${JSON.stringify(parsed.keyNames)}`)
+          return
+        }
+        if (parsed.error) {
+          debugLog(`[AuthBridge] JS error: ${parsed.error}`)
+          return
+        }
+        if (!hasUserAuth) debugLog(`[AuthBridge] Got auth token! userId: ${parsed.userId}`)
         hasUserAuth = true
         bubbleWindow.webContents.send('auth-token', parsed)
         // Show bubble once user is authenticated
@@ -942,7 +959,7 @@ function startAuthBridge() {
       }
     } catch (err) {
       // Main window may not be ready yet
-      console.log('[AuthBridge] Error:', err.message)
+      debugLog('[AuthBridge] Error: ' + err.message)
     }
   }
 
@@ -1150,6 +1167,7 @@ ipcMain.handle('get-screen-size', async () => {
 // Capture screenshot of primary display for AI vision
 ipcMain.handle('capture-screenshot', async () => {
   try {
+    if (!hasScreenPermission()) return null
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: 1280, height: 720 },
@@ -1171,6 +1189,7 @@ ipcMain.on('open-recording-window', () => {
 // Handle desktopCapturer for Meet feature
 ipcMain.handle('get-sources', async () => {
   try {
+    if (!hasScreenPermission()) return []
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: 0, height: 0 },
@@ -1479,6 +1498,12 @@ async function triggerAutoScan() {
 // Open or focus WhatsApp window
 ipcMain.on('open-whatsapp', () => {
   createWhatsAppWindow()
+})
+
+ipcMain.on('open-screen-permission-settings', () => {
+  if (process.platform === 'darwin') {
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+  }
 })
 
 // Bubble asks for current WhatsApp state
@@ -1886,185 +1911,79 @@ function isLeftMeetWindow(title) {
   return MEET_LEFT_PATTERNS.some(p => lower.includes(p))
 }
 
+let screenPermissionDenied = false // Set to true after first denial — stops retrying
+
+// Check screen recording permission WITHOUT triggering the popup
+function hasScreenPermission() {
+  if (process.platform !== 'darwin') return true // Windows/Linux don't need this
+  if (screenPermissionDenied) return false
+  const status = systemPreferences.getMediaAccessStatus('screen')
+  if (status !== 'granted') {
+    screenPermissionDenied = true
+    debugLog(`[Permission] Screen Recording not granted (${status}) — blocking all desktopCapturer calls`)
+    return false
+  }
+  return true
+}
+
 async function checkForMeetWindow() {
   if (!hasUserAuth) {
-    debugLog('[MeetDetect] Skipping — no auth yet')
+    if (!checkForMeetWindow._noAuthLog || Date.now() - checkForMeetWindow._noAuthLog > 30000) {
+      checkForMeetWindow._noAuthLog = Date.now()
+      debugLog('[MeetDetect] Skipping — no auth yet')
+    }
     return
   }
 
   try {
+    // ─── PRIMARY: AppleScript-based detection (macOS, no Screen Recording needed) ───
+    // Queries Chrome tabs directly for meet.google.com URLs
+    if (process.platform === 'darwin') {
+      try {
+        const chromeState = await checkChromeMeetState()
+        if (chromeState.available) {
+          await handleMeetState(chromeState)
+          return // AppleScript handled it — skip desktopCapturer entirely
+        }
+      } catch (e) {
+        debugLog(`[MeetDetect] AppleScript failed: ${e.message} — falling back to desktopCapturer`)
+      }
+    }
+
+    // ─── FALLBACK: desktopCapturer-based detection (Windows/Linux, or Chrome not running) ───
+    if (!hasScreenPermission()) return
+
     const sources = await desktopCapturer.getSources({
       types: ['window'],
       thumbnailSize: { width: 0, height: 0 },
     })
 
+    if (!checkForMeetWindow._lastLog || Date.now() - checkForMeetWindow._lastLog > 30000) {
+      checkForMeetWindow._lastLog = Date.now()
+      debugLog(`[MeetDetect] Scanning ${sources.length} windows (desktopCapturer fallback)`)
+    }
+
     // Categorize Meet windows
-    // Don't require 🔊 — Chrome hides it when tab is in background or sharing screen
     const activeMeet = sources.find(s => hasMeetCode(s.name) && !isLeftMeetWindow(s.name))
     const meetTabAny = sources.find(s => hasMeetCode(s.name))
     const userLeft = sources.some(s => isLeftMeetWindow(s.name))
     const meetWithAudio = sources.find(s => hasMeetCode(s.name) && s.name.includes('🔊'))
 
-    // Debug: log all windows when recording (critical for diagnosing end-detection issues)
-    if (isRecordingMeet) {
-      const allTitles = sources.map(s => `"${s.name}"`).join(', ')
-      debugLog(`[MeetDetect] RECORDING | activeMeet=${!!activeMeet} meetTabAny=${!!meetTabAny} userLeft=${userLeft} hasAudio=${!!meetWithAudio} noActiveMeetCount=${noActiveMeetCount}`)
-      debugLog(`[MeetDetect] ALL WINDOWS: ${allTitles}`)
-    } else {
-      const meetRelated = sources.filter(s => /meet/i.test(s.name) || hasMeetCode(s.name))
-      if (meetRelated.length > 0) {
-        debugLog(`[MeetDetect] Windows: ${meetRelated.map(s => `"${s.name}"`).join(', ')} | activeMeet=${!!activeMeet} | isRecording=${isRecordingMeet}`)
-      }
+    // Build a chromeState-like object from desktopCapturer results
+    const dcState = {
+      available: true,
+      hasMeetTab: !!meetTabAny,
+      state: userLeft ? 'LEFT' : (activeMeet ? 'ACTIVE' : (meetTabAny ? 'UNKNOWN' : 'NONE')),
+      url: activeMeet?.name || meetTabAny?.name || '',
+      title: activeMeet?.name || meetTabAny?.name || '',
+      // Extra desktopCapturer-specific data
+      _sources: sources,
+      _activeMeet: activeMeet,
+      _meetTabAny: meetTabAny,
+      _meetWithAudio: meetWithAudio,
     }
 
-    if (!isRecordingMeet && !pendingMeetConfirmation) {
-      // Not recording — ask user if they want to record
-      if (activeMeet) {
-        const meetCode = activeMeet.name.match(MEET_CODE_PATTERN)?.[0]
-        if (meetCode && meetCode === lastRecordedMeetCode) return // Already recorded, skip
-        if (meetCode && meetCode === declinedMeetCode) return // User declined this meeting
-
-        pendingMeetConfirmation = true
-        pendingMeetTitle = activeMeet.name
-
-        debugLog('[MeetDetect] Active meeting detected, asking user:', activeMeet.name)
-
-        // Show confirmation card in bubble
-        if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-          bubbleWindow.webContents.send('ask-meeting-start', activeMeet.name)
-        }
-      }
-    } else if (pendingMeetConfirmation) {
-      // Waiting for user response — check if meeting disappeared
-      if (!activeMeet) {
-        meetWindowGoneCount++
-        if (meetWindowGoneCount >= 2) {
-          debugLog('[MeetDetect] Meeting disappeared while waiting for confirmation — cancelling')
-          meetWindowGoneCount = 0
-          pendingMeetConfirmation = false
-          pendingMeetTitle = null
-          if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-            bubbleWindow.webContents.send('hide-meeting-start')
-          }
-        }
-      } else {
-        meetWindowGoneCount = 0
-      }
-    } else {
-      // Currently recording — detect when meeting ends.
-      // After user dismisses "ended?" card, we wait until Meet becomes active again
-      // before re-asking (state-based, not time-based cooldown).
-
-      // Track audio indicator
-      if (meetWithAudio) meetHadAudioIndicator = true
-
-      // If waiting for reactivation and Meet is active again → reset, resume detection
-      if (waitingForMeetReactivation && activeMeet) {
-        debugLog('[MeetDetect] Meet became active again after dismiss — resuming end detection')
-        waitingForMeetReactivation = false
-        meetWindowGoneCount = 0
-        noActiveMeetCount = 0
-      }
-
-      // PRIMARY DETECTION: AppleScript checks Chrome tab URL (no JS execution needed)
-      if (!waitingForMeetReactivation) {
-        try {
-          const chromeState = await checkChromeMeetState()
-          if (chromeState.available) {
-            if (chromeState.state === 'LEFT') {
-              // DEFINITIVE: URL changed to landing page or has authuser redirect
-              debugLog(`[MeetDetect] AppleScript: LEFT detected — URL: ${chromeState.url} title: ${chromeState.title}`)
-              noControlsCount = 0
-              meetWindowGoneCount = 0
-              noActiveMeetCount = 0
-              if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-                bubbleWindow.webContents.send('ask-meeting-ended')
-              }
-              return
-            } else if (chromeState.state === 'ACTIVE') {
-              noControlsCount = 0 // Reset — meeting is active
-            } else if (!chromeState.hasMeetTab) {
-              // Meet tab completely gone from Chrome
-              noControlsCount++
-              debugLog(`[MeetDetect] AppleScript: Meet tab gone (${noControlsCount}/${NO_CONTROLS_THRESHOLD})`)
-              if (noControlsCount >= NO_CONTROLS_THRESHOLD) {
-                debugLog('[MeetDetect] Meet tab gone for 3 checks — asking confirmation')
-                noControlsCount = 0
-                if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-                  bubbleWindow.webContents.send('ask-meeting-ended')
-                }
-                return
-              }
-            }
-          }
-        } catch (e) {
-          debugLog(`[MeetDetect] AppleScript exception: ${e.message}`)
-          // AppleScript not available — fall through to desktopCapturer-based detection
-        }
-      }
-
-      // FALLBACK DETECTION: desktopCapturer-based (for non-macOS or when AppleScript fails)
-      // Skip end-detection while waiting for reactivation
-      if (waitingForMeetReactivation) {
-        // Still waiting — just track counters silently
-        if (activeMeet) {
-          meetWindowGoneCount = 0
-          noActiveMeetCount = 0
-        }
-      } else if (userLeft) {
-        // Definitive signal — always show
-        debugLog('[MeetDetect] User left the meeting (title match). Asking confirmation...')
-        meetWindowGoneCount = 0
-        noActiveMeetCount = 0
-        if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-          bubbleWindow.webContents.send('ask-meeting-ended')
-        }
-      } else if (!meetTabAny) {
-        // Meet window gone — user closed the tab or Chrome
-        // AppleScript should have caught this already, but fallback just in case
-        meetWindowGoneCount++
-        noActiveMeetCount = 0
-        debugLog(`[MeetDetect] Meet window not found (${meetWindowGoneCount}/3)`)
-        if (meetWindowGoneCount >= 3) { // 3 × 1.5s = 4.5s debounce
-          debugLog('[MeetDetect] Meet window gone — asking confirmation')
-          meetWindowGoneCount = 0
-          if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-            bubbleWindow.webContents.send('ask-meeting-ended')
-          }
-        }
-      } else if (meetTabAny && !activeMeet) {
-        // Meet code exists but activeMeet is null (left pattern matched, or title changed)
-        noActiveMeetCount++
-        meetWindowGoneCount = 0
-        debugLog(`[MeetDetect] meetTabAny but no activeMeet (${noActiveMeetCount}/4)`)
-        if (noActiveMeetCount >= 4) { // 4 × 1.5s = 6s
-          debugLog('[MeetDetect] No active meeting for 6s — asking confirmation')
-          noActiveMeetCount = 0
-          if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-            bubbleWindow.webContents.send('ask-meeting-ended')
-          }
-        }
-      } else if (activeMeet && meetHadAudioIndicator && !meetWithAudio) {
-        // 🔊 disappeared — meeting might have ended
-        // Longer debounce since this is less reliable (tab background, screen sharing)
-        noActiveMeetCount++
-        meetWindowGoneCount = 0
-        debugLog(`[MeetDetect] Audio indicator lost (${noActiveMeetCount}/12)`)
-        if (noActiveMeetCount >= 12) { // 12 × 1.5s = 18s
-          debugLog('[MeetDetect] Audio gone for 18s — asking confirmation')
-          noActiveMeetCount = 0
-          if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-            bubbleWindow.webContents.send('ask-meeting-ended')
-          }
-        }
-      } else {
-        // Meet tab active — keep recording
-        if (activeMeet) {
-          meetWindowGoneCount = 0
-          noActiveMeetCount = 0
-        }
-      }
-    }
+    await handleMeetState(dcState)
 
     // Reset when all Meet tabs are closed (allow detecting next meeting)
     if (!meetTabAny && !isRecordingMeet && !userLeft && !pendingMeetConfirmation) {
@@ -2076,9 +1995,128 @@ async function checkForMeetWindow() {
   }
 }
 
+// Unified state handler — works with both AppleScript and desktopCapturer results
+async function handleMeetState(state) {
+  if (!state.available) return
+
+  if (!isRecordingMeet && !pendingMeetConfirmation) {
+    // ── NOT RECORDING: detect meeting START ──
+    if (state.state === 'ACTIVE' && state.hasMeetTab) {
+      const meetCode = (state.url || state.title || '').match(MEET_CODE_PATTERN)?.[0]
+      if (meetCode && meetCode === lastRecordedMeetCode) return
+      if (meetCode && meetCode === declinedMeetCode) return
+
+      pendingMeetConfirmation = true
+      pendingMeetTitle = state.title || state.url || 'Google Meet'
+
+      debugLog(`[MeetDetect] Active meeting detected via ${state._sources ? 'desktopCapturer' : 'AppleScript'}: ${pendingMeetTitle}`)
+
+      if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+        bubbleWindow.webContents.send('ask-meeting-start', pendingMeetTitle)
+      }
+    }
+    // Also reset declined/recorded codes when no meet tabs exist
+    if (state.state === 'NONE' || !state.hasMeetTab) {
+      lastRecordedMeetCode = null
+      declinedMeetCode = null
+    }
+  } else if (pendingMeetConfirmation) {
+    // ── WAITING FOR USER CONFIRMATION ──
+    if (state.state !== 'ACTIVE' && state.state !== 'UNKNOWN') {
+      meetWindowGoneCount++
+      if (meetWindowGoneCount >= 2) {
+        debugLog('[MeetDetect] Meeting disappeared while waiting for confirmation — cancelling')
+        meetWindowGoneCount = 0
+        pendingMeetConfirmation = false
+        pendingMeetTitle = null
+        if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+          bubbleWindow.webContents.send('hide-meeting-start')
+        }
+      }
+    } else {
+      meetWindowGoneCount = 0
+    }
+  } else {
+    // ── RECORDING: detect meeting END ──
+
+    // Track audio indicator (desktopCapturer only)
+    if (state._meetWithAudio) meetHadAudioIndicator = true
+
+    // If waiting for reactivation and Meet is active again → reset
+    if (waitingForMeetReactivation && state.state === 'ACTIVE') {
+      debugLog('[MeetDetect] Meet became active again after dismiss — resuming end detection')
+      waitingForMeetReactivation = false
+      meetWindowGoneCount = 0
+      noActiveMeetCount = 0
+      noControlsCount = 0
+    }
+
+    if (waitingForMeetReactivation) return
+
+    if (state.state === 'LEFT') {
+      debugLog(`[MeetDetect] LEFT detected — URL: ${state.url} title: ${state.title}`)
+      noControlsCount = 0
+      meetWindowGoneCount = 0
+      noActiveMeetCount = 0
+      if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+        bubbleWindow.webContents.send('ask-meeting-ended')
+      }
+    } else if (!state.hasMeetTab) {
+      // Meet tab completely gone
+      noControlsCount++
+      debugLog(`[MeetDetect] Meet tab gone (${noControlsCount}/${NO_CONTROLS_THRESHOLD})`)
+      if (noControlsCount >= NO_CONTROLS_THRESHOLD) {
+        debugLog('[MeetDetect] Meet tab gone for 3 checks — asking confirmation')
+        noControlsCount = 0
+        if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+          bubbleWindow.webContents.send('ask-meeting-ended')
+        }
+      }
+    } else if (state.state === 'ACTIVE') {
+      // Meeting still active — reset counters
+      noControlsCount = 0
+      meetWindowGoneCount = 0
+      noActiveMeetCount = 0
+    } else if (state.hasMeetTab && state.state !== 'ACTIVE') {
+      // Meet tab exists but not active (UNKNOWN state)
+      noActiveMeetCount++
+      meetWindowGoneCount = 0
+      debugLog(`[MeetDetect] Meet tab present but not active (${noActiveMeetCount}/4)`)
+      if (noActiveMeetCount >= 4) {
+        debugLog('[MeetDetect] No active meeting for 4 checks — asking confirmation')
+        noActiveMeetCount = 0
+        if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+          bubbleWindow.webContents.send('ask-meeting-ended')
+        }
+      }
+    }
+  }
+}
+
 const MEET_CHECK_IDLE = 3000    // 3s when not recording
 const MEET_CHECK_RECORDING = 1500 // 1.5s when recording (faster end detection)
 let currentMeetCheckInterval = MEET_CHECK_IDLE
+
+let screenPermissionWarned = false
+
+function checkScreenPermission() {
+  if (process.platform !== 'darwin') return true
+  const status = systemPreferences.getMediaAccessStatus('screen')
+  debugLog(`[MeetDetect] Screen recording permission: ${status}`)
+  if (status !== 'granted') {
+    if (!screenPermissionWarned) {
+      screenPermissionWarned = true
+      debugLog('[MeetDetect] Screen recording NOT granted — prompting user')
+      // Tell bubble to show permission message
+      if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+        bubbleWindow.webContents.send('screen-permission-needed')
+      }
+    }
+    return false
+  }
+  screenPermissionWarned = false
+  return true
+}
 
 function startMeetDetection() {
   if (meetDetectionInterval) return
@@ -2101,6 +2139,85 @@ function stopMeetDetection() {
   if (meetDetectionInterval) {
     clearInterval(meetDetectionInterval)
     meetDetectionInterval = null
+  }
+}
+
+// ============================================================
+// CALENDAR-BASED MEET DETECTION (no Screen Recording needed)
+// ============================================================
+let calendarCheckInterval = null
+let lastCalendarMeetingId = null  // Prevents re-asking for same meeting
+
+async function getAuthToken() {
+  if (!mainWindow || mainWindow.isDestroyed()) return null
+  try {
+    return await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              var raw = localStorage.getItem(key);
+              if (raw) {
+                var parsed = JSON.parse(raw);
+                if (parsed && parsed.access_token) return parsed.access_token;
+              }
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    `)
+  } catch { return null }
+}
+
+async function checkCalendarForMeeting() {
+  if (!hasUserAuth || isRecordingMeet || pendingMeetConfirmation) return
+
+  try {
+    const token = await getAuthToken()
+    if (!token) return
+
+    const res = await fetch(`${PLATFORM_URL}/api/calendar/next-meeting?minutes=3`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+
+    if (!res.ok) return
+
+    const data = await res.json()
+    if (!data.meeting) return
+
+    // Don't ask again for same meeting
+    if (data.meeting.id === lastCalendarMeetingId) return
+    if (data.meeting.id === declinedMeetCode) return
+
+    debugLog(`[CalendarDetect] Meeting starting soon: "${data.meeting.title}" in ${data.meeting.minutesUntil}min`)
+
+    lastCalendarMeetingId = data.meeting.id
+    pendingMeetConfirmation = true
+    pendingMeetTitle = data.meeting.title
+
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+      bubbleWindow.webContents.send('ask-meeting-start', data.meeting.title)
+    }
+  } catch (err) {
+    // Silent — don't spam logs for network errors
+  }
+}
+
+function startCalendarDetection() {
+  if (calendarCheckInterval) return
+  // Check every 30s (lightweight API call, no permissions needed)
+  calendarCheckInterval = setInterval(checkCalendarForMeeting, 30000)
+  // First check after 10s
+  setTimeout(checkCalendarForMeeting, 10000)
+  debugLog('[CalendarDetect] Started calendar-based meeting detection (every 30s)')
+}
+
+function stopCalendarDetection() {
+  if (calendarCheckInterval) {
+    clearInterval(calendarCheckInterval)
+    calendarCheckInterval = null
   }
 }
 
@@ -2688,6 +2805,7 @@ app.whenReady().then(() => {
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
     console.log('[AudioLoopback] System picker was cancelled — falling back to manual source')
     try {
+      if (!hasScreenPermission()) { callback({}); return }
       const sources = await desktopCapturer.getSources({ types: ['screen'] })
       if (sources.length > 0) {
         callback({ video: sources[0], audio: 'loopback' })
@@ -2735,6 +2853,7 @@ app.whenReady().then(() => {
   createTray()
   startAuthBridge()
   startMeetDetection()
+  startCalendarDetection()
   console.log('[Main] All init complete')
 
   // macOS: restore dock icon after bubble settings are applied

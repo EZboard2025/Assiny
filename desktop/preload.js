@@ -61,4 +61,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hideNotificationToast: () => ipcRenderer.invoke('hide-notification-toast'),
   onNotificationClicked: (callback) => ipcRenderer.on('notification-clicked', () => callback()),
   onNotificationDismissed: (callback) => ipcRenderer.on('notification-dismissed', () => callback()),
+  // Screen recording permission
+  onScreenPermissionNeeded: (callback) => ipcRenderer.on('screen-permission-needed', () => callback()),
+  openScreenPermissionSettings: () => ipcRenderer.send('open-screen-permission-settings'),
 })
