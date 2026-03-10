@@ -2826,37 +2826,6 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: '🔊 Testar Áudio',
-      click: async () => {
-        if (!mainWindow || mainWindow.isDestroyed()) return
-        mainWindow.webContents.setAudioMuted(false)
-        const result = await mainWindow.webContents.executeJavaScript(`
-          (async () => {
-            try {
-              const ctx = new AudioContext();
-              if (ctx.state === 'suspended') await ctx.resume();
-              const osc = ctx.createOscillator();
-              const gain = ctx.createGain();
-              osc.connect(gain);
-              gain.connect(ctx.destination);
-              osc.frequency.value = 440;
-              gain.gain.value = 0.5;
-              osc.start();
-              await new Promise(r => setTimeout(r, 1000));
-              osc.stop();
-              await ctx.close();
-              return 'Audio test completed - you should have heard a beep';
-            } catch (e) {
-              return 'Audio test FAILED: ' + e.message;
-            }
-          })()
-        `)
-        console.log('[Audio Test]', result)
-        dialog.showMessageBox(mainWindow, { type: 'info', title: 'Audio Test', message: result })
-      },
-    },
-    { type: 'separator' },
-    {
       label: 'Sair',
       click: () => {
         app.isQuitting = true
