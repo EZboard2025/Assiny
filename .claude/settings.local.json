@@ -38,7 +38,13 @@
       "Bash(git push:*)",
       "Bash(ssh root@31.97.84.130 'export NVM_DIR=\"\"$HOME/.nvm\"\" && [ -s \"\"$NVM_DIR/nvm.sh\"\" ] && . \"\"$NVM_DIR/nvm.sh\"\" && cd /var/www/assiny && git pull origin main && export NODE_OPTIONS=\"\"--max-old-space-size=4096\"\" && npm run build && pm2 restart assiny')",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Read(//c/Program Files/Ramppy/**)",
+      "Bash(gh run list --limit 3)",
+      "Bash(where gh)",
+      "Bash(scp public/downloads/Ramppy.exe root@31.97.84.130:/var/www/assiny/public/downloads/Ramppy.exe)",
+      "Read(//c/Users/ADM/.ssh/**)",
+      "Bash(ssh -o StrictHostKeyChecking=accept-new root@31.97.84.130 \"echo connected\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
