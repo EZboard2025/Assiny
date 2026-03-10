@@ -1815,10 +1815,7 @@ function stopPowerSaveBlocker() {
 // This detects "Você saiu da reunião" INSTANTLY (desktopCapturer can't see inactive tabs)
 function checkChromeMeetState() {
   return new Promise((resolve) => {
-    // Two-phase detection:
-    // 1. Try JavaScript execution (instant — checks page content for "Você saiu da reunião")
-    //    Requires Chrome > View > Developer > "Allow JavaScript from Apple Events" (one-time setting)
-    // 2. Fallback to URL-only (checks for /landing redirect — takes ~60s after leaving)
+    // URL+title based detection — no JS execution (avoids timeout on heavy Meet pages)
     const script = `
 tell application "Google Chrome"
   set meetResults to ""
@@ -1827,18 +1824,14 @@ tell application "Google Chrome"
       if URL of t contains "meet.google.com/" then
         set meetUrl to URL of t
         set meetTitle to title of t
-        set pageState to "UNKNOWN"
-        try
-          set pageState to execute t javascript "(() => { const b = document.body ? document.body.innerText : ''; const leftTexts = ['saiu da reunião', 'left the meeting', 'Voltando à tela inicial', 'Return to home screen', 'reunião foi encerrada', 'meeting has ended', 'Saliste de la reunión', 'La reunión finalizó']; if (leftTexts.some(t => b.includes(t))) return 'LEFT'; return 'ACTIVE'; })()"
-        end try
-        set meetResults to meetResults & meetUrl & "|||" & meetTitle & "|||" & pageState & ":::"
+        set meetResults to meetResults & meetUrl & "|||" & meetTitle & ":::"
       end if
     end repeat
   end repeat
   if meetResults is "" then return "NONE"
   return meetResults
 end tell`
-    exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { timeout: 3000 }, (err, stdout) => {
+    exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { timeout: 5000 }, (err, stdout) => {
       if (err) {
         debugLog(`[MeetDetect] AppleScript error: ${err.message}`)
         resolve({ available: false })
@@ -1849,36 +1842,26 @@ end tell`
         resolve({ available: true, hasMeetTab: false, state: 'NONE' })
         return
       }
-      // Parse all Meet tabs: url|||title|||pageState:::
+      // Parse all Meet tabs: url|||title:::
       const tabs = result.split(':::').filter(Boolean).map(entry => {
         const parts = entry.split('|||')
-        return { url: parts[0] || '', title: parts[1] || '', pageState: parts[2] || 'UNKNOWN' }
+        return { url: parts[0] || '', title: parts[1] || '' }
       })
-      debugLog(`[MeetDetect] AppleScript: ${tabs.map(t => `${t.pageState} ${t.url}`).join(' | ')}`)
+      debugLog(`[MeetDetect] AppleScript: ${tabs.map(t => `${t.url} "${t.title}"`).join(' | ')}`)
 
-      // Phase 1: JavaScript-based detection (instant & reliable)
-      const jsLeftTab = tabs.find(t => t.pageState === 'LEFT')
-      const jsActiveTab = tabs.find(t => t.pageState === 'ACTIVE')
-      if (jsLeftTab) {
-        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: jsLeftTab.url, title: jsLeftTab.title })
-        return
-      }
-      if (jsActiveTab) {
-        resolve({ available: true, hasMeetTab: true, state: 'ACTIVE', url: jsActiveTab.url, title: jsActiveTab.title })
-        return
-      }
-
-      // Phase 2: URL-only fallback (when JS execution is disabled in Chrome)
-      // Note: authuser= is present during AND after meeting, so we can't use it as a signal
-      const landingTab = tabs.find(t => t.url.includes('/landing'))
-      const meetCodeTab = tabs.find(t => MEET_CODE_PATTERN.test(t.url))
+      // Classify tabs by URL and title patterns
+      const meetCodeTab = tabs.find(t => MEET_CODE_PATTERN.test(t.url) && !t.url.includes('/landing'))
       const titleLeftTab = tabs.find(t => MEET_LEFT_PATTERNS.some(p => t.title.toLowerCase().includes(p)))
+      const landingTab = tabs.find(t => t.url.includes('/landing'))
 
-      if (landingTab || titleLeftTab) {
-        const lt = landingTab || titleLeftTab
-        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: lt.url, title: lt.title })
-      } else if (meetCodeTab) {
+      // Priority: active meeting > left meeting > landing page
+      if (meetCodeTab && !titleLeftTab) {
         resolve({ available: true, hasMeetTab: true, state: 'ACTIVE', url: meetCodeTab.url, title: meetCodeTab.title })
+      } else if (titleLeftTab) {
+        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: titleLeftTab.url, title: titleLeftTab.title })
+      } else if (landingTab) {
+        // Landing page only (no active meeting) — not a meeting
+        resolve({ available: true, hasMeetTab: false, state: 'NONE' })
       } else {
         resolve({ available: true, hasMeetTab: tabs.length > 0, state: 'UNKNOWN' })
       }
