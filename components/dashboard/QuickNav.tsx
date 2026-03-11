@@ -13,7 +13,7 @@ const ITEMS = [
   // WhatsApp IA removed — now handled exclusively by the Electron desktop app
   { key: 'meet-analysis', icon: Video, label: 'Análise Meet', always: true },
   { key: 'pdi', icon: Target, label: 'PDI', needsPDI: true },
-  { key: 'roleplay-links', icon: Link2, label: 'Processo Seletivo', adminOnly: true },
+  { key: 'roleplay-links', icon: Link2, label: 'Simulação Pública', adminOnly: true },
   { key: 'manager', icon: BarChart3, label: 'Gestão', adminOnly: true },
 ]
 

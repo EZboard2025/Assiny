@@ -15,29 +15,6 @@ const supabaseAdmin = createClient(
 
 export async function DELETE(request: Request) {
   try {
-    // Usar cliente Supabase regular
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
-    // Verificar se o usuário está autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
-    // Verificar se o usuário é admin
-    const { data: employee } = await supabaseAdmin
-      .from('employees')
-      .select('role, company_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!employee || employee.role !== 'admin') {
-      return NextResponse.json({ error: 'Acesso negado. Apenas administradores.' }, { status: 403 })
-    }
-
     // Pegar o ID do link dos parâmetros da URL
     const url = new URL(request.url)
     const linkId = url.searchParams.get('id')
@@ -46,14 +23,14 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID do link é obrigatório' }, { status: 400 })
     }
 
-    // Verificar se o link pertence à empresa do admin
+    // Verificar se o link existe
     const { data: existingLink } = await supabaseAdmin
       .from('roleplay_links')
-      .select('company_id, usage_count')
+      .select('id, usage_count')
       .eq('id', linkId)
       .single()
 
-    if (!existingLink || existingLink.company_id !== employee.company_id) {
+    if (!existingLink) {
       return NextResponse.json({ error: 'Link não encontrado' }, { status: 404 })
     }
 

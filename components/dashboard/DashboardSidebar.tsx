@@ -34,7 +34,7 @@ export default function DashboardSidebar({
     { icon: User, href: '/profile', label: 'Meu Perfil', show: true },
     { icon: Target, href: '/pdi-page', label: 'PDI', show: hasPDI },
     { icon: TrendingUp, href: '/manager', label: 'Gestão', show: isAdmin || isGestor },
-    { icon: Link2, href: '/roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
+    { icon: Link2, href: '/simulacao-publica', label: 'Simulação Pública', show: isAdmin || isGestor },
     { icon: Download, href: '/#download', label: 'Download', show: typeof window !== 'undefined' && !(window as any).electronAPI },
   ]
 

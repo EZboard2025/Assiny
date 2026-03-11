@@ -39,7 +39,7 @@ export default function Sidebar({
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
     // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden
     { icon: TrendingUp, view: 'manager', label: 'Gestão', show: isAdmin || isGestor },
-    { icon: Link2, view: 'roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
+    { icon: Link2, view: 'roleplay-links', label: 'Simulação Pública', show: isAdmin || isGestor },
     { icon: Download, view: 'download', label: 'Download', show: typeof window !== 'undefined' && !(window as any).electronAPI },
   ]
 
