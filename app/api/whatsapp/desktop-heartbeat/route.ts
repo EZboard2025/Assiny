@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { claimPendingCommands, completeCommand } from '@/lib/whatsapp-command-queue'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -101,6 +102,18 @@ export async function POST(request: Request) {
       }
     }
 
+    // Process command results reported by desktop
+    if (body.commandResults && Array.isArray(body.commandResults)) {
+      for (const result of body.commandResults) {
+        if (!result.commandId) continue
+        await completeCommand(
+          result.commandId,
+          result.result || null,
+          result.error || null
+        )
+      }
+    }
+
     // Check for pending scrape requests for this seller
     const { data: pendingRequests } = await supabaseAdmin
       .from('scrape_requests')
@@ -119,6 +132,9 @@ export async function POST(request: Request) {
         .in('id', pendingRequests.map(r => r.id))
     }
 
+    // Claim pending desktop commands for this user
+    const pendingCommands = await claimPendingCommands(user.id)
+
     return NextResponse.json({
       ok: true,
       status: 'active',
@@ -126,6 +142,11 @@ export async function POST(request: Request) {
         requestId: r.id,
         contactName: r.contact_name,
         contactPhone: r.contact_phone,
+      })),
+      desktopCommands: pendingCommands.map(c => ({
+        commandId: c.id,
+        type: c.command_type,
+        payload: c.payload,
       })),
     })
   } catch (error: any) {

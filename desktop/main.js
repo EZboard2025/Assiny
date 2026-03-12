@@ -691,6 +691,7 @@ function createWhatsAppWindow() {
   waView.webContents.on('did-finish-load', () => setTimeout(checkWaAuth, 2000))
 
   let pendingScrapeResults = []
+  let pendingCommandResults = []
 
   async function sendDesktopWaHeartbeat(status) {
     try {
@@ -721,6 +722,10 @@ function createWhatsAppWindow() {
       if (pendingScrapeResults.length > 0) {
         bodyPayload.scrapeResults = pendingScrapeResults.splice(0)
       }
+      // Attach pending command results if any
+      if (pendingCommandResults.length > 0) {
+        bodyPayload.commandResults = pendingCommandResults.splice(0)
+      }
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -743,9 +748,139 @@ function createWhatsAppWindow() {
           sendDesktopWaHeartbeat('active')
         }
       }
+
+      // Process desktop commands from server (command queue)
+      if (result.desktopCommands && result.desktopCommands.length > 0) {
+        debugLog(`[Command Queue] Received ${result.desktopCommands.length} command(s)`)
+        for (const cmd of result.desktopCommands) {
+          await executeDesktopCommand(cmd)
+        }
+        // Send immediate heartbeat to report command results
+        if (pendingCommandResults.length > 0) {
+          sendDesktopWaHeartbeat('active')
+        }
+      }
     } catch (err) {
       console.error('[WhatsApp Desktop] Heartbeat failed:', err.message)
     }
+  }
+
+  // --- Desktop Command Executor (command queue) ---
+  async function executeDesktopCommand(cmd) {
+    const { commandId, type, payload } = cmd
+    debugLog(`[Command Queue] Executing: ${type} (${commandId})`)
+
+    if (!waView || waView.webContents.isDestroyed()) {
+      pendingCommandResults.push({ commandId, error: 'whatsapp_not_open' })
+      return
+    }
+
+    try {
+      switch (type) {
+        case 'send_text': {
+          const { contactPhone, contactName, message } = payload
+          const target = contactPhone || contactName
+          if (!target || !message) {
+            pendingCommandResults.push({ commandId, error: 'missing_contact_or_message' })
+            return
+          }
+
+          // 1. Navigate to the contact
+          const navResult = await waView.webContents.executeJavaScript(
+            `window.__ramppyNavigateToContact(${JSON.stringify(target)})`
+          )
+          if (!navResult || !navResult.success) {
+            // Try with contactName if phone didn't work
+            let retryResult = null
+            if (contactName && contactName !== target) {
+              retryResult = await waView.webContents.executeJavaScript(
+                `window.__ramppyNavigateToContact(${JSON.stringify(contactName)})`
+              )
+            }
+            if (!retryResult || !retryResult.success) {
+              pendingCommandResults.push({
+                commandId,
+                error: `contact_not_found: ${target}`,
+              })
+              return
+            }
+          }
+
+          // 2. Small delay to simulate natural typing
+          await new Promise(r => setTimeout(r, 500 + Math.random() * 1000))
+
+          // 3. Inject the text
+          const injected = await waView.webContents.executeJavaScript(
+            `(function() {
+              var input = (function trySelect(parent, selectors) {
+                var sels = Array.isArray(selectors) ? selectors : [selectors];
+                for (var i = 0; i < sels.length; i++) {
+                  var el = parent.querySelector(sels[i]);
+                  if (el) return el;
+                }
+                return null;
+              })(document, ${JSON.stringify(SELECTORS_FOR_JS.inputField)});
+              if (!input) return false;
+              input.focus();
+              input.textContent = '';
+              document.execCommand('insertText', false, ${JSON.stringify(message)});
+              input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ${JSON.stringify(message)} }));
+              return true;
+            })()`
+          )
+
+          if (!injected) {
+            pendingCommandResults.push({ commandId, error: 'input_field_not_found' })
+            return
+          }
+
+          // 4. Small delay then press Enter
+          await new Promise(r => setTimeout(r, 300 + Math.random() * 500))
+
+          await waView.webContents.executeJavaScript(
+            `window.__ramppySendMessage()`
+          )
+
+          debugLog(`[Command Queue] send_text completed: "${message.substring(0, 50)}..." to ${target}`)
+          pendingCommandResults.push({ commandId, result: { sent: true, to: target } })
+          break
+        }
+
+        case 'navigate_to_contact': {
+          const target = payload.contactPhone || payload.contactName
+          if (!target) {
+            pendingCommandResults.push({ commandId, error: 'missing_contact' })
+            return
+          }
+          const navResult = await waView.webContents.executeJavaScript(
+            `window.__ramppyNavigateToContact(${JSON.stringify(target)})`
+          )
+          if (!navResult || !navResult.success) {
+            pendingCommandResults.push({ commandId, error: navResult?.error || 'navigation_failed' })
+          } else {
+            pendingCommandResults.push({ commandId, result: { navigated: true, contactName: navResult.contactName } })
+          }
+          break
+        }
+
+        default:
+          debugLog(`[Command Queue] Unknown command type: ${type}`)
+          pendingCommandResults.push({ commandId, error: `unknown_command_type: ${type}` })
+      }
+    } catch (err) {
+      debugLog(`[Command Queue] Error executing ${type}: ${err.message}`)
+      pendingCommandResults.push({ commandId, error: err.message })
+    }
+  }
+
+  // Input field selectors (passed to executeJavaScript since scraper context is separate)
+  const SELECTORS_FOR_JS = {
+    inputField: [
+      '#main footer div[contenteditable="true"]',
+      '#main [data-testid="conversation-compose-box-input"]',
+      '[data-testid="compose-box"] div[contenteditable="true"]',
+      'footer div[contenteditable="true"]',
+    ],
   }
 
   // --- Targeted Scrape (on-demand from manager) ---
@@ -1317,6 +1452,19 @@ ipcMain.on('whatsapp-conversation-list', (_event, list) => {
   lastSidebarList = list  // Store for smart re-sync comparison
   console.log(`[WhatsApp IPC] Conversation list received: ${list.length} conversations`)
   syncConversationList(list)
+})
+
+// New messages detected in real time — trigger immediate sync
+ipcMain.on('whatsapp-new-messages', (_event, data) => {
+  if (!data.contactName || !data.messages?.length) return
+  console.log(`[WhatsApp IPC] New messages: ${data.messages.length} from "${data.contactName}"`)
+  // Queue for immediate sync
+  let syncKey = data.contactName
+  if (/^[\d+\s()-]+$/.test(syncKey.replace(/\s/g, ''))) {
+    syncKey = syncKey.replace(/\s/g, '')
+  }
+  queueForSync(syncKey, data.contactName, data.messages)
+  executeSync()
 })
 
 // Copilot requests text injection into WhatsApp input
@@ -1894,10 +2042,7 @@ function stopPowerSaveBlocker() {
 // This detects "Você saiu da reunião" INSTANTLY (desktopCapturer can't see inactive tabs)
 function checkChromeMeetState() {
   return new Promise((resolve) => {
-    // Two-phase detection:
-    // 1. Try JavaScript execution (instant — checks page content for "Você saiu da reunião")
-    //    Requires Chrome > View > Developer > "Allow JavaScript from Apple Events" (one-time setting)
-    // 2. Fallback to URL-only (checks for /landing redirect — takes ~60s after leaving)
+    // URL+title based detection — no JS execution (avoids timeout on heavy Meet pages)
     const script = `
 tell application "Google Chrome"
   set meetResults to ""
@@ -1906,18 +2051,14 @@ tell application "Google Chrome"
       if URL of t contains "meet.google.com/" then
         set meetUrl to URL of t
         set meetTitle to title of t
-        set pageState to "UNKNOWN"
-        try
-          set pageState to execute t javascript "(() => { const b = document.body ? document.body.innerText : ''; const leftTexts = ['saiu da reunião', 'left the meeting', 'Voltando à tela inicial', 'Return to home screen', 'reunião foi encerrada', 'meeting has ended', 'Saliste de la reunión', 'La reunión finalizó']; if (leftTexts.some(t => b.includes(t))) return 'LEFT'; return 'ACTIVE'; })()"
-        end try
-        set meetResults to meetResults & meetUrl & "|||" & meetTitle & "|||" & pageState & ":::"
+        set meetResults to meetResults & meetUrl & "|||" & meetTitle & ":::"
       end if
     end repeat
   end repeat
   if meetResults is "" then return "NONE"
   return meetResults
 end tell`
-    exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { timeout: 3000 }, (err, stdout) => {
+    exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { timeout: 5000 }, (err, stdout) => {
       if (err) {
         debugLog(`[MeetDetect] AppleScript error: ${err.message}`)
         resolve({ available: false })
@@ -1928,36 +2069,26 @@ end tell`
         resolve({ available: true, hasMeetTab: false, state: 'NONE' })
         return
       }
-      // Parse all Meet tabs: url|||title|||pageState:::
+      // Parse all Meet tabs: url|||title:::
       const tabs = result.split(':::').filter(Boolean).map(entry => {
         const parts = entry.split('|||')
-        return { url: parts[0] || '', title: parts[1] || '', pageState: parts[2] || 'UNKNOWN' }
+        return { url: parts[0] || '', title: parts[1] || '' }
       })
-      debugLog(`[MeetDetect] AppleScript: ${tabs.map(t => `${t.pageState} ${t.url}`).join(' | ')}`)
+      debugLog(`[MeetDetect] AppleScript: ${tabs.map(t => `${t.url} "${t.title}"`).join(' | ')}`)
 
-      // Phase 1: JavaScript-based detection (instant & reliable)
-      const jsLeftTab = tabs.find(t => t.pageState === 'LEFT')
-      const jsActiveTab = tabs.find(t => t.pageState === 'ACTIVE')
-      if (jsLeftTab) {
-        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: jsLeftTab.url, title: jsLeftTab.title })
-        return
-      }
-      if (jsActiveTab) {
-        resolve({ available: true, hasMeetTab: true, state: 'ACTIVE', url: jsActiveTab.url, title: jsActiveTab.title })
-        return
-      }
-
-      // Phase 2: URL-only fallback (when JS execution is disabled in Chrome)
-      // Note: authuser= is present during AND after meeting, so we can't use it as a signal
-      const landingTab = tabs.find(t => t.url.includes('/landing'))
-      const meetCodeTab = tabs.find(t => MEET_CODE_PATTERN.test(t.url))
+      // Classify tabs by URL and title patterns
+      const meetCodeTab = tabs.find(t => MEET_CODE_PATTERN.test(t.url) && !t.url.includes('/landing'))
       const titleLeftTab = tabs.find(t => MEET_LEFT_PATTERNS.some(p => t.title.toLowerCase().includes(p)))
+      const landingTab = tabs.find(t => t.url.includes('/landing'))
 
-      if (landingTab || titleLeftTab) {
-        const lt = landingTab || titleLeftTab
-        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: lt.url, title: lt.title })
-      } else if (meetCodeTab) {
+      // Priority: active meeting > left meeting > landing page
+      if (meetCodeTab && !titleLeftTab) {
         resolve({ available: true, hasMeetTab: true, state: 'ACTIVE', url: meetCodeTab.url, title: meetCodeTab.title })
+      } else if (titleLeftTab) {
+        resolve({ available: true, hasMeetTab: true, state: 'LEFT', url: titleLeftTab.url, title: titleLeftTab.title })
+      } else if (landingTab) {
+        // Landing page only (no active meeting) — not a meeting
+        resolve({ available: true, hasMeetTab: false, state: 'NONE' })
       } else {
         resolve({ available: true, hasMeetTab: tabs.length > 0, state: 'UNKNOWN' })
       }

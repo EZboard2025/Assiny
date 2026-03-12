@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         meeting_url: meetingUrl,
-        bot_name: botName || 'Ramppy',
+        bot_name: botName || 'Anotações',
         recording_config: {
           transcript: {
             provider: {

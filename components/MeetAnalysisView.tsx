@@ -266,7 +266,16 @@ export default function MeetAnalysisView() {
           startTime: parsed.startTime ? new Date(parsed.startTime) : undefined
         }
         const activeStatuses: BotStatus[] = ['sending', 'joining', 'waiting_room', 'in_meeting', 'transcribing', 'evaluating']
-        if (activeStatuses.includes(restored.status) && restored.botId) {
+
+        // Auto-clear stale sessions stuck in waiting_room/joining/sending for over 15 minutes
+        const isStaleStatus = ['waiting_room', 'joining', 'sending'].includes(restored.status)
+        const sessionAge = restored.startTime ? Date.now() - new Date(restored.startTime).getTime() : Infinity
+        const STALE_THRESHOLD = 15 * 60 * 1000 // 15 minutes
+
+        if (isStaleStatus && sessionAge > STALE_THRESHOLD) {
+          console.log('🧹 Clearing stale session (stuck for', Math.round(sessionAge / 60000), 'min)')
+          localStorage.removeItem('meetActiveSession')
+        } else if (activeStatuses.includes(restored.status) && restored.botId) {
           setSession(restored)
           setMeetUrl(restored.meetingUrl)
           hasRestoredSessionRef.current = true
@@ -2218,18 +2227,13 @@ export default function MeetAnalysisView() {
                           {/* Transcript segments */}
                           <div className="px-4 py-3 border-t border-gray-100">
                             <p className="text-xs font-medium text-gray-600 mb-2">Transcrição ({transcript.length} segmentos)</p>
-                            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                            <div className="max-h-80 overflow-y-auto pr-1">
                               {transcript.length === 0 ? (
                                 <p className="text-xs text-gray-400 italic">Sem transcrição disponível</p>
                               ) : (
-                                transcript.map((seg: any, idx: number) => (
-                                  <div key={idx} className="flex gap-2">
-                                    <span className="text-xs font-medium text-green-600 whitespace-nowrap min-w-[60px]">
-                                      {seg.speaker || `#${idx + 1}`}
-                                    </span>
-                                    <p className="text-xs text-gray-700">{seg.text}</p>
-                                  </div>
-                                ))
+                                <p className="text-sm text-gray-700 leading-relaxed">
+                                  {transcript.map((seg: any) => (seg.text || '').trim()).filter(Boolean).join(' ')}
+                                </p>
                               )}
                             </div>
                           </div>

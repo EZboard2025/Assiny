@@ -64,7 +64,7 @@ async function handleSchedule() {
     try {
       // Skip if calendar connection is not active or auto-record is disabled
       const conn = meeting.google_calendar_connections
-      if (conn && conn.status !== 'active') continue
+      if (conn && conn.status === 'disconnected') continue
       if (conn && conn.auto_record_enabled === false) continue
 
       // Create Recall.ai bot for this meeting
@@ -215,31 +215,47 @@ async function createRecallBot(meetingUrl: string, userId: string, companyId: st
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
   try {
+    const webhookUrl = `${appUrl}/api/recall/webhook`
+
     const response = await fetch(`https://${RECALL_REGION}.recall.ai/api/v1/bot/`, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${RECALL_API_KEY}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
         meeting_url: meetingUrl,
-        bot_name: 'Ramppy Análise',
-        transcription_options: {
-          provider: 'deepgram',
-          deepgram: {
-            model: 'nova-3',
-            language: 'pt-BR',
-            diarize: true,
+        bot_name: 'Anotações',
+        recording_config: {
+          transcript: {
+            provider: {
+              deepgram_streaming: {
+                language: 'pt-BR',
+                model: 'nova-3',
+                smart_format: true,
+                punctuate: true,
+                diarize: true,
+              },
+            },
+            diarization: {
+              use_separate_streams_when_available: true,
+            },
           },
-        },
-        real_time_transcription: {
-          destination_url: `${appUrl}/api/recall/webhook`,
-          partial_transcripts: true,
+          realtime_endpoints: [
+            {
+              type: 'webhook',
+              url: webhookUrl,
+              events: ['transcript.data', 'transcript.partial_data'],
+            },
+          ],
         },
         automatic_leave: {
           waiting_room_timeout: 600,
           noone_joined_timeout: 600,
-          everyone_left_timeout: 30,
+          everyone_left_timeout: {
+            timeout: 30,
+          },
         },
         chat: {
           on_bot_join: {

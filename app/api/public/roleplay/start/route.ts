@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { getRandomMaleClientName } from '@/lib/utils/randomNames'
 import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
+import { buildSystemPrompt } from '@/lib/roleplay/buildSystemPrompt'
 
-const N8N_ROLEPLAY_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/d40a1fd9-bfb3-4588-bd45-7bcf2123725d/chat'
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+const OPENAI_TIMEOUT = 90000
 
 // Cliente Supabase com service role
 const supabaseAdmin = createClient(
@@ -197,59 +203,65 @@ PERFIL DO CLIENTE B2B:
 - Empresa: ${persona.company_type || persona.tipo_empresa_faturamento || 'Não especificado'}
 - Contexto: ${persona.context || persona.contexto || 'Não especificado'}
 - O que busca para a empresa: ${persona.company_goals || persona.busca || 'Não especificado'}
-- Principais desafios do negócio: ${persona.business_challenges || persona.dores || 'Não especificado'}`
+- Principais desafios do negócio: ${persona.business_challenges || persona.dores || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada ainda'}`
       } else if (persona.business_type === 'B2C') {
         personaInfo = `
 PERFIL DO CLIENTE B2C:
 - Profissão: ${persona.profession || persona.cargo || 'Não especificado'}
 - Contexto: ${persona.context || persona.contexto || 'Não especificado'}
 - O que busca/valoriza: ${persona.what_seeks || persona.busca || 'Não especificado'}
-- Principais dores/problemas: ${persona.main_pains || persona.dores || 'Não especificado'}`
+- Principais dores/problemas: ${persona.main_pains || persona.dores || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada ainda'}`
       }
       console.log('📝 PersonaInfo montada:', personaInfo)
     }
 
-    // Enviar contexto para N8N com variáveis separadas para System Prompt
-    const n8nResponse = await fetch(N8N_ROLEPLAY_WEBHOOK, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'sendMessage',
-        chatInput: 'Inicie a conversa como cliente',  // Mensagem simplificada
-        sessionId: threadId,
-        companyId: companyId,
-        // Dados da empresa
-        companyName: companyData?.nome || null,
-        companyDescription: companyData?.descricao || null,
-        companyType: companyType,
-        // Variáveis para o System Prompt do agente N8N:
-        nome: clientName,
-        idade: config.age,
-        temperamento: config.temperament,
-        persona: personaInfo.trim(),
-        objecoes: objectionsText,
-        objetivo: objective?.name
-          ? `${objective.name}${objective.description ? `\nDescrição: ${objective.description}` : ''}`
-          : 'Não especificado'
-      }),
+    // Construir system prompt para o roleplay
+    const systemPrompt = buildSystemPrompt({
+      companyName: companyData?.nome || null,
+      companyDescription: companyData?.descricao || null,
+      companyType,
+      objetivo: objective?.name
+        ? `${objective.name}${objective.description ? `\nDescrição: ${objective.description}` : ''}`
+        : 'Não especificado',
+      nome: clientName,
+      idade: config.age,
+      temperamento: config.temperament,
+      persona: personaInfo.trim(),
+      objecoes: objectionsText
     })
 
-    if (!n8nResponse.ok) {
-      throw new Error('Erro ao iniciar roleplay no N8N')
-    }
+    console.log('📤 Enviando para OpenAI...')
 
-    const n8nData = await n8nResponse.json()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), OPENAI_TIMEOUT)
 
-    // Parse response (N8N retorna [{output: "..."}])
     let firstMessage = ''
-    if (Array.isArray(n8nData) && n8nData[0]?.output) {
-      firstMessage = n8nData[0].output
-    } else if (n8nData?.output) {
-      firstMessage = n8nData.output
-    } else if (typeof n8nData === 'string') {
-      firstMessage = n8nData
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4.1',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Inicie a conversa como cliente' }
+        ],
+        max_tokens: 500,
+        temperature: 0.8,
+      })
+
+      clearTimeout(timeoutId)
+      firstMessage = completion.choices[0]?.message?.content || ''
+      console.log('✅ Resposta OpenAI:', firstMessage.substring(0, 100) + '...')
+    } catch (openaiError: any) {
+      clearTimeout(timeoutId)
+      if (openaiError.name === 'AbortError') {
+        console.error('❌ Timeout na chamada OpenAI')
+        return NextResponse.json(
+          { error: 'Timeout ao processar mensagem. Tente novamente.' },
+          { status: 504 }
+        )
+      }
+      throw openaiError
     }
 
     // Criar sessão no banco de dados (sem salvar a primeira mensagem)
@@ -264,7 +276,8 @@ PERFIL DO CLIENTE B2C:
         persona: persona,
         objections: objections,
         objective: objective,
-        clientName: clientName  // Armazenar o nome do cliente para uso nas próximas mensagens
+        clientName: clientName,
+        systemPrompt: systemPrompt  // Armazenar para reutilizar no /chat
       },
       messages: [],
       status: 'in_progress'

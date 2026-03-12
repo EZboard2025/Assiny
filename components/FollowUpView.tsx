@@ -2088,6 +2088,11 @@ export default function FollowUpView() {
         <p className="text-[#8696a0] text-xs mt-6">
           Voce precisara escanear o QR Code com seu celular.
         </p>
+        <div className="mt-4 p-3 bg-[#182229] border border-[#2a3942] rounded-lg">
+          <p className="text-[#8696a0] text-xs">
+            Ou abra o <span className="text-[#00a884] font-medium">app Ramppy Desktop</span> para conectar automaticamente.
+          </p>
+        </div>
       </div>
     </div>
   )

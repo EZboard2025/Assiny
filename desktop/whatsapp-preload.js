@@ -9,4 +9,8 @@ contextBridge.exposeInMainWorld('ramppy', {
   onInjectText: (callback) => ipcRenderer.on('inject-whatsapp-text', (_event, text) => callback(text)),
   // Report auto-scan progress to main process
   sendAutoScanProgress: (progress) => ipcRenderer.send('auto-scan-progress', progress),
+  // Report new messages detected in real time
+  sendNewMessages: (data) => ipcRenderer.send('whatsapp-new-messages', data),
+  // Report command execution result to main process
+  sendCommandResult: (result) => ipcRenderer.send('desktop-command-result', result),
 })

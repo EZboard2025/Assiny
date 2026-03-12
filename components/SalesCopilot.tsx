@@ -34,6 +34,7 @@ interface CopilotMessage {
   content: string
   feedbackId?: string
   timestamp: Date
+  calendarPrompt?: boolean // Show proactive "Agendar reunião?" button
 }
 
 interface SalesCopilotProps {
@@ -856,12 +857,24 @@ export default function SalesCopilot({
         throw new Error(data.error || data.message || 'Erro ao processar')
       }
 
+      // Show proactive calendar button when intent detected but AI didn't generate {{AGENDAR}} tags
+      const hasAgendarTag = data.suggestion?.includes('{{AGENDAR:')
+      const showCalendarPrompt = data.hasCalendarIntent && data.calendarConnected && !hasAgendarTag
+
+      // If AI responded with ONLY scheduling tag(s) and no text, prepend context
+      let finalSuggestion = data.suggestion || ''
+      const strippedText = finalSuggestion.replace(/\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/g, '').trim()
+      if (hasAgendarTag && !strippedText) {
+        finalSuggestion = `Pronto! Encontrei as informações na conversa e preparei o agendamento:\n\n${finalSuggestion}`
+      }
+
       const aiMsg: CopilotMessage = {
         id: `ai_${Date.now()}`,
         role: 'assistant',
-        content: data.suggestion,
+        content: finalSuggestion,
         feedbackId: data.feedbackId,
-        timestamp: new Date()
+        timestamp: new Date(),
+        calendarPrompt: showCalendarPrompt
       }
       setCopilotMessages(prev => [...prev, aiMsg])
     } catch (error: any) {
@@ -1245,11 +1258,54 @@ export default function SalesCopilot({
                           sentBubbles={sentBubblesByMsg[msg.id]}
                         />
 
+                        {/* Proactive calendar scheduling button */}
+                        {doneRevealing && msg.calendarPrompt && !msg.content.startsWith('Erro:') && (
+                          <div className="mt-3 mx-1 bg-[#1a2730] rounded-xl border border-[#2a3942] overflow-hidden">
+                            <div className="px-3 py-2.5 flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0">
+                                <Calendar className="w-4 h-4 text-blue-400" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-[#e9edef] text-[13px] font-medium">
+                                  Agendar reunião com {selectedConversation?.contact_name || 'este cliente'}?
+                                </p>
+                                <p className="text-[#8696a0] text-[11px] mt-0.5">
+                                  Vou consultar sua agenda e sugerir horários
+                                </p>
+                              </div>
+                            </div>
+                            <div className="px-3 pb-2.5 flex gap-2">
+                              <button
+                                onClick={() => handleSend(`Sugira horários disponíveis para agendar reunião com ${selectedConversation?.contact_name || 'este cliente'}`)}
+                                disabled={isLoading}
+                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#00a884] hover:bg-[#00917a] text-white text-xs font-medium transition-colors disabled:opacity-50"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Sim, agendar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setCopilotMessages(prev => prev.map(m =>
+                                    m.id === msg.id ? { ...m, calendarPrompt: false } : m
+                                  ))
+                                }}
+                                className="px-3 py-2 rounded-lg bg-[#2a3942] hover:bg-[#344854] text-[#8696a0] text-xs transition-colors"
+                              >
+                                Não
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Action bar - icons with hint labels that disappear after first interaction */}
-                        {doneRevealing && !msg.content.startsWith('Erro:') && (
+                        {doneRevealing && !msg.content.startsWith('Erro:') && (() => {
+                          // Hide send/copy when response is only scheduling tags (no sendable text)
+                          const cleanedForActions = msg.content.replace(/\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/g, '').trim()
+                          const hasOnlyTags = !cleanedForActions || cleanedForActions === 'Pronto! Encontrei as informações na conversa e preparei o agendamento:'
+                          return (
                           <div className="flex items-start gap-1 mt-3">
                             {/* Send to chat */}
-                            {onSendToChat && (
+                            {onSendToChat && !hasOnlyTags && (
                               <div className="flex flex-col items-center">
                                 <button
                                   onClick={async () => {
@@ -1329,6 +1385,7 @@ export default function SalesCopilot({
                               {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Refazer</span>}
                             </div>
                             {/* Copy */}
+                            {!hasOnlyTags && (
                             <div className="flex flex-col items-center">
                               <button
                                 onClick={() => { setShowActionHints(false); handleCopy(msg.content, msg.id) }}
@@ -1341,8 +1398,9 @@ export default function SalesCopilot({
                               </button>
                               {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Copiar</span>}
                             </div>
+                            )}
                           </div>
-                        )}
+                          )})()}
                       </div>
                     </div>
                     )

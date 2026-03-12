@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, PlayCircle, Settings, CheckCircle, AlertCircle, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap, Search, Target } from 'lucide-react'
+import { Building2, Plus, Globe, Users, Mail, Calendar, Trash2, Edit, Check, X, Loader2, PlayCircle, Settings, CheckCircle, AlertCircle, Package, Clock, MessageSquare, FileText, Star, ChevronRight, Lock, LockOpen, Zap, Search, Target, Video } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast, ToastContainer } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -65,6 +65,26 @@ interface RoleplaySession {
     top_strengths?: string[]
     critical_gaps?: string[]
   }
+  employee_name?: string
+  employee_email?: string
+}
+
+interface MeetEvaluation {
+  id: string
+  user_id: string
+  meeting_id: string
+  seller_name: string
+  call_objective: string | null
+  funnel_stage: string | null
+  transcript: any
+  evaluation: any
+  overall_score: number | null
+  performance_level: string | null
+  spin_s_score: number | null
+  spin_p_score: number | null
+  spin_i_score: number | null
+  spin_n_score: number | null
+  created_at: string
   employee_name?: string
   employee_email?: string
 }
@@ -239,6 +259,14 @@ export default function CompaniesAdmin() {
   const [roleplays, setRoleplays] = useState<RoleplaySession[]>([])
   const [loadingRoleplays, setLoadingRoleplays] = useState(false)
   const [selectedRoleplay, setSelectedRoleplay] = useState<RoleplaySession | null>(null)
+
+  // Estados para visualizar meet evaluations
+  const [showMeetModal, setShowMeetModal] = useState(false)
+  const [companyToViewMeet, setCompanyToViewMeet] = useState<Company | null>(null)
+  const [meetEvaluations, setMeetEvaluations] = useState<MeetEvaluation[]>([])
+  const [loadingMeet, setLoadingMeet] = useState(false)
+  const [selectedMeetEval, setSelectedMeetEval] = useState<MeetEvaluation | null>(null)
+  const [showMeetTranscript, setShowMeetTranscript] = useState(false)
 
   // Estados para desafios diários
   const [challengeGenInfo, setChallengeGenInfo] = useState<{
@@ -679,6 +707,57 @@ export default function CompaniesAdmin() {
     if (score >= 6) return 'bg-yellow-50'
     if (score >= 4) return 'bg-orange-50'
     return 'bg-red-50'
+  }
+
+  // Função para carregar meet evaluations de uma empresa
+  const handleViewMeetEvaluations = async (company: Company) => {
+    setCompanyToViewMeet(company)
+    setShowMeetModal(true)
+    setLoadingMeet(true)
+    setMeetEvaluations([])
+    setSelectedMeetEval(null)
+    setShowMeetTranscript(false)
+
+    try {
+      const response = await fetch(`/api/admin/companies/meet-evaluations?companyId=${company.id}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      setMeetEvaluations(data.evaluations || [])
+    } catch (error: any) {
+      console.error('Erro ao carregar meet evaluations:', error)
+      showToast('error', 'Erro ao carregar avaliações de Meet', error.message)
+    } finally {
+      setLoadingMeet(false)
+    }
+  }
+
+  const normalizeMeetScore = (score: number | null): number => {
+    if (score === null || score === undefined) return 0
+    return score > 10 ? score / 10 : score
+  }
+
+  const getPerformanceLabel = (level: string | null) => {
+    const labels: Record<string, string> = {
+      'legendary': 'Lendário',
+      'excellent': 'Excelente',
+      'very_good': 'Muito Bom',
+      'good': 'Bom',
+      'needs_improvement': 'Precisa Melhorar',
+      'poor': 'Em Desenvolvimento'
+    }
+    return labels[level || ''] || level || 'N/A'
+  }
+
+  const getFunnelStageLabel = (stage: string | null) => {
+    const labels: Record<string, string> = {
+      'prospeccao': 'Prospecção',
+      'discovery': 'Discovery',
+      'demo': 'Demo',
+      'negociacao': 'Negociação',
+      'fechamento': 'Fechamento',
+      'follow_up': 'Follow-up'
+    }
+    return labels[stage || ''] || stage || ''
   }
 
   const confirmDelete = async () => {
@@ -1189,6 +1268,13 @@ export default function CompaniesAdmin() {
                     title="Ver roleplays"
                   >
                     <MessageSquare className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleViewMeetEvaluations(company)}
+                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                    title="Ver avaliações de Meet"
+                  >
+                    <Video className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => toggleLock(company)}
@@ -2088,6 +2174,289 @@ export default function CompaniesAdmin() {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Meet Evaluations */}
+        {showMeetModal && companyToViewMeet && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-gray-200 shadow-xl">
+              {/* Header */}
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Video className="w-6 h-6 text-purple-600" />
+                    Avaliações de Meet - {companyToViewMeet.name}
+                  </h2>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {meetEvaluations.length} avaliação(ões) encontrada(s)
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowMeetModal(false)
+                    setCompanyToViewMeet(null)
+                    setSelectedMeetEval(null)
+                    setShowMeetTranscript(false)
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex h-[calc(90vh-120px)]">
+                {/* Lista de Meet Evaluations */}
+                <div className="w-1/3 border-r border-gray-200 overflow-y-auto">
+                  {loadingMeet ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+                    </div>
+                  ) : meetEvaluations.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6">
+                      <Video className="w-12 h-12 mb-4 opacity-50" />
+                      <p className="text-center">Nenhuma avaliação de Meet encontrada para esta empresa</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {meetEvaluations.map((evalItem) => {
+                        const score = normalizeMeetScore(evalItem.overall_score)
+                        return (
+                          <button
+                            key={evalItem.id}
+                            onClick={() => { setSelectedMeetEval(evalItem); setShowMeetTranscript(false) }}
+                            className={`w-full p-4 text-left transition-colors ${
+                              selectedMeetEval?.id === evalItem.id
+                                ? 'bg-purple-50 border-l-4 border-purple-500'
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-gray-900 font-medium truncate">
+                                {evalItem.employee_name || 'Usuário'}
+                              </span>
+                              {evalItem.overall_score !== null && (
+                                <span className={`text-sm font-bold ${getScoreColor(score)}`}>
+                                  {score.toFixed(1)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 space-y-1">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(evalItem.created_at).toLocaleDateString('pt-BR')} às{' '}
+                                {new Date(evalItem.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                              {evalItem.call_objective && (
+                                <div className="truncate text-purple-600/70">
+                                  {evalItem.call_objective}
+                                </div>
+                              )}
+                              {evalItem.funnel_stage && (
+                                <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                                  {getFunnelStageLabel(evalItem.funnel_stage)}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Detalhes da Meet Evaluation */}
+                <div className="flex-1 overflow-y-auto">
+                  {!selectedMeetEval ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <ChevronRight className="w-12 h-12 mb-4 opacity-30" />
+                      <p className="text-gray-500">Selecione uma avaliação para ver os detalhes</p>
+                    </div>
+                  ) : (() => {
+                    const score = normalizeMeetScore(selectedMeetEval.overall_score)
+                    const eval_ = selectedMeetEval.evaluation || {}
+                    // Parse N8N format if needed
+                    let parsedEval = eval_
+                    if (typeof eval_ === 'object' && 'output' in eval_ && typeof eval_.output === 'string') {
+                      try { parsedEval = JSON.parse(eval_.output) } catch { parsedEval = eval_ }
+                    }
+                    const spinS = selectedMeetEval.spin_s_score ?? parsedEval?.spin_evaluation?.S?.final_score
+                    const spinP = selectedMeetEval.spin_p_score ?? parsedEval?.spin_evaluation?.P?.final_score
+                    const spinI = selectedMeetEval.spin_i_score ?? parsedEval?.spin_evaluation?.I?.final_score
+                    const spinN = selectedMeetEval.spin_n_score ?? parsedEval?.spin_evaluation?.N?.final_score
+
+                    return (
+                      <div className="p-6 space-y-6">
+                        {/* Info + Score */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <h3 className="text-gray-900 font-semibold mb-3 flex items-center gap-2">
+                              <Users className="w-4 h-4 text-purple-600" />
+                              Informações
+                            </h3>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Funcionário:</span>
+                                <span className="text-gray-900">{selectedMeetEval.employee_name}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Email:</span>
+                                <span className="text-gray-600 text-xs">{selectedMeetEval.employee_email}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Data:</span>
+                                <span className="text-gray-900">
+                                  {new Date(selectedMeetEval.created_at).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                              {selectedMeetEval.call_objective && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500">Objetivo:</span>
+                                  <span className="text-gray-900 text-right max-w-[60%]">{selectedMeetEval.call_objective}</span>
+                                </div>
+                              )}
+                              {selectedMeetEval.funnel_stage && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500">Etapa:</span>
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                                    {getFunnelStageLabel(selectedMeetEval.funnel_stage)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className={`rounded-xl p-4 border ${getScoreBgColor(score)} border-gray-200`}>
+                            <h3 className="text-gray-900 font-semibold mb-3 flex items-center gap-2">
+                              <Star className="w-4 h-4 text-yellow-500" />
+                              Avaliação
+                            </h3>
+                            {selectedMeetEval.overall_score !== null ? (
+                              <div className="space-y-3">
+                                <div className="text-center">
+                                  <div className={`text-4xl font-bold ${getScoreColor(score)}`}>
+                                    {score.toFixed(1)}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {getPerformanceLabel(selectedMeetEval.performance_level)}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-gray-500 text-sm text-center">Sem avaliação</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* SPIN Scores */}
+                        {(spinS !== null || spinP !== null || spinI !== null || spinN !== null) && (
+                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <h3 className="text-gray-900 font-semibold mb-3">Scores SPIN</h3>
+                            <div className="grid grid-cols-4 gap-3">
+                              {[
+                                { letter: 'S', score: spinS, label: 'Situação' },
+                                { letter: 'P', score: spinP, label: 'Problema' },
+                                { letter: 'I', score: spinI, label: 'Implicação' },
+                                { letter: 'N', score: spinN, label: 'Necessidade' },
+                              ].map(({ letter, score: s, label }) => (
+                                <div key={letter} className={`rounded-lg p-3 text-center ${getScoreBgColor(s ?? undefined)}`}>
+                                  <div className="text-lg font-bold text-gray-900">{letter}</div>
+                                  <div className={`text-2xl font-bold ${getScoreColor(s ?? undefined)}`}>
+                                    {s !== null && s !== undefined ? Number(s).toFixed(1) : 'N/A'}
+                                  </div>
+                                  <div className="text-xs text-gray-500">{label}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Resumo Executivo */}
+                        {parsedEval?.executive_summary && (
+                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <h3 className="text-gray-900 font-semibold mb-3">Resumo Executivo</h3>
+                            <p className="text-gray-600 text-sm leading-relaxed">
+                              {parsedEval.executive_summary}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Pontos Fortes e Gaps */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {parsedEval?.top_strengths && parsedEval.top_strengths.length > 0 && (
+                            <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                              <h3 className="text-green-700 font-semibold mb-3">Pontos Fortes</h3>
+                              <ul className="space-y-1">
+                                {parsedEval.top_strengths.map((strength: string, idx: number) => (
+                                  <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                    {strength}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {parsedEval?.critical_gaps && parsedEval.critical_gaps.length > 0 && (
+                            <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                              <h3 className="text-red-700 font-semibold mb-3">Gaps Críticos</h3>
+                              <ul className="space-y-1">
+                                {parsedEval.critical_gaps.map((gap: string, idx: number) => (
+                                  <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                                    {gap}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Transcrição (collapsible) */}
+                        {selectedMeetEval.transcript && (
+                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <button
+                              onClick={() => setShowMeetTranscript(!showMeetTranscript)}
+                              className="w-full flex items-center justify-between"
+                            >
+                              <h3 className="text-gray-900 font-semibold flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-purple-600" />
+                                Transcrição
+                              </h3>
+                              <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${showMeetTranscript ? 'rotate-90' : ''}`} />
+                            </button>
+                            {showMeetTranscript && (
+                              <div className="space-y-2 max-h-96 overflow-y-auto mt-3">
+                                {Array.isArray(selectedMeetEval.transcript) ? (
+                                  selectedMeetEval.transcript.map((segment: any, idx: number) => (
+                                    <div key={idx} className={`p-2 rounded-lg text-sm ${
+                                      segment.speaker?.toLowerCase().includes('vendedor') || segment.speaker?.toLowerCase().includes('seller')
+                                        ? 'bg-purple-50 border border-purple-200 ml-4'
+                                        : 'bg-gray-100 border border-gray-200 mr-4'
+                                    }`}>
+                                      <span className="font-medium text-xs text-gray-700">
+                                        {segment.speaker || 'Participante'}
+                                        {segment.timestamp ? ` (${segment.timestamp})` : ''}
+                                      </span>
+                                      <p className="text-gray-600 mt-0.5">{segment.text}</p>
+                                    </div>
+                                  ))
+                                ) : typeof selectedMeetEval.transcript === 'string' ? (
+                                  <pre className="text-sm text-gray-600 whitespace-pre-wrap">{selectedMeetEval.transcript}</pre>
+                                ) : (
+                                  <pre className="text-sm text-gray-600 whitespace-pre-wrap">{JSON.stringify(selectedMeetEval.transcript, null, 2)}</pre>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             </div>

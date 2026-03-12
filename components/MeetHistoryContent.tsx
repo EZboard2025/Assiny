@@ -82,11 +82,24 @@ function formatSmartNotesForCopy(notes: any): string {
 }
 
 function formatTranscriptForCopy(transcript: any[] | string): string {
-  if (typeof transcript === 'string') return transcript
+  if (typeof transcript === 'string') return transcript.replace(/\s*\\n\s*/g, ' ').replace(/\s*\n\s*/g, ' ').trim()
+  const speakers = new Set(transcript.map(s => s.speaker).filter(Boolean))
+  const hasMultipleSpeakers = speakers.size > 1
+
+  if (!hasMultipleSpeakers) {
+    // App transcript: continuous text
+    return transcript
+      .map(seg => (seg.text || seg.words?.map((w: any) => w.text).join(' ') || '').trim())
+      .filter(Boolean)
+      .join(' ')
+  }
+
+  // Bot transcript: with speaker labels
   return transcript.map(seg => {
-    const text = seg.text || seg.words?.map((w: any) => w.text).join(' ') || ''
-    return text.trim().replace(/\.+$/, '')
-  }).filter(Boolean).join(', ')
+    const text = (seg.text || seg.words?.map((w: any) => w.text).join(' ') || '').trim()
+    if (!text) return ''
+    return `${seg.speaker || 'Participante'}: ${text}`
+  }).filter(Boolean).join('\n')
 }
 
 function mapAreaToSpinLetter(area: string): string | null {
@@ -1313,17 +1326,47 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                         </button>
                       </div>
                       <div className="max-h-[500px] overflow-y-auto pr-2">
-                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                          {typeof selectedEvaluation.transcript === 'string'
-                            ? selectedEvaluation.transcript
-                            : selectedEvaluation.transcript
-                                .map((segment: any) => {
-                                  const text = segment.text || segment.words?.map((w: any) => w.text).join(' ') || ''
-                                  return text.trim().replace(/\.+$/, '')
-                                })
-                                .filter(Boolean)
-                                .join(', ')}
-                        </p>
+                        {typeof selectedEvaluation.transcript === 'string'
+                          ? <p className="text-sm text-gray-700 leading-relaxed">{selectedEvaluation.transcript.replace(/\s*\\n\s*/g, ' ').replace(/\s*\n\s*/g, ' ').trim()}</p>
+                          : (() => {
+                              const segs = selectedEvaluation.transcript as any[]
+                              // Check if transcript has multiple distinct speakers (bot) or not (app)
+                              const speakers = new Set(segs.map((s: any) => s.speaker).filter(Boolean))
+                              const hasMultipleSpeakers = speakers.size > 1
+
+                              if (!hasMultipleSpeakers) {
+                                // App transcript: continuous text
+                                const allText = segs
+                                  .map((s: any) => (s.text || s.words?.map((w: any) => w.text).join(' ') || '').trim())
+                                  .filter(Boolean)
+                                  .join(' ')
+                                return <p className="text-sm text-gray-700 leading-relaxed">{allText}</p>
+                              }
+
+                              // Bot transcript: group by speaker
+                              const groups: Array<{ speaker: string; texts: string[] }> = []
+                              for (const seg of segs) {
+                                const text = (seg.text || seg.words?.map((w: any) => w.text).join(' ') || '').trim()
+                                if (!text) continue
+                                const speaker = seg.speaker || 'Participante'
+                                const last = groups[groups.length - 1]
+                                if (last && last.speaker === speaker) {
+                                  last.texts.push(text)
+                                } else {
+                                  groups.push({ speaker, texts: [text] })
+                                }
+                              }
+                              return (
+                                <div className="text-sm text-gray-700 leading-relaxed space-y-3">
+                                  {groups.map((group, idx) => (
+                                    <p key={idx}>
+                                      <span className="font-semibold text-gray-800">{group.speaker}: </span>
+                                      {group.texts.join(' ')}
+                                    </p>
+                                  ))}
+                                </div>
+                              )
+                            })()}
                       </div>
                     </div>
                   )}

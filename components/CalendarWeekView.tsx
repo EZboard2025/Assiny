@@ -410,13 +410,13 @@ export default function CalendarWeekView({
           }}
         >
           {/* === STICKY DAY HEADERS === */}
-          <div className="sticky top-0 z-[3] bg-white border-b border-gray-200" />
+          <div className="sticky top-0 z-[40] bg-white border-b border-gray-200" />
           {weekDays.map((day, i) => {
             const today = isToday(day)
             return (
               <div
                 key={`header-${i}`}
-                className={`sticky top-0 z-[3] bg-white text-center py-2 border-b border-gray-200 ${i > 0 ? 'border-l border-l-gray-200' : ''}`}
+                className={`sticky top-0 z-[40] bg-white text-center py-2 border-b border-gray-200 ${i > 0 ? 'border-l border-l-gray-200' : ''}`}
               >
                 <div className={`text-[11px] font-medium tracking-wider ${today ? 'text-blue-600' : 'text-gray-500'}`}>
                   {WEEK_DAYS_PT[day.getDay()]}

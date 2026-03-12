@@ -1,23 +1,20 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-)
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 
-// Webhook do N8N para TTS
-const N8N_TTS_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/0ffb3d05-ba95-40e1-b3f1-9bd963fd2b59'
+// Vozes mapeadas por faixa etária
+const VOICE_BY_AGE_RANGE: Record<string, string> = {
+  '18-24': 'RW887Krqkhkn77rPnjT9',
+  '25-34': 'YGgtUkdLOCAVgzsgM2S7',
+  '35-44': '3QAt3IeuUNgSZQCVUNIu',
+  '45-60': 'rnJZLKxtlBZt77uIED10'
+}
+
+const DEFAULT_VOICE_ID = 'RW887Krqkhkn77rPnjT9' // 18-24 anos
 
 export async function POST(request: Request) {
   try {
-    const { text, sessionId } = await request.json()
+    const { text, ageRange } = await request.json()
 
     if (!text) {
       return NextResponse.json(
@@ -26,57 +23,63 @@ export async function POST(request: Request) {
       )
     }
 
-    // Se tiver sessionId, verificar se a sessão existe e está ativa
-    if (sessionId) {
-      const { data: session, error: sessionError } = await supabaseAdmin
-        .from('roleplays_unicos')
-        .select('id')
-        .eq('id', sessionId)
-        .eq('status', 'in_progress')
-        .single()
-
-      if (sessionError || !session) {
-        return NextResponse.json(
-          { error: 'Sessão não encontrada ou já finalizada' },
-          { status: 404 }
-        )
-      }
+    if (!ELEVENLABS_API_KEY) {
+      console.error('ELEVENLABS_API_KEY não configurada')
+      return NextResponse.json(
+        { error: 'Configuração do servidor incompleta' },
+        { status: 500 }
+      )
     }
 
-    console.log('🔊 TTS N8N (Público) - Gerando áudio para:', text)
+    // Selecionar voz baseada na faixa etária
+    const voiceId = ageRange && VOICE_BY_AGE_RANGE[ageRange]
+      ? VOICE_BY_AGE_RANGE[ageRange]
+      : DEFAULT_VOICE_ID
 
-    // Enviar para o webhook do N8N
-    const response = await fetch(N8N_TTS_WEBHOOK, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text }),
-    })
+    console.log(`🔊 TTS ElevenLabs (Público) - Gerando áudio para: ${text.substring(0, 50)}... (Idade: ${ageRange || 'padrão'}, Voz: ${voiceId})`)
+
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_flash_v2_5',
+          voice_settings: {
+            stability: 0.7,
+            similarity_boost: 0.85,
+            style: 0.0,
+            use_speaker_boost: true
+          },
+          output_format: 'mp3_44100_128'
+        })
+      }
+    )
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ Erro no webhook N8N:', response.status, errorText)
-      throw new Error(`N8N webhook error: ${response.status} - ${errorText}`)
+      console.error('❌ Erro no ElevenLabs:', response.status, errorText)
+      throw new Error(`ElevenLabs error: ${response.status}`)
     }
 
-    // Receber o áudio do N8N
     const audioBuffer = await response.arrayBuffer()
-    console.log('✅ Áudio recebido do N8N (público):', audioBuffer.byteLength, 'bytes')
-
-    // Determinar o tipo de conteúdo baseado na resposta
-    const contentType = response.headers.get('content-type') || 'audio/mpeg'
+    console.log(`✅ TTS gerado (público): ${audioBuffer.byteLength} bytes`)
 
     return new NextResponse(audioBuffer, {
       headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'no-cache',
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.byteLength.toString()
       }
     })
-  } catch (error) {
-    console.error('❌ Erro no TTS N8N (público):', error)
+  } catch (error: any) {
+    console.error('❌ Erro no TTS (público):', error)
     return NextResponse.json(
-      { error: 'Erro ao gerar áudio' },
+      { error: error.message || 'Erro ao gerar áudio' },
       { status: 500 }
     )
   }

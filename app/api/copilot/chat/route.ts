@@ -207,10 +207,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2b. Calendar intent detection
-    const calendarKeywords = /\b(agenda|agendar|hor[aá]rio|reuni[ãa]o|marcar|disponib|calendar|livre|ocupado|semana que vem|amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|meet|call)\b/i
+    // 2b. Calendar intent detection — check copilot messages AND WhatsApp conversation
+    const calendarKeywords = /\b(agenda|agendar|hor[aá]rio|reuni[ãa]o|marcar|disponib|calendar|livre|ocupado|semana que vem|amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|meet|call|demo|apresenta[çc][ãa]o|bate.?papo|conversar)\b/i
     const recentHistory = copilotHistory?.slice?.(-2)?.map((m: any) => m.content).join(' ') || ''
-    const hasCalendarIntent = calendarKeywords.test(userMessage) || calendarKeywords.test(recentHistory)
+    // Also check the last ~500 chars of the WhatsApp conversation for scheduling intent
+    const recentConversation = conversationContext?.slice?.(-500) || ''
+    const hasCalendarIntent = calendarKeywords.test(userMessage) || calendarKeywords.test(recentHistory) || calendarKeywords.test(recentConversation)
 
     // 3. Generate embedding for RAG search
     const embeddingText = `${userMessage}\n${conversationContext.slice(-500)}`
@@ -515,9 +517,20 @@ CONTEXTO B2B:
 - Se nao souber o email, use _ no campo email
 - Fuso horario: America/Sao_Paulo`
     } else if (hasCalendarIntent) {
-      // Intent detected but no calendar connected
-      systemPrompt += `\n\nNOTA: O vendedor NAO tem Google Calendar conectado. Pergunte os horarios disponiveis ao vendedor manualmente.`
+      // No calendar connected — still generate {{AGENDAR}} tags when info is available
+      systemPrompt += `\n\nNOTA: O vendedor NAO tem Google Calendar conectado ainda, mas voce AINDA DEVE gerar tags {{AGENDAR}} quando tiver as informacoes necessarias (data, hora, email). O sistema vai orientar o vendedor a conectar a agenda.
+- Use {{AGENDAR:titulo|YYYY-MM-DDTHH:mm|YYYY-MM-DDTHH:mm|email}} normalmente
+- Se nao souber o email, use _ no campo email
+- Fuso horario: America/Sao_Paulo`
     }
+
+    // Layer 8: Direct action rule — when seller explicitly asks to schedule
+    systemPrompt += `\n\nREGRA DE ACAO DIRETA (MUITO IMPORTANTE):
+Quando o vendedor pedir EXPLICITAMENTE para agendar/marcar uma reuniao (ex: "marca a reuniao", "agenda pra gente", "cria o evento"), e a conversa do WhatsApp JA CONTEM as informacoes necessarias (data, hora, email do lead), voce DEVE:
+1. Gerar a tag {{AGENDAR}} IMEDIATAMENTE com os dados da conversa — NAO faca perguntas
+2. Se faltar algum dado (ex: hora exata ou email), pergunte APENAS o que falta — nao faca diagnostico
+3. NUNCA responda com "perguntas estrategicas" quando o vendedor quer uma ACAO, nao uma analise
+O vendedor e seu chefe — quando ele pede pra fazer algo, FACA. Nao questione.`
 
     // 6. Build messages array
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -592,6 +605,8 @@ CONTEXTO B2B:
     return NextResponse.json({
       suggestion,
       feedbackId: feedbackRecord?.id || null,
+      hasCalendarIntent,
+      calendarConnected: calendarEvents !== null,
       ragContext: {
         successExamplesCount: successExamples.length,
         failureExamplesCount: failureExamples.length,
