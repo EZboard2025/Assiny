@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, History, CheckCircle, Video, Users, AlertCircle, ArrowLeft, FileText } from 'lucide-react'
+import { Clock, User, MessageCircle, Calendar, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, History, CheckCircle, Video, Users, AlertCircle, ArrowLeft, FileText, FileAudio } from 'lucide-react'
 import { getUserRoleplaySessions, deleteRoleplaySession, type RoleplaySession } from '@/lib/roleplay'
 import { useNotifications } from '@/hooks/useNotifications'
 import { supabase } from '@/lib/supabase'
@@ -39,7 +39,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
   const [selectedSession, setSelectedSession] = useState<RoleplaySession | null>(null)
   const [mounted, setMounted] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
-  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | null>(
+  const [historyType, setHistoryType] = useState<'simulacoes' | 'followups' | 'meet' | 'correcoes' | 'desafios' | 'gravacoes' | null>(
     (initialHistoryTab as any) || (urlTab === 'meet' ? 'meet' : null)
   )
   const [userId, setUserId] = useState<string | null>(null)
@@ -65,7 +65,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
 
     // Listen for history type change event (from Dashboard)
     const handleSetHistoryType = (e: CustomEvent) => {
-      if (e.detail === 'desafios' || e.detail === 'meet' || e.detail === 'simulacoes' || e.detail === 'correcoes') {
+      if (e.detail === 'desafios' || e.detail === 'meet' || e.detail === 'simulacoes' || e.detail === 'correcoes' || e.detail === 'gravacoes') {
         setHistoryType(e.detail)
       }
     }
@@ -348,6 +348,18 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
       hoverBorder: 'hover:border-blue-300',
     },
     {
+      key: 'gravacoes' as const,
+      label: 'Reuniões Gravadas',
+      description: 'Avaliações de áudios e vídeos enviados manualmente',
+      icon: FileAudio,
+      color: 'purple',
+      bgColor: 'bg-purple-50',
+      iconColor: 'text-purple-600',
+      borderColor: 'border-purple-200',
+      hoverBg: 'hover:bg-purple-50',
+      hoverBorder: 'hover:border-purple-300',
+    },
+    {
       key: 'correcoes' as const,
       label: 'Correções',
       description: 'Simulações de correção baseadas nos seus erros',
@@ -458,6 +470,10 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
         ) : historyType === 'meet' ? (
           <Suspense fallback={<LazySpinner />}>
             <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={initialMeetEvaluationId || urlEvaluationId} onInitialEvaluationLoaded={onMeetEvaluationLoaded} onOpenMeetAgent={onOpenMeetAgent} />
+          </Suspense>
+        ) : historyType === 'gravacoes' ? (
+          <Suspense fallback={<LazySpinner />}>
+            <MeetHistoryContent sourceFilter="upload" />
           </Suspense>
         ) : historyType === 'correcoes' ? (
           <Suspense fallback={<LazySpinner />}>

@@ -3,6 +3,14 @@ import OpenAI, { toFile } from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from '@/lib/meet/evaluateMeetTranscript'
 import { generateSmartNotes } from '@/lib/meet/generateSmartNotes'
+import { writeFile, unlink } from 'fs/promises'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import { readFile } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
+
+const execFileAsync = promisify(execFile)
 
 export const maxDuration = 300
 
@@ -46,6 +54,24 @@ Regras:
   }
 }
 
+// Whisper supported formats
+const WHISPER_FORMATS = new Set(['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'])
+
+async function convertToMp3(fileBuffer: Buffer, originalName: string): Promise<{ buffer: Buffer; name: string }> {
+  const inputPath = join(tmpdir(), `upload_${Date.now()}_${originalName}`)
+  const outputPath = inputPath.replace(/\.[^.]+$/, '.mp3')
+
+  try {
+    await writeFile(inputPath, fileBuffer)
+    await execFileAsync('ffmpeg', ['-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-q:a', '4', '-y', outputPath])
+    const mp3Buffer = await readFile(outputPath)
+    return { buffer: mp3Buffer, name: originalName.replace(/\.[^.]+$/, '.mp3') }
+  } finally {
+    await unlink(inputPath).catch(() => {})
+    await unlink(outputPath).catch(() => {})
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -53,29 +79,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { storagePath, fileName, companyId, sellerName, userId } = body
+    // Accept file directly via FormData
+    const formData = await request.formData()
+    const file = formData.get('file') as File
+    const fileName = formData.get('fileName') as string
+    const companyId = formData.get('companyId') as string
+    const sellerName = formData.get('sellerName') as string
+    const userId = formData.get('userId') as string
 
-    if (!storagePath) {
-      return NextResponse.json({ error: 'storagePath é obrigatório' }, { status: 400 })
+    if (!file) {
+      return NextResponse.json({ error: 'Arquivo é obrigatório' }, { status: 400 })
     }
 
-    console.log(`[UploadEvaluate] Processando: ${fileName} de ${storagePath}`)
+    const fileSizeMB = file.size / 1024 / 1024
+    console.log(`[UploadEvaluate] Processando: ${fileName} (${fileSizeMB.toFixed(1)}MB)`)
 
-    // Step 1: Download file from Supabase Storage
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('meet-uploads')
-      .download(storagePath)
-
-    if (downloadError || !fileData) {
-      console.error('[UploadEvaluate] Erro ao baixar:', downloadError)
-      return NextResponse.json({ error: 'Erro ao baixar arquivo do storage' }, { status: 500 })
-    }
-
-    const fileSizeMB = fileData.size / 1024 / 1024
-    console.log(`[UploadEvaluate] Baixado: ${fileSizeMB.toFixed(1)}MB`)
-
-    // Step 2: Build Whisper prompt from company terms
+    // Step 1: Build Whisper prompt from company terms
     let whisperPrompt = ''
     if (companyId) {
       const { data: companyData } = await supabase
@@ -98,17 +117,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Step 2: Convert unsupported formats (mov, avi, mkv, etc.) to mp3
+    const ext = (fileName?.split('.').pop() || 'mp3').toLowerCase()
+    let fileBuffer: Buffer = Buffer.from(await file.arrayBuffer())
+    let actualFileName = fileName || 'audio.mp3'
+
+    if (!WHISPER_FORMATS.has(ext)) {
+      console.log(`[UploadEvaluate] Formato ${ext} não suportado pelo Whisper, convertendo para mp3...`)
+      const converted = await convertToMp3(fileBuffer, actualFileName)
+      fileBuffer = converted.buffer
+      actualFileName = converted.name
+      console.log(`[UploadEvaluate] Convertido: ${(fileBuffer.length / 1024 / 1024).toFixed(1)}MB`)
+    }
+
     // Step 3: Transcribe with Whisper (chunked for files > 24MB)
     const CHUNK_SIZE = 24 * 1024 * 1024 // 24MB (Whisper limit is 25MB)
     let rawTranscript = ''
-    const ext = fileName?.split('.').pop() || 'mp3'
+    const fileBlob = new Blob([new Uint8Array(fileBuffer)])
 
-    if (fileData.size <= CHUNK_SIZE) {
+    const audioExt = actualFileName.split('.').pop() || 'mp3'
+
+    if (fileBuffer.length <= CHUNK_SIZE) {
       // Small file — single Whisper call
       console.log('[UploadEvaluate] Transcrevendo com Whisper (arquivo único)...')
-      const file = await toFile(fileData, fileName || 'audio.mp3')
+      const whisperFile = await toFile(fileBlob, actualFileName)
       const result = await openai.audio.transcriptions.create({
-        file,
+        file: whisperFile,
         model: 'whisper-1',
         language: 'pt',
         ...(whisperPrompt ? { prompt: whisperPrompt } : {})
@@ -116,15 +150,15 @@ export async function POST(request: NextRequest) {
       rawTranscript = result.text
     } else {
       // Large file — split into 24MB chunks and transcribe sequentially
-      const totalChunks = Math.ceil(fileData.size / CHUNK_SIZE)
-      console.log(`[UploadEvaluate] Arquivo grande (${fileSizeMB.toFixed(0)}MB) — dividindo em ${totalChunks} chunks...`)
+      const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE)
+      console.log(`[UploadEvaluate] Arquivo grande (${(fileBuffer.length / 1024 / 1024).toFixed(0)}MB) — dividindo em ${totalChunks} chunks...`)
       const transcriptParts: string[] = []
 
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE
-        const end = Math.min(start + CHUNK_SIZE, fileData.size)
-        const chunk = fileData.slice(start, end)
-        const chunkFile = await toFile(chunk, `chunk_${i}.${ext}`)
+        const end = Math.min(start + CHUNK_SIZE, fileBuffer.length)
+        const chunk = fileBlob.slice(start, end)
+        const chunkFile = await toFile(chunk, `chunk_${i}.${audioExt}`)
 
         console.log(`[UploadEvaluate] Transcrevendo chunk ${i + 1}/${totalChunks}...`)
         const result = await openai.audio.transcriptions.create({
@@ -141,7 +175,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (!rawTranscript || rawTranscript.length < 50) {
-      await supabase.storage.from('meet-uploads').remove([storagePath])
       return NextResponse.json({
         error: `Transcrição muito curta (${rawTranscript?.length || 0} chars). O áudio precisa ter pelo menos uma conversa audível.`
       }, { status: 400 })
@@ -149,10 +182,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[UploadEvaluate] Transcrição: ${rawTranscript.length} chars`)
 
-    // Step 4: Clean transcript
+    // Step 3: Clean transcript
     const cleanedTranscript = await cleanTranscript(rawTranscript)
 
-    // Step 5: Evaluate (SPIN + Smart Notes in parallel)
+    // Step 4: Evaluate (SPIN + Smart Notes in parallel)
     const meetingId = `upload_${Date.now()}`
     const [evalResult, notesResult] = await Promise.all([
       evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId, companyId: companyId || '', sellerName }),
@@ -160,7 +193,6 @@ export async function POST(request: NextRequest) {
     ])
 
     if (!evalResult?.success || !evalResult.evaluation) {
-      await supabase.storage.from('meet-uploads').remove([storagePath])
       return NextResponse.json({ error: evalResult?.error || 'Falha na avaliação SPIN' }, { status: 500 })
     }
 
@@ -171,7 +203,7 @@ export async function POST(request: NextRequest) {
     let overallScore = evaluation.overall_score
     if (overallScore <= 10) overallScore = overallScore * 10
 
-    // Step 6: Save to meet_evaluations
+    // Step 5: Save to meet_evaluations
     const { data: saved, error: saveError } = await supabase
       .from('meet_evaluations')
       .insert({
@@ -192,9 +224,6 @@ export async function POST(request: NextRequest) {
     if (saveError) {
       console.error('[UploadEvaluate] Erro ao salvar:', saveError)
     }
-
-    // Cleanup storage
-    await supabase.storage.from('meet-uploads').remove([storagePath])
 
     console.log(`[UploadEvaluate] Avaliação concluída: ${overallScore}/100`)
 

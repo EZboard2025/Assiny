@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'fileName and userId required' }, { status: 400 })
     }
 
-    // Ensure bucket exists with 1GB limit
-    const FILE_SIZE_LIMIT = 5368709120 // 5GB
+    // Ensure bucket exists (no file size limit)
+    const FILE_SIZE_LIMIT = 0 // 0 = unlimited
     const { error: bucketError } = await supabase.storage.createBucket('meet-uploads', {
       public: false,
       fileSizeLimit: FILE_SIZE_LIMIT,

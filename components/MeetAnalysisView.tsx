@@ -189,11 +189,35 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
   const [isSavingSimulation, setIsSavingSimulation] = useState(false)
   const [currentSimSaved, setCurrentSimSaved] = useState(false)
   const [recentEvaluations, setRecentEvaluations] = useState<any[]>([])
+  const [uploadedRecordings, setUploadedRecordings] = useState<any[]>([])
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'transcribing' | 'evaluating' | 'done' | 'error'>('idle')
+  const [uploadPercent, setUploadPercent] = useState(0)
   const [uploadError, setUploadError] = useState('')
   const [uploadEvaluation, setUploadEvaluation] = useState<any>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+
+  // Gradual progress bar for upload evaluation
+  useEffect(() => {
+    if (uploadProgress === 'idle' || uploadProgress === 'error') {
+      setUploadPercent(0)
+      return
+    }
+    if (uploadProgress === 'done') {
+      setUploadPercent(100)
+      return
+    }
+    // Slowly increase toward 95% (never reaches 100 until done)
+    const interval = setInterval(() => {
+      setUploadPercent(prev => {
+        if (prev >= 95) return 95
+        // Slows down as it gets higher
+        const increment = prev < 30 ? 2 : prev < 60 ? 1 : prev < 80 ? 0.5 : 0.2
+        return Math.min(prev + increment, 95)
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [uploadProgress])
   const simulationRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -356,6 +380,19 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
 
         if (evals) {
           setRecentEvaluations(evals)
+        }
+
+        // Load uploaded recordings separately
+        const { data: uploads } = await supabase
+          .from('meet_evaluations')
+          .select('id, overall_score, executive_summary, created_at, seller_name, performance_level, spin_s_score, spin_p_score, spin_i_score, spin_n_score')
+          .eq('user_id', user.id)
+          .eq('source', 'upload')
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (uploads) {
+          setUploadedRecordings(uploads)
         }
       } catch (e) {
         console.error('Error loading data:', e)
@@ -634,47 +671,20 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         .eq('auth_user_id', userId)
         .single()
 
-      // Step 1: Get signed upload URL from our API (creates bucket if needed)
-      const bucketRes = await fetch('/api/meet/ensure-bucket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: uploadFile.name, userId })
-      })
-      const bucketData = await bucketRes.json()
+      // Send file directly to API via FormData (no Supabase Storage needed)
+      const formData = new FormData()
+      formData.append('file', uploadFile)
+      formData.append('fileName', uploadFile.name)
+      formData.append('companyId', compId || '')
+      formData.append('userId', userId || '')
+      formData.append('sellerName', emp?.name || 'Vendedor')
 
-      if (!bucketRes.ok || !bucketData.signedUrl) {
-        setUploadError('Erro ao preparar upload: ' + (bucketData.error || 'Tente novamente'))
-        setUploadProgress('error')
-        return
-      }
-
-      // Step 2: Upload file directly to Supabase Storage via signed URL (no Next.js body limit)
-      const uploadRes = await supabase.storage
-        .from('meet-uploads')
-        .uploadToSignedUrl(bucketData.storagePath, bucketData.token, uploadFile)
-
-      if (uploadRes.error) {
-        setUploadError('Erro ao enviar arquivo: ' + uploadRes.error.message)
-        setUploadProgress('error')
-        return
-      }
-
-      setUploadProgress('evaluating')
-
-      // Step 3: Call API to transcribe + evaluate (sends only the path, not the file)
       const res = await fetch('/api/meet/upload-evaluate', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authSession.access_token}`,
-          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          storagePath: bucketData.storagePath,
-          fileName: uploadFile.name,
-          companyId: compId,
-          userId,
-          sellerName: emp?.name || 'Vendedor'
-        })
+        body: formData
       })
 
       const data = await res.json()
@@ -689,6 +699,22 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
       setUploadProgress('done')
       setShowEvaluationModal(true)
       setEvaluation(data.evaluation)
+
+      // Add to uploaded recordings list
+      if (data.evaluationId) {
+        setUploadedRecordings(prev => [{
+          id: data.evaluationId,
+          overall_score: data.overallScore,
+          executive_summary: data.evaluation?.executive_summary,
+          created_at: new Date().toISOString(),
+          seller_name: emp?.name || 'Vendedor',
+          performance_level: data.evaluation?.performance_level,
+          spin_s_score: data.evaluation?.spin_evaluation?.S?.final_score,
+          spin_p_score: data.evaluation?.spin_evaluation?.P?.final_score,
+          spin_i_score: data.evaluation?.spin_evaluation?.I?.final_score,
+          spin_n_score: data.evaluation?.spin_evaluation?.N?.final_score,
+        }, ...prev])
+      }
 
     } catch (err: any) {
       setUploadError(err.message || 'Erro ao enviar arquivo')
@@ -2098,7 +2124,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                     <div className="flex flex-col items-center gap-2">
                       <Upload className="w-8 h-8 text-gray-300 group-hover:text-green-500 transition-colors" />
                       <span className="text-sm text-gray-500 group-hover:text-green-700">Clique para selecionar arquivo</span>
-                      <span className="text-xs text-gray-400">MP3, WAV, M4A, MP4, WebM — até 5GB</span>
+                      <span className="text-xs text-gray-400">MP3, WAV, M4A, MP4, MOV, WebM e outros</span>
                     </div>
                   </button>
                 ) : (
@@ -2125,16 +2151,19 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                         className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2"
                       >
                         <Sparkles className="w-4 h-4" />
-                        Transcrever e Avaliar
+                        Avaliar
                       </button>
                     )}
 
                     {(uploadProgress === 'transcribing' || uploadProgress === 'evaluating') && (
-                      <div className="flex items-center justify-center gap-3 py-3 bg-green-50 rounded-xl border border-green-200">
-                        <Loader2 className="w-5 h-5 animate-spin text-green-600" />
-                        <span className="text-sm font-medium text-green-700">
-                          {uploadProgress === 'transcribing' ? 'Transcrevendo áudio...' : 'Avaliando com IA...'}
-                        </span>
+                      <div className="py-3 px-4 bg-green-50 rounded-xl border border-green-200">
+                        <div className="flex items-center justify-center gap-3 mb-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+                          <span className="text-sm font-medium text-green-700">Avaliando...</span>
+                        </div>
+                        <div className="w-full bg-green-200 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-green-600 h-1.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${uploadPercent}%` }} />
+                        </div>
                       </div>
                     )}
 
@@ -2153,6 +2182,58 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Uploaded Recordings History */}
+            {uploadedRecordings.length > 0 && activeTab === 'manual' && mode !== 'calendar' && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FileAudio className="w-4 h-4 text-green-600" />
+                    <h2 className="text-sm font-semibold text-gray-700">Reuniões Gravadas</h2>
+                  </div>
+                  <button
+                    onClick={() => router.push('/history?tab=meet')}
+                    className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1 transition-colors"
+                  >
+                    Ver todas
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {uploadedRecordings.map((ev) => {
+                    const rawScore = ev.overall_score || 0
+                    const score = rawScore > 10 ? rawScore / 10 : rawScore
+                    const scoreColor = score >= 7 ? 'text-green-600 bg-green-50 border-green-200' :
+                      score >= 5 ? 'text-amber-600 bg-amber-50 border-amber-200' :
+                      'text-red-600 bg-red-50 border-red-200'
+                    const date = new Date(ev.created_at)
+                    return (
+                      <div
+                        key={ev.id}
+                        onClick={() => router.push(`/history?tab=meet&evaluationId=${ev.id}`)}
+                        className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-4 cursor-pointer hover:border-green-300 hover:shadow-sm transition-all"
+                      >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border font-bold text-lg ${scoreColor}`}>
+                          {score.toFixed(1)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900 truncate">
+                            {ev.executive_summary || ev.seller_name || 'Gravação de reunião'}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <CalendarDays className="w-3.5 h-3.5 text-gray-400" />
+                            <span className="text-xs text-gray-500">
+                              {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
 

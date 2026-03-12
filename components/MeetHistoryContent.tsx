@@ -146,9 +146,11 @@ interface MeetHistoryContentProps {
   onOpenMeetAgent?: (meetId: string, title: string, date: string) => void
   /** When provided, fetches data via admin API (manager view, read-only) */
   sellerId?: string
+  /** Filter evaluations by source (e.g. 'upload', 'bot'). If not set, shows all. */
+  sourceFilter?: string
 }
 
-export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded, onOpenMeetAgent, sellerId }: MeetHistoryContentProps) {
+export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded, onOpenMeetAgent, sellerId, sourceFilter }: MeetHistoryContentProps) {
   const isManagerView = !!sellerId
   const router = useRouter()
   const [evaluations, setEvaluations] = useState<MeetEvaluation[]>([])
@@ -238,11 +240,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
         return
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('meet_evaluations')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      if (sourceFilter) {
+        query = query.eq('source', sourceFilter)
+      }
+      const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) {
         console.error('Erro ao carregar histórico:', error)
