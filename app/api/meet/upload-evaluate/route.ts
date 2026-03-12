@@ -1,0 +1,186 @@
+import { NextRequest, NextResponse } from 'next/server'
+import OpenAI, { toFile } from 'openai'
+import { createClient } from '@supabase/supabase-js'
+import { evaluateMeetTranscript } from '@/lib/meet/evaluateMeetTranscript'
+import { generateSmartNotes } from '@/lib/meet/generateSmartNotes'
+
+export const maxDuration = 300
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+async function cleanTranscript(rawText: string): Promise<string> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4.1-nano',
+      messages: [
+        {
+          role: 'system',
+          content: `Você é um revisor de transcrições de reuniões em português brasileiro.
+Sua tarefa é limpar a transcrição bruta mantendo 100% do conteúdo original.
+
+Regras:
+- Corrija acentuação (reuniao → reunião, voce → você, etc.)
+- Adicione pontuação natural (vírgulas, pontos, interrogações) onde faz sentido
+- Corrija capitalização (início de frases, nomes próprios)
+- Remova repetições de gaguejos (ex: "eu eu eu acho" → "eu acho")
+- Remova filler words excessivos (hm, eh, ahn) mas mantenha se fazem parte do contexto
+- NÃO resuma, NÃO omita conteúdo, NÃO reorganize
+- NÃO adicione identificação de falantes
+- Retorne APENAS o texto limpo, sem explicações`
+        },
+        { role: 'user', content: rawText }
+      ],
+      temperature: 0.1,
+    })
+
+    const cleaned = response.choices[0]?.message?.content?.trim()
+    if (cleaned && cleaned.length > rawText.length * 0.3) return cleaned
+    return rawText
+  } catch {
+    return rawText
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { storagePath, fileName, companyId, sellerName, userId } = body
+
+    if (!storagePath) {
+      return NextResponse.json({ error: 'storagePath é obrigatório' }, { status: 400 })
+    }
+
+    console.log(`[UploadEvaluate] Processando: ${fileName} de ${storagePath}`)
+
+    // Step 1: Download file from Supabase Storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('meet-uploads')
+      .download(storagePath)
+
+    if (downloadError || !fileData) {
+      console.error('[UploadEvaluate] Erro ao baixar:', downloadError)
+      return NextResponse.json({ error: 'Erro ao baixar arquivo do storage' }, { status: 500 })
+    }
+
+    const fileSizeMB = fileData.size / 1024 / 1024
+    console.log(`[UploadEvaluate] Baixado: ${fileSizeMB.toFixed(1)}MB`)
+
+    // Step 2: Convert Blob to File for Whisper
+    // Whisper limit is 25MB — if file is larger, we'll still try (OpenAI may reject)
+    const file = await toFile(fileData, fileName || 'audio.mp3')
+
+    // Step 3: Transcribe with Whisper
+    let whisperPrompt = ''
+    if (companyId) {
+      const { data: companyData } = await supabase
+        .from('company_data')
+        .select('nome, descricao, produtos_servicos, concorrentes')
+        .eq('company_id', companyId)
+        .single()
+
+      if (companyData) {
+        const termos = [
+          companyData.nome,
+          ...(companyData.produtos_servicos?.split('\n')
+            .map((linha: string) => linha.split(':')[0].trim())
+            .filter((termo: string) => termo.length > 2) || []),
+          ...(companyData.concorrentes?.split(',')
+            .map((c: string) => c.trim())
+            .filter((c: string) => c.length > 2) || [])
+        ].filter(Boolean).join(', ')
+        whisperPrompt = termos
+      }
+    }
+
+    console.log('[UploadEvaluate] Transcrevendo com Whisper...')
+    const transcriptionOptions: any = {
+      file: file,
+      model: 'whisper-1',
+      language: 'pt',
+    }
+    if (whisperPrompt) transcriptionOptions.prompt = whisperPrompt
+
+    const whisperResult = await openai.audio.transcriptions.create(transcriptionOptions)
+    const rawTranscript = whisperResult.text
+
+    if (!rawTranscript || rawTranscript.length < 50) {
+      await supabase.storage.from('meet-uploads').remove([storagePath])
+      return NextResponse.json({
+        error: `Transcrição muito curta (${rawTranscript?.length || 0} chars). O áudio precisa ter pelo menos uma conversa audível.`
+      }, { status: 400 })
+    }
+
+    console.log(`[UploadEvaluate] Transcrição: ${rawTranscript.length} chars`)
+
+    // Step 4: Clean transcript
+    const cleanedTranscript = await cleanTranscript(rawTranscript)
+
+    // Step 5: Evaluate (SPIN + Smart Notes in parallel)
+    const [evaluation, smartNotes] = await Promise.all([
+      evaluateMeetTranscript(cleanedTranscript, companyId || undefined),
+      generateSmartNotes(cleanedTranscript, null).catch(() => null)
+    ])
+
+    if (!evaluation) {
+      await supabase.storage.from('meet-uploads').remove([storagePath])
+      return NextResponse.json({ error: 'Falha na avaliação SPIN' }, { status: 500 })
+    }
+
+    // Normalize score to 0-100
+    let overallScore = evaluation.overall_score
+    if (overallScore <= 10) overallScore = overallScore * 10
+
+    // Step 6: Save to meet_evaluations
+    const meetingId = `upload_${Date.now()}`
+    const { data: saved, error: saveError } = await supabase
+      .from('meet_evaluations')
+      .insert({
+        meeting_id: meetingId,
+        user_id: userId,
+        company_id: companyId,
+        seller_name: sellerName || 'Vendedor',
+        transcript: cleanedTranscript,
+        evaluation: evaluation,
+        smart_notes: smartNotes,
+        overall_score: overallScore,
+        performance_level: evaluation.performance_level,
+        source: 'upload'
+      })
+      .select('id')
+      .single()
+
+    if (saveError) {
+      console.error('[UploadEvaluate] Erro ao salvar:', saveError)
+    }
+
+    // Cleanup storage
+    await supabase.storage.from('meet-uploads').remove([storagePath])
+
+    console.log(`[UploadEvaluate] Avaliação concluída: ${overallScore}/100`)
+
+    return NextResponse.json({
+      success: true,
+      evaluation,
+      smartNotes,
+      cleanedTranscript,
+      overallScore,
+      evaluationId: saved?.id || null
+    })
+
+  } catch (error: any) {
+    console.error('[UploadEvaluate] Erro:', error)
+    return NextResponse.json({
+      error: error.message || 'Erro interno ao processar arquivo'
+    }, { status: 500 })
+  }
+}

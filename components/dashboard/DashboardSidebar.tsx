@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp, Download } from 'lucide-react'
+import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp, Download, CalendarDays } from 'lucide-react'
 
 interface DashboardSidebarProps {
   userRole: string | null
@@ -29,12 +29,13 @@ export default function DashboardSidebar({
     { icon: Home, href: '/', label: 'Home', show: true },
     { icon: Users, href: '/roleplay', label: 'Simulação', show: true },
     { icon: MessageSquare, href: '#whatsapp', label: 'WhatsApp IA', show: true },
+    { icon: CalendarDays, href: '/calendar', label: 'Calendário', show: true },
     { icon: Video, href: '/meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, href: '/history', label: 'Histórico', show: true },
     { icon: User, href: '/profile', label: 'Meu Perfil', show: true },
     { icon: Target, href: '/pdi-page', label: 'PDI', show: hasPDI },
     { icon: TrendingUp, href: '/manager', label: 'Gestão', show: isAdmin || isGestor },
-    { icon: Link2, href: '/roleplay-links', label: 'Processo Seletivo', show: isAdmin || isGestor },
+    { icon: Link2, href: '/simulacao-publica', label: 'Simulação Pública', show: isAdmin || isGestor },
     { icon: Download, href: '/#download', label: 'Download', show: typeof window !== 'undefined' && !(window as any).electronAPI },
   ]
 

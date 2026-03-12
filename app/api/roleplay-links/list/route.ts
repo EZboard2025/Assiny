@@ -15,34 +15,19 @@ const supabaseAdmin = createClient(
 
 export async function GET(request: Request) {
   try {
-    // Usar cliente Supabase regular
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    // Extrair companyId da query string
+    const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
 
-    // Verificar se o usuário está autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    if (!companyId) {
+      return NextResponse.json({ error: 'Company ID é obrigatório' }, { status: 400 })
     }
 
-    // Verificar se o usuário é admin
-    const { data: employee } = await supabaseAdmin
-      .from('employees')
-      .select('role, company_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!employee || employee.role !== 'admin') {
-      return NextResponse.json({ error: 'Acesso negado. Apenas administradores.' }, { status: 403 })
-    }
-
-    // Buscar links da empresa
+    // Buscar links da empresa via service role (ignora RLS)
     const { data: links, error: linksError } = await supabaseAdmin
       .from('roleplay_links')
       .select('*')
-      .eq('company_id', employee.company_id)
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
 
     if (linksError) {

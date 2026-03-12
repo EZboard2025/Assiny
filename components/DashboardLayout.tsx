@@ -7,6 +7,7 @@ import { getCompanyId, clearCompanyIdCache } from '@/lib/utils/getCompanyFromSub
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar'
 import ConfigHub from '@/components/ConfigHub'
+import SellerAgentChat from '@/components/SellerAgentChat'
 
 interface User {
   id: string
@@ -129,13 +130,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <main
-        className={`absolute top-0 bottom-0 right-0 overflow-y-auto overflow-x-hidden transition-all duration-300 ${
+        className={`absolute top-0 bottom-0 right-0 overflow-y-auto overflow-x-hidden transition-all duration-300 bg-[#F8F9FA] ${
           isSidebarExpanded ? 'left-56' : 'left-16'
         }`}
         style={isDesktopApp ? { zoom: 1.15 } : undefined}
       >
         {children}
       </main>
+
+      {/* Seller Agent Chat (Nicole) */}
+      {typeof window !== 'undefined' && !(window as any).electronAPI && (
+        <SellerAgentChat userName={user.name} currentView="roleplay-links" />
+      )}
 
       {/* Config Hub Modal */}
       {showConfigHub && isAdmin && (

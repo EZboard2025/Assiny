@@ -12,6 +12,10 @@ const nextConfig = {
       bodySizeLimit: '100mb',
     },
   },
+  // Aumentar limite de body para API routes (upload de áudio/vídeo)
+  serverRuntimeConfig: {
+    bodySizeLimit: '100mb',
+  },
 }
 
 module.exports = nextConfig

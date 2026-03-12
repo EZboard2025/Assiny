@@ -15,42 +15,39 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   try {
-    // Usar cliente Supabase regular
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
-    // Verificar se o usuário está autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
-    // Verificar se o usuário é admin
-    const { data: employee } = await supabaseAdmin
-      .from('employees')
-      .select('role, company_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!employee || employee.role !== 'admin') {
-      return NextResponse.json({ error: 'Acesso negado. Apenas administradores.' }, { status: 403 })
-    }
-
     // Pegar dados do corpo da requisição
     const body = await request.json()
-    const { name, description, config } = body
+    const { name, description, config, companyId, userId } = body
+
+    if (!companyId) {
+      return NextResponse.json({ error: 'Company ID é obrigatório' }, { status: 400 })
+    }
+
+    // Verificar permissão via employee (mesmo padrão do get-or-create)
+    let createdBy = userId || null
+    if (userId) {
+      const { data: employee } = await supabaseAdmin
+        .from('employees')
+        .select('role, company_id')
+        .eq('user_id', userId)
+        .single()
+
+      if (employee && employee.company_id !== companyId) {
+        return NextResponse.json({ error: 'Acesso negado.' }, { status: 403 })
+      }
+    }
 
     // Validações
     if (!name) {
       return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
     }
 
-    if (!config || !config.age || !config.temperament || !config.persona_id || !config.objection_ids) {
-      return NextResponse.json({
-        error: 'Configuração incompleta. Todos os campos são obrigatórios.'
-      }, { status: 400 })
+    // Default config if not provided or incomplete
+    const finalConfig = {
+      age: config?.age || '25-34',
+      temperament: config?.temperament || 'Analítico',
+      persona_id: config?.persona_id || null,
+      objection_ids: config?.objection_ids || []
     }
 
     // Gerar código único (8 caracteres alfanuméricos)
@@ -92,12 +89,12 @@ export async function POST(request: Request) {
     const { data: newLink, error: createError } = await supabaseAdmin
       .from('roleplay_links')
       .insert({
-        company_id: employee.company_id,
+        company_id: companyId,
         link_code: linkCode,
         name,
         description: description || null,
-        config,
-        created_by: user.id,
+        config: finalConfig,
+        created_by: createdBy,
         is_active: true,
         usage_count: 0
       })
@@ -106,8 +103,9 @@ export async function POST(request: Request) {
 
     if (createError) {
       console.error('Erro ao criar link:', createError)
+      console.error('Insert data:', { company_id: companyId, link_code: linkCode, name, created_by: createdBy })
       return NextResponse.json({
-        error: 'Erro ao criar link de roleplay'
+        error: `Erro ao criar link: ${createError.message || createError.code || 'desconhecido'}`
       }, { status: 500 })
     }
 
