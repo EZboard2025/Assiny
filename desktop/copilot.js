@@ -664,12 +664,108 @@ window.handleFeedback = async function (btn, wasHelpful) {
 }
 
 // ============================================================
+// CALENDAR SCHEDULING
+// ============================================================
+
+async function handleScheduleEvent(btn, title, startISO, endISO, email) {
+  if (!accessToken || btn.disabled) return
+  btn.disabled = true
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Criando evento...`
+  btn.style.background = '#f3f4f6'
+  btn.style.color = '#6b7280'
+  btn.style.cursor = 'default'
+
+  try {
+    const res = await fetch(`${API_BASE}/api/copilot/calendar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        title,
+        startDateTime: startISO,
+        endDateTime: endISO,
+        attendeeEmail: email || '_',
+        addMeetLink: true,
+      }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Falha ao criar evento')
+
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Agendado!`
+    btn.style.background = 'rgba(0,168,132,0.15)'
+    btn.style.color = '#00a884'
+
+    if (data.event?.meetLink) {
+      const linkDiv = document.createElement('div')
+      linkDiv.style.cssText = 'padding:0 12px 10px;display:flex;gap:6px;'
+      linkDiv.innerHTML = `<button onclick="navigator.clipboard.writeText('${data.event.meetLink}')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px;border-radius:8px;background:#f3f4f6;color:#6b7280;font-size:11px;border:none;cursor:pointer;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        Copiar link do Meet
+      </button>`
+      btn.parentElement.appendChild(linkDiv)
+    }
+  } catch (err) {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> ${err.message || 'Erro ao agendar'}`
+    btn.style.background = 'rgba(239,68,68,0.15)'
+    btn.style.color = '#ef4444'
+    btn.disabled = false
+    btn.style.cursor = 'pointer'
+  }
+}
+
+// ============================================================
 // RICH CONTENT RENDERER
 // ============================================================
 
 function renderRichContent(content) {
-  // Strip calendar tags (not supported in desktop)
-  let text = content.replace(/\{\{AGENDAR:[^}]+\}\}/g, '')
+  // Extract and render scheduling cards
+  let schedulingCardsHtml = ''
+  const agendarRegex = /\{\{AGENDAR:([^}]+)\}\}/g
+  let agMatch
+  while ((agMatch = agendarRegex.exec(content)) !== null) {
+    const parts = agMatch[1].split('|')
+    const title = parts[0] || 'Reunião'
+    const startISO = parts[1] || ''
+    const endISO = parts[2] || ''
+    const email = parts[3] && parts[3] !== '_' ? parts[3] : null
+    const startDate = new Date(startISO)
+    const endDate = new Date(endISO)
+    const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    const dayName = dayNames[startDate.getDay()] || ''
+    const ddmm = `${String(startDate.getDate()).padStart(2, '0')}/${String(startDate.getMonth() + 1).padStart(2, '0')}`
+    const startTime = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`
+    const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
+    schedulingCardsHtml += `
+      <div class="scheduling-card" style="margin:8px 0;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+        <div style="padding:10px 12px;display:flex;align-items:flex-start;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:rgba(59,130,246,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="color:#1a1a1a;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(title)}</div>
+            <div style="color:#6b7280;font-size:11px;margin-top:3px;">${dayName}, ${ddmm} • ${startTime} - ${endTime}</div>
+            ${email ? `<div style="color:#6b7280;font-size:11px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Convidado: ${escapeHtml(email)}</div>` : ''}
+          </div>
+        </div>
+        <div style="padding:0 12px 10px;">
+          <button onclick="handleScheduleEvent(this, '${escapeHtml(title)}', '${startISO}', '${endISO}', '${email || ''}')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;border-radius:8px;background:#00a884;color:white;font-size:12px;font-weight:500;border:none;cursor:pointer;transition:background 0.2s;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Agendar no Google Calendar
+          </button>
+        </div>
+      </div>`
+  }
+
+  // Strip calendar tags from text (they're rendered as cards above)
+  let text = content.replace(/\{\{AGENDAR:[^}]+\}\}/g, '').trim()
+
+  // If response was ONLY scheduling tags, add context text
+  if (!text && schedulingCardsHtml) {
+    text = 'Pronto! Encontrei as informações na conversa e preparei o agendamento:'
+  }
 
   // Parse markdown-like content
   // NOTE: visual tags (NOTA, BARRA, TENDENCIA) are processed in formatInline/formatVisualTags
@@ -719,6 +815,8 @@ function renderRichContent(content) {
   }
 
   if (inList) html += '</div>'
+  // Append scheduling cards after text content
+  if (schedulingCardsHtml) html += schedulingCardsHtml
   return html || escapeHtml(text)
 }
 

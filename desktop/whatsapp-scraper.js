@@ -653,6 +653,14 @@ function extractMessages() {
   return messages
 }
 
+// --- Track last known messages per contact for new-message detection ---
+var lastMessageKeys = lastMessageKeys || new Map() // Map<contactName, Set<key>>
+
+function makeMessageKey(msg) {
+  // Create a unique key from body + timestamp + direction
+  return `${msg.fromMe ? 'out' : 'in'}|${msg.timestamp}|${(msg.body || '').substring(0, 80)}`
+}
+
 // --- Send context update to Electron ---
 function sendUpdate() {
   const contactName = getContactName()
@@ -676,10 +684,25 @@ function sendUpdate() {
   const debugInfo = messages._debugInfo || null
   const contactPhone = getContactPhone()
   const conversationChanged = contactName !== lastContactName
+
+  // Detect NEW messages (messages that weren't in the last extraction for this contact)
+  const currentKeys = new Set(messages.map(makeMessageKey))
+  const prevKeys = lastMessageKeys.get(contactName) || new Set()
+  const newMessages = []
+  if (!conversationChanged && prevKeys.size > 0) {
+    for (const msg of messages) {
+      const key = makeMessageKey(msg)
+      if (!prevKeys.has(key)) {
+        newMessages.push(msg)
+      }
+    }
+  }
+  lastMessageKeys.set(contactName, currentKeys)
+
   lastContactName = contactName
   lastMessageCount = messages.length
 
-  console.log(`[Ramppy Scraper] Update: ${contactName}, ${messages.length} msgs, changed=${conversationChanged}`)
+  console.log(`[Ramppy Scraper] Update: ${contactName}, ${messages.length} msgs, changed=${conversationChanged}, new=${newMessages.length}`)
   if (messages.length > 0) {
     const last = messages[messages.length - 1]
     console.log(`[Ramppy Scraper] Last msg: "${last.body?.substring(0, 50)}" (${last.type}, fromMe=${last.fromMe})`)
@@ -694,6 +717,16 @@ function sendUpdate() {
       conversationChanged,
       _debugInfo: debugInfo,
     })
+
+    // Emit new messages event for immediate sync
+    if (newMessages.length > 0) {
+      console.log(`[Ramppy Scraper] New messages detected: ${newMessages.length} for "${contactName}"`)
+      window.ramppy.sendNewMessages({
+        contactName,
+        contactPhone,
+        messages: newMessages,
+      })
+    }
   }
 }
 
@@ -754,6 +787,127 @@ function injectText(text) {
   input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }))
   return true
 }
+
+// --- Send current message (press Enter on input) ---
+function sendCurrentMessage() {
+  const input = trySelect(document, SELECTORS.inputField)
+  if (!input) {
+    console.warn('[Ramppy Scraper] sendCurrentMessage: Input field not found')
+    return false
+  }
+
+  input.focus()
+  const enterEvent = new KeyboardEvent('keydown', {
+    key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+    bubbles: true, cancelable: true
+  })
+  input.dispatchEvent(enterEvent)
+  console.log('[Ramppy Scraper] sendCurrentMessage: Enter dispatched')
+  return true
+}
+
+// --- Navigate to a contact by name or phone ---
+// Searches the sidebar, clicks on the conversation, waits for #main to load
+async function navigateToContact(nameOrPhone) {
+  const pane = document.getElementById('pane-side')
+  if (!pane) return { success: false, error: 'sidebar_not_found' }
+
+  // Strategy 1: Find by exact name match in sidebar
+  const spans = pane.querySelectorAll('span[title]')
+  let targetCell = null
+
+  for (const span of spans) {
+    const title = span.getAttribute('title')?.trim()
+    if (!title) continue
+    // Match by name or phone (normalized)
+    const normalizedTitle = title.replace(/[\s+()-]/g, '')
+    const normalizedTarget = nameOrPhone.replace(/[\s+()-]/g, '')
+    if (title === nameOrPhone || normalizedTitle === normalizedTarget ||
+        normalizedTitle.endsWith(normalizedTarget) || normalizedTarget.endsWith(normalizedTitle)) {
+      // Walk up to find the row/cell container
+      let el = span
+      while (el && el !== pane) {
+        if (el.getAttribute('role') === 'row' || el.getAttribute('role') === 'listitem' ||
+            (el.dataset && el.dataset.testid === 'cell-frame-container')) {
+          targetCell = el
+          break
+        }
+        el = el.parentElement
+      }
+      if (targetCell) break
+    }
+  }
+
+  if (!targetCell) {
+    // Strategy 2: Use WhatsApp search
+    const searchBox = document.querySelector('[data-testid="chat-list-search"]') ||
+                      document.querySelector('[contenteditable="true"][data-tab="3"]') ||
+                      document.querySelector('div[title="Pesquisar ou começar uma nova conversa"]')
+    if (searchBox) {
+      searchBox.focus()
+      searchBox.textContent = ''
+      document.execCommand('insertText', false, nameOrPhone)
+      searchBox.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: nameOrPhone }))
+      // Wait for search results
+      await new Promise(r => setTimeout(r, 1500))
+      // Click first result
+      const results = pane.querySelectorAll('[role="row"], [data-testid="cell-frame-container"]')
+      if (results.length > 0) {
+        targetCell = results[0]
+      }
+    }
+  }
+
+  if (!targetCell) {
+    return { success: false, error: 'contact_not_found' }
+  }
+
+  // Click on the conversation
+  const clickTarget = targetCell.querySelector('div[tabindex="-1"]') ||
+                      targetCell.querySelector('div[role="gridcell"]') ||
+                      targetCell
+  const rect = clickTarget.getBoundingClientRect()
+  const cx = rect.left + rect.width / 2
+  const cy = rect.top + rect.height / 2
+  const evtInit = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0 }
+  clickTarget.dispatchEvent(new PointerEvent('pointerdown', evtInit))
+  clickTarget.dispatchEvent(new MouseEvent('mousedown', evtInit))
+  clickTarget.dispatchEvent(new PointerEvent('pointerup', evtInit))
+  clickTarget.dispatchEvent(new MouseEvent('mouseup', evtInit))
+  clickTarget.dispatchEvent(new MouseEvent('click', evtInit))
+
+  // Wait for #main panel to load
+  const loaded = await new Promise(resolve => {
+    let checks = 0
+    const iv = setInterval(() => {
+      checks++
+      if (document.querySelector('#main') || checks >= 25) {
+        clearInterval(iv)
+        resolve(!!document.querySelector('#main'))
+      }
+    }, 200)
+  })
+
+  if (!loaded) {
+    return { success: false, error: 'panel_not_loaded' }
+  }
+
+  // Clear search box if we used it
+  const searchBox = document.querySelector('[data-testid="chat-list-search"]') ||
+                    document.querySelector('[contenteditable="true"][data-tab="3"]')
+  if (searchBox && searchBox.textContent?.trim()) {
+    // Press Escape to clear search
+    searchBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }))
+  }
+
+  const contactName = getContactName()
+  console.log(`[Ramppy Scraper] navigateToContact: Navigated to "${contactName}"`)
+  return { success: true, contactName }
+}
+
+// Expose for main process
+window.__ramppySendMessage = sendCurrentMessage
+window.__ramppyNavigateToContact = navigateToContact
 
 // --- Listen for text injection requests ---
 if (window.ramppy) {

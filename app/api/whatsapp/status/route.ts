@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getClientState } from '@/lib/whatsapp-client'
+import { isDesktopConnected } from '@/lib/whatsapp-command-queue'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,13 +22,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only trust in-memory client state (not DB, which can be stale)
+    // Check VPS in-memory client state first
     const clientState = getClientState(user.id)
     if (clientState) {
       if (clientState.status === 'connected') {
         return NextResponse.json({
           connected: true,
           status: 'active',
+          source: 'vps',
           phone_number: clientState.phoneNumber,
           syncStatus: clientState.syncStatus
         })
@@ -42,14 +44,24 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // No in-memory client = not connected
-    // DB may still show 'active' from a previous session but that's stale
-    // Clean up stale DB records so they don't cause confusion later
+    // Check Desktop App connection (recent heartbeat)
+    const desktopOnline = await isDesktopConnected(user.id)
+    if (desktopOnline) {
+      return NextResponse.json({
+        connected: true,
+        status: 'active',
+        source: 'desktop',
+      })
+    }
+
+    // No VPS client and no desktop connection = not connected
+    // Clean up stale DB records (non-desktop only) so they don't cause confusion later
     const { data: staleConnection } = await supabaseAdmin
       .from('whatsapp_connections')
-      .select('id')
+      .select('id, phone_number_id')
       .eq('user_id', user.id)
       .eq('status', 'active')
+      .not('phone_number_id', 'like', 'desktop_%')
       .order('connected_at', { ascending: false })
       .limit(1)
       .single()

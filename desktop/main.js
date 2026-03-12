@@ -645,6 +645,7 @@ function createWhatsAppWindow() {
   waView.webContents.on('did-finish-load', () => setTimeout(checkWaAuth, 2000))
 
   let pendingScrapeResults = []
+  let pendingCommandResults = []
 
   async function sendDesktopWaHeartbeat(status) {
     try {
@@ -675,6 +676,10 @@ function createWhatsAppWindow() {
       if (pendingScrapeResults.length > 0) {
         bodyPayload.scrapeResults = pendingScrapeResults.splice(0)
       }
+      // Attach pending command results if any
+      if (pendingCommandResults.length > 0) {
+        bodyPayload.commandResults = pendingCommandResults.splice(0)
+      }
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -697,9 +702,139 @@ function createWhatsAppWindow() {
           sendDesktopWaHeartbeat('active')
         }
       }
+
+      // Process desktop commands from server (command queue)
+      if (result.desktopCommands && result.desktopCommands.length > 0) {
+        debugLog(`[Command Queue] Received ${result.desktopCommands.length} command(s)`)
+        for (const cmd of result.desktopCommands) {
+          await executeDesktopCommand(cmd)
+        }
+        // Send immediate heartbeat to report command results
+        if (pendingCommandResults.length > 0) {
+          sendDesktopWaHeartbeat('active')
+        }
+      }
     } catch (err) {
       console.error('[WhatsApp Desktop] Heartbeat failed:', err.message)
     }
+  }
+
+  // --- Desktop Command Executor (command queue) ---
+  async function executeDesktopCommand(cmd) {
+    const { commandId, type, payload } = cmd
+    debugLog(`[Command Queue] Executing: ${type} (${commandId})`)
+
+    if (!waView || waView.webContents.isDestroyed()) {
+      pendingCommandResults.push({ commandId, error: 'whatsapp_not_open' })
+      return
+    }
+
+    try {
+      switch (type) {
+        case 'send_text': {
+          const { contactPhone, contactName, message } = payload
+          const target = contactPhone || contactName
+          if (!target || !message) {
+            pendingCommandResults.push({ commandId, error: 'missing_contact_or_message' })
+            return
+          }
+
+          // 1. Navigate to the contact
+          const navResult = await waView.webContents.executeJavaScript(
+            `window.__ramppyNavigateToContact(${JSON.stringify(target)})`
+          )
+          if (!navResult || !navResult.success) {
+            // Try with contactName if phone didn't work
+            let retryResult = null
+            if (contactName && contactName !== target) {
+              retryResult = await waView.webContents.executeJavaScript(
+                `window.__ramppyNavigateToContact(${JSON.stringify(contactName)})`
+              )
+            }
+            if (!retryResult || !retryResult.success) {
+              pendingCommandResults.push({
+                commandId,
+                error: `contact_not_found: ${target}`,
+              })
+              return
+            }
+          }
+
+          // 2. Small delay to simulate natural typing
+          await new Promise(r => setTimeout(r, 500 + Math.random() * 1000))
+
+          // 3. Inject the text
+          const injected = await waView.webContents.executeJavaScript(
+            `(function() {
+              var input = (function trySelect(parent, selectors) {
+                var sels = Array.isArray(selectors) ? selectors : [selectors];
+                for (var i = 0; i < sels.length; i++) {
+                  var el = parent.querySelector(sels[i]);
+                  if (el) return el;
+                }
+                return null;
+              })(document, ${JSON.stringify(SELECTORS_FOR_JS.inputField)});
+              if (!input) return false;
+              input.focus();
+              input.textContent = '';
+              document.execCommand('insertText', false, ${JSON.stringify(message)});
+              input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ${JSON.stringify(message)} }));
+              return true;
+            })()`
+          )
+
+          if (!injected) {
+            pendingCommandResults.push({ commandId, error: 'input_field_not_found' })
+            return
+          }
+
+          // 4. Small delay then press Enter
+          await new Promise(r => setTimeout(r, 300 + Math.random() * 500))
+
+          await waView.webContents.executeJavaScript(
+            `window.__ramppySendMessage()`
+          )
+
+          debugLog(`[Command Queue] send_text completed: "${message.substring(0, 50)}..." to ${target}`)
+          pendingCommandResults.push({ commandId, result: { sent: true, to: target } })
+          break
+        }
+
+        case 'navigate_to_contact': {
+          const target = payload.contactPhone || payload.contactName
+          if (!target) {
+            pendingCommandResults.push({ commandId, error: 'missing_contact' })
+            return
+          }
+          const navResult = await waView.webContents.executeJavaScript(
+            `window.__ramppyNavigateToContact(${JSON.stringify(target)})`
+          )
+          if (!navResult || !navResult.success) {
+            pendingCommandResults.push({ commandId, error: navResult?.error || 'navigation_failed' })
+          } else {
+            pendingCommandResults.push({ commandId, result: { navigated: true, contactName: navResult.contactName } })
+          }
+          break
+        }
+
+        default:
+          debugLog(`[Command Queue] Unknown command type: ${type}`)
+          pendingCommandResults.push({ commandId, error: `unknown_command_type: ${type}` })
+      }
+    } catch (err) {
+      debugLog(`[Command Queue] Error executing ${type}: ${err.message}`)
+      pendingCommandResults.push({ commandId, error: err.message })
+    }
+  }
+
+  // Input field selectors (passed to executeJavaScript since scraper context is separate)
+  const SELECTORS_FOR_JS = {
+    inputField: [
+      '#main footer div[contenteditable="true"]',
+      '#main [data-testid="conversation-compose-box-input"]',
+      '[data-testid="compose-box"] div[contenteditable="true"]',
+      'footer div[contenteditable="true"]',
+    ],
   }
 
   // --- Targeted Scrape (on-demand from manager) ---
@@ -1238,6 +1373,19 @@ ipcMain.on('whatsapp-conversation-list', (_event, list) => {
   lastSidebarList = list  // Store for smart re-sync comparison
   console.log(`[WhatsApp IPC] Conversation list received: ${list.length} conversations`)
   syncConversationList(list)
+})
+
+// New messages detected in real time — trigger immediate sync
+ipcMain.on('whatsapp-new-messages', (_event, data) => {
+  if (!data.contactName || !data.messages?.length) return
+  console.log(`[WhatsApp IPC] New messages: ${data.messages.length} from "${data.contactName}"`)
+  // Queue for immediate sync
+  let syncKey = data.contactName
+  if (/^[\d+\s()-]+$/.test(syncKey.replace(/\s/g, ''))) {
+    syncKey = syncKey.replace(/\s/g, '')
+  }
+  queueForSync(syncKey, data.contactName, data.messages)
+  executeSync()
 })
 
 // Copilot requests text injection into WhatsApp input

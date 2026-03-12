@@ -277,7 +277,7 @@ export default function RoleplayPublico() {
       const response = await fetch('/api/public/roleplay/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, sessionId })
+        body: JSON.stringify({ text, ageRange: selectedAge })
       })
 
       if (!response.ok) {

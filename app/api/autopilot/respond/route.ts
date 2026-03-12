@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 import { PLAN_CONFIGS, PlanType } from '@/lib/types/plans'
 import { sendAutopilotMessage, pushAutopilotEvent } from '@/lib/whatsapp-client'
+import { insertCommand, waitForCommandCompletion, isDesktopConnected } from '@/lib/whatsapp-command-queue'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
@@ -580,11 +581,42 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
     }
 
     // 10. Send each message bubble with delay between them
+    // Try Desktop App first (command queue), fallback to VPS
+    const desktopOnline = await isDesktopConnected(userId)
     const messageIds: string[] = []
-    for (let i = 0; i < messages.length; i++) {
-      const sendResult = await sendAutopilotMessage(userId, contactPhone, messages[i])
 
-      if (!sendResult.success) {
+    for (let i = 0; i < messages.length; i++) {
+      let sendSuccess = false
+      let sendMessageId: string | undefined
+
+      if (desktopOnline) {
+        // Desktop path: send via command queue
+        try {
+          const commandId = await insertCommand(userId, 'send_text', {
+            contactPhone,
+            contactName: contactName || contactPhone,
+            message: messages[i],
+          })
+          const cmdResult = await waitForCommandCompletion(commandId, 30000)
+          if (cmdResult.success) {
+            sendSuccess = true
+            sendMessageId = `desktop_autopilot_${commandId}`
+          } else {
+            console.warn(`[Autopilot] Desktop send failed: ${cmdResult.error}`)
+          }
+        } catch (cmdErr: any) {
+          console.warn(`[Autopilot] Desktop command error: ${cmdErr.message}`)
+        }
+      }
+
+      if (!sendSuccess) {
+        // VPS fallback
+        const sendResult = await sendAutopilotMessage(userId, contactPhone, messages[i])
+        sendSuccess = sendResult.success
+        sendMessageId = sendResult.messageId
+      }
+
+      if (!sendSuccess) {
         console.error(`[Autopilot] Failed to send bubble ${i + 1}/${messages.length} to ${contactPhone}`)
         if (messageIds.length === 0) {
           // First bubble failed — log error and bail
@@ -603,7 +635,7 @@ LEMBRE-SE: Se voce nao tem CERTEZA ABSOLUTA que o complemento vai melhorar a con
         break // Partial send — continue with what we got
       }
 
-      if (sendResult.messageId) messageIds.push(sendResult.messageId)
+      if (sendMessageId) messageIds.push(sendMessageId)
 
       // Delay between bubbles (2-4s) — skip after last message
       if (i < messages.length - 1) {

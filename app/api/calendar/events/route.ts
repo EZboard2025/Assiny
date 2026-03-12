@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .single()
 
-    if (!connection || connection.status !== 'active') {
+    if (!connection || connection.status === 'disconnected') {
       return NextResponse.json({ error: 'Calendar not connected', events: [] }, { status: 200 })
     }
 

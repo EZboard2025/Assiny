@@ -422,11 +422,18 @@ export async function createCalendarEvent(
   if (!client) return null
 
   try {
+    // Normalize dateTime to full ISO 8601 (Google requires seconds)
+    // "2026-03-12T18:00" → "2026-03-12T18:00:00"
+    const normalizeDateTime = (dt: string) => {
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dt)) return dt + ':00'
+      return dt
+    }
+
     const eventBody: any = {
       summary: input.title,
       description: input.description || '',
-      start: { dateTime: input.startDateTime, timeZone: input.timeZone || 'America/Sao_Paulo' },
-      end: { dateTime: input.endDateTime, timeZone: input.timeZone || 'America/Sao_Paulo' },
+      start: { dateTime: normalizeDateTime(input.startDateTime), timeZone: input.timeZone || 'America/Sao_Paulo' },
+      end: { dateTime: normalizeDateTime(input.endDateTime), timeZone: input.timeZone || 'America/Sao_Paulo' },
     }
 
     if (input.attendees?.length) {
@@ -478,7 +485,7 @@ export async function createCalendarEvent(
     }
   } catch (err: any) {
     console.error('[Google Calendar] Failed to create event:', err.message)
-    return null
+    throw err
   }
 }
 

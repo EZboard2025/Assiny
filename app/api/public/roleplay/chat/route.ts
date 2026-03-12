@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
+import { buildSystemPrompt } from '@/lib/roleplay/buildSystemPrompt'
 
-const N8N_ROLEPLAY_WEBHOOK = 'https://ezboard.app.n8n.cloud/webhook/d40a1fd9-bfb3-4588-bd45-7bcf2123725d/chat'
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+const OPENAI_TIMEOUT = 90000
+const MAX_HISTORY_MESSAGES = 100
 
 // Cliente Supabase com service role
 const supabaseAdmin = createClient(
@@ -17,7 +24,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { sessionId, threadId, message } = await request.json()
+    const { sessionId, message } = await request.json()
 
     if (!sessionId || !message) {
       return NextResponse.json(
@@ -41,107 +48,133 @@ export async function POST(request: Request) {
       )
     }
 
-    // Buscar dados da empresa
-    const { data: companyData } = await supabaseAdmin
-      .from('company_data')
-      .select('*')
-      .eq('company_id', session.company_id)
-      .single()
-
-    // Buscar company_type
-    const { data: companyTypeData } = await supabaseAdmin
-      .from('company_type')
-      .select('type')
-      .eq('company_id', session.company_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    const companyType = companyTypeData?.type || 'B2C'
-
-    // Extrair dados da configuração da sessão para manter consistência
     const sessionConfig = session.config || {}
-    const clientName = sessionConfig.clientName || 'Cliente'
-    const age = sessionConfig.age || 30
-    const temperament = sessionConfig.temperament || 'Analítico'
 
-    // Formatar persona e objeções
-    let personaFormatted = ''
-    if (sessionConfig.persona) {
-      const p = sessionConfig.persona
-      if (p.business_type === 'B2B') {
-        personaFormatted = `
+    // Reconstruir system prompt (usar o salvo na sessão ou reconstruir)
+    let systemPrompt = sessionConfig.systemPrompt
+    if (!systemPrompt) {
+      // Fallback: reconstruir system prompt se não estiver salvo na sessão
+      const { data: companyData } = await supabaseAdmin
+        .from('company_data')
+        .select('*')
+        .eq('company_id', session.company_id)
+        .single()
+
+      const { data: companyTypeData } = await supabaseAdmin
+        .from('company_type')
+        .select('type')
+        .eq('company_id', session.company_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const companyType = companyTypeData?.type || 'B2C'
+
+      // Formatar persona
+      let personaFormatted = ''
+      if (sessionConfig.persona) {
+        const p = sessionConfig.persona
+        if (p.business_type === 'B2B') {
+          personaFormatted = `
 PERFIL DO CLIENTE B2B:
-- Cargo: ${p.cargo || 'Não especificado'}
-- Empresa: ${p.tipo_empresa_faturamento || 'Não especificado'}
-- Contexto: ${p.contexto || 'Não especificado'}
-- O que busca: ${p.busca || 'Não especificado'}
-- Principais desafios: ${p.dores || 'Não especificado'}`
-      } else if (p.business_type === 'B2C') {
-        personaFormatted = `
+- Cargo: ${p.job_title || p.cargo || 'Não especificado'}
+- Empresa: ${p.company_type || p.tipo_empresa_faturamento || 'Não especificado'}
+- Contexto: ${p.context || p.contexto || 'Não especificado'}
+- O que busca: ${p.company_goals || p.busca || 'Não especificado'}
+- Principais desafios: ${p.business_challenges || p.dores || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${p.prior_knowledge || 'Não sabe nada ainda'}`
+        } else if (p.business_type === 'B2C') {
+          personaFormatted = `
 PERFIL DO CLIENTE B2C:
-- Profissão: ${p.cargo || 'Não especificado'}
-- Contexto: ${p.contexto || 'Não especificado'}
-- O que busca: ${p.busca || 'Não especificado'}
-- Principais dores: ${p.dores || 'Não especificado'}`
-      }
-    }
-
-    let objectionsFormatted = 'Nenhuma objeção específica'
-    if (sessionConfig.objections && sessionConfig.objections.length > 0) {
-      objectionsFormatted = sessionConfig.objections.map((obj: any, index: number) => {
-        let text = `OBJEÇÃO ${index + 1}:\n${obj.name || obj}`
-        if (obj.rebuttals && obj.rebuttals.length > 0) {
-          text += `\n\nFormas de quebrar esta objeção:`
-          text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
+- Profissão: ${p.profession || p.cargo || 'Não especificado'}
+- Contexto: ${p.context || p.contexto || 'Não especificado'}
+- O que busca: ${p.what_seeks || p.busca || 'Não especificado'}
+- Principais dores: ${p.main_pains || p.dores || 'Não especificado'}
+- O que já sabe sobre sua empresa: ${p.prior_knowledge || 'Não sabe nada ainda'}`
         }
-        return text
-      }).join('\n\n---\n\n')
-    }
+      }
 
-    console.log('📤 Enviando para N8N:', {
-      sessionId: threadId,
-      chatInput: message.substring(0, 50) + '...',
-      companyId: session.company_id,
-      companyName: companyData?.nome,
-      clientName: clientName
-    })
+      // Formatar objeções
+      let objectionsFormatted = 'Nenhuma objeção específica'
+      if (sessionConfig.objections && sessionConfig.objections.length > 0) {
+        objectionsFormatted = sessionConfig.objections.map((obj: any, index: number) => {
+          let text = `OBJEÇÃO ${index + 1}:\n${obj.name || obj}`
+          if (obj.rebuttals && obj.rebuttals.length > 0) {
+            text += `\n\nFormas de quebrar esta objeção:`
+            text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
+          }
+          return text
+        }).join('\n\n---\n\n')
+      }
 
-    // Enviar para N8N com variáveis separadas para System Prompt
-    const n8nResponse = await fetch(N8N_ROLEPLAY_WEBHOOK, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        action: 'sendMessage',
-        sessionId: threadId,
-        chatInput: message,
-        companyId: session.company_id,
-        // Dados da empresa
+      systemPrompt = buildSystemPrompt({
         companyName: companyData?.nome || null,
         companyDescription: companyData?.descricao || null,
-        companyType: companyType,
-        // Variáveis para o System Prompt do agente N8N:
-        nome: clientName,
-        idade: age,
-        temperamento: temperament,
+        companyType,
+        objetivo: sessionConfig.objective?.name
+          ? `${sessionConfig.objective.name}${sessionConfig.objective.description ? `\nDescrição: ${sessionConfig.objective.description}` : ''}`
+          : 'Não especificado',
+        nome: sessionConfig.clientName || 'Cliente',
+        idade: sessionConfig.age || '35',
+        temperamento: sessionConfig.temperament || 'Analítico',
         persona: personaFormatted.trim(),
         objecoes: objectionsFormatted
       })
-    })
-
-    if (!n8nResponse.ok) {
-      const errorText = await n8nResponse.text()
-      console.error('❌ Erro N8N:', n8nResponse.status, errorText)
-      throw new Error('Erro ao processar mensagem no N8N')
     }
 
-    const n8nData = await n8nResponse.json()
-    console.log('📥 Resposta N8N:', n8nData)
+    // Construir histórico de mensagens para o OpenAI
+    const chatMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt }
+    ]
 
-    const responseText = n8nData.output || n8nData[0]?.output || ''
-    console.log('💬 Texto extraído:', responseText.substring(0, 100))
+    // Adicionar mensagens anteriores da sessão
+    const existingMessages = session.messages || []
+    const limitedMessages = existingMessages.slice(-MAX_HISTORY_MESSAGES)
+
+    for (const msg of limitedMessages) {
+      if (msg.role === 'seller') {
+        chatMessages.push({ role: 'user', content: msg.text })
+      } else if (msg.role === 'client') {
+        chatMessages.push({ role: 'assistant', content: msg.text })
+      }
+    }
+
+    // Adicionar nova mensagem do vendedor
+    chatMessages.push({ role: 'user', content: message })
+
+    console.log('📤 Enviando para OpenAI:', {
+      sessionId,
+      chatInput: message.substring(0, 50) + '...',
+      companyId: session.company_id,
+      totalMessages: chatMessages.length
+    })
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), OPENAI_TIMEOUT)
+
+    let responseText = ''
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4.1',
+        messages: chatMessages,
+        max_tokens: 500,
+        temperature: 0.8,
+      })
+
+      clearTimeout(timeoutId)
+      responseText = completion.choices[0]?.message?.content || ''
+      console.log('✅ Resposta OpenAI:', responseText.substring(0, 100) + '...')
+    } catch (openaiError: any) {
+      clearTimeout(timeoutId)
+      if (openaiError.name === 'AbortError') {
+        console.error('❌ Timeout na chamada OpenAI')
+        return NextResponse.json(
+          { error: 'Timeout ao processar mensagem. Tente novamente.' },
+          { status: 504 }
+        )
+      }
+      throw openaiError
+    }
 
     // Atualizar mensagens na sessão
     const updatedMessages = [

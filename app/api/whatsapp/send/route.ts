@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getConnectedClient } from '@/lib/whatsapp-client'
+import { insertCommand, waitForCommandCompletion, isDesktopConnected } from '@/lib/whatsapp-command-queue'
 import { MessageMedia } from 'whatsapp-web.js'
 import { execFile } from 'child_process'
 import { writeFileSync, readFileSync, unlinkSync } from 'fs'
@@ -46,13 +47,52 @@ async function handleTextMessage(request: NextRequest, body: any) {
 
     console.log(`[WA Send] Attempting to send text to: ${to}${quotedMessageId ? ` (reply to ${quotedMessageId})` : ''}`)
 
+    // --- Try Desktop App first (command queue) ---
+    const desktopOnline = await isDesktopConnected(user!.id)
+    if (desktopOnline) {
+      console.log(`[WA Send] Desktop connected — using command queue`)
+      try {
+        const commandId = await insertCommand(user!.id, 'send_text', {
+          contactPhone: to,
+          contactName: to, // Desktop will search by phone or name
+          message,
+        })
+
+        const result = await waitForCommandCompletion(commandId, 30000)
+
+        if (result.success) {
+          console.log(`[WA Send] Desktop sent message to ${to}`)
+          return NextResponse.json({
+            success: true,
+            message: {
+              id: `desktop_cmd_${commandId}`,
+              waMessageId: `desktop_cmd_${commandId}`,
+              body: message,
+              fromMe: true,
+              timestamp: new Date().toISOString(),
+              type: 'text',
+              hasMedia: false,
+              status: 'sent',
+            }
+          })
+        } else {
+          console.warn(`[WA Send] Desktop command failed: ${result.error}`)
+          // Fall through to VPS fallback
+        }
+      } catch (cmdErr: any) {
+        console.warn(`[WA Send] Desktop command error: ${cmdErr.message}`)
+        // Fall through to VPS fallback
+      }
+    }
+
+    // --- VPS Fallback (Puppeteer client) ---
     const client = getConnectedClient(user!.id)
     if (!client) {
       console.error(`[WA Send] No connected client for user ${user!.id}`)
-      return NextResponse.json({ error: 'WhatsApp not connected' }, { status: 404 })
+      return NextResponse.json({ error: 'WhatsApp not connected. Abra o app Ramppy Desktop.' }, { status: 404 })
     }
 
-    console.log(`[WA Send] Resolving chatId for: ${to}`)
+    console.log(`[WA Send] Using VPS client. Resolving chatId for: ${to}`)
     const chatId = await Promise.race([
       resolveChatId(to, user!.id, client),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('resolveChatId timeout (10s)')), 10000))

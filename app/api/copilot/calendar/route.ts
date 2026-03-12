@@ -32,18 +32,27 @@ export async function POST(req: NextRequest) {
 
     const attendees = attendeeEmail && attendeeEmail !== '_' ? [attendeeEmail] : []
 
-    const event = await createCalendarEvent(user.id, {
-      title,
-      startDateTime,
-      endDateTime,
-      attendees,
-      addMeetLink,
-    })
+    let event
+    try {
+      event = await createCalendarEvent(user.id, {
+        title,
+        startDateTime,
+        endDateTime,
+        attendees,
+        addMeetLink,
+      })
+    } catch (calError: any) {
+      console.error('[Copilot Calendar] Google API error:', calError.message)
+      return NextResponse.json(
+        { error: calError.message || 'Erro ao criar evento no Google Calendar' },
+        { status: 500 }
+      )
+    }
 
     if (!event) {
       return NextResponse.json(
-        { error: 'Falha ao criar evento. Verifique se o Google Calendar está conectado.' },
-        { status: 500 }
+        { error: 'Google Calendar não conectado. Conecte nas configurações.' },
+        { status: 400 }
       )
     }
 
