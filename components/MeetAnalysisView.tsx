@@ -2098,7 +2098,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                     <div className="flex flex-col items-center gap-2">
                       <Upload className="w-8 h-8 text-gray-300 group-hover:text-green-500 transition-colors" />
                       <span className="text-sm text-gray-500 group-hover:text-green-700">Clique para selecionar arquivo</span>
-                      <span className="text-xs text-gray-400">MP3, WAV, M4A, MP4, WebM — até 500MB</span>
+                      <span className="text-xs text-gray-400">MP3, WAV, M4A, MP4, WebM — até 5GB</span>
                     </div>
                   </button>
                 ) : (

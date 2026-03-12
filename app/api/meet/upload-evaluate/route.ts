@@ -75,11 +75,7 @@ export async function POST(request: NextRequest) {
     const fileSizeMB = fileData.size / 1024 / 1024
     console.log(`[UploadEvaluate] Baixado: ${fileSizeMB.toFixed(1)}MB`)
 
-    // Step 2: Convert Blob to File for Whisper
-    // Whisper limit is 25MB — if file is larger, we'll still try (OpenAI may reject)
-    const file = await toFile(fileData, fileName || 'audio.mp3')
-
-    // Step 3: Transcribe with Whisper
+    // Step 2: Build Whisper prompt from company terms
     let whisperPrompt = ''
     if (companyId) {
       const { data: companyData } = await supabase
@@ -102,16 +98,47 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('[UploadEvaluate] Transcrevendo com Whisper...')
-    const transcriptionOptions: any = {
-      file: file,
-      model: 'whisper-1',
-      language: 'pt',
-    }
-    if (whisperPrompt) transcriptionOptions.prompt = whisperPrompt
+    // Step 3: Transcribe with Whisper (chunked for files > 24MB)
+    const CHUNK_SIZE = 24 * 1024 * 1024 // 24MB (Whisper limit is 25MB)
+    let rawTranscript = ''
+    const ext = fileName?.split('.').pop() || 'mp3'
 
-    const whisperResult = await openai.audio.transcriptions.create(transcriptionOptions)
-    const rawTranscript = whisperResult.text
+    if (fileData.size <= CHUNK_SIZE) {
+      // Small file — single Whisper call
+      console.log('[UploadEvaluate] Transcrevendo com Whisper (arquivo único)...')
+      const file = await toFile(fileData, fileName || 'audio.mp3')
+      const result = await openai.audio.transcriptions.create({
+        file,
+        model: 'whisper-1',
+        language: 'pt',
+        ...(whisperPrompt ? { prompt: whisperPrompt } : {})
+      })
+      rawTranscript = result.text
+    } else {
+      // Large file — split into 24MB chunks and transcribe sequentially
+      const totalChunks = Math.ceil(fileData.size / CHUNK_SIZE)
+      console.log(`[UploadEvaluate] Arquivo grande (${fileSizeMB.toFixed(0)}MB) — dividindo em ${totalChunks} chunks...`)
+      const transcriptParts: string[] = []
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE
+        const end = Math.min(start + CHUNK_SIZE, fileData.size)
+        const chunk = fileData.slice(start, end)
+        const chunkFile = await toFile(chunk, `chunk_${i}.${ext}`)
+
+        console.log(`[UploadEvaluate] Transcrevendo chunk ${i + 1}/${totalChunks}...`)
+        const result = await openai.audio.transcriptions.create({
+          file: chunkFile,
+          model: 'whisper-1',
+          language: 'pt',
+          ...(whisperPrompt ? { prompt: whisperPrompt } : {})
+        })
+        transcriptParts.push(result.text)
+      }
+
+      rawTranscript = transcriptParts.join(' ')
+      console.log(`[UploadEvaluate] Todos os ${totalChunks} chunks transcritos`)
+    }
 
     if (!rawTranscript || rawTranscript.length < 50) {
       await supabase.storage.from('meet-uploads').remove([storagePath])
@@ -126,22 +153,25 @@ export async function POST(request: NextRequest) {
     const cleanedTranscript = await cleanTranscript(rawTranscript)
 
     // Step 5: Evaluate (SPIN + Smart Notes in parallel)
-    const [evaluation, smartNotes] = await Promise.all([
-      evaluateMeetTranscript(cleanedTranscript, companyId || undefined),
-      generateSmartNotes(cleanedTranscript, null).catch(() => null)
+    const meetingId = `upload_${Date.now()}`
+    const [evalResult, notesResult] = await Promise.all([
+      evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId, companyId: companyId || '', sellerName }),
+      generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || '' }).catch(() => null)
     ])
 
-    if (!evaluation) {
+    if (!evalResult?.success || !evalResult.evaluation) {
       await supabase.storage.from('meet-uploads').remove([storagePath])
-      return NextResponse.json({ error: 'Falha na avaliação SPIN' }, { status: 500 })
+      return NextResponse.json({ error: evalResult?.error || 'Falha na avaliação SPIN' }, { status: 500 })
     }
+
+    const evaluation = evalResult.evaluation
+    const smartNotes = notesResult?.success ? notesResult.notes : null
 
     // Normalize score to 0-100
     let overallScore = evaluation.overall_score
     if (overallScore <= 10) overallScore = overallScore * 10
 
     // Step 6: Save to meet_evaluations
-    const meetingId = `upload_${Date.now()}`
     const { data: saved, error: saveError } = await supabase
       .from('meet_evaluations')
       .insert({

@@ -15,15 +15,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'fileName and userId required' }, { status: 400 })
     }
 
-    // Ensure bucket exists
+    // Ensure bucket exists with 1GB limit
+    const FILE_SIZE_LIMIT = 5368709120 // 5GB
     const { error: bucketError } = await supabase.storage.createBucket('meet-uploads', {
       public: false,
-      fileSizeLimit: 524288000, // 500MB
+      fileSizeLimit: FILE_SIZE_LIMIT,
     })
 
-    if (bucketError && !bucketError.message?.includes('already exists')) {
+    if (bucketError && bucketError.message?.includes('already exists')) {
+      // Update existing bucket to ensure file size limit is current
+      await supabase.storage.updateBucket('meet-uploads', {
+        public: false,
+        fileSizeLimit: FILE_SIZE_LIMIT,
+      })
+    } else if (bucketError) {
       console.error('[EnsureBucket] Bucket creation error:', bucketError)
-      // Try to list buckets to check if it exists
       const { data: buckets } = await supabase.storage.listBuckets()
       const exists = buckets?.some(b => b.name === 'meet-uploads')
       if (!exists) {
