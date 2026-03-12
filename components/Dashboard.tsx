@@ -63,6 +63,7 @@ const PerfilView = dynamic(() => import('./PerfilView'), { ssr: false, loading: 
 const PDIView = dynamic(() => import('./PDIView'), { ssr: false, loading: ViewLoadingSkeleton })
 // FollowUpView removed — WhatsApp now handled exclusively by Electron desktop app
 const MeetAnalysisView = dynamic(() => import('./MeetAnalysisView'), { ssr: false, loading: ViewLoadingSkeleton })
+const CalendarView = dynamic(() => import('./CalendarView'), { ssr: false, loading: ViewLoadingSkeleton })
 const RepresentanteView = dynamic(() => import('./RepresentanteView'), { ssr: false, loading: ViewLoadingSkeleton })
 const ChallengeHistoryView = dynamic(() => import('./dashboard/ChallengeHistoryView'), { ssr: false, loading: ViewLoadingSkeleton })
 const RoleplayLinksView = dynamic(() => import('./RoleplayLinksView'), { ssr: false, loading: ViewLoadingSkeleton })
@@ -79,6 +80,7 @@ const prefetchMap: Record<string, () => void> = {
   historico: () => { import('./HistoricoView') },
   pdi: () => { import('./PDIView') },
   'meet-analysis': () => { import('./MeetAnalysisView') },
+  'calendar': () => { import('./CalendarView') },
   'roleplay-links': () => { import('./RoleplayLinksView') },
   'challenge-history': () => { import('./dashboard/ChallengeHistoryView') },
   chat: () => { import('./ChatInterface') },
@@ -90,7 +92,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
-  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'meet-analysis' | 'challenge-history' | 'manager' | 'download'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'meet-analysis' | 'calendar' | 'challenge-history' | 'manager' | 'download'>('home')
   const [mounted, setMounted] = useState(false)
   const [isDesktopApp, setIsDesktopApp] = useState(false)
   const [nicoleRoleplayConfig, setNicoleRoleplayConfig] = useState<any | null>(null)
@@ -613,7 +615,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     }
 
     if (currentView === 'meet-analysis') {
-      return <MeetAnalysisView />
+      return <MeetAnalysisView initialTab="manual" mode="meet" />
+    }
+
+    if (currentView === 'calendar') {
+      return <CalendarView />
     }
 
     if (currentView === 'download') {

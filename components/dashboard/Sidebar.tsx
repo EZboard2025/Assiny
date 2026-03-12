@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp, Download } from 'lucide-react'
+import { Home, User, Link2, Settings, LogOut, Users, Target, Clock, MessageSquare, Video, TrendingUp, Download, CalendarDays } from 'lucide-react'
 
 interface SidebarProps {
   currentView: string
@@ -35,6 +35,7 @@ export default function Sidebar({
     { icon: User, view: 'perfil', label: 'Meu Perfil', show: true },
     { icon: Users, view: 'roleplay', label: 'Simulação', show: true },
     { icon: MessageSquare, view: 'whatsapp', label: 'WhatsApp IA', show: true },
+    { icon: CalendarDays, view: 'calendar', label: 'Calendário', show: true },
     { icon: Video, view: 'meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, view: 'historico', label: 'Histórico', show: true },
     // { icon: Target, view: 'pdi', label: 'PDI', show: hasPDI }, // temporarily hidden

@@ -33,7 +33,9 @@ import {
   LogOut,
   Monitor,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Upload,
+  FileAudio
 } from 'lucide-react'
 import { getCompanyId } from '@/lib/utils/getCompanyFromSubdomain'
 import { supabase } from '@/lib/supabase'
@@ -164,7 +166,13 @@ function cleanGptText(text: string): string {
     .trim()
 }
 
-export default function MeetAnalysisView() {
+interface MeetAnalysisViewProps {
+  initialTab?: 'calendar' | 'manual' | 'transcricoes'
+  /** When set, hides tabs and locks to a specific page mode */
+  mode?: 'calendar' | 'meet'
+}
+
+export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewProps = {}) {
   const router = useRouter()
   const [meetUrl, setMeetUrl] = useState('')
   const [session, setSession] = useState<MeetingSession | null>(null)
@@ -181,6 +189,11 @@ export default function MeetAnalysisView() {
   const [isSavingSimulation, setIsSavingSimulation] = useState(false)
   const [currentSimSaved, setCurrentSimSaved] = useState(false)
   const [recentEvaluations, setRecentEvaluations] = useState<any[]>([])
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<'idle' | 'transcribing' | 'evaluating' | 'done' | 'error'>('idle')
+  const [uploadError, setUploadError] = useState('')
+  const [uploadEvaluation, setUploadEvaluation] = useState<any>(null)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
   const simulationRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -210,7 +223,13 @@ export default function MeetAnalysisView() {
 
   // Tab & calendar week state
   type MeetTab = 'calendar' | 'manual' | 'transcricoes'
-  const [activeTab, setActiveTab] = useState<MeetTab>('calendar')
+  const [activeTab, _setActiveTab] = useState<MeetTab>(initialTab || 'calendar')
+  const setActiveTab = (tab: MeetTab) => {
+    // In meet mode, never allow calendar tab. In calendar mode, never allow manual/transcricoes tabs.
+    if (mode === 'meet' && tab === 'calendar') return
+    if (mode === 'calendar' && tab !== 'calendar') return
+    _setActiveTab(tab)
+  }
   const [desktopTranscriptions, setDesktopTranscriptions] = useState<any[]>([])
   const [loadingTranscriptions, setLoadingTranscriptions] = useState(false)
   const [expandedTranscription, setExpandedTranscription] = useState<string | null>(null)
@@ -578,6 +597,94 @@ export default function MeetAnalysisView() {
   const handleUrlChange = (value: string) => {
     setMeetUrl(value)
     setError('')
+  }
+
+  // Upload and evaluate a recorded meeting file
+  const handleUploadEvaluate = async () => {
+    if (!uploadFile) return
+
+    setUploadError('')
+    setUploadProgress('transcribing')
+    setUploadEvaluation(null)
+
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      if (!authSession?.access_token) {
+        setUploadError('Sessão expirada. Recarregue a página.')
+        setUploadProgress('error')
+        return
+      }
+
+      const compId = await getCompanyId()
+      const userId = authSession.user?.id
+
+      // Get user name
+      const { data: emp } = await supabase
+        .from('employees')
+        .select('name')
+        .eq('auth_user_id', userId)
+        .single()
+
+      // Step 1: Get signed upload URL from our API (creates bucket if needed)
+      const bucketRes = await fetch('/api/meet/ensure-bucket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: uploadFile.name, userId })
+      })
+      const bucketData = await bucketRes.json()
+
+      if (!bucketRes.ok || !bucketData.signedUrl) {
+        setUploadError('Erro ao preparar upload: ' + (bucketData.error || 'Tente novamente'))
+        setUploadProgress('error')
+        return
+      }
+
+      // Step 2: Upload file directly to Supabase Storage via signed URL (no Next.js body limit)
+      const uploadRes = await supabase.storage
+        .from('meet-uploads')
+        .uploadToSignedUrl(bucketData.storagePath, bucketData.token, uploadFile)
+
+      if (uploadRes.error) {
+        setUploadError('Erro ao enviar arquivo: ' + uploadRes.error.message)
+        setUploadProgress('error')
+        return
+      }
+
+      setUploadProgress('evaluating')
+
+      // Step 3: Call API to transcribe + evaluate (sends only the path, not the file)
+      const res = await fetch('/api/meet/upload-evaluate', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          storagePath: bucketData.storagePath,
+          fileName: uploadFile.name,
+          companyId: compId,
+          userId,
+          sellerName: emp?.name || 'Vendedor'
+        })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setUploadError(data.error || 'Erro ao processar arquivo')
+        setUploadProgress('error')
+        return
+      }
+
+      setUploadEvaluation(data.evaluation)
+      setUploadProgress('done')
+      setShowEvaluationModal(true)
+      setEvaluation(data.evaluation)
+
+    } catch (err: any) {
+      setUploadError(err.message || 'Erro ao enviar arquivo')
+      setUploadProgress('error')
+    }
   }
 
   // Send bot to meeting using Recall.ai
@@ -1118,7 +1225,7 @@ export default function MeetAnalysisView() {
         if (data.autoRecordEnabled !== undefined) setAutoRecordEnabled(data.autoRecordEnabled)
         if (data.connected) {
           loadCalendarEvents(authSession.access_token)
-        } else if (activeTab === 'calendar') {
+        } else if (activeTab === 'calendar' && mode !== 'calendar') {
           setActiveTab('manual')
         }
       }
@@ -1488,19 +1595,19 @@ export default function MeetAnalysisView() {
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected && !calendarLoading ? 'pt-[22vh]' : 'pt-8'}`}>
-      <div className={`w-full ${(calendarConnected || calendarLoading) && activeTab === 'calendar' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
+    <div className={`min-h-screen bg-gray-50 px-6 flex items-start justify-center ${!session && !calendarConnected && !calendarLoading && mode !== 'calendar' ? 'pt-[22vh]' : 'pt-8'}`}>
+      <div className={`w-full ${mode === 'calendar' || ((calendarConnected || calendarLoading) && activeTab === 'calendar') ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
         {/* Compact Header */}
         <div className="flex items-center justify-center gap-4 mb-6">
-          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Video className="w-5 h-5 text-green-600" />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${mode === 'calendar' ? 'bg-blue-100' : 'bg-green-100'}`}>
+            {mode === 'calendar' ? <CalendarDays className="w-5 h-5 text-blue-600" /> : <Video className="w-5 h-5 text-green-600" />}
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">
-              {calendarConnected || calendarLoading ? 'Calendário & Análise Meet' : 'Análise Meet'}
+              {mode === 'calendar' ? 'Calendário' : mode === 'meet' ? 'Análise Meet' : (calendarConnected || calendarLoading ? 'Calendário & Análise Meet' : 'Análise Meet')}
             </h1>
             <p className="text-sm text-gray-500">
-              {calendarConnected || calendarLoading ? 'Gerencie sua agenda e avalie reuniões com IA' : 'Avaliação automática de reuniões com IA'}
+              {mode === 'calendar' ? 'Gerencie sua agenda e grave reuniões automaticamente' : mode === 'meet' ? 'Avaliação automática de reuniões com IA' : (calendarConnected || calendarLoading ? 'Gerencie sua agenda e avalie reuniões com IA' : 'Avaliação automática de reuniões com IA')}
             </p>
           </div>
         </div>
@@ -1599,7 +1706,7 @@ export default function MeetAnalysisView() {
         {(!session || session.status === 'sending' || session.status === 'joining' || session.status === 'waiting_room') && (
           <>
             {/* Google Calendar Connection Card (not connected) — Enhanced onboarding */}
-            {!calendarConnected && !calendarLoading && (
+            {!calendarConnected && !calendarLoading && mode !== 'meet' && (
               <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 rounded-2xl p-6 mb-4 text-white shadow-lg shadow-blue-200/50 relative overflow-hidden">
                 <img src="/google-calendar-logo.png" alt="Google Calendar" className="absolute -top-2 -left-2 w-28 h-28 object-contain drop-shadow-md opacity-90" />
                 <div className="flex items-start gap-4">
@@ -1634,8 +1741,8 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {/* Tab Navigation (when NOT connected — show Manual + Transcrições) */}
-            {!calendarConnected && !calendarLoading && (
+            {/* Tab Navigation (when NOT connected OR in meet mode — show Manual + Transcrições) */}
+            {((!calendarConnected && !calendarLoading) || mode === 'meet') && mode !== 'calendar' && (
               <div className="mb-4">
                 <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
                   {([
@@ -1678,12 +1785,13 @@ export default function MeetAnalysisView() {
             )}
 
             {/* Tab Navigation (when connected) */}
-            {calendarConnected && (
+            {calendarConnected && mode !== 'meet' && (
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-3">
+                  {mode !== 'calendar' && (
                   <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
                     {([
-                      { id: 'calendar' as MeetTab, icon: CalendarDays, label: 'Calendário' },
+                      ...(mode !== 'meet' ? [{ id: 'calendar' as MeetTab, icon: CalendarDays, label: 'Calendário' }] : []),
                       { id: 'manual' as MeetTab, icon: Link2, label: 'Manual' },
                       { id: 'transcricoes' as MeetTab, icon: Monitor, label: 'Transcrições App' },
                     ]).map(tab => (
@@ -1701,6 +1809,7 @@ export default function MeetAnalysisView() {
                       </button>
                     ))}
                   </div>
+                  )}
                   <div className="flex items-center gap-2">
                     {calendarEmail && (
                       <div className="flex items-center gap-1.5 hidden sm:flex">
@@ -1782,7 +1891,7 @@ export default function MeetAnalysisView() {
             )}
 
             {/* ========== TAB: Calendário (Google Calendar style) ========== */}
-            {calendarConnected && activeTab === 'calendar' && (
+            {calendarConnected && activeTab === 'calendar' && mode !== 'meet' && (
               <div className="flex gap-4">
                 {/* Mini month calendar sidebar */}
                 <MiniCalendar
@@ -1903,7 +2012,7 @@ export default function MeetAnalysisView() {
             />
 
             {/* ========== TAB: Manual (or when not connected and on manual tab) ========== */}
-            {(activeTab === 'manual') && (
+            {(activeTab === 'manual') && mode !== 'calendar' && (
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -1945,6 +2054,97 @@ export default function MeetAnalysisView() {
                 </div>
               )}
             </div>
+            )}
+
+            {/* ========== Upload Recording File ========== */}
+            {(activeTab === 'manual') && mode !== 'calendar' && (
+              <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileAudio className="w-4 h-4 text-green-600" />
+                  <h3 className="text-sm font-semibold text-gray-900">Enviar gravação de reunião</h3>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">Faça upload de um áudio ou vídeo de reunião para transcrição e avaliação automática</p>
+
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept="audio/*,video/*,.mp3,.wav,.ogg,.m4a,.mp4,.webm,.flac"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setUploadFile(file)
+                      setUploadProgress('idle')
+                      setUploadError('')
+                      setUploadEvaluation(null)
+                    }
+                  }}
+                />
+
+                {!uploadFile ? (
+                  <button
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-gray-300 rounded-xl p-8 hover:border-green-400 hover:bg-green-50/50 transition-all group cursor-pointer"
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-gray-300 group-hover:text-green-500 transition-colors" />
+                      <span className="text-sm text-gray-500 group-hover:text-green-700">Clique para selecionar arquivo</span>
+                      <span className="text-xs text-gray-400">MP3, WAV, M4A, MP4, WebM — até 500MB</span>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
+                      <div className="flex items-center gap-3">
+                        <FileAudio className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 truncate max-w-[300px]">{uploadFile.name}</p>
+                          <p className="text-xs text-gray-400">{(uploadFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setUploadFile(null); setUploadProgress('idle'); setUploadError(''); if (uploadInputRef.current) uploadInputRef.current.value = '' }}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <XCircle className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {uploadProgress === 'idle' && (
+                      <button
+                        onClick={handleUploadEvaluate}
+                        className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Transcrever e Avaliar
+                      </button>
+                    )}
+
+                    {(uploadProgress === 'transcribing' || uploadProgress === 'evaluating') && (
+                      <div className="flex items-center justify-center gap-3 py-3 bg-green-50 rounded-xl border border-green-200">
+                        <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+                        <span className="text-sm font-medium text-green-700">
+                          {uploadProgress === 'transcribing' ? 'Transcrevendo áudio...' : 'Avaliando com IA...'}
+                        </span>
+                      </div>
+                    )}
+
+                    {uploadProgress === 'done' && (
+                      <div className="flex items-center gap-2 py-3 px-4 bg-green-50 rounded-xl border border-green-200">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="text-sm font-medium text-green-700">Avaliação concluída!</span>
+                      </div>
+                    )}
+
+                    {uploadProgress === 'error' && uploadError && (
+                      <div className="flex items-center gap-2 py-3 px-4 bg-red-50 rounded-xl border border-red-200">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <span className="text-sm text-red-700">{uploadError}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Steps + Background notice (only when calendar not connected and on manual tab) */}
@@ -2290,7 +2490,7 @@ export default function MeetAnalysisView() {
               </div>
             )}
 
-            {recentEvaluations.length === 0 && activeTab !== 'transcricoes' && (
+            {recentEvaluations.length === 0 && activeTab !== 'transcricoes' && activeTab !== 'calendar' && mode !== 'calendar' && (
               <p className="text-sm text-gray-400 text-center py-6">Nenhuma análise ainda</p>
             )}
           </>
