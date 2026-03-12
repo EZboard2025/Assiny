@@ -302,20 +302,23 @@ async function triggerAutoLearningHooks(
         return `[${time}] ${role}: ${text}`
       })
 
-      await supabaseAdmin
-        .from('seller_message_tracking')
-        .insert({
-          user_id: userId,
-          company_id: companyId,
-          contact_phone: contactPhone,
-          contact_name: contactName || null,
-          seller_message: (msg.content || '').substring(0, 2000),
-          conversation_context: contextLines.join('\n').substring(0, 5000),
-          message_timestamp: msg.message_timestamp,
-          is_autopilot: false,
-        })
-        .then(() => console.log(`[Desktop Sync] Tracked seller message for ${contactPhone}`))
-        .catch(err => console.error('[Desktop Sync] trackSellerMessage error:', err.message))
+      try {
+        await supabaseAdmin
+          .from('seller_message_tracking')
+          .insert({
+            user_id: userId,
+            company_id: companyId,
+            contact_phone: contactPhone,
+            contact_name: contactName || null,
+            seller_message: (msg.content || '').substring(0, 2000),
+            conversation_context: contextLines.join('\n').substring(0, 5000),
+            message_timestamp: msg.message_timestamp,
+            is_autopilot: false,
+          })
+        console.log(`[Desktop Sync] Tracked seller message for ${contactPhone}`)
+      } catch (err: any) {
+        console.error('[Desktop Sync] trackSellerMessage error:', err.message)
+      }
 
     } else if (msg.direction === 'inbound') {
       // Client response → trigger outcome analysis
