@@ -216,6 +216,10 @@ export async function POST(request: NextRequest) {
         smart_notes: smartNotes,
         overall_score: overallScore,
         performance_level: evaluation.performance_level,
+        spin_s_score: evaluation.spin_evaluation?.S?.final_score,
+        spin_p_score: evaluation.spin_evaluation?.P?.final_score,
+        spin_i_score: evaluation.spin_evaluation?.I?.final_score,
+        spin_n_score: evaluation.spin_evaluation?.N?.final_score,
         source: 'upload'
       })
       .select('id')
