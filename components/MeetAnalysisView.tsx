@@ -46,6 +46,15 @@ import MiniCalendar from './MiniCalendar'
 
 type BotStatus = 'idle' | 'sending' | 'joining' | 'waiting_room' | 'in_meeting' | 'transcribing' | 'ended' | 'evaluating' | 'error'
 
+const PERFORMANCE_LABELS: Record<string, string> = {
+  poor: 'Reprovado',
+  needs_improvement: 'Precisa Melhorar',
+  good: 'Mediano',
+  very_good: 'Bom',
+  excellent: 'Excelente',
+  legendary: 'Lendário',
+}
+
 interface TranscriptSegment {
   speaker: string
   text: string
@@ -2690,7 +2699,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                         (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
                         (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
                       }`}>{evaluation.overall_score?.toFixed(1)}</div>
-                      <div className="text-gray-500 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
+                      <div className="text-gray-500 text-sm capitalize">{PERFORMANCE_LABELS[evaluation.performance_level] || evaluation.performance_level?.replace('_', ' ')}</div>
                       {evaluation.playbook_adherence && (
                         <div className="mt-2 flex items-center gap-1 justify-end text-gray-600">
                           <BookOpen className="w-4 h-4" />
@@ -2842,7 +2851,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                       (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
                       (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
                     }`}>{evaluation.overall_score?.toFixed(1)}</div>
-                    <div className="text-gray-500 text-sm capitalize">{evaluation.performance_level?.replace('_', ' ')}</div>
+                    <div className="text-gray-500 text-sm capitalize">{PERFORMANCE_LABELS[evaluation.performance_level] || evaluation.performance_level?.replace('_', ' ')}</div>
                   </div>
                 </div>
               </div>
@@ -3303,20 +3312,6 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
 
               {/* Footer */}
               <div className="p-6 border-t border-gray-200 flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
-                <button
-                  onClick={() => {
-                    if (session) {
-                      const text = session.transcript
-                        .map(s => `${s.speaker}: ${s.text}`)
-                        .join('\n')
-                      navigator.clipboard.writeText(text)
-                    }
-                  }}
-                  className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-gray-200"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copiar Transcricao
-                </button>
                 <button
                   onClick={async () => {
                     if (simulationConfig && !currentSimSaved) {
