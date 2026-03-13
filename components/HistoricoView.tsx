@@ -469,7 +469,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
 
         ) : historyType === 'meet' ? (
           <Suspense fallback={<LazySpinner />}>
-            <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={initialMeetEvaluationId || urlEvaluationId} onInitialEvaluationLoaded={onMeetEvaluationLoaded} onOpenMeetAgent={onOpenMeetAgent} />
+            <MeetHistoryContent newEvaluationIds={newEvaluationIds} initialEvaluationId={initialMeetEvaluationId || urlEvaluationId} onInitialEvaluationLoaded={onMeetEvaluationLoaded} onOpenMeetAgent={onOpenMeetAgent} sourceFilter="bot" />
           </Suspense>
         ) : historyType === 'gravacoes' ? (
           <Suspense fallback={<LazySpinner />}>

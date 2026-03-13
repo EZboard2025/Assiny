@@ -244,8 +244,10 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
         .from('meet_evaluations')
         .select('*')
         .eq('user_id', user.id)
-      if (sourceFilter) {
-        query = query.eq('source', sourceFilter)
+      if (sourceFilter === 'upload') {
+        query = query.eq('source', 'upload')
+      } else if (sourceFilter === 'bot') {
+        query = query.or('source.eq.bot,source.is.null')
       }
       const { data, error } = await query.order('created_at', { ascending: false })
 

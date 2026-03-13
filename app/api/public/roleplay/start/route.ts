@@ -279,7 +279,7 @@ PERFIL DO CLIENTE B2C:
         clientName: clientName,
         systemPrompt: systemPrompt  // Armazenar para reutilizar no /chat
       },
-      messages: [],
+      messages: firstMessage ? [{ role: 'client', text: firstMessage, timestamp: new Date().toISOString() }] : [],
       status: 'in_progress'
     }
 
