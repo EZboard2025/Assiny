@@ -254,14 +254,7 @@ export default function RoleplayPublico() {
       setMessages(updatedMessages)
 
       const isFinalizationMessage = response.includes('Roleplay finalizado, aperte em finalizar sessão')
-      await playAudioResponse(response)
-
-      if (isFinalizationMessage) {
-        setShowAutoFinalizingMessage(true)
-        setTimeout(() => {
-          endRoleplay()
-        }, 2000)
-      }
+      await playAudioResponse(response, isFinalizationMessage)
     } catch (error) {
       console.error('Erro ao processar áudio:', error)
       alert('Erro ao processar sua mensagem')
@@ -270,7 +263,7 @@ export default function RoleplayPublico() {
     }
   }
 
-  const playAudioResponse = async (text: string) => {
+  const playAudioResponse = async (text: string, isFinalizationMessage: boolean = false) => {
     try {
       setIsPlayingAudio(true)
 
@@ -290,12 +283,29 @@ export default function RoleplayPublico() {
       const audio = new Audio(audioUrl)
       audioRef.current = audio
 
-      audio.onended = () => {
-        setIsPlayingAudio(false)
-        URL.revokeObjectURL(audioUrl)
-      }
+      await new Promise<void>((resolve) => {
+        audio.onended = () => {
+          setIsPlayingAudio(false)
+          URL.revokeObjectURL(audioUrl)
 
-      await audio.play()
+          if (isFinalizationMessage) {
+            setShowAutoFinalizingMessage(true)
+            setTimeout(() => {
+              endRoleplay()
+            }, 1500)
+          }
+
+          resolve()
+        }
+
+        audio.onerror = () => {
+          setIsPlayingAudio(false)
+          URL.revokeObjectURL(audioUrl)
+          resolve()
+        }
+
+        audio.play()
+      })
     } catch (error) {
       console.error('Erro ao reproduzir áudio:', error)
       setIsPlayingAudio(false)
@@ -837,15 +847,20 @@ export default function RoleplayPublico() {
           </div>
         )}
 
-        {showAutoFinalizingMessage && (
-          <div className="flex justify-center mt-4">
-            <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-xl">
-              <Loader2 className="w-4 h-4 text-yellow-600 animate-spin" />
-              <p className="text-yellow-700 font-medium text-sm">Finalizando simulação automaticamente...</p>
+      </div>
+
+      {/* Fullscreen Finalizing / Evaluating Overlay */}
+      {(showAutoFinalizingMessage || isEvaluating) && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
+            <Loader2 className="w-16 h-16 text-green-400 animate-spin mx-auto" />
+            <div>
+              <h3 className="text-2xl font-bold text-white mb-2">Analisando sua performance...</h3>
+              <p className="text-gray-400">Nosso agente está avaliando sua conversa com base em metodologia SPIN Selling</p>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Evaluation Modal */}
         {showEvaluationModal && evaluation && (
