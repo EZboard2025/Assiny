@@ -74,6 +74,8 @@ import { getObjectionTitle } from '@/lib/utils/objectionTitle'
 
 interface ConfigHubProps {
   onClose: () => void
+  initialTab?: 'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'meet_notes' | 'usage'
+  onboardingMode?: boolean
 }
 
 // Interface para Playbook de Vendas
@@ -310,7 +312,10 @@ function ConfigurationInterface({
   showAIModal,
   setShowAIModal,
   showAIGenerateModal,
-  setShowAIGenerateModal
+  setShowAIGenerateModal,
+  initialTab,
+  onboardingMode,
+  onClose
 }: {
   qualityEvaluation: any
   setQualityEvaluation: (val: any) => void
@@ -320,6 +325,9 @@ function ConfigurationInterface({
   setShowAIModal: (val: boolean) => void
   showAIGenerateModal: 'objections' | 'personas' | 'objectives' | null
   setShowAIGenerateModal: (val: 'objections' | 'personas' | 'objectives' | null) => void
+  initialTab?: 'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'meet_notes' | 'usage'
+  onboardingMode?: boolean
+  onClose?: () => void
 }) {
   const { currentCompany } = useCompany()
   const { showToast } = useToast()
@@ -332,7 +340,7 @@ function ConfigurationInterface({
 
   // Plano Individual não tem acesso à aba de funcionários
   const isIndividualPlan = trainingPlan === PlanType.INDIVIDUAL
-  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'meet_notes' | 'usage'>(isIndividualPlan ? 'personas' : 'employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'meet_notes' | 'usage'>(initialTab || (isIndividualPlan ? 'personas' : 'employees'))
   const [employees, setEmployees] = useState<Employee[]>([])
   const [newEmployeeName, setNewEmployeeName] = useState('')
   const [newEmployeeEmail, setNewEmployeeEmail] = useState('')
@@ -913,6 +921,20 @@ function ConfigurationInterface({
     loadTags()
   }, [])
 
+  // No modo onboarding, auto-abrir formulários quando dados carregarem
+  useEffect(() => {
+    if (onboardingMode && !loading) {
+      if (activeTab === 'personas') {
+        setShowPersonaForm(true)
+        setNewPersona({})
+        setEditingPersonaId(null)
+        setSelectedPersonaTags([])
+      } else if (activeTab === 'objections') {
+        setShowObjectionChat(true)
+      }
+    }
+  }, [onboardingMode, loading, activeTab])
+
   // Carregar PDFs quando userCompanyId estiver disponível
   useEffect(() => {
     if (userCompanyId) {
@@ -1323,6 +1345,11 @@ function ConfigurationInterface({
 
       showToast('success', 'Dados Salvos', 'Embeddings estão sendo gerados em segundo plano.')
       setCompanyDataEdited(false) // Resetar flag de edição após salvar
+
+      // No modo onboarding, fechar ConfigHub após salvar para voltar à tela de cards
+      if (onboardingMode && onClose) {
+        setTimeout(() => onClose(), 1200)
+      }
 
     } catch (error) {
       console.error('💥 Erro ao salvar dados:', error)
@@ -2540,6 +2567,7 @@ function ConfigurationInterface({
         setShowPersonaForm(false)
         setEditingPersonaId(null)
         setSelectedPersonaTags([])
+        if (onboardingMode && onClose) setTimeout(() => onClose(), 800)
       } else {
         // Criar nova persona
         const result = await addPersona({ ...persona, business_type: personaType })
@@ -2552,6 +2580,7 @@ function ConfigurationInterface({
           setNewPersona({})
           setShowPersonaForm(false)
           setSelectedPersonaTags([])
+          if (onboardingMode && onClose) setTimeout(() => onClose(), 800)
         }
       }
     } else if (personaType === 'B2C') {
@@ -2586,6 +2615,7 @@ function ConfigurationInterface({
         setShowPersonaForm(false)
         setEditingPersonaId(null)
         setSelectedPersonaTags([])
+        if (onboardingMode && onClose) setTimeout(() => onClose(), 800)
       } else {
         // Criar nova persona
         const result = await addPersona({ ...persona, business_type: personaType })
@@ -2598,6 +2628,7 @@ function ConfigurationInterface({
           setNewPersona({})
           setShowPersonaForm(false)
           setSelectedPersonaTags([])
+          if (onboardingMode && onClose) setTimeout(() => onClose(), 800)
         }
       }
     }
@@ -2629,6 +2660,11 @@ function ConfigurationInterface({
         setNewObjection('')
         setEditingObjectionId(objection.id)
         setExpandedObjections(new Set([objection.id]))
+
+        // No modo onboarding, fechar ConfigHub após adicionar objeção
+        if (onboardingMode && onClose) {
+          setTimeout(() => onClose(), 800)
+        }
       }
     }
   }
@@ -3174,7 +3210,8 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
 
   return (
     <div className="flex h-full">
-      {/* Sidebar */}
+      {/* Sidebar - hidden in onboarding mode */}
+      {!onboardingMode && (
       <div className="w-52 flex-shrink-0 border-r border-gray-200 py-4 px-3 space-y-0.5 overflow-y-auto">
         {trainingPlan !== PlanType.INDIVIDUAL && (
           <button
@@ -3261,6 +3298,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
           <span>Uso</span>
         </button>
       </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-w-0 overflow-y-auto p-6">
@@ -4535,6 +4573,7 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                       setObjections(updated)
                       setShowObjectionChat(false)
                       showToast('success', 'Objeção criada', 'Objeção criada com sucesso via IA!')
+                      if (onboardingMode && onClose) setTimeout(() => onClose(), 800)
                     }}
                     onCancel={() => setShowObjectionChat(false)}
                   />
@@ -6622,7 +6661,7 @@ function AIGeneratedObjectivesPreview({
   )
 }
 
-export default function ConfigHub({ onClose }: ConfigHubProps) {
+export default function ConfigHub({ onClose, initialTab, onboardingMode }: ConfigHubProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
@@ -6691,7 +6730,14 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
         <div className="bg-white rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-200 flex-shrink-0">
-            <h2 className="text-lg font-semibold text-gray-900">Configurações</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {onboardingMode ? (
+                initialTab === 'files' ? 'Dados da Empresa' :
+                initialTab === 'personas' ? 'Personas' :
+                initialTab === 'objections' ? 'Objeções' :
+                'Configurações'
+              ) : 'Configurações'}
+            </h2>
             <button
               onClick={onClose}
               className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -6718,6 +6764,9 @@ export default function ConfigHub({ onClose }: ConfigHubProps) {
                 setShowAIModal={setShowAIModal}
                 showAIGenerateModal={showAIGenerateModal}
                 setShowAIGenerateModal={setShowAIGenerateModal}
+                initialTab={initialTab}
+                onboardingMode={onboardingMode}
+                onClose={onClose}
               />
             ) : (
               // Access denied - Not admin

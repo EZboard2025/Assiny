@@ -73,11 +73,32 @@ interface CompanyDataChatProps {
 }
 
 export default function CompanyDataChat({ companyData, businessType, onFieldUpdate, onBusinessTypeChange, onAutoSave, children }: CompanyDataChatProps) {
+  // Gerar mensagem de boas-vindas contextual baseada nos campos preenchidos
+  const buildWelcomeMessage = () => {
+    const emptyFields = FIELD_CONFIG.filter(f => !companyData[f.key]?.trim())
+    const filledCount = FIELD_CONFIG.length - emptyFields.length
+
+    if (filledCount === 0) {
+      return 'Olá! Sou o assistente de dados da empresa. Me conte sobre a sua empresa, o que ela faz, quais produtos ou serviços oferece, e eu vou te ajudar a preencher todos os campos automaticamente.\n\nVocê também pode enviar o link do site da empresa ou um arquivo PDF com informações (apresentações, playbooks, materiais de vendas) para que eu extraia os dados automaticamente.'
+    }
+
+    if (emptyFields.length === 0) {
+      return 'Todos os campos já estão preenchidos! Se quiser ajustar algum dado, é só me dizer qual campo quer melhorar.'
+    }
+
+    const missingLabels = emptyFields.map(f => f.label).join(', ')
+    if (emptyFields.length <= 3) {
+      return `Olá! Vejo que a maioria dos dados já está preenchida (${filledCount}/${FIELD_CONFIG.length}). ${emptyFields.length === 1 ? 'Falta apenas o campo' : 'Faltam apenas os campos'}: **${missingLabels}**.\n\nMe conte sobre ${emptyFields.length === 1 ? 'isso' : 'esses pontos'} e eu preencho para você!`
+    }
+
+    return `Olá! Vejo que alguns campos já estão preenchidos (${filledCount}/${FIELD_CONFIG.length}). Ainda faltam: **${missingLabels}**.\n\nMe conte sobre esses pontos ou envie o link do site / um PDF da empresa para que eu extraia os dados automaticamente.`
+  }
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Olá! Sou o assistente de dados da empresa. Me conte sobre a sua empresa, o que ela faz, quais produtos ou serviços oferece, e eu vou te ajudar a preencher todos os campos automaticamente.\n\nVocê também pode enviar o link do site da empresa ou um arquivo PDF com informações (apresentações, playbooks, materiais de vendas) para que eu extraia os dados automaticamente.'
+      content: buildWelcomeMessage()
     }
   ])
   const [input, setInput] = useState('')
@@ -114,6 +135,18 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     }
     prevFilledRef.current = filledCount
   }, [filledCount, allFilled, totalFields, hasStartedChat, onAutoSave])
+
+  // Quando todos os campos ficam preenchidos, colapsar o chat resetando a conversa
+  useEffect(() => {
+    if (allFilled && hasStartedChat) {
+      setMessages([{
+        id: 'welcome',
+        role: 'assistant',
+        content: buildWelcomeMessage()
+      }])
+      setForceOpen(false)
+    }
+  }, [allFilled])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

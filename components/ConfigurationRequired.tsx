@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, AlertTriangle, CheckCircle, Building2, Users, MessageSquareWarning, ArrowRight, Loader2, LogOut } from 'lucide-react'
+import { Settings, AlertTriangle, CheckCircle, Building2, Users, MessageSquareWarning, Loader2, LogOut, ChevronRight } from 'lucide-react'
 
 interface ConfigurationRequiredProps {
   isLoading: boolean
@@ -10,15 +10,21 @@ interface ConfigurationRequiredProps {
     hasPersonas: boolean
     hasObjections: boolean
   }
-  onOpenConfig: () => void
+  onOpenStep: (tab: string) => void
   onLogout?: () => void
+}
+
+const TAB_MAP: Record<string, string> = {
+  companyData: 'files',
+  personas: 'personas',
+  objections: 'objections'
 }
 
 export default function ConfigurationRequired({
   isLoading,
   missingItems,
   details,
-  onOpenConfig,
+  onOpenStep,
   onLogout
 }: ConfigurationRequiredProps) {
   if (isLoading) {
@@ -58,6 +64,7 @@ export default function ConfigurationRequired({
 
   const completedCount = configItems.filter(item => item.completed).length
   const progress = (completedCount / configItems.length) * 100
+  const firstIncompleteIndex = configItems.findIndex(item => !item.completed)
 
   return (
     <div className="fixed inset-0 z-[80] bg-white/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -111,76 +118,85 @@ export default function ConfigurationRequired({
             </div>
           </div>
 
-          {/* Lista de itens */}
+          {/* Lista de itens clicáveis */}
           <div className="px-8 pb-6 space-y-3">
-            {configItems.map((item) => {
+            {configItems.map((item, index) => {
               const Icon = item.icon
+              const isNextStep = index === firstIncompleteIndex
+              const isFutureStep = !item.completed && !isNextStep
+
               return (
-                <div
+                <button
                   key={item.key}
-                  className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                  onClick={() => {
+                    if (!item.completed) {
+                      onOpenStep(TAB_MAP[item.key])
+                    }
+                  }}
+                  disabled={item.completed}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
                     item.completed
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-gray-50 border-gray-200'
+                      ? 'bg-green-50 border-green-200 cursor-default'
+                      : isNextStep
+                        ? 'bg-white border-green-400 shadow-md shadow-green-100 hover:shadow-lg hover:shadow-green-100 cursor-pointer ring-1 ring-green-400/50'
+                        : 'bg-gray-50 border-gray-200 hover:border-gray-300 hover:bg-gray-100 cursor-pointer'
                   }`}
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     item.completed
                       ? 'bg-green-100'
-                      : 'bg-gray-100'
+                      : isNextStep
+                        ? 'bg-green-100'
+                        : 'bg-gray-100'
                   }`}>
                     {item.completed ? (
                       <CheckCircle className="w-5 h-5 text-green-600" />
                     ) : (
-                      <Icon className="w-5 h-5 text-gray-400" />
+                      <Icon className={`w-5 h-5 ${isNextStep ? 'text-green-600' : 'text-gray-400'}`} />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`font-medium ${
-                      item.completed ? 'text-green-700' : 'text-gray-900'
+                      item.completed ? 'text-green-700' : isNextStep ? 'text-gray-900' : 'text-gray-500'
                     }`}>
                       {item.label}
                     </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {item.description}
+                    <p className={`text-xs truncate ${
+                      isNextStep ? 'text-green-600' : 'text-gray-500'
+                    }`}>
+                      {item.completed ? 'Configurado' : isNextStep ? 'Clique para configurar' : item.description}
                     </p>
                   </div>
-                  {item.completed && (
+                  {item.completed ? (
                     <span className="text-xs text-green-600 font-medium px-2 py-1 bg-green-100 rounded-lg">
                       OK
                     </span>
+                  ) : (
+                    <ChevronRight className={`w-5 h-5 flex-shrink-0 ${isNextStep ? 'text-green-500' : 'text-gray-300'}`} />
                   )}
-                </div>
+                </button>
               )
             })}
           </div>
 
           {/* Aviso */}
-          <div className="mx-8 mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-yellow-700 font-medium">
-                  Configuração necessária
-                </p>
-                <p className="text-xs text-yellow-600 mt-1">
-                  O treinamento de roleplay, chat IA e outras funcionalidades ficam disponíveis após completar a configuração.
-                </p>
+          {completedCount < configItems.length && (
+            <div className="mx-8 mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-yellow-700 font-medium">
+                    Configuração necessária
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    O treinamento de roleplay, chat IA e outras funcionalidades ficam disponíveis após completar a configuração.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Botão de ação */}
-          <div className="p-8 pt-0">
-            <button
-              onClick={onOpenConfig}
-              className="w-full py-4 bg-green-600 hover:bg-green-500 rounded-xl font-semibold text-white transition-all duration-200 flex items-center justify-center gap-3 shadow-lg shadow-green-500/20 hover:shadow-green-500/30"
-            >
-              <Settings className="w-5 h-5" />
-              Abrir Hub de Configuração
-              <ArrowRight className="w-5 h-5" />
-            </button>
-          </div>
+          <div className="pb-8" />
         </div>
 
         {/* Texto de ajuda */}

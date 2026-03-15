@@ -91,6 +91,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const router = useRouter()
   const { currentCompany, loading: companyLoading } = useCompany()
   const [showConfigHub, setShowConfigHub] = useState(false)
+  const [configHubInitialTab, setConfigHubInitialTab] = useState<'employees' | 'personas' | 'objections' | 'objectives' | 'files' | 'meet_notes' | 'usage' | undefined>(undefined)
+  const [configHubOnboarding, setConfigHubOnboarding] = useState(false)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false)
   const [currentView, setCurrentView] = useState<'home' | 'chat' | 'roleplay' | 'pdi' | 'historico' | 'perfil' | 'roleplay-links' | 'meet-analysis' | 'calendar' | 'challenge-history' | 'manager' | 'download'>('home')
   const [mounted, setMounted] = useState(false)
@@ -864,10 +866,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
       {/* Config Hub Modal */}
       {showConfigHub && (
-        <ConfigHub onClose={() => {
-          setShowConfigHub(false)
-          refetchConfig()
-        }} />
+        <ConfigHub
+          onClose={() => {
+            setShowConfigHub(false)
+            setConfigHubInitialTab(undefined)
+            setConfigHubOnboarding(false)
+            refetchConfig()
+          }}
+          initialTab={configHubInitialTab}
+          onboardingMode={configHubOnboarding}
+        />
       )}
 
       {/* Seller Agent Chat - home, profile, roleplay and historico (hidden in Electron desktop app) */}
@@ -882,7 +890,11 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             isLoading={configLoading}
             missingItems={missingItems}
             details={configDetails}
-            onOpenConfig={() => setShowConfigHub(true)}
+            onOpenStep={(tab: string) => {
+              setConfigHubInitialTab(tab as any)
+              setConfigHubOnboarding(true)
+              setShowConfigHub(true)
+            }}
             onLogout={async () => {
               const { supabase } = await import('@/lib/supabase')
               const { clearCompanyIdCache } = await import('@/lib/utils/getCompanyFromSubdomain')
