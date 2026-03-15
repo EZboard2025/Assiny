@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { evaluateChallengePerformance } from '@/lib/challenges/evaluateChallengePerformance'
 import { evaluateRoleplay } from '@/lib/evaluation/evaluateRoleplay'
 import { evaluateMeetCorrection } from '@/lib/evaluation/evaluateMeetCorrection'
+import { computeAndSaveRealismScore } from '@/lib/ml/computeRealismScore'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -265,6 +266,16 @@ OBJEÇÕES TRABALHADAS:`
     }
 
     console.log('💾 Avaliação salva com sucesso!')
+
+    // Compute realism score (fire-and-forget, non-blocking)
+    if (companyId) {
+      const clientMsgs = messages
+        .filter((m: any) => m.role === 'client')
+        .map((m: any) => m.text)
+      computeAndSaveRealismScore(sessionId, companyId, clientMsgs).catch(err => {
+        console.warn('⚠️ Realism score computation failed (non-fatal):', err.message)
+      })
+    }
 
     return NextResponse.json({
       success: true,

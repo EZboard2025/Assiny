@@ -3,6 +3,7 @@ import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { getRandomMaleClientName } from '@/lib/utils/randomNames'
 import { buildSystemPrompt } from '@/lib/roleplay/buildSystemPrompt'
+import { enrichRoleplayWithRealData, formatEnrichmentForPrompt } from '@/lib/ml/enrichRoleplayWithRealData'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -138,6 +139,25 @@ PERFIL DO CLIENTE B2C:
         }
       }
 
+      // ML Enrichment: query real meeting patterns (non-blocking, fallback to empty)
+      let realDataEnrichment = ''
+      if (companyId) {
+        try {
+          const enrichment = await enrichRoleplayWithRealData(companyId, {
+            persona: personaInfo.trim(),
+            objections: objectionsText,
+            companyType,
+            temperament: config.temperament || '',
+          })
+          realDataEnrichment = formatEnrichmentForPrompt(enrichment)
+          if (enrichment.hasData) {
+            console.log('🧠 [chat-v2] ML enrichment applied (real meeting data injected)')
+          }
+        } catch (mlErr: any) {
+          console.warn('⚠️ [chat-v2] ML enrichment failed (non-fatal):', mlErr.message)
+        }
+      }
+
       // Construir system prompt
       const systemPrompt = buildSystemPrompt({
         companyName: companyData?.nome || null,
@@ -150,7 +170,8 @@ PERFIL DO CLIENTE B2C:
         idade: config.age,
         temperamento: config.temperament,
         persona: personaInfo.trim(),
-        objecoes: objectionsText
+        objecoes: objectionsText,
+        realDataEnrichment,
       })
 
       // Log das variáveis de personalização
@@ -281,6 +302,22 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
         }
       }
 
+      // ML Enrichment: query real meeting patterns (non-blocking)
+      let realDataEnrichment = ''
+      if (companyId) {
+        try {
+          const enrichment = await enrichRoleplayWithRealData(companyId, {
+            persona: personaText,
+            objections: objectionsText,
+            companyType,
+            temperament: temperament || '',
+          })
+          realDataEnrichment = formatEnrichmentForPrompt(enrichment)
+        } catch (mlErr: any) {
+          console.warn('⚠️ [chat-v2] ML enrichment failed (non-fatal):', mlErr.message)
+        }
+      }
+
       // Construir system prompt
       const systemPrompt = buildSystemPrompt({
         companyName: companyData?.nome || null,
@@ -293,7 +330,8 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
         idade: age || '35',
         temperamento: temperament || 'Analítico',
         persona: personaText,
-        objecoes: objectionsText
+        objecoes: objectionsText,
+        realDataEnrichment,
       })
 
       // Construir histórico de mensagens

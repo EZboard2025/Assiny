@@ -8,6 +8,7 @@ export interface BuildSystemPromptParams {
   temperamento: string
   persona: string
   objecoes: string
+  realDataEnrichment?: string
 }
 
 // Função para construir o System Prompt com todas as variáveis
@@ -443,5 +444,5 @@ Se for uma pergunta, seja objetiva e curta, sem justificar o motivo da dúvida.
 Nunca escreva como um texto de blog ou de e-mail — pense como uma resposta de WhatsApp durante uma reunião de vendas.
 
 
-Só use respostas mais longas se o contexto exigir explicação (ex: detalhar uma objeção complexa).`
+Só use respostas mais longas se o contexto exigir explicação (ex: detalhar uma objeção complexa).${params.realDataEnrichment || ''}`
 }

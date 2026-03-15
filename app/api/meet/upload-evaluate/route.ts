@@ -229,6 +229,30 @@ export async function POST(request: NextRequest) {
       console.error('[UploadEvaluate] Erro ao salvar:', saveError)
     }
 
+    // Extract ML patterns (fire-and-forget, non-blocking)
+    if (saved?.id && companyId) {
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+        fetch(`${appUrl}/api/meet/extract-patterns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            meetEvaluationId: saved.id,
+            transcript: cleanedTranscript,
+            evaluation,
+            companyId,
+          })
+        }).then(res => {
+          if (res.ok) console.log(`[UploadEvaluate] ML pattern extraction started`)
+          else console.error(`[UploadEvaluate] ML pattern extraction failed: ${res.status}`)
+        }).catch(err => {
+          console.error(`[UploadEvaluate] ML pattern extraction error:`, err.message)
+        })
+      } catch (mlErr: any) {
+        console.error('[UploadEvaluate] ML setup error (non-fatal):', mlErr.message)
+      }
+    }
+
     console.log(`[UploadEvaluate] Avaliação concluída: ${overallScore}/100`)
 
     return NextResponse.json({
