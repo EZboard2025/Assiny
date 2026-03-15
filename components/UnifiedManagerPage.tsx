@@ -73,8 +73,8 @@ export default function UnifiedManagerPage() {
         )}
       </div>
 
-      {/* Unified AI Assistant - context-aware (hidden in desktop app, Nicole is in bubble) */}
-      {!isDesktopApp && <SellerAgentChat
+      {/* Unified AI Assistant - context-aware (hidden in desktop app, except when meet agent is active) */}
+      {(!isDesktopApp || meetAgentContext) && <SellerAgentChat
         currentView={view.type === 'detail' ? 'seller_detail' : 'manager'}
         viewingContext={view.type === 'detail' ? {
           sellerName: view.seller.user_name,
@@ -89,6 +89,7 @@ export default function UnifiedManagerPage() {
           trend: view.seller.trend,
         } : null}
         meetContext={meetAgentContext}
+        onClearMeetContext={() => setMeetAgentContext(null)}
       />}
     </div>
   )

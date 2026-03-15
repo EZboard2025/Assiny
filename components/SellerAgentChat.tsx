@@ -37,6 +37,7 @@ interface SellerAgentChatProps {
   viewingContext?: ViewingContext | null
   meetContext?: MeetAgentContext | null
   onOpenChange?: (open: boolean, width: number) => void
+  onClearMeetContext?: () => void
 }
 
 type Suggestion = { text: string; icon: any; color: string }
@@ -97,7 +98,7 @@ const MIN_PANEL_W = 340
 const MAX_PANEL_W = 700
 const DEFAULT_PANEL_W = 380
 
-export default function SellerAgentChat({ userName, userRole, currentView = 'home', viewingContext, meetContext, onOpenChange }: SellerAgentChatProps) {
+export default function SellerAgentChat({ userName, userRole, currentView = 'home', viewingContext, meetContext, onOpenChange, onClearMeetContext }: SellerAgentChatProps) {
   const [isOpen, setIsOpen] = useState(currentView !== 'historico')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -291,6 +292,7 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
 
   const handleClose = () => {
     setIsOpen(false)
+    onClearMeetContext?.()
   }
 
   // ─── Visual Tag Parser ─────────────────────────────────────────────

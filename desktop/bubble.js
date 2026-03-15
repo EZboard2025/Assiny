@@ -101,21 +101,21 @@ if (window.electronAPI && window.electronAPI.onAuthToken) {
       accessToken = data.accessToken
       userId = data.userId
 
-      // Start notification system on first auth
-      if (wasLoggedOut && accessToken) {
-        startNotificationChecker()
-        checkMorningSummary()
-      }
+      // Notifications & morning summary DISABLED — were too intrusive (opened fullscreen window, stole focus)
+      // if (wasLoggedOut && accessToken) {
+      //   startNotificationChecker()
+      //   checkMorningSummary()
+      // }
     }
   })
 }
 
-// Listen for notification nudge from main process (on window focus)
-if (window.electronAPI && window.electronAPI.onNotificationNudge) {
-  window.electronAPI.onNotificationNudge(() => {
-    if (ensureAuth()) checkNotifications()
-  })
-}
+// Listen for notification nudge from main process (on window focus) — DISABLED
+// if (window.electronAPI && window.electronAPI.onNotificationNudge) {
+//   window.electronAPI.onNotificationNudge(() => {
+//     if (ensureAuth()) checkNotifications()
+//   })
+// }
 
 // Listen for test notification trigger — cycles through all 4 types on each press
 let testNotifIndex = 0
