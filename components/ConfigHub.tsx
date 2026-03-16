@@ -5144,61 +5144,26 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
                 onBusinessTypeChange={handleSetBusinessType}
                 onAutoSave={handleSaveCompanyData}
               >
-                {/* Botões Salvar/Avaliar/Ver */}
-                <div className="flex flex-wrap gap-2">
-                  {(!companyDataId || companyDataEdited) && (
-                    <button
-                      onClick={handleSaveCompanyData}
-                      disabled={savingCompanyData}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {savingCompanyData ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          {companyDataId ? 'Atualizando...' : 'Salvando...'}
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4" />
-                          {companyDataId ? 'Atualizar' : 'Salvar'}
-                        </>
-                      )}
-                    </button>
-                  )}
-
+                {/* Botão Salvar */}
+                {(!companyDataId || companyDataEdited) && (
                   <button
-                    onClick={handleEvaluateQuality}
-                    disabled={evaluatingQuality || (qualityEvaluation && !companyDataEdited)}
-                    className="px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    title={
-                      qualityEvaluation && !companyDataEdited
-                        ? 'Edite os dados para poder reavaliar'
-                        : ''
-                    }
+                    onClick={handleSaveCompanyData}
+                    disabled={savingCompanyData}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {evaluatingQuality ? (
+                    {savingCompanyData ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Avaliando...
+                        {companyDataId ? 'Atualizando...' : 'Salvando...'}
                       </>
                     ) : (
                       <>
-                        <AlertCircle className="w-4 h-4" />
-                        {qualityEvaluation ? 'Reavaliar' : 'Avaliar'}
+                        <CheckCircle className="w-4 h-4" />
+                        {companyDataId ? 'Atualizar' : 'Salvar'}
                       </>
                     )}
                   </button>
-
-                  {qualityEvaluation && (
-                    <button
-                      onClick={() => setShowCompanyEvaluationModal(true)}
-                      className="px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Ver Avaliação
-                    </button>
-                  )}
-                </div>
+                )}
               </CompanyDataChat>
             </div>
           </div>

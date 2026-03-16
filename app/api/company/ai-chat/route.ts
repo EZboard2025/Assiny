@@ -121,7 +121,8 @@ REGRAS DE PROPOSALS:
 
 - Proponha apenas campos que voce tem informacao suficiente para preencher
 - Nao proponha campos que ja foram aceitos pelo usuario (veja currentFields)
-- Proponha EXATAMENTE 1 campo por vez. NUNCA proponha 2 ou mais campos na mesma resposta. O sistema vai automaticamente pedir o proximo campo apos o usuario aceitar/rejeitar.
+- No modo de preenchimento inicial: Proponha EXATAMENTE 1 campo por vez. O sistema vai automaticamente pedir o proximo campo apos o usuario aceitar/rejeitar.
+- No modo de edicao (quando todos os campos ja estao preenchidos): Proponha TODOS os campos que precisam mudar de uma vez. Pode ser 1 ou 10.
 - Se ja coletou informacao suficiente para todos os campos vazios, faca as ultimas propostas
 - Quando todos os campos estiverem preenchidos, parabenize e sugira salvar
 - Use formatacao com lista separada por | quando o campo pede multiplos itens
@@ -144,7 +145,7 @@ Use os labels amigaveis ao se referir aos campos na conversa.`
 
 export async function POST(req: Request) {
   try {
-    const { messages, currentFields, businessType, extractedContent } = await req.json()
+    const { messages, currentFields, businessType, extractedContent, editMode } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -170,7 +171,20 @@ ${filledFields.length > 0 ? filledFields.join('\n') : '  Nenhum'}
 - Campos ainda vazios (${emptyFields.length}):
 ${emptyFields.length > 0 ? emptyFields.join('\n') : '  Todos preenchidos!'}
 
-NÃO proponha campos que já estão preenchidos. Foque nos vazios.${extractedContent ? `
+${editMode ? `🔄 MODO EDICAO ATIVADO - Todos os campos ja estao preenchidos e o usuario quer MODIFICAR dados existentes.
+
+REGRAS DO MODO EDICAO:
+- O usuario vai dizer o que quer mudar. Faca as alteracoes solicitadas.
+- Voce PODE e DEVE propor alteracoes em campos JA preenchidos (isso e o objetivo!)
+- Se o usuario pedir para REESCREVER TUDO ou atualizar todos os campos:
+  * Proponha EXATAMENTE 1 campo por resposta (o sistema vai pedir o proximo automaticamente apos aceitar/rejeitar)
+  * ANTES de propor, pergunte ao usuario como ele quer atualizar aquele campo. Mostre o valor atual e pergunte o que mudar.
+  * Siga a ordem dos campos: nome, descricao, produtos_servicos, funcao_produtos, diferenciais, concorrentes, dados_metricas, erros_comuns, percepcao_desejada, dores_resolvidas
+  * Comece pelo primeiro campo da lista
+- Se o usuario pedir para mudar um campo especifico, proponha APENAS esse campo.
+- Se o usuario enviar um novo arquivo/link, re-analise TODOS os campos e proponha atualizacoes onde o novo conteudo traz informacao melhor (pode propor varios de uma vez nesse caso).
+- Mantenha respostas curtas e diretas.
+` : 'NÃO proponha campos que já estão preenchidos. Foque nos vazios.'}${extractedContent ? `
 
 ===== CONTEUDO EXTRAIDO DO SITE/ARQUIVO =====
 ${extractedContent.substring(0, 15000)}
@@ -182,7 +196,7 @@ Voce recebeu conteudo REAL extraido de um site ou arquivo da empresa. Suas instr
 
 OBRIGATORIO:
 1. Analise TODO o conteudo extraido ANTES de fazer qualquer pergunta
-2. Proponha EXATAMENTE 1 campo por resposta (o sistema vai pedir o proximo automaticamente apos aceitar/rejeitar)
+2. ${editMode ? 'Proponha TODOS os campos que podem ser melhorados com base no novo conteudo de uma vez.' : 'Proponha EXATAMENTE 1 campo por resposta (o sistema vai pedir o proximo automaticamente apos aceitar/rejeitar)'}
 3. Escreva o valor no nivel EXCELENTE usando APENAS informacoes do conteudo extraido
 4. NAO faca perguntas sobre informacoes que estao no conteudo - va direto para a proposal
 5. Na primeira resposta, comece pelo campo mais importante que encontrou (nome ou business_type)

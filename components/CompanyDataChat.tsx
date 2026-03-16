@@ -83,7 +83,7 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     }
 
     if (emptyFields.length === 0) {
-      return 'Todos os campos já estão preenchidos! Se quiser ajustar algum dado, é só me dizer qual campo quer melhorar.'
+      return 'O que você quer atualizar?'
     }
 
     const missingLabels = emptyFields.map(f => f.label).join(', ')
@@ -136,15 +136,15 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     prevFilledRef.current = filledCount
   }, [filledCount, allFilled, totalFields, hasStartedChat, onAutoSave])
 
-  // Quando todos os campos ficam preenchidos, colapsar o chat resetando a conversa
+  // Quando todos os campos ficam preenchidos pela PRIMEIRA vez, colapsar o chat
+  // Mas não colapsar se estamos em modo edição (forceOpen = true)
   useEffect(() => {
-    if (allFilled && hasStartedChat) {
+    if (allFilled && hasStartedChat && !forceOpen) {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
         content: buildWelcomeMessage()
       }])
-      setForceOpen(false)
     }
   }, [allFilled])
 
@@ -170,6 +170,9 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
       })
   }
 
+  // Edit mode: all fields are already filled when user starts chatting
+  const isEditMode = allFilled || (filledCount >= totalFields - 1 && forceOpen)
+
   const sendToAiChat = async (updatedMessages: ChatMessage[], extractedContent?: string, fieldOverrides?: Record<string, string>) => {
     try {
       const mergedFields = { ...companyData, ...fieldOverrides, business_type: fieldOverrides?.business_type || businessType || '' }
@@ -180,7 +183,8 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
           messages: buildApiMessages(updatedMessages),
           currentFields: mergedFields,
           businessType: fieldOverrides?.business_type || businessType,
-          extractedContent
+          extractedContent,
+          editMode: isEditMode
         })
       })
 
@@ -299,6 +303,19 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
+  // Quick action: sends a predefined message directly
+  const handleQuickAction = async (text: string) => {
+    if (isLoading) return
+    const userMsg: ChatMessage = { id: `user_${Date.now()}`, role: 'user', content: text }
+    const updatedMessages = [...messages, userMsg]
+    setMessages(updatedMessages)
+    setInput('')
+    setIsLoading(true)
+    await sendToAiChat(updatedMessages)
+    setIsLoading(false)
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0 || isLoading) return
@@ -361,6 +378,8 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
   // Auto-continue conversation when all proposals in a message are resolved
   const autoContinueIfResolved = async (newMessages: ChatMessage[], msgId: string, overrides: Record<string, string>) => {
     const msg = newMessages.find(m => m.id === msgId)
+    // In edit mode with multiple proposals (batch), don't auto-continue
+    if (isEditMode && msg?.proposals && msg.proposals.length > 1) return
     if (!msg?.proposals?.length) return
     const allResolved = msg.proposals.every(p => p.status === 'accepted' || p.status === 'rejected')
     if (allResolved && !isLoading) {
@@ -369,6 +388,32 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
       setIsLoading(false)
       setTimeout(() => inputRef.current?.focus(), 100)
     }
+  }
+
+  // Accept all pending proposals in a message at once
+  const handleAcceptAll = (msgId: string) => {
+    const msg = messages.find(m => m.id === msgId)
+    if (!msg?.proposals) return
+
+    const pendingProposals = msg.proposals.filter(p => p.status === 'pending')
+    pendingProposals.forEach(p => {
+      if (p.field === 'business_type' && onBusinessTypeChange) {
+        const val = p.value.trim()
+        if (val === 'B2B' || val === 'B2C' || val === 'Ambos') {
+          onBusinessTypeChange(val)
+        }
+      } else {
+        onFieldUpdate(p.field, p.value)
+      }
+    })
+
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === msgId
+          ? { ...m, proposals: m.proposals?.map(p => p.status === 'pending' ? { ...p, status: 'accepted' as const } : p) }
+          : m
+      )
+    )
   }
 
   const handleProposalAction = (msgId: string, field: string, action: 'accept' | 'reject' | 'edit') => {
@@ -555,18 +600,35 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Assistente de Dados</h3>
-                <p className="text-[11px] text-gray-400">Preencha conversando com a IA</p>
+                <p className="text-[11px] text-gray-400">{isEditMode ? 'Diga o que quer mudar' : 'Preencha conversando com a IA'}</p>
               </div>
             </div>
-            {/* Progress */}
             <div className="flex items-center gap-3">
-              <div className="w-24 bg-gray-100 rounded-full h-1.5">
-                <div
-                  className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <span className="text-xs font-medium text-gray-500">{filledCount}/{totalFields}</span>
+              {/* Progress */}
+              {!isEditMode && (
+                <>
+                  <div className="w-24 bg-gray-100 rounded-full h-1.5">
+                    <div
+                      className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium text-gray-500">{filledCount}/{totalFields}</span>
+                </>
+              )}
+              {/* Close button in edit mode */}
+              {isEditMode && forceOpen && (
+                <button
+                  onClick={() => {
+                    setForceOpen(false)
+                    setMessages([{ id: 'welcome', role: 'assistant', content: buildWelcomeMessage() }])
+                  }}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  title="Fechar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -587,6 +649,16 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                       <div className="px-3.5 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm">
                         <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{msg.content}</p>
                       </div>
+                      {/* Accept All button for multiple proposals */}
+                      {msg.proposals && msg.proposals.filter(p => p.status === 'pending').length >= 2 && (
+                        <button
+                          onClick={() => handleAcceptAll(msg.id)}
+                          className="px-3.5 py-2 text-xs font-medium bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors flex items-center gap-1.5 shadow-sm w-fit"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Aceitar todos ({msg.proposals.filter(p => p.status === 'pending').length} campos)
+                        </button>
+                      )}
                       {/* Proposals */}
                       {msg.proposals?.map((p) => (
                         <div
@@ -681,6 +753,28 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                 )}
               </div>
             ))}
+            {/* Quick action chips in edit mode */}
+            {isEditMode && !hasStartedChat && !isLoading && (
+              <div className="ml-9 space-y-2.5">
+                <button
+                  onClick={() => handleQuickAction('Quero reescrever todos os campos. Vamos um por um.')}
+                  className="px-3.5 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                >
+                  Reescrever tudo
+                </button>
+                <div className="flex flex-wrap gap-1.5">
+                  {FIELD_CONFIG.filter(f => companyData[f.key]?.trim()).map((field) => (
+                    <button
+                      key={field.key}
+                      onClick={() => handleQuickAction(`Quero reescrever o campo ${field.label}. Mostre o valor atual e me pergunte como atualizar.`)}
+                      className="px-2.5 py-1 text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-md hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-colors"
+                    >
+                      {field.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Loading */}
             {isLoading && (
               <div className="flex gap-2.5 max-w-[92%]">
@@ -759,7 +853,7 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
                   e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder={pendingFiles.length > 0 ? 'Adicione uma mensagem ou envie os arquivos...' : 'Descreva sua empresa ou cole um link...'}
+                placeholder={pendingFiles.length > 0 ? 'Adicione uma mensagem ou envie os arquivos...' : isEditMode ? 'Ex: Melhore os diferenciais, atualize a descrição...' : 'Descreva sua empresa ou cole um link...'}
                 rows={1}
                 className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none transition-all overflow-y-auto"
                 style={{ minHeight: '40px', maxHeight: '160px' }}
@@ -813,59 +907,25 @@ export default function CompanyDataChat({ companyData, businessType, onFieldUpda
         </div>
       )}
 
-      {/* Expandable Fields - only after all filled */}
+      {/* Expandable Fields - read-only display, edit only via AI */}
       {allFilled && showFields && (
-        <div className="px-5 pb-4 pt-3 space-y-3 border-t border-gray-100">
-          {/* Business Type Selector */}
-          <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-              Tipo de Negócio
-              {businessType && <CheckCircle className="w-2.5 h-2.5 text-green-500 inline ml-1" />}
-            </label>
-            <div className="flex items-center gap-2">
-              {(['B2C', 'B2B', 'Ambos'] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => onBusinessTypeChange?.(type)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    businessType === type
-                      ? 'bg-green-100 text-green-700 border border-green-500/30'
-                      : 'bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
+        <div className="px-5 pb-4 pt-3 space-y-2.5 border-t border-gray-100">
+          {/* Business Type */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Tipo de Negócio</span>
+            <span className="text-sm font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-md">{businessType}</span>
           </div>
 
-          {FIELD_CONFIG.map((field) => (
-            <div key={field.key}>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-                {field.label}
-                {companyData[field.key]?.trim() && (
-                  <CheckCircle className="w-2.5 h-2.5 text-green-500 inline ml-1" />
-                )}
-              </label>
-              {field.type === 'input' ? (
-                <input
-                  type="text"
-                  value={companyData[field.key] || ''}
-                  onChange={(e) => onFieldUpdate(field.key, e.target.value)}
-                  placeholder={field.placeholder}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
-                />
-              ) : (
-                <textarea
-                  value={companyData[field.key] || ''}
-                  onChange={(e) => onFieldUpdate(field.key, e.target.value)}
-                  placeholder={field.placeholder}
-                  rows={2}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none transition-all"
-                />
-              )}
-            </div>
-          ))}
+          {FIELD_CONFIG.map((field) => {
+            const value = companyData[field.key]?.trim()
+            if (!value) return null
+            return (
+              <div key={field.key}>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{field.label}</span>
+                <p className="text-sm text-gray-700 leading-relaxed mt-0.5 whitespace-pre-line">{value}</p>
+              </div>
+            )
+          })}
         </div>
       )}
 
