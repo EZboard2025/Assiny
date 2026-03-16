@@ -52,21 +52,23 @@ export async function processCompletedBot(botId: string): Promise<void> {
     .eq('bot_id', botId)
 
   try {
-    // 4. Wait for Recall.ai to finalize transcript processing
-    await delay(5000)
+    // 4. Fetch transcript with progressive retries (Recall.ai needs time to process)
+    const retryDelays = [10000, 20000, 30000, 40000] // 10s, 20s, 30s, 40s = up to 100s total
+    let segments: TranscriptSegment[] = []
 
-    // 5. Fetch transcript from Recall.ai API
-    let segments = await fetchTranscriptFromRecallApi(botId)
+    for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+      if (attempt > 0) {
+        const waitMs = retryDelays[attempt - 1]
+        console.log(`[MeetBG] No transcript yet, retry ${attempt}/${retryDelays.length} in ${waitMs / 1000}s...`)
+        await delay(waitMs)
+      }
 
-    // Retry once if empty (Recall may need more time)
-    if (segments.length === 0) {
-      console.log(`[MeetBG] No transcript yet, retrying in 10s...`)
-      await delay(10000)
       segments = await fetchTranscriptFromRecallApi(botId)
+      if (segments.length > 0) break
     }
 
     if (segments.length === 0) {
-      throw new Error('Transcrição vazia - Recall.ai não retornou dados')
+      throw new Error('Transcrição vazia - Recall.ai não retornou dados após 4 tentativas (~100s)')
     }
 
     console.log(`[MeetBG] Got ${segments.length} transcript segments`)

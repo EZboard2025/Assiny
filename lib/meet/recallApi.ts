@@ -39,7 +39,8 @@ export async function fetchTranscriptFromRecallApi(botId: string): Promise<Trans
         return segments
       }
     } else {
-      console.warn(`[RecallAPI] Bot transcript endpoint returned ${botTranscriptResponse.status}`)
+      const errorBody = await botTranscriptResponse.text().catch(() => '')
+      console.warn(`[RecallAPI] Bot transcript endpoint returned ${botTranscriptResponse.status}: ${errorBody.slice(0, 200)}`)
     }
 
     // Fallback: Use recording's direct download URL
