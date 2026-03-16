@@ -63,7 +63,8 @@ async function convertToMp3(fileBuffer: Buffer, originalName: string): Promise<{
 
   try {
     await writeFile(inputPath, fileBuffer)
-    await execFileAsync('ffmpeg', ['-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-q:a', '4', '-y', outputPath])
+    const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg'
+    await execFileAsync(ffmpegPath, ['-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-q:a', '4', '-y', outputPath])
     const mp3Buffer = await readFile(outputPath)
     return { buffer: mp3Buffer, name: originalName.replace(/\.[^.]+$/, '.mp3') }
   } finally {
@@ -202,6 +203,7 @@ export async function POST(request: NextRequest) {
     // Normalize score to 0-100
     let overallScore = evaluation.overall_score
     if (overallScore <= 10) overallScore = overallScore * 10
+    overallScore = Math.round(overallScore)
 
     // Step 5: Save to meet_evaluations
     const { data: saved, error: saveError } = await supabase
@@ -232,7 +234,9 @@ export async function POST(request: NextRequest) {
     // Extract ML patterns (fire-and-forget, non-blocking)
     if (saved?.id && companyId) {
       try {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+        const host = request.headers.get('host') || 'localhost:3000'
+        const protocol = host.includes('localhost') ? 'http' : 'https'
+        const appUrl = `${protocol}://${host}`
         fetch(`${appUrl}/api/meet/extract-patterns`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

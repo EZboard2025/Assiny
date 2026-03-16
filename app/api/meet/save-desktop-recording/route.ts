@@ -97,6 +97,32 @@ export async function POST(request: Request) {
       if (notifError) console.error('❌ Erro ao criar notificação:', notifError)
     })
 
+    // Extract ML patterns (fire-and-forget, non-blocking)
+    if (data?.id && companyId) {
+      try {
+        const host = request.headers.get('host') || 'localhost:3000'
+        const protocol = host.includes('localhost') ? 'http' : 'https'
+        const appUrl = `${protocol}://${host}`
+        fetch(`${appUrl}/api/meet/extract-patterns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            meetEvaluationId: data.id,
+            transcript,
+            evaluation,
+            companyId,
+          })
+        }).then(res => {
+          if (res.ok) console.log(`[DesktopRecording] ML pattern extraction started for ${data.id}`)
+          else console.error(`[DesktopRecording] ML pattern extraction failed: ${res.status}`)
+        }).catch(err => {
+          console.error(`[DesktopRecording] ML pattern extraction error:`, err.message)
+        })
+      } catch (mlErr: any) {
+        console.error('[DesktopRecording] ML setup error (non-fatal):', mlErr.message)
+      }
+    }
+
     return NextResponse.json({ success: true, evaluationId: data.id })
 
   } catch (error: any) {
