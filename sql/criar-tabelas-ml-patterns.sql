@@ -3,6 +3,9 @@
 -- Usado para enriquecer roleplays com dados de conversas reais
 -- ============================================================================
 
+-- Ensure pgvector extension exists
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- 1. meeting_patterns — Padrões extraídos de reuniões reais (com embeddings)
 CREATE TABLE IF NOT EXISTS meeting_patterns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

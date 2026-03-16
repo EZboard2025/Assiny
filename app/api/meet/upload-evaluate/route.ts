@@ -24,7 +24,7 @@ const supabase = createClient(
 async function cleanTranscript(rawText: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',

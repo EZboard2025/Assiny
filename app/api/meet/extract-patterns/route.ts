@@ -11,37 +11,40 @@ const supabaseAdmin = createClient(
 
 // ─── Extraction Prompt ──────────────────────────────────────────────────────
 
-const EXTRACTION_PROMPT = `Você é um analisador de reuniões de vendas. Analise a transcrição e avaliação abaixo e extraia padrões estruturados.
+const EXTRACTION_PROMPT = `Você é um analisador especializado em reuniões de vendas B2B/B2C em português brasileiro.
+Analise a transcrição e avaliação abaixo e extraia padrões estruturados.
 
-Retorne APENAS JSON válido com esta estrutura exata:
+A transcrição contém falas de VENDEDOR e CLIENTE. Quando houver identificação de speakers (ex: "[Vendedor]:", "[Cliente]:"), use para distinguir. Quando não houver, infira pelo contexto: quem apresenta produto/serviço é o vendedor, quem faz perguntas e levanta objeções é o cliente.
+
+Retorne APENAS JSON válido com esta estrutura:
 
 {
   "objections": [
     {
       "objection_type": "preco|timing|autoridade|concorrencia|confianca|necessidade|outro",
-      "objection_text": "Resumo da objeção em 1 frase",
-      "client_exact_words": "Frase exata ou muito próxima que o cliente usou",
-      "context_before": "O que o vendedor disse antes que provocou a objeção",
-      "seller_response": "Como o vendedor respondeu",
-      "was_resolved": true/false,
-      "resolution_quality": 0-10
+      "objection_text": "Resumo da objeção em 1 frase clara",
+      "client_exact_words": "Copie a frase EXATA que o cliente disse (não parafraseie)",
+      "context_before": "O que o vendedor disse ou perguntou que levou à objeção",
+      "seller_response": "Como o vendedor respondeu à objeção",
+      "was_resolved": true,
+      "resolution_quality": 7
     }
   ],
   "speech_patterns": [
     {
-      "phrase": "Frase ou expressão real usada pelo cliente",
-      "context": "Em que momento da conversa foi usado",
-      "emotional_tone": "neutro|interessado|cetico|frustrado|entusiasmado|resistente",
+      "phrase": "Frase ou expressão EXATA usada pelo cliente (copie literalmente)",
+      "context": "Momento da conversa: abertura, investigação, objeção, fechamento, etc.",
+      "emotional_tone": "neutro|interessado|cetico|frustrado|entusiasmado|resistente|defensivo|curioso",
       "formality_level": "formal|informal|misto"
     }
   ],
   "emotional_progression": {
     "stages": [
       {
-        "stage_name": "Nome do estágio (ex: abertura_cautelosa, interesse_inicial, objecao_preco, resolucao)",
-        "client_behavior": "Descrição do comportamento do cliente neste estágio",
-        "seller_trigger": "O que o vendedor fez para mudar de estágio",
-        "client_phrases": ["Frases representativas do cliente neste estágio"]
+        "stage_name": "Nome descritivo (ex: abertura_cautelosa, interesse_crescente, resistencia_preco, aceitacao)",
+        "client_behavior": "Como o cliente se comportou neste momento (tom, postura, tipo de resposta)",
+        "seller_trigger": "O que o vendedor fez que causou essa mudança emocional",
+        "client_phrases": ["Frases exatas do cliente que demonstram esse estado emocional"]
       }
     ]
   },
@@ -49,29 +52,31 @@ Retorne APENAS JSON válido com esta estrutura exata:
     "phases": [
       {
         "phase": "abertura|qualificacao|apresentacao|objecao|negociacao|fechamento",
-        "duration_pct": 0-100,
-        "key_topics": ["tópicos abordados"],
-        "transition": "Como a conversa transicionou para a próxima fase"
+        "duration_pct": 25,
+        "key_topics": ["tópicos abordados nesta fase"],
+        "transition": "O que fez a conversa mudar para a próxima fase"
       }
     ],
     "outcome": "ganho|perdido|follow_up|inconclusivo"
   }
 }
 
-REGRAS:
-- Extraia APENAS padrões que realmente existem na transcrição
-- client_exact_words deve ser o mais próximo possível do que foi dito
-- Se não houver objeções, retorne array vazio
-- speech_patterns: extraia 3-8 frases marcantes do cliente
-- emotional_progression: identifique 2-5 estágios emocionais
-- conversation_flow: identifique as fases reais da conversa
-- Seja preciso e factual, não invente`
+REGRAS CRÍTICAS:
+- Extraia APENAS padrões que REALMENTE existem na transcrição — NUNCA invente
+- client_exact_words e phrase DEVEM ser cópias literais ou muito próximas do que foi dito
+- Priorize frases do CLIENTE (não do vendedor) para speech_patterns
+- Se não houver objeções claras, retorne "objections": []
+- speech_patterns: extraia 5-10 frases marcantes e naturais do cliente (expressões, gírias, reações emocionais)
+- emotional_progression: identifique 2-5 estágios emocionais reais (não genéricos)
+- conversation_flow: identifique as fases reais, duration_pct deve somar 100
+- was_resolved é boolean (true ou false), resolution_quality é número inteiro de 0 a 10
+- Foque em padrões que seriam úteis para treinar um agente de IA a simular clientes realistas`
 
 // ─── Generate Embedding ──────────────────────────────────────────────────────
 
 async function generateEmbedding(text: string): Promise<number[]> {
   const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
+    model: 'text-embedding-ada-002',
     input: text.slice(0, 8000),
   })
   return response.data[0].embedding
@@ -82,7 +87,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
 async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return []
   const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
+    model: 'text-embedding-ada-002',
     input: texts.map(t => t.slice(0, 8000)),
   })
   return response.data.map(d => d.embedding)
@@ -97,12 +102,16 @@ async function deduplicateObjection(
   objectionData: any
 ): Promise<'inserted' | 'merged'> {
   // Check for existing similar objection
-  const { data: matches } = await supabaseAdmin.rpc('match_real_objections', {
+  const { data: matches, error: rpcError } = await supabaseAdmin.rpc('match_real_objections', {
     query_embedding: embedding,
     company_id_filter: companyId,
     match_threshold: 0.9,
     match_count: 1,
   })
+
+  if (rpcError) {
+    console.error('[ExtractPatterns] RPC match_real_objections error:', rpcError.message)
+  }
 
   if (matches && matches.length > 0) {
     // Merge: increment frequency, append phrases, merge context, recalc score
@@ -183,14 +192,31 @@ export async function POST(request: NextRequest) {
 
     // Format transcript for extraction
     let transcriptText = ''
+    let parsedTranscript = transcript
+
+    // If transcript is a string, try to parse as JSON array (speaker-tagged format)
     if (typeof transcript === 'string') {
-      transcriptText = transcript
-    } else if (Array.isArray(transcript)) {
-      transcriptText = transcript.map((s: any) => `[${s.speaker || 'Unknown'}]: ${s.text}`).join('\n')
+      try {
+        const parsed = JSON.parse(transcript)
+        if (Array.isArray(parsed)) {
+          parsedTranscript = parsed
+        }
+      } catch {
+        // Not JSON, treat as plain text
+      }
     }
 
-    if (transcriptText.length < 100) {
-      console.log('[ExtractPatterns] Transcript too short, skipping')
+    if (Array.isArray(parsedTranscript)) {
+      transcriptText = parsedTranscript
+        .filter((s: any) => s.text && s.text.trim().length > 0)
+        .map((s: any) => `[${s.speaker || 'Desconhecido'}]: ${s.text}`)
+        .join('\n')
+    } else if (typeof parsedTranscript === 'string') {
+      transcriptText = parsedTranscript
+    }
+
+    if (transcriptText.length < 300) {
+      console.log(`[ExtractPatterns] Transcript too short (${transcriptText.length} chars), skipping`)
       return NextResponse.json({ success: true, skipped: true, reason: 'transcript_too_short' })
     }
 
@@ -203,16 +229,16 @@ AVALIAÇÃO DA REUNIÃO:
 ${evaluation.objections_analysis ? `- Objeções identificadas: ${JSON.stringify(evaluation.objections_analysis)}` : ''}
 ` : ''
 
-    // Step 1: Extract patterns with GPT-4.1-nano
-    console.log('[ExtractPatterns] Calling GPT-4.1-nano for extraction...')
+    // Step 1: Extract patterns with GPT-4o-mini
+    console.log('[ExtractPatterns] Calling GPT-4o-mini for extraction...')
     const extractionResponse = await openai.chat.completions.create({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: EXTRACTION_PROMPT },
-        { role: 'user', content: `TRANSCRIÇÃO:\n${transcriptText.slice(0, 12000)}\n\n${evalContext}` },
+        { role: 'user', content: `TRANSCRIÇÃO COMPLETA:\n${transcriptText}\n\n${evalContext}` },
       ],
-      temperature: 0.2,
-      max_tokens: 3000,
+      temperature: 0.15,
+      max_tokens: 4096,
       response_format: { type: 'json_object' },
     })
 

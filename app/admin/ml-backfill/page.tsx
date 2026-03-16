@@ -17,6 +17,24 @@ export default function MLBackfillPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<BackfillResult | null>(null)
   const [companyId, setCompanyId] = useState('')
+  const [authenticated, setAuthenticated] = useState(false)
+  const [password, setPassword] = useState('')
+
+  // Check session on mount
+  useState(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('admin_authenticated') === 'true') {
+      setAuthenticated(true)
+    }
+  })
+
+  const handleLogin = () => {
+    if (password === 'admin123') {
+      setAuthenticated(true)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('admin_authenticated', 'true')
+      }
+    }
+  }
 
   const runBackfill = async () => {
     setLoading(true)
@@ -39,6 +57,65 @@ export default function MLBackfillPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!authenticated) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#0a0a0a',
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'system-ui, sans-serif',
+      }}>
+        <div style={{
+          background: '#1a1a2e',
+          borderRadius: 16,
+          padding: 40,
+          maxWidth: 400,
+          width: '100%',
+          textAlign: 'center',
+        }}>
+          <h1 style={{ fontSize: 24, marginBottom: 16 }}>Admin - ML Backfill</h1>
+          <input
+            type="password"
+            placeholder="Senha de administrador"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: 8,
+              border: '1px solid #333',
+              background: '#111',
+              color: '#fff',
+              marginBottom: 16,
+              fontSize: 14,
+              boxSizing: 'border-box',
+            }}
+          />
+          <button
+            onClick={handleLogin}
+            style={{
+              width: '100%',
+              padding: '12px 24px',
+              borderRadius: 8,
+              border: 'none',
+              background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+              color: '#fff',
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Entrar
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

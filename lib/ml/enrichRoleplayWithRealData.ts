@@ -37,7 +37,7 @@ export interface RealPatternEnrichment {
 
 async function generateEmbedding(text: string): Promise<number[]> {
   const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
+    model: 'text-embedding-ada-002',
     input: text.slice(0, 8000),
   })
   return response.data[0].embedding
@@ -92,7 +92,7 @@ export async function enrichRoleplayWithRealData(
     const searchQuery = buildSearchQuery(params)
     const embedding = await generateEmbedding(searchQuery)
 
-    // Run all searches in parallel
+    // Run all searches in parallel (with error handling per query)
     const [objections, speechPatterns, emotionalPatterns, flowPatterns] = await Promise.all([
       // Real objections from the bank (deduplicated, with frequency)
       supabaseAdmin.rpc('match_real_objections', {
@@ -100,6 +100,9 @@ export async function enrichRoleplayWithRealData(
         company_id_filter: companyId,
         match_threshold: 0.5,
         match_count: 5,
+      }).then(res => {
+        if (res.error) console.error('[ML Enrich] match_real_objections error:', res.error.message)
+        return res
       }),
       // Speech patterns from meetings
       supabaseAdmin.rpc('match_meeting_patterns', {
@@ -108,6 +111,9 @@ export async function enrichRoleplayWithRealData(
         pattern_type_filter: 'speech_pattern',
         match_threshold: 0.5,
         match_count: 8,
+      }).then(res => {
+        if (res.error) console.error('[ML Enrich] match_meeting_patterns (speech) error:', res.error.message)
+        return res
       }),
       // Emotional progressions
       supabaseAdmin.rpc('match_meeting_patterns', {
@@ -116,6 +122,9 @@ export async function enrichRoleplayWithRealData(
         pattern_type_filter: 'emotional_progression',
         match_threshold: 0.45,
         match_count: 3,
+      }).then(res => {
+        if (res.error) console.error('[ML Enrich] match_meeting_patterns (emotional) error:', res.error.message)
+        return res
       }),
       // Conversation flows
       supabaseAdmin.rpc('match_meeting_patterns', {
@@ -124,6 +133,9 @@ export async function enrichRoleplayWithRealData(
         pattern_type_filter: 'conversation_flow',
         match_threshold: 0.45,
         match_count: 3,
+      }).then(res => {
+        if (res.error) console.error('[ML Enrich] match_meeting_patterns (flow) error:', res.error.message)
+        return res
       }),
     ])
 

@@ -29,7 +29,7 @@ export async function computeAndSaveRealismScore(
 
     // Generate embedding for the roleplay client behavior
     const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: 'text-embedding-ada-002',
       input: clientText,
     })
     const roleplayEmbedding = response.data[0].embedding

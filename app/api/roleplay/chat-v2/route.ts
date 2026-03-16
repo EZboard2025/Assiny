@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getRandomMaleClientName } from '@/lib/utils/randomNames'
 import { buildSystemPrompt } from '@/lib/roleplay/buildSystemPrompt'
 import { enrichRoleplayWithRealData, formatEnrichmentForPrompt } from '@/lib/ml/enrichRoleplayWithRealData'
+import { getTurnGuidance } from '@/lib/ml/getTurnGuidance'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -199,7 +200,7 @@ PERFIL DO CLIENTE B2C:
 
       try {
         const completion = await openai.chat.completions.create({
-          model: 'gpt-4.1',
+          model: 'gpt-4o',
           messages,
           max_tokens: 500,
           temperature: 0.8,
@@ -242,24 +243,43 @@ PERFIL DO CLIENTE B2C:
         console.warn(`⚠️ [chat-v2] Mensagem truncada de ${message.length} para ${MAX_USER_MESSAGE_LENGTH} caracteres`)
       }
 
-      // Buscar dados da empresa
-      const { data: companyData } = await supabase
-        .from('company_data')
-        .select('*')
-        .eq('company_id', companyId)
-        .single()
+      // ── Parallel: DB queries + Turn Guidance + format data (all independent) ──
+      const recentMsgs = (chatHistory || []).slice(-3).map((m: any) =>
+        `${m.role === 'client' ? 'Cliente' : 'Vendedor'}: ${m.text?.slice(0, 150)}`
+      ).join('\n')
 
-      const { data: companyTypeData } = await supabase
-        .from('company_type')
-        .select('type')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
+      const [companyDataResult, companyTypeResult, turnGuidanceResult] = await Promise.all([
+        // DB: company_data
+        supabase
+          .from('company_data')
+          .select('*')
+          .eq('company_id', companyId)
+          .single()
+          .then(r => r.data),
 
-      const companyType = companyTypeData?.type || 'B2C'
+        // DB: company_type
+        supabase
+          .from('company_type')
+          .select('type')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+          .then(r => r.data),
 
-      // Formatar objeções
+        // ML Turn Guidance (embedding + vector search in parallel with DB)
+        companyId
+          ? getTurnGuidance(companyId, truncatedMessage, recentMsgs).catch((err: any) => {
+              console.warn('⚠️ [chat-v2] Turn guidance failed (non-fatal):', err.message)
+              return { hasGuidance: false, prompt: '' }
+            })
+          : Promise.resolve({ hasGuidance: false, prompt: '' }),
+      ])
+
+      const companyData = companyDataResult
+      const companyType = companyTypeResult?.type || 'B2C'
+
+      // Formatar objeções (CPU only, instant)
       let objectionsText = 'Nenhuma objeção específica'
       if (objections) {
         if (typeof objections === 'string') {
@@ -279,7 +299,7 @@ PERFIL DO CLIENTE B2C:
         }
       }
 
-      // Formatar persona (usando nomes de campos do banco de dados)
+      // Formatar persona (CPU only, instant)
       let personaText = ''
       if (persona) {
         if (typeof persona === 'string') {
@@ -302,23 +322,7 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
         }
       }
 
-      // ML Enrichment: query real meeting patterns (non-blocking)
-      let realDataEnrichment = ''
-      if (companyId) {
-        try {
-          const enrichment = await enrichRoleplayWithRealData(companyId, {
-            persona: personaText,
-            objections: objectionsText,
-            companyType,
-            temperament: temperament || '',
-          })
-          realDataEnrichment = formatEnrichmentForPrompt(enrichment)
-        } catch (mlErr: any) {
-          console.warn('⚠️ [chat-v2] ML enrichment failed (non-fatal):', mlErr.message)
-        }
-      }
-
-      // Construir system prompt
+      // System prompt SEM ML enrich duplicado (já foi injetado na criação da sessão)
       const systemPrompt = buildSystemPrompt({
         companyName: companyData?.nome || null,
         companyDescription: companyData?.descricao || null,
@@ -331,7 +335,7 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
         temperamento: temperament || 'Analítico',
         persona: personaText,
         objecoes: objectionsText,
-        realDataEnrichment,
+        // Static enrichment already in CASO 1, not needed again
       })
 
       // Construir histórico de mensagens
@@ -341,7 +345,6 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
 
       // Adicionar histórico de chat (limitado)
       if (chatHistory && Array.isArray(chatHistory)) {
-        // Pegar apenas as últimas N mensagens para evitar overflow de contexto
         const limitedHistory = chatHistory.slice(-MAX_HISTORY_MESSAGES)
 
         if (chatHistory.length > MAX_HISTORY_MESSAGES) {
@@ -357,6 +360,12 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
         }
       }
 
+      // Inject turn guidance (already computed in parallel above)
+      if (turnGuidanceResult.hasGuidance) {
+        messages.push({ role: 'system', content: turnGuidanceResult.prompt })
+        console.log('🧠 [chat-v2] ML turn guidance injected')
+      }
+
       // Adicionar nova mensagem do usuário
       messages.push({ role: 'user', content: truncatedMessage })
 
@@ -368,7 +377,7 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
 
       try {
         const completion = await openai.chat.completions.create({
-          model: 'gpt-4.1',
+          model: 'gpt-4o',
           messages,
           max_tokens: 500,
           temperature: 0.8,
