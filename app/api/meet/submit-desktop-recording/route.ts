@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       .from('meet_live_sessions')
       .update({
         transcript: transcript,
-        status: 'queued',
+        status: 'evaluating',
         updated_at: new Date().toISOString(),
       })
       .eq('id', liveSessionId)
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
-    console.log(`[SubmitDesktop] Session ${liveSessionId} queued for processing (${transcriptText.length} chars)`)
+    console.log(`[SubmitDesktop] Session ${liveSessionId} submitted for processing (${transcriptText.length} chars)`)
 
     // 5. Fire-and-forget background processing
     processDesktopRecording(liveSessionId).catch(err => {

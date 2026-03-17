@@ -8,8 +8,8 @@ const { isBlackHoleInstalled, installBlackHoleDriver, createMultiOutputDevice, d
 const LOG_FILE = '/tmp/electron-debug.log'
 function debugLog(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`
-  fs.appendFileSync(LOG_FILE, line)
-  console.log(msg)
+  try { fs.appendFileSync(LOG_FILE, line) } catch {}
+  try { console.log(msg) } catch {}
 }
 
 debugLog('=== Electron main.js loaded ===')
@@ -176,9 +176,9 @@ function createMainWindow() {
           }
         })()
       `)
-      console.log('[Audio] Init result:', JSON.stringify(result))
+      try { console.log('[Audio] Init result:', JSON.stringify(result)) } catch {}
     } catch (e) {
-      console.error('[Audio] Init failed:', e.message)
+      try { console.error('[Audio] Init failed:', e.message) } catch {}
     }
   })
 
@@ -336,7 +336,7 @@ function createBubbleWindow() {
   })
 
   // Highest window level + relative bump
-  bubbleWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+  bubbleWindow.setAlwaysOnTop(true, 'floating', 1)
   bubbleWindow.setVisibleOnAllWorkspaces(true, {
     visibleOnFullScreen: true,
     skipTransformProcessType: true,
@@ -352,14 +352,14 @@ function createBubbleWindow() {
   // Re-assert on blur (other apps stealing z-order)
   bubbleWindow.on('blur', () => {
     if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-      bubbleWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+      bubbleWindow.setAlwaysOnTop(true, 'floating', 1)
     }
   })
 
   // Re-assert on show
   bubbleWindow.on('show', () => {
     if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-      bubbleWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+      bubbleWindow.setAlwaysOnTop(true, 'floating', 1)
       bubbleWindow.setVisibleOnAllWorkspaces(true, {
         visibleOnFullScreen: true,
         skipTransformProcessType: true,
@@ -367,12 +367,14 @@ function createBubbleWindow() {
     }
   })
 
-  // Re-apply always-on-top periodically (some Windows apps can steal it)
+  // Re-apply always-on-top periodically and force focus recovery
   setInterval(() => {
-    if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-      bubbleWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+    if (bubbleWindow && !bubbleWindow.isDestroyed() && bubbleWindow.isVisible()) {
+      bubbleWindow.setAlwaysOnTop(true, 'floating', 1)
+      // On macOS, moveTop() brings window above fullscreen apps
+      bubbleWindow.moveTop()
     }
-  }, 3000)
+  }, 2000)
 
   // F12 for DevTools on bubble too
   bubbleWindow.webContents.on('before-input-event', (_event, input) => {

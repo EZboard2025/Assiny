@@ -85,7 +85,7 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
   // 3. Update status
   await supabaseAdmin
     .from('meet_live_sessions')
-    .update({ status: 'processing', updated_at: new Date().toISOString() })
+    .update({ status: 'evaluating', updated_at: new Date().toISOString() })
     .eq('id', sessionId)
 
   try {
@@ -148,7 +148,7 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
         spin_p_score: evalData.spin_evaluation?.P?.final_score || 0,
         spin_i_score: evalData.spin_evaluation?.I?.final_score || 0,
         spin_n_score: evalData.spin_evaluation?.N?.final_score || 0,
-        source: 'desktop',
+        source: 'bot',
       })
       .select('id')
       .single()
