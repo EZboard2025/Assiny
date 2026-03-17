@@ -2136,6 +2136,36 @@ const recBar = document.getElementById('rec-bar')
 const btnStopRec = document.getElementById('btn-stop-rec')
 let isBubbleRecording = false
 
+// --- Drag Logic (rec-bar) ---
+// Allow dragging the window from the recording bar at the top
+if (recBar) {
+  recBar.style.cursor = 'grab'
+  recBar.addEventListener('mousedown', async (e) => {
+    // Ignore clicks on the stop button
+    if (e.target.closest('.rec-bar-stop')) return
+    if (e.button !== 0) return
+
+    recBar.style.cursor = 'grabbing'
+    const startX = e.screenX
+    const startY = e.screenY
+    const pos = await window.electronAPI.getBubblePos()
+
+    const onUp = () => {
+      recBar.style.cursor = 'grab'
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+
+    const onMove = (ev) => {
+      if (ev.buttons === 0) { onUp(); return }
+      window.electronAPI.moveBubble(pos.x + ev.screenX - startX, pos.y + ev.screenY - startY)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  })
+}
+
 // Screen recording permission needed (macOS)
 if (window.electronAPI && window.electronAPI.onScreenPermissionNeeded) {
   window.electronAPI.onScreenPermissionNeeded(() => {
@@ -2240,6 +2270,8 @@ async function hideMeetStartPrompt() {
     }
   } else {
     // Hide window → resize → show bubble (same pattern as collapse)
+    // NOTE: do NOT call disableMouseCapture() here — collapse() doesn't call it,
+    // and setIgnoreMouseEvents(true) makes the bubble click-through on Windows.
     await window.electronAPI.setBubbleOpacity(0)
     bubble.style.display = 'flex'
     if (savedBubblePos) {
@@ -2247,7 +2279,6 @@ async function hideMeetStartPrompt() {
     } else {
       await window.electronAPI.resizeBubble(BUBBLE_SIZE, BUBBLE_SIZE)
     }
-    disableMouseCapture()
     await window.electronAPI.setBubbleOpacity(1)
   }
 }
@@ -2319,6 +2350,8 @@ async function hideMeetPrompt() {
     }
   } else {
     // Hide window → resize → show bubble (same pattern as collapse)
+    // NOTE: do NOT call disableMouseCapture() here — collapse() doesn't call it,
+    // and setIgnoreMouseEvents(true) makes the bubble click-through on Windows.
     await window.electronAPI.setBubbleOpacity(0)
     bubble.style.display = 'flex'
     if (savedBubblePos) {
@@ -2326,7 +2359,6 @@ async function hideMeetPrompt() {
     } else {
       await window.electronAPI.resizeBubble(BUBBLE_SIZE, BUBBLE_SIZE)
     }
-    disableMouseCapture()
     await window.electronAPI.setBubbleOpacity(1)
   }
 }

@@ -1062,6 +1062,11 @@ body {
 .bubble.edge-bar-top .siri-blob.b5,
 .bubble.edge-bar-bottom .siri-blob.b5 { left: 88% !important; }
 
+/* Edge-bar + recording: change gradient to red */
+.bubble.edge-bar.recording .siri-orb {
+  background: linear-gradient(180deg, #fca5a5, #f87171, #dc2626, #b91c1c) !important;
+}
+
 /* Hover — brighten gradient */
 .bubble.edge-bar:hover .siri-orb {
   filter: brightness(1.1);
@@ -1529,13 +1534,31 @@ body {
   background: rgba(255,255,255,0.35);
 }
 
-/* When recording, change bubble to red */
+/* When recording, change bubble to red circle */
 .bubble.recording .siri-orb {
   background: linear-gradient(145deg, #f87171, #dc2626, #b91c1c);
+  border-radius: 50%;
 }
 
 .bubble.recording .bubble-ping {
   background: #f87171;
+}
+
+/* Recolor blobs to red shades so the orb looks like a proper red sphere */
+.bubble.recording .siri-blob.b1 {
+  background: radial-gradient(circle at 40% 40%, #fca5a5, #f87171) !important;
+}
+.bubble.recording .siri-blob.b2 {
+  background: radial-gradient(circle at 60% 40%, #fb7185, #ef4444) !important;
+}
+.bubble.recording .siri-blob.b3 {
+  background: radial-gradient(circle at 50% 60%, #dc2626, #991b1b) !important;
+}
+.bubble.recording .siri-blob.b4 {
+  background: radial-gradient(circle at 30% 50%, #fecaca, #fca5a5) !important;
+}
+.bubble.recording .siri-blob.b5 {
+  background: radial-gradient(circle at 60% 70%, #ef4444, #b91c1c) !important;
 }
 
 /* ============================================================

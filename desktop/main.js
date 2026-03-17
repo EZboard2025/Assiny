@@ -103,6 +103,7 @@ let meetWindowGoneCount = 0 // Debounce counter for Meet tab disappearing
 let noActiveMeetCount = 0 // Tracks how long activeMeet is null while meetTabAny still exists
 let meetHadAudioIndicator = false // Whether the meet title had 🔊 at some point during recording
 let waitingForMeetReactivation = false // After user dismisses "ended?" card, wait for Meet to become active again before re-asking
+let dismissCooldownUntil = null // Timestamp: don't re-ask until this time passes (60s after dismiss)
 let pendingMeetConfirmation = false // Waiting for user to confirm/decline recording
 let pendingMeetTitle = null // Title of the meeting awaiting confirmation
 let declinedMeetCode = null // Meeting code the user declined (don't ask again)
@@ -2100,7 +2101,8 @@ end tell`
 
 // Track consecutive NO_CONTROLS detections for debounce
 let noControlsCount = 0
-const NO_CONTROLS_THRESHOLD = 3 // 3 consecutive checks = definitive end
+const NO_CONTROLS_THRESHOLD = 6 // 6 consecutive checks (~9s) = definitive end
+let leftDetectionCount = 0      // Debounce LEFT state (desktopCapturer can be flaky on Windows)
 
 // Chrome shows 🔊 when the tab is producing audio (WebRTC call active)
 // When user leaves the meeting, 🔊 disappears because audio stops
@@ -2254,49 +2256,52 @@ async function handleMeetState(state) {
     // Track audio indicator (desktopCapturer only)
     if (state._meetWithAudio) meetHadAudioIndicator = true
 
-    // If waiting for reactivation and Meet is active again → reset
-    if (waitingForMeetReactivation && state.state === 'ACTIVE') {
-      debugLog('[MeetDetect] Meet became active again after dismiss — resuming end detection')
-      waitingForMeetReactivation = false
-      meetWindowGoneCount = 0
-      noActiveMeetCount = 0
-      noControlsCount = 0
+    // After user clicked "Ignorar": only resume detection if the meeting
+    // becomes ACTIVE again (user re-entered). If they never re-enter, never ask again.
+    // User can always stop manually via REC badge or Parar button.
+    if (waitingForMeetReactivation) {
+      if (state.state === 'ACTIVE') {
+        debugLog('[MeetDetect] Meeting active again after dismiss — resuming end detection')
+        waitingForMeetReactivation = false
+        leftDetectionCount = 0
+        noControlsCount = 0
+        // Don't fall through — just reset. Next check will handle normally.
+      }
+      return
     }
 
-    if (waitingForMeetReactivation) return
+    // On Windows, desktopCapturer is unreliable — it frequently misses windows or
+    // returns stale titles, causing constant false positives. Therefore:
+    // ONLY ask "A reunião acabou?" when the window title EXPLICITLY says the user left.
+    // For all other cases (tab gone, unknown state), the user can manually stop via
+    // the REC badge or Parar button. This eliminates false positives entirely.
 
     if (state.state === 'LEFT') {
-      debugLog(`[MeetDetect] LEFT detected — URL: ${state.url} title: ${state.title}`)
+      leftDetectionCount++
       noControlsCount = 0
-      meetWindowGoneCount = 0
-      noActiveMeetCount = 0
-      if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-        bubbleWindow.webContents.send('ask-meeting-ended')
-      }
-    } else if (!state.hasMeetTab) {
-      // Meet tab completely gone
-      noControlsCount++
-      debugLog(`[MeetDetect] Meet tab gone (${noControlsCount}/${NO_CONTROLS_THRESHOLD})`)
-      if (noControlsCount >= NO_CONTROLS_THRESHOLD) {
-        debugLog('[MeetDetect] Meet tab gone for 3 checks — asking confirmation')
-        noControlsCount = 0
+      debugLog(`[MeetDetect] LEFT detected (${leftDetectionCount}/3) — title: ${state.title}`)
+      // Require 3 consecutive LEFT detections (~4.5s) to confirm it's real
+      if (leftDetectionCount >= 3) {
+        leftDetectionCount = 0
         if (bubbleWindow && !bubbleWindow.isDestroyed()) {
           bubbleWindow.webContents.send('ask-meeting-ended')
         }
       }
-    } else if (state.state === 'ACTIVE') {
-      // Meeting still active — reset counters
+    } else if (state.state === 'ACTIVE' || state.hasMeetTab) {
+      // Meeting still present — reset ALL counters
+      leftDetectionCount = 0
       noControlsCount = 0
-      meetWindowGoneCount = 0
-      noActiveMeetCount = 0
-    } else if (state.hasMeetTab && state.state !== 'ACTIVE') {
-      // Meet tab exists but not active (UNKNOWN state)
-      noActiveMeetCount++
-      meetWindowGoneCount = 0
-      debugLog(`[MeetDetect] Meet tab present but not active (${noActiveMeetCount}/4)`)
-      if (noActiveMeetCount >= 4) {
-        debugLog('[MeetDetect] No active meeting for 4 checks — asking confirmation')
-        noActiveMeetCount = 0
+    } else if (state.state === 'NONE' && !state.hasMeetTab) {
+      // No Meet window at all — Chrome might be closed
+      // Require 7 consecutive checks (~10s) to confirm it's truly gone
+      leftDetectionCount = 0
+      noControlsCount++
+      if (noControlsCount % 3 === 0) {
+        debugLog(`[MeetDetect] No Meet window (${noControlsCount}/7)`)
+      }
+      if (noControlsCount >= 7) {
+        debugLog('[MeetDetect] No Meet window for ~10s — asking confirmation')
+        noControlsCount = 0
         if (bubbleWindow && !bubbleWindow.isDestroyed()) {
           bubbleWindow.webContents.send('ask-meeting-ended')
         }
@@ -2493,14 +2498,13 @@ ipcMain.on('dismiss-meeting-start', () => {
 // MEETING END CONFIRMATION (bubble asks user)
 // ============================================================
 
-// Heuristic signal from recording.js (DISABLED — only window-based detection now)
+// Heuristic signal from recording.js — DISABLED on Windows
+// The audio heuristics (silent system audio, no transcription) produce too many false positives,
+// especially in solo meetings or when the user mutes. Window-based LEFT detection + manual
+// stop via REC badge/Parar button is sufficient and doesn't annoy the user.
 ipcMain.on('meeting-maybe-ended', () => {
-  if (!isRecordingMeet) return
-  if (waitingForMeetReactivation) return // User already dismissed, don't re-ask from heuristic
-  debugLog('[MeetDetect] Audio heuristic: system audio silent + no transcript → asking confirmation')
-  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
-    bubbleWindow.webContents.send('ask-meeting-ended')
-  }
+  debugLog('[MeetDetect] Audio heuristic received — IGNORED (disabled, too many false positives)')
+  // Do nothing — user can stop manually via REC badge or Parar button
 })
 
 // User confirmed meeting ended → stop recording (fallback path — auto-stop is preferred)
@@ -2526,11 +2530,13 @@ ipcMain.on('confirm-meeting-ended', () => {
 
 // User dismissed → meeting still going, wait for Meet to become active again before re-asking
 ipcMain.on('dismiss-meeting-ended', () => {
-  debugLog('[MeetDetect] User dismissed → waiting for Meet to reactivate before asking again')
+  debugLog('[MeetDetect] User dismissed → waiting for Meet to reactivate + 60s cooldown')
   waitingForMeetReactivation = true
+  dismissCooldownUntil = null // Will be set when Meet becomes active again
   meetWindowGoneCount = 0
   noActiveMeetCount = 0
   noControlsCount = 0
+  leftDetectionCount = 0
   if (recordingWindow && !recordingWindow.isDestroyed()) {
     recordingWindow.webContents.send('reset-meeting-detection')
   }
