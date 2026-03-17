@@ -1055,82 +1055,32 @@ function deduplicateSegments(segs) {
 // ============================================================
 
 async function evaluateAndSave() {
-  // Build plain text transcript (no speaker labels — mono audio, no attribution)
-  const cleanSegments = segments // No dedup needed for mono
-  const transcriptText = cleanSegments
-    .map(s => s.text)
-    .join('\n')
+  // Build plain text transcript for validation
+  const transcriptText = segments.map(s => s.text).join('\n')
 
   if (transcriptText.length < 50) {
     throw new Error(`Transcricao muito curta para avaliar (${transcriptText.length} chars, minimo 50)`)
   }
 
-  const meetingId = `desktop_${Date.now()}`
+  console.log(`[Recorder] Submitting for background evaluation: ${transcriptText.length} chars, ${segments.length} segments, ${wordCount} words`)
 
-  // 1. Call evaluate API (5 min timeout for long transcripts)
-  console.log(`[Recorder] Evaluating transcript: ${transcriptText.length} chars, ${cleanSegments.length} segments (${segments.length} before dedup), ${wordCount} words`)
-  const evalController = new AbortController()
-  const evalTimeout = setTimeout(() => evalController.abort(), 5 * 60 * 1000)
+  // Submit to server for background processing (returns immediately)
+  const res = await fetch(`${BASE_URL}/api/meet/submit-desktop-recording`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      liveSessionId,
+      transcript: segments,
+    }),
+  })
 
-  let evalRes
-  try {
-    evalRes = await fetch(`${BASE_URL}/api/meet/evaluate`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      signal: evalController.signal,
-      body: JSON.stringify({
-        transcript: transcriptText,
-        meetingId,
-        companyId,
-        sellerName: userName,
-      }),
-    })
-  } catch (fetchErr) {
-    clearTimeout(evalTimeout)
-    if (fetchErr.name === 'AbortError') {
-      throw new Error('Avaliacao demorou mais de 5 minutos. Tente novamente ou grave uma reuniao menor.')
-    }
-    throw fetchErr
-  }
-  clearTimeout(evalTimeout)
-
-  if (!evalRes.ok) {
-    const err = await evalRes.json().catch(() => ({ error: 'Erro na avaliacao' }))
-    console.error('[Recorder] Evaluate API error:', evalRes.status, err)
-    throw new Error(err.error || `Erro na avaliacao (status ${evalRes.status})`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Erro ao enviar gravacao' }))
+    throw new Error(err.error || `Erro ao enviar (status ${res.status})`)
   }
 
-  const evalData = await evalRes.json()
-  lastSmartNotes = evalData.smartNotes || null
-
-  // 2. Save to database (use cleaned transcript from nano if available)
-  try {
-    const saveRes = await fetch(`${BASE_URL}/api/meet/save-desktop-recording`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        transcript: evalData.cleanedTranscript || transcriptText,
-        evaluation: evalData.evaluation,
-        smartNotes: lastSmartNotes,
-        meetingId,
-        companyId,
-        sellerName: userName,
-      }),
-    })
-
-    if (saveRes.ok) {
-      const saveData = await saveRes.json()
-      lastEvaluationId = saveData.evaluationId
-      console.log('[Recorder] Saved to DB:', lastEvaluationId)
-    } else {
-      console.error('[Recorder] Save failed:', await saveRes.text())
-    }
-  } catch (err) {
-    console.error('[Recorder] Save error:', err)
-    // Non-fatal — show results even if save fails
-  }
-
-  return evalData.evaluation
+  console.log('[Recorder] Submitted for background processing')
+  return null // Evaluation happens server-side
 }
 
 // ============================================================
@@ -1253,15 +1203,39 @@ els.btnStop.addEventListener('click', async () => {
   showScreen('screen-evaluating')
 
   try {
-    const evaluation = await evaluateAndSave()
-    await stopLiveSession('completed')
+    await evaluateAndSave()
+    // Show submitted screen — evaluation runs server-side
+    showScreen('screen-evaluating')
+    els.evalDuration.textContent = els.recTimer.textContent || ''
+    els.evalWords.textContent = `${wordCount} palavras`
+    // Replace spinner with success message
+    const evalScreen = document.getElementById('screen-evaluating')
+    if (evalScreen) {
+      const spinner = evalScreen.querySelector('.eval-spinner')
+      if (spinner) spinner.style.display = 'none'
+      const evalTitle = evalScreen.querySelector('.eval-title')
+      if (evalTitle) evalTitle.textContent = 'Gravação enviada!'
+      const evalSubtitle = evalScreen.querySelector('.eval-subtitle')
+      if (evalSubtitle) evalSubtitle.textContent = 'A avaliação está sendo processada. Você receberá uma notificação quando estiver pronta. Pode fechar esta janela.'
+    }
     cleanupLiveSession()
-    showResults(evaluation)
+
+    // Notify main process and auto-close after 5s
+    if (window.electronAPI.notifyRecordingFinished) {
+      setTimeout(() => window.electronAPI.notifyRecordingFinished(), 5000)
+    }
   } catch (err) {
-    console.error('[Recorder] Evaluation error:', err)
+    console.error('[Recorder] Submit error:', err)
     await stopLiveSession('error')
     cleanupLiveSession()
     showError(err.message)
+
+    if (window.electronAPI.notifyRecordingError) {
+      window.electronAPI.notifyRecordingError(err.message || 'Erro desconhecido')
+    }
+    if (window.electronAPI.notifyRecordingFinished) {
+      window.electronAPI.notifyRecordingFinished()
+    }
   } finally {
     els.btnStop.disabled = false
     els.btnStop.querySelector('.btn-text').style.display = ''
@@ -1355,34 +1329,26 @@ async function triggerAutoStop() {
   showScreen('screen-evaluating')
 
   try {
-    const evaluation = await evaluateAndSave()
-    await stopLiveSession('completed')
+    await evaluateAndSave()
     cleanupLiveSession()
-    showResults(evaluation)
+    isAutoMode = false
 
-    // Notify main process that recording is done (triggers notification + auto-close)
+    // Notify main process — evaluation is running server-side
     if (window.electronAPI.notifyRecordingFinished) {
       window.electronAPI.notifyRecordingFinished()
     }
-
-    isAutoMode = false
   } catch (err) {
-    console.error('[Recorder] Auto-stop evaluation error:', err)
+    console.error('[Recorder] Auto-stop submit error:', err)
     isAutoMode = false
     await stopLiveSession('error')
     cleanupLiveSession()
 
-    // Notify main process of error (shows native notification)
     if (window.electronAPI.notifyRecordingError) {
-      window.electronAPI.notifyRecordingError(err.message || 'Erro desconhecido na avaliação')
+      window.electronAPI.notifyRecordingError(err.message || 'Erro desconhecido')
     }
-
-    // Notify main process even on error (cleanup + close window)
     if (window.electronAPI.notifyRecordingFinished) {
       window.electronAPI.notifyRecordingFinished()
     }
-
-    showError(err.message)
   }
 }
 
