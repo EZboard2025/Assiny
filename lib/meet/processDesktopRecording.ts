@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from './evaluateMeetTranscript'
 import { generateSmartNotes } from './generateSmartNotes'
+import { classifyMeeting } from './classifyMeeting'
 import OpenAI from 'openai'
 
 const supabaseAdmin = createClient(
@@ -100,7 +101,11 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
 
     console.log(`[DesktopBG] Transcript: ${transcriptText.length} chars`)
 
-    // 5. Clean transcript (skip for very long transcripts to avoid timeout)
+    // 5. Classify meeting type
+    const classification = await classifyMeeting(transcriptText)
+    const isSales = classification.meeting_type === 'sales'
+
+    // 5b. Clean transcript (skip for very long transcripts to avoid timeout)
     let cleanedTranscript: string
     if (transcriptText.length > 30000) {
       console.log(`[DesktopBG] Transcript too long for cleaning (${transcriptText.length} chars), skipping clean step`)
@@ -109,39 +114,48 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
       cleanedTranscript = await cleanTranscript(transcriptText)
     }
 
-    // Cap transcript for evaluation (gpt-4.1 handles ~128k tokens but keep reasonable)
+    // Cap transcript for evaluation
     const maxEvalChars = 80000
     const evalTranscript = cleanedTranscript.length > maxEvalChars
       ? cleanedTranscript.substring(0, maxEvalChars) + '\n\n[... transcrição truncada por tamanho ...]'
       : cleanedTranscript
 
-    // 6. Evaluate + Smart Notes in parallel (use capped transcript for evaluation)
-    const [evalResult, notesResult] = await Promise.allSettled([
-      evaluateMeetTranscript({
-        transcript: evalTranscript,
-        meetingId,
-        companyId: company_id || '',
-        sellerName: seller_name || undefined,
-      }),
-      generateSmartNotes({
-        transcript: evalTranscript,
-        companyId: company_id || '',
-      })
-    ])
+    let evalData: any = null
+    let smartNotes: any = null
+    let overallScore = 0
 
-    const result = evalResult.status === 'fulfilled' ? evalResult.value : null
-    if (!result?.success || !result.evaluation) {
-      throw new Error(result?.error || 'Avaliação falhou')
+    if (isSales) {
+      // === SALES: Full pipeline ===
+      const [evalResult, notesResult] = await Promise.allSettled([
+        evaluateMeetTranscript({
+          transcript: evalTranscript,
+          meetingId,
+          companyId: company_id || '',
+          sellerName: seller_name || undefined,
+        }),
+        generateSmartNotes({
+          transcript: evalTranscript,
+          companyId: company_id || '',
+        })
+      ])
+
+      const result = evalResult.status === 'fulfilled' ? evalResult.value : null
+      if (!result?.success || !result.evaluation) {
+        throw new Error(result?.error || 'Avaliação falhou')
+      }
+      evalData = result.evaluation
+      smartNotes = notesResult.status === 'fulfilled' && notesResult.value.success
+        ? notesResult.value.notes : null
+
+      overallScore = evalData.overall_score
+      if (overallScore && overallScore <= 10) overallScore = overallScore * 10
+      overallScore = Math.round(overallScore || 0)
+    } else {
+      // === NON-SALES: Only Smart Notes ===
+      console.log(`[DesktopBG] Non-sales meeting (${classification.category}), skipping SPIN evaluation`)
+      const notesResult = await generateSmartNotes({ transcript: evalTranscript, companyId: company_id || '' }).catch(() => null)
+      smartNotes = notesResult?.success ? notesResult.notes : null
     }
-    const evalData = result.evaluation
-
-    const smartNotes = notesResult.status === 'fulfilled' && notesResult.value.success
-      ? notesResult.value.notes : null
-
-    // 7. Normalize score
-    let overallScore = evalData.overall_score
-    if (overallScore && overallScore <= 10) overallScore = overallScore * 10
-    overallScore = Math.round(overallScore || 0)
 
     // 8. Save to meet_evaluations
     const { data: saved, error: saveError } = await supabaseAdmin
@@ -150,17 +164,19 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
         user_id,
         company_id,
         meeting_id: meetingId,
-        seller_name: seller_name || evalData.seller_identification?.name || 'Não identificado',
+        seller_name: isSales ? (seller_name || evalData?.seller_identification?.name || 'Não identificado') : 'N/A',
         transcript: cleanedTranscript,
         evaluation: evalData,
         smart_notes: smartNotes,
         overall_score: overallScore,
-        performance_level: evalData.performance_level || 'needs_improvement',
-        spin_s_score: evalData.spin_evaluation?.S?.final_score || 0,
-        spin_p_score: evalData.spin_evaluation?.P?.final_score || 0,
-        spin_i_score: evalData.spin_evaluation?.I?.final_score || 0,
-        spin_n_score: evalData.spin_evaluation?.N?.final_score || 0,
+        performance_level: isSales ? (evalData?.performance_level || 'needs_improvement') : null,
+        spin_s_score: isSales ? (evalData?.spin_evaluation?.S?.final_score || 0) : null,
+        spin_p_score: isSales ? (evalData?.spin_evaluation?.P?.final_score || 0) : null,
+        spin_i_score: isSales ? (evalData?.spin_evaluation?.I?.final_score || 0) : null,
+        spin_n_score: isSales ? (evalData?.spin_evaluation?.N?.final_score || 0) : null,
         source: 'bot',
+        meeting_category: classification.meeting_type,
+        meeting_category_detail: classification.category,
       })
       .select('id')
       .single()
@@ -173,7 +189,7 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
       throw new Error(`Erro ao salvar: ${saveError.message}`)
     }
 
-    console.log(`[DesktopBG] Evaluation saved: ${saved.id} (score: ${overallScore})`)
+    console.log(`[DesktopBG] Evaluation saved: ${saved.id} (${classification.meeting_type}/${classification.category}, score: ${overallScore})`)
 
     // 9. Update live session
     await supabaseAdmin
@@ -182,63 +198,67 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
       .eq('id', sessionId)
 
     // 10. Create notification
-    const scoreDisplay = evalData.overall_score !== undefined
-      ? (evalData.overall_score <= 10 ? evalData.overall_score.toFixed(1) : (evalData.overall_score / 10).toFixed(1))
-      : '0'
-
-    await supabaseAdmin.from('user_notifications').insert({
-      user_id,
-      type: 'meet_evaluation_ready',
-      title: 'Análise de reunião pronta!',
-      message: `Sua reunião foi avaliada. Score: ${scoreDisplay}/10`,
-      data: {
-        evaluationId: saved.id,
-        overallScore,
-        performanceLevel: evalData.performance_level,
-        sellerName: seller_name,
-        source: 'desktop_recording',
-      }
-    })
+    if (isSales) {
+      const scoreDisplay = evalData.overall_score !== undefined
+        ? (evalData.overall_score <= 10 ? evalData.overall_score.toFixed(1) : (evalData.overall_score / 10).toFixed(1))
+        : '0'
+      await supabaseAdmin.from('user_notifications').insert({
+        user_id,
+        type: 'meet_evaluation_ready',
+        title: 'Análise de reunião pronta!',
+        message: `Sua reunião foi avaliada. Score: ${scoreDisplay}/10`,
+        data: { evaluationId: saved.id, overallScore, performanceLevel: evalData.performance_level, sellerName: seller_name, source: 'desktop_recording' }
+      })
+    } else {
+      await supabaseAdmin.from('user_notifications').insert({
+        user_id,
+        type: 'meet_evaluation_ready',
+        title: 'Resumo de reunião pronto!',
+        message: `Sua reunião (${classification.category}) foi resumida.`,
+        data: { evaluationId: saved.id, meetingCategory: classification.category, source: 'non_sales' }
+      })
+    }
 
     console.log(`[DesktopBG] Notification created for user ${user_id}`)
 
-    // 11. Generate simulation (fire-and-forget)
-    try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
-      fetch(`${appUrl}/api/meet/generate-simulation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ evaluation: evalData, transcript: cleanedTranscript, companyId: company_id })
-      }).then(async res => {
-        if (res.ok) {
-          const simData = await res.json()
-          if (simData.success && simData.simulationConfig) {
-            await supabaseAdmin.from('saved_simulations').insert({
-              user_id,
-              company_id,
-              simulation_config: simData.simulationConfig,
-              simulation_justification: simData.simulationConfig.simulation_justification || null,
-              meeting_context: simData.simulationConfig.meeting_context || null,
-              meet_evaluation_id: saved.id,
-              status: 'pending',
-            })
-            console.log(`[DesktopBG] Simulation saved for ${saved.id}`)
+    // 11-12. Simulation + ML patterns — ONLY for sales meetings
+    if (isSales) {
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+        fetch(`${appUrl}/api/meet/generate-simulation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ evaluation: evalData, transcript: cleanedTranscript, companyId: company_id })
+        }).then(async res => {
+          if (res.ok) {
+            const simData = await res.json()
+            if (simData.success && simData.simulationConfig) {
+              await supabaseAdmin.from('saved_simulations').insert({
+                user_id, company_id,
+                simulation_config: simData.simulationConfig,
+                simulation_justification: simData.simulationConfig.simulation_justification || null,
+                meeting_context: simData.simulationConfig.meeting_context || null,
+                meet_evaluation_id: saved.id, status: 'pending',
+              })
+              console.log(`[DesktopBG] Simulation saved for ${saved.id}`)
+            }
           }
-        }
-      }).catch(() => {})
-    } catch {}
+        }).catch(() => {})
+      } catch {}
 
-    // 12. Extract ML patterns (fire-and-forget)
-    try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
-      fetch(`${appUrl}/api/meet/extract-patterns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetEvaluationId: saved.id, transcript: cleanedTranscript, evaluation: evalData, companyId: company_id })
-      }).then(res => {
-        if (res.ok) console.log(`[DesktopBG] ML patterns started for ${saved.id}`)
-      }).catch(() => {})
-    } catch {}
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+        fetch(`${appUrl}/api/meet/extract-patterns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ meetEvaluationId: saved.id, transcript: cleanedTranscript, evaluation: evalData, companyId: company_id })
+        }).then(res => {
+          if (res.ok) console.log(`[DesktopBG] ML patterns started for ${saved.id}`)
+        }).catch(() => {})
+      } catch {}
+    } else {
+      console.log(`[DesktopBG] Skipping simulation + ML for non-sales meeting`)
+    }
 
   } catch (error: any) {
     console.error(`[DesktopBG] Error processing ${sessionId}:`, error)

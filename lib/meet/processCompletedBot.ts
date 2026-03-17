@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from './evaluateMeetTranscript'
 import { generateSmartNotes } from './generateSmartNotes'
 import { fetchTranscriptFromRecallApi, TranscriptSegment } from './recallApi'
+import { classifyMeeting } from './classifyMeeting'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -88,65 +89,76 @@ export async function processCompletedBot(botId: string): Promise<void> {
       .map((s: TranscriptSegment) => `${s.speaker}: ${s.text}`)
       .join('\n')
 
-    // 7. Run SPIN evaluation AND smart notes in parallel
-    const [evalResult, notesResult] = await Promise.allSettled([
-      evaluateMeetTranscript({
-        transcript: transcriptText,
-        meetingId: botId,
-        companyId: company_id
-      }),
-      generateSmartNotes({
-        transcript: transcriptText,
-        companyId: company_id
-      })
-    ])
+    // 6b. Classify meeting type before evaluating
+    const classification = await classifyMeeting(transcriptText)
+    const isSales = classification.meeting_type === 'sales'
 
-    // Extract evaluation (required)
-    const result = evalResult.status === 'fulfilled' ? evalResult.value : null
-    if (!result?.success || !result.evaluation) {
-      throw new Error(result?.error || 'Avaliação falhou')
-    }
-    const evalData = result.evaluation
+    let evalData: any = null
+    let smartNotes: any = null
+    let overallScore = 0
 
-    // Extract smart notes (optional — failure does NOT block evaluation)
-    const smartNotes = notesResult.status === 'fulfilled' && notesResult.value.success
-      ? notesResult.value.notes : null
-    if (notesResult.status === 'rejected') {
-      console.error(`[MeetBG] Smart notes generation failed (non-fatal):`, notesResult.reason)
-    } else if (notesResult.status === 'fulfilled' && !notesResult.value.success) {
-      console.warn(`[MeetBG] Smart notes generation returned error: ${notesResult.value.error}`)
+    if (isSales) {
+      // === SALES: Full pipeline ===
+      const [evalResult, notesResult] = await Promise.allSettled([
+        evaluateMeetTranscript({
+          transcript: transcriptText,
+          meetingId: botId,
+          companyId: company_id
+        }),
+        generateSmartNotes({
+          transcript: transcriptText,
+          companyId: company_id
+        })
+      ])
+
+      const result = evalResult.status === 'fulfilled' ? evalResult.value : null
+      if (!result?.success || !result.evaluation) {
+        throw new Error(result?.error || 'Avaliação falhou')
+      }
+      evalData = result.evaluation
+
+      smartNotes = notesResult.status === 'fulfilled' && notesResult.value.success
+        ? notesResult.value.notes : null
+      if (notesResult.status === 'rejected') {
+        console.error(`[MeetBG] Smart notes generation failed (non-fatal):`, notesResult.reason)
+      }
+
+      overallScore = evalData.overall_score
+      if (overallScore && overallScore <= 10) overallScore = overallScore * 10
+      overallScore = Math.round(overallScore || 0)
+    } else {
+      // === NON-SALES: Only Smart Notes ===
+      console.log(`[MeetBG] Non-sales meeting (${classification.category}), skipping SPIN evaluation`)
+      const notesResult = await generateSmartNotes({ transcript: transcriptText, companyId: company_id }).catch(() => null)
+      smartNotes = notesResult?.success ? notesResult.notes : null
     }
 
     // 8. Save to meet_evaluations
-    let overallScore = evalData.overall_score
-    if (overallScore && overallScore <= 10) {
-      overallScore = overallScore * 10
-    }
-
     const { data: savedEval, error: evalError } = await supabaseAdmin
       .from('meet_evaluations')
       .insert({
         user_id,
         company_id,
         meeting_id: botId,
-        seller_name: evalData.seller_identification?.name || 'Não identificado',
+        seller_name: isSales ? (evalData?.seller_identification?.name || 'Não identificado') : 'N/A',
         call_objective: null,
         funnel_stage: null,
         transcript: segments,
         evaluation: evalData,
-        overall_score: Math.round(overallScore || 0),
-        performance_level: evalData.performance_level || 'needs_improvement',
-        spin_s_score: evalData.spin_evaluation?.S?.final_score || 0,
-        spin_p_score: evalData.spin_evaluation?.P?.final_score || 0,
-        spin_i_score: evalData.spin_evaluation?.I?.final_score || 0,
-        spin_n_score: evalData.spin_evaluation?.N?.final_score || 0,
-        smart_notes: smartNotes
+        overall_score: overallScore,
+        performance_level: isSales ? (evalData?.performance_level || 'needs_improvement') : null,
+        spin_s_score: isSales ? (evalData?.spin_evaluation?.S?.final_score || 0) : null,
+        spin_p_score: isSales ? (evalData?.spin_evaluation?.P?.final_score || 0) : null,
+        spin_i_score: isSales ? (evalData?.spin_evaluation?.I?.final_score || 0) : null,
+        spin_n_score: isSales ? (evalData?.spin_evaluation?.N?.final_score || 0) : null,
+        smart_notes: smartNotes,
+        meeting_category: classification.meeting_type,
+        meeting_category_detail: classification.category,
       })
       .select('id')
       .single()
 
     if (evalError) {
-      // Handle unique constraint violation (frontend may have saved first)
       if (evalError.code === '23505') {
         console.log(`[MeetBG] Evaluation already saved by frontend for bot ${botId}, skipping`)
         const { data: existing } = await supabaseAdmin
@@ -166,7 +178,7 @@ export async function processCompletedBot(botId: string): Promise<void> {
       throw new Error(`Erro ao salvar avaliação: ${evalError.message}`)
     }
 
-    console.log(`[MeetBG] Evaluation saved: ${savedEval.id}`)
+    console.log(`[MeetBG] Evaluation saved: ${savedEval.id} (${classification.meeting_type}/${classification.category})`)
 
     // 9. Update bot session as completed
     await supabaseAdmin
@@ -179,21 +191,37 @@ export async function processCompletedBot(botId: string): Promise<void> {
       .eq('bot_id', botId)
 
     // 10. Create notification
-    const scoreDisplay = evalData.overall_score?.toFixed(1) || '?'
-    await supabaseAdmin
-      .from('user_notifications')
-      .insert({
-        user_id,
-        type: 'meet_evaluation_ready',
-        title: 'Análise de Meet pronta!',
-        message: `Sua reunião foi avaliada. Score: ${scoreDisplay}/10`,
-        data: {
-          evaluationId: savedEval.id,
-          overallScore: evalData.overall_score,
-          performanceLevel: evalData.performance_level,
-          sellerName: evalData.seller_identification?.name || 'Não identificado'
-        }
-      })
+    if (isSales) {
+      const scoreDisplay = evalData.overall_score?.toFixed(1) || '?'
+      await supabaseAdmin
+        .from('user_notifications')
+        .insert({
+          user_id,
+          type: 'meet_evaluation_ready',
+          title: 'Análise de Meet pronta!',
+          message: `Sua reunião foi avaliada. Score: ${scoreDisplay}/10`,
+          data: {
+            evaluationId: savedEval.id,
+            overallScore: evalData.overall_score,
+            performanceLevel: evalData.performance_level,
+            sellerName: evalData.seller_identification?.name || 'Não identificado'
+          }
+        })
+    } else {
+      await supabaseAdmin
+        .from('user_notifications')
+        .insert({
+          user_id,
+          type: 'meet_evaluation_ready',
+          title: 'Resumo de reunião pronto!',
+          message: `Sua reunião (${classification.category}) foi resumida.`,
+          data: {
+            evaluationId: savedEval.id,
+            meetingCategory: classification.category,
+            source: 'non_sales',
+          }
+        })
+    }
 
     console.log(`[MeetBG] Notification created for user ${user_id}`)
 
@@ -208,68 +236,72 @@ export async function processCompletedBot(botId: string): Promise<void> {
         })
         .eq('bot_id', botId)
     } catch (calErr) {
-      // Non-fatal — calendar bot may not exist (manual URL submissions)
       console.warn(`[MeetBG] Calendar bot update skipped for ${botId}`)
     }
 
-    // 11. Generate correction simulation (fire-and-forget, don't fail evaluation)
-    try {
-      console.log(`[MeetBG] Generating correction simulation for bot ${botId}`)
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
-      const simResponse = await fetch(`${appUrl}/api/meet/generate-simulation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          evaluation: evalData,
-          transcript: transcriptText,
-          companyId: company_id
+    // 11-12. Simulation + ML patterns — ONLY for sales meetings
+    if (isSales) {
+      // 11. Generate correction simulation (fire-and-forget)
+      try {
+        console.log(`[MeetBG] Generating correction simulation for bot ${botId}`)
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+        const simResponse = await fetch(`${appUrl}/api/meet/generate-simulation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            evaluation: evalData,
+            transcript: transcriptText,
+            companyId: company_id
+          })
         })
-      })
 
-      if (simResponse.ok) {
-        const simData = await simResponse.json()
-        if (simData.success && simData.simulationConfig) {
-          await supabaseAdmin
-            .from('saved_simulations')
-            .insert({
-              user_id,
-              company_id,
-              simulation_config: simData.simulationConfig,
-              simulation_justification: simData.simulationConfig.simulation_justification || null,
-              meeting_context: simData.simulationConfig.meeting_context || null,
-              meet_evaluation_id: savedEval.id,
-              status: 'pending'
-            })
-          console.log(`[MeetBG] Simulation saved for evaluation ${savedEval.id}`)
+        if (simResponse.ok) {
+          const simData = await simResponse.json()
+          if (simData.success && simData.simulationConfig) {
+            await supabaseAdmin
+              .from('saved_simulations')
+              .insert({
+                user_id,
+                company_id,
+                simulation_config: simData.simulationConfig,
+                simulation_justification: simData.simulationConfig.simulation_justification || null,
+                meeting_context: simData.simulationConfig.meeting_context || null,
+                meet_evaluation_id: savedEval.id,
+                status: 'pending'
+              })
+            console.log(`[MeetBG] Simulation saved for evaluation ${savedEval.id}`)
+          }
+        } else {
+          console.error(`[MeetBG] Simulation generation failed: ${simResponse.status}`)
         }
-      } else {
-        console.error(`[MeetBG] Simulation generation failed: ${simResponse.status}`)
+      } catch (simError: any) {
+        console.error(`[MeetBG] Error generating simulation (non-fatal):`, simError.message)
       }
-    } catch (simError: any) {
-      console.error(`[MeetBG] Error generating simulation (non-fatal):`, simError.message)
-    }
 
-    // 12. Extract ML patterns from real meeting (fire-and-forget)
-    try {
-      console.log(`[MeetBG] Extracting ML patterns for evaluation ${savedEval.id}`)
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
-      fetch(`${appUrl}/api/meet/extract-patterns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          meetEvaluationId: savedEval.id,
-          transcript: segments,
-          evaluation: evalData,
-          companyId: company_id,
+      // 12. Extract ML patterns (fire-and-forget)
+      try {
+        console.log(`[MeetBG] Extracting ML patterns for evaluation ${savedEval.id}`)
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
+        fetch(`${appUrl}/api/meet/extract-patterns`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            meetEvaluationId: savedEval.id,
+            transcript: segments,
+            evaluation: evalData,
+            companyId: company_id,
+          })
+        }).then(res => {
+          if (res.ok) console.log(`[MeetBG] ML pattern extraction started for ${savedEval.id}`)
+          else console.error(`[MeetBG] ML pattern extraction failed: ${res.status}`)
+        }).catch(err => {
+          console.error(`[MeetBG] ML pattern extraction error (non-fatal):`, err.message)
         })
-      }).then(res => {
-        if (res.ok) console.log(`[MeetBG] ML pattern extraction started for ${savedEval.id}`)
-        else console.error(`[MeetBG] ML pattern extraction failed: ${res.status}`)
-      }).catch(err => {
-        console.error(`[MeetBG] ML pattern extraction error (non-fatal):`, err.message)
-      })
-    } catch (mlError: any) {
-      console.error(`[MeetBG] ML pattern extraction setup error (non-fatal):`, mlError.message)
+      } catch (mlError: any) {
+        console.error(`[MeetBG] ML pattern extraction setup error (non-fatal):`, mlError.message)
+      }
+    } else {
+      console.log(`[MeetBG] Skipping simulation + ML patterns for non-sales meeting`)
     }
 
   } catch (error: any) {
