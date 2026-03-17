@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, Power, Sparkles, Edit2, X, Save, Loader2, ArrowUpDown, Calendar, GitCompare, Check, AlertCircle, User, ChevronRight, ChevronDown, Trash2, Plus, FolderOpen } from 'lucide-react'
+import { Link2, Copy, CheckCircle, Users, Power, Sparkles, Edit2, X, Save, Loader2, ArrowUpDown, Calendar, GitCompare, Check, AlertCircle, User, ChevronRight, ChevronDown, Trash2, Plus, FolderOpen, MessageSquare, BarChart3, Target, TrendingUp, Lightbulb, FileText } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PLAN_CONFIGS } from '@/lib/types/plans'
 
@@ -67,6 +67,7 @@ export default function RoleplayLinksView() {
   const [historico, setHistorico] = useState<any[]>([])
   const [loadingHistorico, setLoadingHistorico] = useState(false)
   const [selectedEvaluation, setSelectedEvaluation] = useState<any>(null)
+  const [evalSection, setEvalSection] = useState<string>('resumo')
 
   const [sortBy, setSortBy] = useState<'date' | 'score'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -889,7 +890,7 @@ export default function RoleplayLinksView() {
                         onClick={() => {
                           if (deleteMode) toggleSelectForDeletion(rp.id)
                           else if (compareMode) toggleSelectForComparison(rp.id)
-                          else if (ev) setSelectedEvaluation(rp)
+                          else if (ev) { setEvalSection('resumo'); setSelectedEvaluation(rp) }
                         }}>
                         <div className="flex items-center gap-4">
                           {deleteMode && (
@@ -917,7 +918,7 @@ export default function RoleplayLinksView() {
                           </div>
                           {score !== null && score !== undefined ? (
                             <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className={`text-lg font-bold ${scoreColor(level)}`}>{(score / 10).toFixed(1)}</span>
+                              <span className={`text-lg font-bold ${scoreColor(level)}`}>{score.toFixed(1)}</span>
                               <span className="text-xs text-gray-300">/10</span>
                             </div>
                           ) : (
@@ -940,88 +941,316 @@ export default function RoleplayLinksView() {
       {/* ── Modal: Evaluation Detail ─────────────────────── */}
       {selectedEvaluation && (() => {
         const ev = selectedEvaluation.evaluation
+        const spin = ev?.spin_evaluation
+        const spinLabels: Record<string, string> = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
+        const spinGradients: Record<string, { gradient: string; border: string }> = {
+          S: { gradient: 'from-cyan-50 to-blue-50', border: 'border-cyan-200' },
+          P: { gradient: 'from-green-50 to-emerald-50', border: 'border-green-200' },
+          I: { gradient: 'from-yellow-50 to-orange-50', border: 'border-yellow-200' },
+          N: { gradient: 'from-pink-50 to-rose-50', border: 'border-pink-200' }
+        }
+        const translateIndicator = (key: string) => {
+          const map: Record<string, string> = {
+            open_questions_score: 'Perguntas Abertas', scenario_mapping_score: 'Mapeamento de Cenário', adaptability_score: 'Adaptabilidade',
+            problem_identification_score: 'Identificação de Problemas', consequences_exploration_score: 'Exploração de Consequências',
+            depth_score: 'Profundidade', empathy_score: 'Empatia', impact_understanding_score: 'Compreensão de Impacto',
+            inaction_consequences_score: 'Consequências da Inação', urgency_amplification_score: 'Amplificação de Urgência',
+            concrete_risks_score: 'Riscos Concretos', non_aggressive_urgency_score: 'Urgência Não-Agressiva',
+            solution_clarity_score: 'Clareza da Solução', personalization_score: 'Personalização',
+            benefits_clarity_score: 'Clareza dos Benefícios', credibility_score: 'Credibilidade', cta_effectiveness_score: 'CTA Efetivo'
+          }
+          return map[key] || key.replace(/_/g, ' ').replace(/score$/i, '').trim()
+        }
+        const getScoreColor = (s: number) => s >= 7 ? 'text-green-600' : s >= 5 ? 'text-yellow-600' : 'text-red-500'
+        const getBarColor = (s: number) => s >= 7 ? 'bg-green-500' : s >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+        const getBadgeColor = (s: number) => s >= 7 ? 'bg-green-500' : s >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+
+        const sidebarSections = [
+          { id: 'resumo', label: 'Resumo', icon: FileText, show: !!ev?.executive_summary },
+          { id: 'spin', label: 'SPIN', icon: BarChart3, show: !!spin },
+          { id: 'fortes', label: 'Pontos Fortes', icon: CheckCircle, show: ev?.top_strengths?.length > 0 },
+          { id: 'gaps', label: 'Pontos a Melhorar', icon: Target, show: ev?.critical_gaps?.length > 0 },
+          { id: 'melhorias', label: 'Melhorias', icon: Lightbulb, show: ev?.priority_improvements?.length > 0 },
+          { id: 'transcricao', label: 'Transcrição', icon: MessageSquare, show: selectedEvaluation.messages?.length > 0 },
+        ].filter(s => s.show)
+
         return (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[150] flex items-center justify-center p-4" onClick={() => setSelectedEvaluation(null)}>
-            <div className="w-full max-w-lg max-h-[80vh] flex flex-col bg-white rounded-2xl shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
-              {/* Header */}
-              <div className="px-6 pt-6 pb-4 flex-shrink-0">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900">{selectedEvaluation.participant_name}</h2>
-                    <p className="text-xs text-gray-400">{new Date(selectedEvaluation.created_at).toLocaleString('pt-BR')}</p>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4" onClick={() => setSelectedEvaluation(null)}>
+            <div className="w-full max-w-6xl h-[90vh] flex bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+
+              {/* ── Sidebar ── */}
+              <div className="w-[240px] bg-gray-50 border-r border-gray-200 flex flex-col flex-shrink-0">
+                {/* User info + Score */}
+                <div className="p-5 border-b border-gray-200">
+                  <h2 className="text-base font-bold text-gray-900 truncate">{selectedEvaluation.participant_name}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{new Date(selectedEvaluation.created_at).toLocaleString('pt-BR')}</p>
+                  <div className={`rounded-xl p-4 text-center mt-4 ${scoreBg(ev?.performance_level)}`}>
+                    <p className={`text-4xl font-bold ${scoreColor(ev?.performance_level)}`}>
+                      {ev?.overall_score !== undefined ? ev.overall_score.toFixed(1) : '0.0'}
+                      <span className="text-sm font-normal opacity-50">/10</span>
+                    </p>
+                    <p className={`text-xs font-medium mt-0.5 ${scoreColor(ev?.performance_level)} opacity-70`}>{levelText(ev?.performance_level)}</p>
                   </div>
-                  <button onClick={() => setSelectedEvaluation(null)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400">
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
 
-                {/* Score */}
-                <div className={`rounded-xl p-4 text-center ${scoreBg(ev?.performance_level)}`}>
-                  <p className={`text-3xl font-bold ${scoreColor(ev?.performance_level)}`}>
-                    {ev?.overall_score ? (ev.overall_score / 10).toFixed(1) : '0.0'}
-                    <span className="text-base font-normal opacity-50">/10</span>
-                  </p>
-                  <p className={`text-xs font-medium mt-0.5 ${scoreColor(ev?.performance_level)} opacity-70`}>{levelText(ev?.performance_level)}</p>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4" style={{ scrollbarWidth: 'thin' }}>
-                {ev?.executive_summary && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Resumo</p>
-                    <p className="text-sm text-gray-600 leading-relaxed">{ev.executive_summary}</p>
+                {/* SPIN mini scores */}
+                {spin && (
+                  <div className="px-5 py-3 border-b border-gray-200">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(['S', 'P', 'I', 'N'] as const).map(k => {
+                        const s = spin[k]?.final_score ?? 0
+                        return (
+                          <div key={k} className="text-center">
+                            <div className={`text-sm font-bold ${getScoreColor(s)}`}>{s.toFixed(1)}</div>
+                            <div className="text-[9px] text-gray-400 font-medium">{k}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
 
-                {ev?.spin_evaluation && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">SPIN</p>
-                    <div className="grid grid-cols-4 gap-2">
-                      {['S', 'P', 'I', 'N'].map(k => (
-                        <div key={k} className="bg-gray-50 rounded-lg p-2.5 text-center">
-                          <p className="text-[10px] text-gray-400">{k === 'S' ? 'Situação' : k === 'P' ? 'Problema' : k === 'I' ? 'Implicação' : 'Necessidade'}</p>
-                          <p className="text-lg font-bold text-gray-900">{ev.spin_evaluation[k]?.final_score?.toFixed(1) || '0.0'}</p>
+                {/* Nav items */}
+                <nav className="flex-1 overflow-y-auto p-3 space-y-1" style={{ scrollbarWidth: 'thin' }}>
+                  {sidebarSections.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setEvalSection(id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all text-sm ${
+                        evalSection === id
+                          ? 'bg-green-600 text-white shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className="font-medium truncate">{label}</span>
+                    </button>
+                  ))}
+                </nav>
+
+                {/* Close button */}
+                <div className="p-3 border-t border-gray-200">
+                  <button onClick={() => setSelectedEvaluation(null)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors">
+                    <X className="w-4 h-4" />
+                    Fechar
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Main Content ── */}
+              <div className="flex-1 overflow-y-auto p-8" style={{ scrollbarWidth: 'thin' }}>
+
+                {/* RESUMO */}
+                {evalSection === 'resumo' && ev?.executive_summary && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Resumo Executivo</h3>
+                      <p className="text-sm text-gray-400">Visão geral da performance na simulação</p>
+                    </div>
+                    <div className={`rounded-2xl p-6 text-center ${scoreBg(ev?.performance_level)}`}>
+                      <p className={`text-5xl font-bold ${scoreColor(ev?.performance_level)}`}>
+                        {ev?.overall_score !== undefined ? ev.overall_score.toFixed(1) : '0.0'}
+                        <span className="text-lg font-normal opacity-50">/10</span>
+                      </p>
+                      <p className={`text-sm font-medium mt-1 ${scoreColor(ev?.performance_level)} opacity-70`}>{levelText(ev?.performance_level)}</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-200 p-6">
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{ev.executive_summary}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* SPIN */}
+                {evalSection === 'spin' && spin && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Avaliação SPIN</h3>
+                      <p className="text-sm text-gray-400">Análise detalhada por dimensão SPIN</p>
+                    </div>
+
+                    {/* Score cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {(['S', 'P', 'I', 'N'] as const).map(k => {
+                        const s = spin[k]?.final_score ?? 0
+                        return (
+                          <div key={k} className={`bg-gradient-to-br ${spinGradients[k].gradient} rounded-xl border ${spinGradients[k].border} p-5 text-center`}>
+                            <div className={`text-3xl font-bold mb-1 ${getScoreColor(s)}`}>{s.toFixed(1)}</div>
+                            <div className="text-xs text-gray-500 uppercase tracking-wider font-medium">{spinLabels[k]}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* SPIN Average */}
+                    {(() => {
+                      const avg = (['S', 'P', 'I', 'N'] as const).reduce((sum, k) => sum + (spin[k]?.final_score ?? 0), 0) / 4
+                      return (
+                        <div className="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
+                          <div className={`text-2xl font-bold mb-1 ${getScoreColor(avg)}`}>{avg.toFixed(1)}</div>
+                          <div className="text-xs text-green-600 uppercase tracking-wider font-medium">Média Geral SPIN</div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Detailed breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(['S', 'P', 'I', 'N'] as const).map(k => {
+                        const data = spin[k]
+                        if (!data) return null
+                        const letterScore = data.final_score ?? 0
+                        return (
+                          <div key={k} className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white text-base ${getBadgeColor(letterScore)}`}>
+                                {k}
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">{spinLabels[k]}</div>
+                                <div className={`text-xs font-medium ${getScoreColor(letterScore)}`}>{letterScore.toFixed(1)}/10</div>
+                              </div>
+                            </div>
+
+                            {data.indicators && (
+                              <div className="space-y-2.5 mb-4">
+                                {Object.entries(data.indicators).map(([key, value]: [string, any]) => (
+                                  <div key={key}>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-xs text-gray-600">{translateIndicator(key)}</span>
+                                      <span className="text-xs font-semibold text-gray-700">{Number(value).toFixed(1)}</span>
+                                    </div>
+                                    <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                                      <div className={`h-full rounded-full transition-all ${getBarColor(Number(value))}`} style={{ width: `${(Number(value) / 10) * 100}%` }} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {data.technical_feedback && (
+                              <p className="text-sm text-gray-600 leading-relaxed border-t border-gray-200 pt-4">{data.technical_feedback}</p>
+                            )}
+
+                            {data.missed_opportunities?.length > 0 && (
+                              <div className="bg-orange-50 rounded-lg p-4 border border-orange-100 mt-4">
+                                <p className="text-xs font-semibold text-orange-700 mb-2">Oportunidades perdidas</p>
+                                <ul className="space-y-1.5">
+                                  {data.missed_opportunities.map((opp: string, i: number) => (
+                                    <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                      <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>{opp}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* PONTOS FORTES */}
+                {evalSection === 'fortes' && ev?.top_strengths?.length > 0 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Pontos Fortes</h3>
+                      <p className="text-sm text-gray-400">Aspectos positivos identificados na simulação</p>
+                    </div>
+                    <div className="bg-green-50 rounded-2xl border border-green-100 p-6">
+                      <ul className="space-y-3">
+                        {ev.top_strengths.map((s: string, i: number) => (
+                          <li key={i} className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                            </div>
+                            <p className="text-sm text-gray-700 leading-relaxed">{s}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* GAPS */}
+                {evalSection === 'gaps' && ev?.critical_gaps?.length > 0 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Pontos a Melhorar</h3>
+                      <p className="text-sm text-gray-400">Gaps críticos que precisam de desenvolvimento</p>
+                    </div>
+                    <div className="bg-red-50 rounded-2xl border border-red-100 p-6">
+                      <ul className="space-y-3">
+                        {ev.critical_gaps.map((g: string, i: number) => (
+                          <li key={i} className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                            </div>
+                            <p className="text-sm text-gray-700 leading-relaxed">{g}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* MELHORIAS */}
+                {evalSection === 'melhorias' && ev?.priority_improvements?.length > 0 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Prioridades de Melhoria</h3>
+                      <p className="text-sm text-gray-400">Ações recomendadas para evolução</p>
+                    </div>
+                    <div className="space-y-4">
+                      {ev.priority_improvements.map((imp: any, i: number) => (
+                        <div key={i} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                              imp.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                              imp.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {imp.priority === 'critical' ? 'Crítico' : imp.priority === 'high' ? 'Alta' : 'Média'}
+                            </span>
+                            <span className="text-base font-semibold text-gray-900">{imp.area}</span>
+                          </div>
+                          {imp.current_gap && (
+                            <p className="text-sm text-gray-500 mb-2 italic">{imp.current_gap}</p>
+                          )}
+                          <p className="text-sm text-gray-700 leading-relaxed">{imp.action_plan}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {ev?.top_strengths?.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-green-600 uppercase tracking-wide mb-1.5">Pontos Fortes</p>
-                    <ul className="space-y-1">
-                      {ev.top_strengths.map((s: string, i: number) => (
-                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                          <span className="w-1 h-1 bg-green-500 rounded-full mt-2 flex-shrink-0" />{s}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {ev?.critical_gaps?.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-red-500 uppercase tracking-wide mb-1.5">Gaps</p>
-                    <ul className="space-y-1">
-                      {ev.critical_gaps.map((g: string, i: number) => (
-                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                          <span className="w-1 h-1 bg-red-500 rounded-full mt-2 flex-shrink-0" />{g}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {ev?.priority_improvements?.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Melhorias</p>
-                    <div className="space-y-2">
-                      {ev.priority_improvements.map((imp: any, i: number) => (
-                        <div key={i} className="bg-gray-50 rounded-lg p-3">
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">{imp.area}</p>
-                          <p className="text-xs text-gray-500">{imp.action_plan}</p>
+                {/* TRANSCRIÇÃO */}
+                {evalSection === 'transcricao' && selectedEvaluation.messages?.length > 0 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Transcrição</h3>
+                      <p className="text-sm text-gray-400">{selectedEvaluation.messages.length} mensagens na simulação</p>
+                    </div>
+                    <div className="space-y-3">
+                      {selectedEvaluation.messages.map((msg: { role: string; text: string; timestamp?: string }, i: number) => (
+                        <div key={i} className={`flex gap-3 ${msg.role === 'seller' ? 'flex-row-reverse' : ''}`}>
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                            msg.role === 'seller' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {msg.role === 'seller' ? 'V' : 'C'}
+                          </div>
+                          <div className={`max-w-[75%] rounded-2xl px-5 py-3 ${
+                            msg.role === 'seller'
+                              ? 'bg-green-50 border border-green-100'
+                              : 'bg-gray-50 border border-gray-200'
+                          }`}>
+                            <p className="text-[10px] font-semibold mb-1 uppercase tracking-wider ${
+                              msg.role === 'seller' ? 'text-green-500' : 'text-blue-500'
+                            }">
+                              {msg.role === 'seller' ? 'Vendedor' : 'Cliente'}
+                            </p>
+                            <p className="text-sm text-gray-800 leading-relaxed">{msg.text}</p>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1069,7 +1298,7 @@ export default function RoleplayLinksView() {
                         </td>
                         <td className="text-center py-3">
                           <span className={`font-bold ${scoreColor(ev?.performance_level)}`}>
-                            {ev?.overall_score ? (ev.overall_score / 10).toFixed(1) : '—'}
+                            {ev?.overall_score !== undefined ? ev.overall_score.toFixed(1) : '—'}
                           </span>
                         </td>
                         <td className="text-center py-3 text-gray-600">{sp?.S?.final_score?.toFixed(1) || '—'}</td>
