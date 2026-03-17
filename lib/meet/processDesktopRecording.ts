@@ -100,19 +100,31 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
 
     console.log(`[DesktopBG] Transcript: ${transcriptText.length} chars`)
 
-    // 5. Clean transcript
-    const cleanedTranscript = await cleanTranscript(transcriptText)
+    // 5. Clean transcript (skip for very long transcripts to avoid timeout)
+    let cleanedTranscript: string
+    if (transcriptText.length > 30000) {
+      console.log(`[DesktopBG] Transcript too long for cleaning (${transcriptText.length} chars), skipping clean step`)
+      cleanedTranscript = transcriptText
+    } else {
+      cleanedTranscript = await cleanTranscript(transcriptText)
+    }
 
-    // 6. Evaluate + Smart Notes in parallel
+    // Cap transcript for evaluation (gpt-4.1 handles ~128k tokens but keep reasonable)
+    const maxEvalChars = 80000
+    const evalTranscript = cleanedTranscript.length > maxEvalChars
+      ? cleanedTranscript.substring(0, maxEvalChars) + '\n\n[... transcrição truncada por tamanho ...]'
+      : cleanedTranscript
+
+    // 6. Evaluate + Smart Notes in parallel (use capped transcript for evaluation)
     const [evalResult, notesResult] = await Promise.allSettled([
       evaluateMeetTranscript({
-        transcript: cleanedTranscript,
+        transcript: evalTranscript,
         meetingId,
         companyId: company_id || '',
         sellerName: seller_name || undefined,
       }),
       generateSmartNotes({
-        transcript: cleanedTranscript,
+        transcript: evalTranscript,
         companyId: company_id || '',
       })
     ])
