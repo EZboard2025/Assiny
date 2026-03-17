@@ -1000,6 +1000,7 @@ body {
 
 .bubble.edge-bar .siri-icon { display: none; }
 .bubble.edge-bar .siri-glow { display: none; }
+.bubble.edge-bar .rec-badge { display: none !important; }
 
 /* Hide blobs in bar state */
 .bubble.edge-bar .siri-blob {
@@ -1062,9 +1063,26 @@ body {
 .bubble.edge-bar-top .siri-blob.b5,
 .bubble.edge-bar-bottom .siri-blob.b5 { left: 88% !important; }
 
-/* Edge-bar + recording: change gradient to red */
-.bubble.edge-bar.recording .siri-orb {
+/* Edge-bar + recording: red gradient matching the green bar style */
+.bubble.edge-bar-left.recording .siri-orb,
+.bubble.edge-bar-right.recording .siri-orb {
   background: linear-gradient(180deg, #fca5a5, #f87171, #dc2626, #b91c1c) !important;
+}
+.bubble.edge-bar-left.recording .siri-orb {
+  border-radius: 0 8px 8px 0 !important;
+}
+.bubble.edge-bar-right.recording .siri-orb {
+  border-radius: 8px 0 0 8px !important;
+}
+.bubble.edge-bar-top.recording .siri-orb,
+.bubble.edge-bar-bottom.recording .siri-orb {
+  background: linear-gradient(90deg, #fca5a5, #f87171, #dc2626, #b91c1c) !important;
+}
+.bubble.edge-bar-top.recording .siri-orb {
+  border-radius: 0 0 8px 8px !important;
+}
+.bubble.edge-bar-bottom.recording .siri-orb {
+  border-radius: 8px 8px 0 0 !important;
 }
 
 /* Hover — brighten gradient */
