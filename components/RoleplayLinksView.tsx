@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, Power, Sparkles, Edit2, X, Save, Loader2, ArrowUpDown, Calendar, GitCompare, Check, AlertCircle, User, ChevronRight, ChevronDown, Trash2, Plus, FolderOpen, MessageSquare, BarChart3, Target, TrendingUp, Lightbulb, FileText } from 'lucide-react'
+import { Link2, Copy, CheckCircle, Users, Power, Sparkles, Edit2, X, Save, Loader2, ArrowUpDown, Calendar, GitCompare, Check, AlertCircle, User, ChevronRight, ChevronDown, Trash2, Plus, FolderOpen, MessageSquare, BarChart3, Target, TrendingUp, Lightbulb, FileText, Shield } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PLAN_CONFIGS } from '@/lib/types/plans'
 
@@ -968,6 +968,7 @@ export default function RoleplayLinksView() {
         const sidebarSections = [
           { id: 'resumo', label: 'Resumo', icon: FileText, show: !!ev?.executive_summary },
           { id: 'spin', label: 'SPIN', icon: BarChart3, show: !!spin },
+          { id: 'objecoes', label: 'Objeções', icon: Shield, show: ev?.objections_analysis?.length > 0 },
           { id: 'fortes', label: 'Pontos Fortes', icon: CheckCircle, show: ev?.top_strengths?.length > 0 },
           { id: 'gaps', label: 'Pontos a Melhorar', icon: Target, show: ev?.critical_gaps?.length > 0 },
           { id: 'melhorias', label: 'Melhorias', icon: Lightbulb, show: ev?.priority_improvements?.length > 0 },
@@ -1147,6 +1148,67 @@ export default function RoleplayLinksView() {
                           </div>
                         )
                       })}
+                    </div>
+                  </div>
+                )}
+
+                {/* OBJEÇÕES */}
+                {evalSection === 'objecoes' && ev?.objections_analysis?.length > 0 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Análise de Objeções</h3>
+                      <p className="text-sm text-gray-400">{ev.objections_analysis.length} objeções identificadas na simulação</p>
+                    </div>
+                    <div className="space-y-4">
+                      {ev.objections_analysis.map((obj: any, idx: number) => (
+                        <div key={idx} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                                  obj.objection_type === 'preço' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
+                                  obj.objection_type === 'timing' ? 'bg-blue-100 text-blue-700' :
+                                  obj.objection_type === 'autoridade' ? 'bg-purple-100 text-purple-700' :
+                                  obj.objection_type === 'concorrência' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>{obj.objection_type}</span>
+                              </div>
+                              <p className="text-sm text-gray-700 italic leading-relaxed">&ldquo;{obj.objection_text}&rdquo;</p>
+                            </div>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ml-4 ${
+                              obj.score >= 7 ? 'bg-green-100' : obj.score >= 5 ? 'bg-yellow-100' : 'bg-red-100'
+                            }`}>
+                              <span className={`text-xl font-bold ${
+                                obj.score >= 7 ? 'text-green-600' : obj.score >= 5 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>{obj.score}</span>
+                            </div>
+                          </div>
+
+                          {obj.detailed_analysis && (
+                            <p className="text-sm text-gray-600 leading-relaxed mb-3">{obj.detailed_analysis}</p>
+                          )}
+
+                          {obj.critical_errors && obj.critical_errors.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs font-semibold text-red-600 mb-1.5">Erros críticos:</p>
+                              <ul className="space-y-1">
+                                {obj.critical_errors.map((err: string, i: number) => (
+                                  <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                                    <span className="text-red-400 mt-1 flex-shrink-0">•</span>{err}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {obj.ideal_response && (
+                            <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                              <p className="text-xs font-semibold text-green-700 mb-1">Resposta ideal:</p>
+                              <p className="text-sm text-gray-700 leading-relaxed">{obj.ideal_response}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

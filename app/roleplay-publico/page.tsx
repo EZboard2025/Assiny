@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X, User, FileText, Lightbulb, AlertTriangle, Video, VideoOff, UserCircle2, Volume2 } from 'lucide-react'
+import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X, User, FileText, Lightbulb, AlertTriangle, Video, VideoOff, UserCircle2, Volume2, Shield, TrendingUp } from 'lucide-react'
 import Image from 'next/image'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 import { generateAvatarWithAI, generateAvatarUrl, preloadImage, type PersonaBase } from '@/lib/utils/generateAvatar'
@@ -902,21 +902,162 @@ export default function RoleplayPublico() {
                 )}
 
                 {/* SPIN Metrics */}
-                {evaluation.spin_evaluation && (
+                {evaluation.spin_evaluation && (() => {
+                  const spin = evaluation.spin_evaluation
+                  const spinLabels: Record<string, string> = { S: 'Situação', P: 'Problema', I: 'Implicação', N: 'Necessidade' }
+                  const translateIndicator = (key: string) => {
+                    const map: Record<string, string> = {
+                      open_questions_score: 'Perguntas Abertas', scenario_mapping_score: 'Mapeamento de Cenário', adaptability_score: 'Adaptabilidade',
+                      problem_identification_score: 'Identificação de Problemas', consequences_exploration_score: 'Exploração de Consequências',
+                      depth_score: 'Profundidade', empathy_score: 'Empatia', impact_understanding_score: 'Compreensão de Impacto',
+                      inaction_consequences_score: 'Consequências da Inação', urgency_amplification_score: 'Amplificação de Urgência',
+                      concrete_risks_score: 'Riscos Concretos', non_aggressive_urgency_score: 'Urgência Não-Agressiva',
+                      solution_clarity_score: 'Clareza da Solução', personalization_score: 'Personalização',
+                      benefits_clarity_score: 'Clareza dos Benefícios', credibility_score: 'Credibilidade', cta_effectiveness_score: 'CTA Efetivo'
+                    }
+                    return map[key] || key.replace(/_/g, ' ').replace(/score$/i, '').trim()
+                  }
+                  return (
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                        Análise SPIN
+                      </h3>
+                      {/* Score cards */}
+                      <div className="grid grid-cols-4 gap-3 mb-4">
+                        {(['S', 'P', 'I', 'N'] as const).map((key) => {
+                          const score = spin[key]?.final_score || 0
+                          return (
+                            <div key={key} className={`text-center p-3 rounded-xl border ${getScoreBg(score)}`}>
+                              <div className="text-xs font-medium text-gray-500 mb-1">{spinLabels[key]}</div>
+                              <div className={`text-xl font-bold ${getScoreColor(score)}`}>
+                                {score.toFixed(1)}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Detailed breakdown per letter */}
+                      <div className="space-y-4">
+                        {(['S', 'P', 'I', 'N'] as const).map((key) => {
+                          const data = spin[key]
+                          if (!data) return null
+                          const letterScore = data.final_score ?? 0
+                          return (
+                            <div key={key} className="bg-white rounded-xl border border-gray-200 p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm ${
+                                  letterScore >= 7 ? 'bg-green-500' : letterScore >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}>{key}</div>
+                                <div>
+                                  <span className="text-sm font-semibold text-gray-900">{spinLabels[key]}</span>
+                                  <span className={`ml-2 text-sm font-bold ${getScoreColor(letterScore)}`}>{letterScore.toFixed(1)}</span>
+                                </div>
+                              </div>
+
+                              {/* Indicators */}
+                              {data.indicators && (
+                                <div className="space-y-2 mb-3">
+                                  {Object.entries(data.indicators).map(([indKey, value]: [string, any]) => (
+                                    <div key={indKey}>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs text-gray-600">{translateIndicator(indKey)}</span>
+                                        <span className="text-xs font-semibold text-gray-700">{Number(value).toFixed(1)}</span>
+                                      </div>
+                                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full ${
+                                          Number(value) >= 7 ? 'bg-green-500' : Number(value) >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`} style={{ width: `${(Number(value) / 10) * 100}%` }} />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Technical feedback */}
+                              {data.technical_feedback && (
+                                <p className="text-xs text-gray-600 leading-relaxed border-t border-gray-100 pt-3 mb-2">{data.technical_feedback}</p>
+                              )}
+
+                              {/* Missed opportunities */}
+                              {data.missed_opportunities?.length > 0 && (
+                                <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                                  <p className="text-xs font-semibold text-orange-700 mb-1">Oportunidades perdidas:</p>
+                                  <ul className="space-y-1">
+                                    {data.missed_opportunities.map((opp: string, i: number) => (
+                                      <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                        <span className="text-orange-400 mt-0.5 flex-shrink-0">•</span>{opp}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Objections Analysis */}
+                {evaluation.objections_analysis && evaluation.objections_analysis.length > 0 && (
                   <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Métricas SPIN</h3>
-                    <div className="grid grid-cols-4 gap-3">
-                      {['S', 'P', 'I', 'N'].map((key) => {
-                        const score = evaluation.spin_evaluation[key]?.final_score || 0
-                        return (
-                          <div key={key} className={`text-center p-3 rounded-xl border ${getScoreBg(score)}`}>
-                            <div className="text-xs font-medium text-gray-500 mb-1">{key}</div>
-                            <div className={`text-xl font-bold ${getScoreColor(score)}`}>
-                              {score.toFixed(1)}
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-red-600" />
+                      Análise de Objeções
+                    </h3>
+                    <div className="space-y-3">
+                      {evaluation.objections_analysis.map((obj: any, idx: number) => (
+                        <div key={idx} className="bg-white rounded-xl border border-gray-200 p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                  obj.objection_type === 'preço' || obj.objection_type === 'preco' ? 'bg-red-100 text-red-700' :
+                                  obj.objection_type === 'timing' ? 'bg-blue-100 text-blue-700' :
+                                  obj.objection_type === 'autoridade' ? 'bg-purple-100 text-purple-700' :
+                                  obj.objection_type === 'concorrência' || obj.objection_type === 'concorrencia' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>{obj.objection_type}</span>
+                              </div>
+                              <p className="text-sm text-gray-700 italic">&ldquo;{obj.objection_text}&rdquo;</p>
+                            </div>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-3 ${
+                              obj.score >= 7 ? 'bg-green-100' : obj.score >= 5 ? 'bg-yellow-100' : 'bg-red-100'
+                            }`}>
+                              <span className={`text-lg font-bold ${
+                                obj.score >= 7 ? 'text-green-600' : obj.score >= 5 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>{obj.score}</span>
                             </div>
                           </div>
-                        )
-                      })}
+
+                          {obj.detailed_analysis && (
+                            <p className="text-xs text-gray-600 leading-relaxed mb-2">{obj.detailed_analysis}</p>
+                          )}
+
+                          {obj.critical_errors && obj.critical_errors.length > 0 && (
+                            <div className="mb-2">
+                              <p className="text-xs font-semibold text-red-600 mb-1">Erros críticos:</p>
+                              <ul className="space-y-0.5">
+                                {obj.critical_errors.map((err: string, i: number) => (
+                                  <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                    <span className="text-red-400 mt-0.5 flex-shrink-0">•</span>{err}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {obj.ideal_response && (
+                            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                              <p className="text-xs font-semibold text-green-700 mb-1">Resposta ideal:</p>
+                              <p className="text-xs text-gray-700 leading-relaxed">{obj.ideal_response}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
