@@ -971,6 +971,7 @@ export default function RoleplayLinksView() {
           { id: 'fortes', label: 'Pontos Fortes', icon: CheckCircle, show: ev?.top_strengths?.length > 0 },
           { id: 'gaps', label: 'Pontos a Melhorar', icon: Target, show: ev?.critical_gaps?.length > 0 },
           { id: 'melhorias', label: 'Melhorias', icon: Lightbulb, show: ev?.priority_improvements?.length > 0 },
+          { id: 'playbook', label: 'Playbook', icon: FileText, show: !!ev?.playbook_adherence },
           { id: 'transcricao', label: 'Transcrição', icon: MessageSquare, show: selectedEvaluation.messages?.length > 0 },
         ].filter(s => s.show)
 
@@ -1256,6 +1257,125 @@ export default function RoleplayLinksView() {
                     </div>
                   </div>
                 )}
+
+                {/* PLAYBOOK */}
+                {evalSection === 'playbook' && ev?.playbook_adherence && (() => {
+                  const pa = ev.playbook_adherence
+                  return (
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">Aderência ao Playbook</h3>
+                        <p className="text-sm text-gray-400">Avaliação de conformidade com o playbook de vendas</p>
+                      </div>
+
+                      {/* Score + Level */}
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 p-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-purple-700 uppercase tracking-wider">Aderência ao Playbook</span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            pa.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
+                            pa.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
+                            pa.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {pa.adherence_level === 'exemplary' ? 'Exemplar' :
+                             pa.adherence_level === 'compliant' ? 'Conforme' :
+                             pa.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
+                          </span>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <span className="text-4xl font-bold text-purple-600">{pa.overall_adherence_score}%</span>
+                          <span className="text-sm text-gray-500 mb-1">de aderência</span>
+                        </div>
+                      </div>
+
+                      {/* Dimensions */}
+                      {pa.dimensions && (
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                          {[
+                            { key: 'opening', label: 'Abertura', icon: '🎯' },
+                            { key: 'closing', label: 'Fechamento', icon: '🤝' },
+                            { key: 'conduct', label: 'Conduta', icon: '👔' },
+                            { key: 'required_scripts', label: 'Scripts', icon: '📝' },
+                            { key: 'process', label: 'Processo', icon: '⚙️' }
+                          ].map(({ key, label, icon }) => {
+                            const dim = pa.dimensions?.[key as keyof typeof pa.dimensions]
+                            if (!dim || dim.status === 'not_evaluated') return null
+                            return (
+                              <div key={key} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
+                                <div className="text-xl mb-1">{icon}</div>
+                                <div className={`text-2xl font-bold ${
+                                  (dim.score || 0) >= 70 ? 'text-green-600' :
+                                  (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>{dim.score || 0}%</div>
+                                <div className="text-xs text-gray-500">{label}</div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Violations */}
+                      <div className="bg-red-50 rounded-2xl border border-red-200 p-5">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-red-700 mb-3">
+                          <AlertCircle className="w-4 h-4" />
+                          Violações Detectadas
+                        </h4>
+                        {pa.violations?.length > 0 ? (
+                          <ul className="space-y-2">
+                            {pa.violations.map((v: any, i: number) => (
+                              <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-3 border border-red-100">
+                                <div className="font-medium text-red-700">{v.criterion}</div>
+                                {v.evidence && <p className="text-xs text-gray-500 mt-1 italic">"{v.evidence}"</p>}
+                                {v.recommendation && <p className="text-xs text-red-600 mt-1">{v.recommendation}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-green-600 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            Nenhuma violação detectada
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Missed Requirements */}
+                      <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
+                        <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
+                          <AlertCircle className="w-4 h-4" />
+                          Requisitos Não Cumpridos
+                        </h4>
+                        {pa.missed_requirements?.length > 0 ? (
+                          <ul className="space-y-2">
+                            {pa.missed_requirements.map((m: any, i: number) => (
+                              <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-3 border border-amber-100">
+                                <div className="font-medium text-amber-700">{m.criterion}</div>
+                                {m.expected && <p className="text-xs text-gray-500 mt-1">Esperado: {m.expected}</p>}
+                                {m.recommendation && <p className="text-xs text-amber-600 mt-1">{m.recommendation}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-green-600 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            Todos os requisitos foram cumpridos
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Coaching Notes */}
+                      {pa.coaching_notes && (
+                        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-5">
+                          <h4 className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-3">
+                            <Lightbulb className="w-4 h-4" />
+                            Orientações para Melhorar
+                          </h4>
+                          <p className="text-sm text-gray-700 leading-relaxed">{pa.coaching_notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </div>

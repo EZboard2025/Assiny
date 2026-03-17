@@ -981,6 +981,99 @@ export default function RoleplayPublico() {
                   </div>
                 )}
 
+                {/* Playbook Adherence */}
+                {evaluation.playbook_adherence && (() => {
+                  const pa = evaluation.playbook_adherence
+                  return (
+                    <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                      <h3 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Aderência ao Playbook
+                      </h3>
+
+                      {/* Score + Level */}
+                      <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-3 mb-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl font-bold text-purple-600">{pa.overall_adherence_score}%</span>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            pa.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
+                            pa.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
+                            pa.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {pa.adherence_level === 'exemplary' ? 'Exemplar' :
+                             pa.adherence_level === 'compliant' ? 'Conforme' :
+                             pa.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Dimensions */}
+                      {pa.dimensions && (
+                        <div className="grid grid-cols-5 gap-2 mb-3">
+                          {[
+                            { key: 'opening', label: 'Abertura' },
+                            { key: 'closing', label: 'Fechamento' },
+                            { key: 'conduct', label: 'Conduta' },
+                            { key: 'required_scripts', label: 'Scripts' },
+                            { key: 'process', label: 'Processo' }
+                          ].map(({ key, label }) => {
+                            const dim = pa.dimensions?.[key as keyof typeof pa.dimensions]
+                            if (!dim || dim.status === 'not_evaluated') return null
+                            return (
+                              <div key={key} className="bg-white rounded-lg p-2 text-center border border-purple-200">
+                                <div className={`text-lg font-bold ${
+                                  (dim.score || 0) >= 70 ? 'text-green-600' :
+                                  (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>{dim.score || 0}%</div>
+                                <div className="text-[10px] text-gray-500">{label}</div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Violations */}
+                      {pa.violations?.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-xs font-semibold text-red-600 mb-1.5">Violações</p>
+                          <ul className="space-y-1.5">
+                            {pa.violations.map((v: any, i: number) => (
+                              <li key={i} className="text-sm text-gray-700 bg-red-50 rounded-lg p-2.5 border border-red-100">
+                                <span className="font-medium text-red-700">{v.criterion}</span>
+                                {v.recommendation && <p className="text-xs text-red-500 mt-1">{v.recommendation}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Missed Requirements */}
+                      {pa.missed_requirements?.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-xs font-semibold text-amber-600 mb-1.5">Requisitos Não Cumpridos</p>
+                          <ul className="space-y-1.5">
+                            {pa.missed_requirements.map((m: any, i: number) => (
+                              <li key={i} className="text-sm text-gray-700 bg-amber-50 rounded-lg p-2.5 border border-amber-100">
+                                <span className="font-medium text-amber-700">{m.criterion}</span>
+                                {m.recommendation && <p className="text-xs text-amber-500 mt-1">{m.recommendation}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Coaching Notes */}
+                      {pa.coaching_notes && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-100 mt-2">
+                          <p className="text-xs font-semibold text-blue-700 mb-1">Orientações para Melhorar</p>
+                          <p className="text-sm text-gray-600 leading-relaxed">{pa.coaching_notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
                 {/* Close Button */}
                 <button
                   onClick={closeEvaluationAndReset}
