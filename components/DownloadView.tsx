@@ -50,7 +50,7 @@ export default function DownloadView() {
   const current = platforms[selectedPlatform]
 
   return (
-    <div className="py-8 pl-20 pr-6 relative z-10">
+    <div className="py-8 px-6 relative">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-10">
