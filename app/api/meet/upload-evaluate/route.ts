@@ -3,7 +3,7 @@ import OpenAI, { toFile } from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from '@/lib/meet/evaluateMeetTranscript'
 import { generateSmartNotes } from '@/lib/meet/generateSmartNotes'
-import { classifyMeeting } from '@/lib/meet/classifyMeeting'
+import { classifyMeeting, getCompanyContext } from '@/lib/meet/classifyMeeting'
 import { writeFile, unlink } from 'fs/promises'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
@@ -188,7 +188,8 @@ export async function POST(request: NextRequest) {
     const cleanedTranscript = await cleanTranscript(rawTranscript)
 
     // Step 4: Classify meeting type
-    const classification = await classifyMeeting(cleanedTranscript)
+    const companyContext = companyId ? await getCompanyContext(companyId) : undefined
+    const classification = await classifyMeeting(cleanedTranscript, companyContext)
     const isSales = classification.meeting_type === 'sales'
     console.log(`[UploadEvaluate] Classificação: ${classification.meeting_type} (${classification.category})`)
 

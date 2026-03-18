@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from './evaluateMeetTranscript'
 import { generateSmartNotes } from './generateSmartNotes'
 import { fetchTranscriptFromRecallApi, TranscriptSegment } from './recallApi'
-import { classifyMeeting } from './classifyMeeting'
+import { classifyMeeting, getCompanyContext } from './classifyMeeting'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -90,7 +90,8 @@ export async function processCompletedBot(botId: string): Promise<void> {
       .join('\n')
 
     // 6b. Classify meeting type before evaluating
-    const classification = await classifyMeeting(transcriptText)
+    const companyContext = company_id ? await getCompanyContext(company_id) : undefined
+    const classification = await classifyMeeting(transcriptText, companyContext)
     const isSales = classification.meeting_type === 'sales'
 
     let evalData: any = null

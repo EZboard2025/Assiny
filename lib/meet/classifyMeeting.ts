@@ -1,6 +1,20 @@
 import OpenAI from 'openai'
+import { createClient } from '@supabase/supabase-js'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+export async function getCompanyContext(companyId: string): Promise<{ name?: string, products?: string } | undefined> {
+  try {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const { data } = await supabase
+      .from('company_data')
+      .select('nome, produtos_servicos')
+      .eq('company_id', companyId)
+      .maybeSingle()
+    if (data?.nome) return { name: data.nome, products: data.produtos_servicos || undefined }
+  } catch {}
+  return undefined
+}
 
 export interface MeetingClassification {
   meeting_type: 'sales' | 'non_sales'
@@ -9,7 +23,7 @@ export interface MeetingClassification {
   reason: string
 }
 
-export async function classifyMeeting(transcript: string): Promise<MeetingClassification> {
+export async function classifyMeeting(transcript: string, companyContext?: { name?: string, products?: string }): Promise<MeetingClassification> {
   // Transcripts too short to classify reliably → default non_sales
   if (transcript.length < 200) {
     console.log(`[ClassifyMeeting] Transcript too short (${transcript.length} chars), defaulting to non_sales`)
@@ -20,6 +34,10 @@ export async function classifyMeeting(transcript: string): Promise<MeetingClassi
     // Use first ~3000 chars — enough to identify context
     const sample = transcript.substring(0, 3000)
 
+    const companyInfo = companyContext?.name
+      ? `\n\nCONTEXTO: O vendedor trabalha na empresa "${companyContext.name}"${companyContext.products ? ` que vende: ${companyContext.products.substring(0, 200)}` : ''}. A reuniao so e VENDAS se o vendedor esta tentando VENDER os produtos/servicos desta empresa. Se ele esta COMPRANDO algo, cotando servicos, ou a conversa nao envolve os produtos desta empresa, e NAO-VENDAS.`
+      : ''
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: [
@@ -29,8 +47,8 @@ export async function classifyMeeting(transcript: string): Promise<MeetingClassi
 
 Analise a transcricao e determine se e uma reuniao de VENDAS ou NAO-VENDAS.
 
-VENDAS inclui: prospecao, discovery, demo de produto, negociacao, fechamento, follow-up comercial, qualificacao de lead.
-NAO-VENDAS inclui: alinhamento interno, kickoff de projeto, onboarding de cliente ja fechado, suporte tecnico, reuniao de equipe, treinamento, retrospectiva, 1:1.
+VENDAS: O vendedor esta VENDENDO ou apresentando os produtos/servicos da empresa dele. Inclui: prospecao, discovery, demo, negociacao, fechamento, follow-up comercial, qualificacao de lead.
+NAO-VENDAS: Qualquer outra coisa. Inclui: alinhamento interno, kickoff, onboarding, suporte, reuniao de equipe, treinamento, retrospectiva, 1:1, cotacao onde o vendedor e o COMPRADOR, reunioes sociais, networking.${companyInfo}
 
 Responda APENAS com JSON valido:
 {

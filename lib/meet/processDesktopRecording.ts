@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from './evaluateMeetTranscript'
 import { generateSmartNotes } from './generateSmartNotes'
-import { classifyMeeting } from './classifyMeeting'
+import { classifyMeeting, getCompanyContext } from './classifyMeeting'
 import OpenAI from 'openai'
 
 const supabaseAdmin = createClient(
@@ -102,7 +102,8 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
     console.log(`[DesktopBG] Transcript: ${transcriptText.length} chars`)
 
     // 5. Classify meeting type
-    const classification = await classifyMeeting(transcriptText)
+    const companyContext = company_id ? await getCompanyContext(company_id) : undefined
+    const classification = await classifyMeeting(transcriptText, companyContext)
     const isSales = classification.meeting_type === 'sales'
 
     // 5b. Clean transcript (skip for very long transcripts to avoid timeout)
