@@ -1271,15 +1271,15 @@ ipcMain.on('start-drag', () => {
   if (!bubbleWindow || bubbleWindow.isDestroyed()) return
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
 
-  // Calculate offset entirely in main process — avoids DPI mismatch between
-  // renderer screenX/Y (Chromium DIPs) and main process coordinates
+  // Calculate offset entirely in main process — avoids DPI mismatch
   const cursor = screen.getCursorScreenPoint()
-  const [bx, by] = bubbleWindow.getPosition()
-  dragOffsetX = cursor.x - bx
-  dragOffsetY = cursor.y - by
+  const bounds = bubbleWindow.getBounds()
+  dragOffsetX = cursor.x - bounds.x
+  dragOffsetY = cursor.y - bounds.y
 
-  const [w, h] = bubbleWindow.getSize()
   const all = getAllScreenBounds()
+  const w = bounds.width
+  const h = bounds.height
 
   let lastDragX = -1, lastDragY = -1
   dragInterval = setInterval(() => {
@@ -1296,14 +1296,16 @@ ipcMain.on('start-drag', () => {
     if (x + w > all.maxX) x = all.maxX - w
     if (y + h > all.maxY) y = all.maxY - h
 
-    // Skip if position unchanged — avoids DPI rounding drift from repeated setBounds
+    // Skip if position unchanged
     if (x === lastDragX && y === lastDragY) return
     lastDragX = x
     lastDragY = y
 
-    lastProgrammaticMove = Date.now()
-    bubbleWindow.setBounds({ x, y, width: w, height: h })
-  }, 8) // ~120fps for smoother tracking
+    // CRITICAL: use setPosition, NOT setBounds — setBounds on resizable:false
+    // windows shrinks the window 1-2px per call (Electron bug #13043), causing
+    // the bubble to "fall" downward at high call rates
+    bubbleWindow.setPosition(x, y)
+  }, 16) // 60fps — smooth enough, avoids accumulating rounding errors
 })
 
 ipcMain.on('stop-drag', () => {
