@@ -385,10 +385,10 @@ function createBubbleWindow() {
     }
   })
 
-  // Block OS-level window dragging but allow programmatic setBounds moves.
-  // Uses timestamp instead of boolean flag to avoid async timing issues on Windows.
+  // Block ALL OS-level window moves. Programmatic moves use setPosition/setBounds
+  // which bypass will-move on Windows (WM_MOVING is only for user-initiated moves).
   bubbleWindow.on('will-move', (e) => {
-    if (Date.now() - lastProgrammaticMove > 50) e.preventDefault()
+    e.preventDefault()
   })
 
   // Forward console.log from bubble renderer to main process stdout (for debugging)
@@ -1251,19 +1251,20 @@ ipcMain.handle('resize-bubble', async (_event, width, height) => {
 })
 
 // Move bubble to absolute screen position (clamped to combined display area)
+// Uses setPosition instead of setBounds for drag — avoids will-move interference on Windows
 ipcMain.on('move-bubble', (_event, x, y) => {
   if (!bubbleWindow) return
-  const bounds = bubbleWindow.getBounds()
+  const [w, h] = bubbleWindow.getSize()
   const all = getAllScreenBounds()
 
   // Clamp so window stays within multi-monitor area
   if (x < all.x) x = all.x
   if (y < all.y) y = all.y
-  if (x + bounds.width > all.maxX) x = all.maxX - bounds.width
-  if (y + bounds.height > all.maxY) y = all.maxY - bounds.height
+  if (x + w > all.maxX) x = all.maxX - w
+  if (y + h > all.maxY) y = all.maxY - h
 
   lastProgrammaticMove = Date.now()
-  bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
+  bubbleWindow.setPosition(Math.round(x), Math.round(y))
 })
 
 // Set bubble bounds (position + size) — used for expand, collapse, and edge resizing

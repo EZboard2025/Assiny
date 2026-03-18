@@ -958,11 +958,13 @@ bubble.addEventListener('mousedown', (e) => {
   dragStartY = e.screenY
   let posReady = false
 
+  window._dragLogCount = 0 // Reset drag log counter for each new drag
   // Get position async but register listeners IMMEDIATELY to avoid race condition
   window.electronAPI.getBubblePos().then(pos => {
     winStartX = pos.x
     winStartY = pos.y
     posReady = true
+    console.log(`[Bubble] dragStart: mouseScreen(${dragStartX},${dragStartY}) winPos(${winStartX},${winStartY}) dpr=${devicePixelRatio}`)
   })
 
   const cleanup = () => {
@@ -997,7 +999,15 @@ bubble.addEventListener('mousedown', (e) => {
       }
     }
     if (isDragging) {
-      window.electronAPI.moveBubble(winStartX + dx, winStartY + dy)
+      const targetX = winStartX + dx
+      const targetY = winStartY + dy
+      // Debug: log first 5 moves to diagnose coordinate issues
+      if (!window._dragLogCount) window._dragLogCount = 0
+      if (window._dragLogCount < 5) {
+        console.log(`[Bubble] drag: mouse(${ev.screenX},${ev.screenY}) start(${dragStartX},${dragStartY}) winStart(${winStartX},${winStartY}) dx=${dx} dy=${dy} target(${targetX},${targetY}) dpr=${devicePixelRatio}`)
+        window._dragLogCount++
+      }
+      window.electronAPI.moveBubble(targetX, targetY)
     }
   }
 
