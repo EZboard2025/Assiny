@@ -53,22 +53,22 @@ Responda APENAS com JSON valido:
       reason: parsed.reason || '',
     }
 
-    // Low confidence → default to sales (better to evaluate than to miss)
-    if (result.confidence < 0.7 && result.meeting_type === 'non_sales') {
-      console.log(`[ClassifyMeeting] Low confidence (${result.confidence}) for non_sales, defaulting to sales`)
-      result.meeting_type = 'sales'
+    // Low confidence → default to non_sales (safer to skip SPIN than pollute data with 0.0 scores)
+    if (result.confidence < 0.5) {
+      console.log(`[ClassifyMeeting] Low confidence (${result.confidence}) for ${result.meeting_type}, defaulting to non_sales`)
+      result.meeting_type = 'non_sales'
     }
 
     console.log(`[ClassifyMeeting] ${result.meeting_type} (${result.category}, confidence: ${result.confidence}) — ${result.reason}`)
     return result
   } catch (err: any) {
     console.error('[ClassifyMeeting] Error:', err.message)
-    // On error, default to sales (safe fallback)
+    // On error, default to non_sales (safer to skip SPIN than pollute data)
     return {
-      meeting_type: 'sales',
+      meeting_type: 'non_sales',
       category: 'outro',
       confidence: 0,
-      reason: 'Erro na classificacao, assumindo vendas',
+      reason: 'Erro na classificacao, assumindo nao-vendas por seguranca',
     }
   }
 }
