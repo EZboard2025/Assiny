@@ -944,85 +944,59 @@ if (window.electronAPI && window.electronAPI.onToggleBubble) {
 }
 
 // --- Drag Logic (bubble) ---
+// Main-process driven drag: renderer sends start/stop, main process polls cursor at 60fps.
+// This avoids cursor-leaves-window issues on small windows (72x72) and notebooks.
 let isDragging = false
-let dragStartX = 0
-let dragStartY = 0
-let winStartX = 0
-let winStartY = 0
 const DRAG_THRESHOLD = 5
+let dragMouseStartX = 0
+let dragMouseStartY = 0
 
 bubble.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return
   isDragging = false
-  dragStartX = e.screenX
-  dragStartY = e.screenY
-  let posReady = false
+  dragMouseStartX = e.screenX
+  dragMouseStartY = e.screenY
 
-  window._dragLogCount = 0 // Reset drag log counter for each new drag
-  // Get position async but register listeners IMMEDIATELY to avoid race condition
-  window.electronAPI.getBubblePos().then(pos => {
-    winStartX = pos.x
-    winStartY = pos.y
-    posReady = true
-    console.log(`[Bubble] dragStart: mouseScreen(${dragStartX},${dragStartY}) winPos(${winStartX},${winStartY}) dpr=${devicePixelRatio}`)
-  })
+  // If in bar state, convert back to bubble for dragging
+  const wasBar = bubble.classList.contains('edge-bar')
+  if (wasBar) {
+    removeBarState()
+    snappedEdge = null
+    isHidden = false
+  }
 
   const cleanup = () => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
-    isDragging = false
   }
 
   const onMove = (ev) => {
-    // Safety: if no mouse button is held, the mouseup was lost (cursor left the window)
-    if (ev.buttons === 0) {
-      cleanup()
-      return
-    }
-    if (!posReady) return // wait for position before allowing drag
-    const dx = ev.screenX - dragStartX
-    const dy = ev.screenY - dragStartY
-    if (!isDragging && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
-      isDragging = true
-      // If in bar state, convert back to bubble for dragging
-      if (bubble.classList.contains('edge-bar')) {
-        removeBarState()
-        const newX = ev.screenX - BUBBLE_SIZE / 2
-        const newY = ev.screenY - BUBBLE_SIZE / 2
-        window.electronAPI.setBubbleBounds(newX, newY, BUBBLE_SIZE, BUBBLE_SIZE)
-        winStartX = newX
-        winStartY = newY
-        dragStartX = ev.screenX
-        dragStartY = ev.screenY
-        snappedEdge = null
-        isHidden = false
+    if (ev.buttons === 0) { cleanup(); window.electronAPI.stopDrag(); isDragging = false; return }
+    if (!isDragging) {
+      const dx = Math.abs(ev.screenX - dragMouseStartX)
+      const dy = Math.abs(ev.screenY - dragMouseStartY)
+      if (dx + dy > DRAG_THRESHOLD) {
+        isDragging = true
+        // Tell main process to start polling cursor position
+        window.electronAPI.startDrag(ev.screenX, ev.screenY)
       }
-    }
-    if (isDragging) {
-      const targetX = winStartX + dx
-      const targetY = winStartY + dy
-      // Debug: log first 5 moves to diagnose coordinate issues
-      if (!window._dragLogCount) window._dragLogCount = 0
-      if (window._dragLogCount < 5) {
-        console.log(`[Bubble] drag: mouse(${ev.screenX},${ev.screenY}) start(${dragStartX},${dragStartY}) winStart(${winStartX},${winStartY}) dx=${dx} dy=${dy} target(${targetX},${targetY}) dpr=${devicePixelRatio}`)
-        window._dragLogCount++
-      }
-      window.electronAPI.moveBubble(targetX, targetY)
     }
   }
 
   const onUp = () => {
     const wasDragging = isDragging
     cleanup()
+    isDragging = false
     if (!wasDragging) {
-      // If hidden at edge, first peek; if already peeked, expand
+      // Click (no drag) — peek or expand
       if (snappedEdge && isHidden) {
         peekFromEdge()
       } else {
         expand()
       }
     } else {
-      // Only snap to edge if dropped near a screen border
+      // Stop the main-process drag loop and snap if near edge
+      window.electronAPI.stopDrag()
       snapIfNearEdge()
     }
   }

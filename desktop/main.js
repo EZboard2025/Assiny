@@ -1251,20 +1251,56 @@ ipcMain.handle('resize-bubble', async (_event, width, height) => {
 })
 
 // Move bubble to absolute screen position (clamped to combined display area)
-// Uses setPosition instead of setBounds for drag — avoids will-move interference on Windows
 ipcMain.on('move-bubble', (_event, x, y) => {
   if (!bubbleWindow) return
   const [w, h] = bubbleWindow.getSize()
   const all = getAllScreenBounds()
-
-  // Clamp so window stays within multi-monitor area
   if (x < all.x) x = all.x
   if (y < all.y) y = all.y
   if (x + w > all.maxX) x = all.maxX - w
   if (y + h > all.maxY) y = all.maxY - h
-
   lastProgrammaticMove = Date.now()
   bubbleWindow.setPosition(Math.round(x), Math.round(y))
+})
+
+// ── Main-process driven drag ──
+// Polls cursor position at 60fps — works even when cursor leaves the 72x72 window.
+let dragInterval = null
+let dragOffsetX = 0
+let dragOffsetY = 0
+
+ipcMain.on('start-drag', (_event, mouseX, mouseY) => {
+  if (!bubbleWindow || bubbleWindow.isDestroyed()) return
+  if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
+
+  const [bx, by] = bubbleWindow.getPosition()
+  dragOffsetX = mouseX - bx  // how far the click was from window top-left
+  dragOffsetY = mouseY - by
+
+  const [w, h] = bubbleWindow.getSize()
+  const all = getAllScreenBounds()
+
+  dragInterval = setInterval(() => {
+    if (!bubbleWindow || bubbleWindow.isDestroyed()) {
+      clearInterval(dragInterval); dragInterval = null; return
+    }
+    const cursor = screen.getCursorScreenPoint()
+    let x = cursor.x - dragOffsetX
+    let y = cursor.y - dragOffsetY
+
+    // Clamp
+    if (x < all.x) x = all.x
+    if (y < all.y) y = all.y
+    if (x + w > all.maxX) x = all.maxX - w
+    if (y + h > all.maxY) y = all.maxY - h
+
+    lastProgrammaticMove = Date.now()
+    bubbleWindow.setPosition(Math.round(x), Math.round(y))
+  }, 16) // ~60fps
+})
+
+ipcMain.on('stop-drag', () => {
+  if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
 })
 
 // Set bubble bounds (position + size) — used for expand, collapse, and edge resizing
