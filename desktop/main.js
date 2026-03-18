@@ -445,9 +445,9 @@ function createRecordingWindow(autoStart = false) {
   recordingWindow.setMenuBarVisibility(false)
 
   // Forward renderer console logs to main process stdout + file
-  recordingWindow.webContents.on('console-message', (event) => {
-    const prefix = ['LOG', 'WARN', 'ERR'][event.level] || 'LOG'
-    debugLog(`[Recorder:${prefix}] ${event.message}`)
+  recordingWindow.webContents.on('console-message', (_event, level, message) => {
+    const prefix = ['LOG', 'WARN', 'ERR'][level] || 'LOG'
+    debugLog(`[Recorder:${prefix}] ${message}`)
   })
 
   // F12 for DevTools

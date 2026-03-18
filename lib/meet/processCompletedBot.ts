@@ -144,7 +144,7 @@ export async function processCompletedBot(botId: string): Promise<void> {
         call_objective: null,
         funnel_stage: null,
         transcript: segments,
-        evaluation: evalData,
+        evaluation: evalData || { meeting_type: 'non_sales', category: classification.category },
         overall_score: overallScore,
         performance_level: isSales ? (evalData?.performance_level || 'needs_improvement') : null,
         spin_s_score: isSales ? (evalData?.spin_evaluation?.S?.final_score || 0) : null,
