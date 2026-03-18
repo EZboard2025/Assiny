@@ -1281,13 +1281,14 @@ ipcMain.on('start-drag', () => {
   const [w, h] = bubbleWindow.getSize()
   const all = getAllScreenBounds()
 
+  let lastDragX = -1, lastDragY = -1
   dragInterval = setInterval(() => {
     if (!bubbleWindow || bubbleWindow.isDestroyed()) {
       clearInterval(dragInterval); dragInterval = null; return
     }
     const cur = screen.getCursorScreenPoint()
-    let x = cur.x - dragOffsetX
-    let y = cur.y - dragOffsetY
+    let x = Math.round(cur.x - dragOffsetX)
+    let y = Math.round(cur.y - dragOffsetY)
 
     // Clamp
     if (x < all.x) x = all.x
@@ -1295,9 +1296,14 @@ ipcMain.on('start-drag', () => {
     if (x + w > all.maxX) x = all.maxX - w
     if (y + h > all.maxY) y = all.maxY - h
 
+    // Skip if position unchanged — avoids DPI rounding drift from repeated setBounds
+    if (x === lastDragX && y === lastDragY) return
+    lastDragX = x
+    lastDragY = y
+
     lastProgrammaticMove = Date.now()
-    bubbleWindow.setPosition(Math.round(x), Math.round(y))
-  }, 16) // ~60fps
+    bubbleWindow.setBounds({ x, y, width: w, height: h })
+  }, 8) // ~120fps for smoother tracking
 })
 
 ipcMain.on('stop-drag', () => {
