@@ -25,6 +25,8 @@ interface MeetEvaluation {
   calendar_event_title?: string | null
   calendar_event_start?: string | null
   calendar_meet_link?: string | null
+  meeting_category?: string | null
+  meeting_category_detail?: string | null
 }
 
 // Icon map for dynamic smart notes sections
@@ -39,6 +41,23 @@ const SMART_NOTES_ICON_MAP: Record<string, any> = {
 
 function getSmartNoteIcon(iconName: string) {
   return SMART_NOTES_ICON_MAP[iconName] || FileText
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  alinhamento: 'Alinhamento Interno',
+  kickoff: 'Kickoff de Projeto',
+  onboarding: 'Onboarding',
+  suporte: 'Suporte Técnico',
+  interno: 'Reunião Interna',
+  reuniao_equipe: 'Reunião de Equipe',
+  treinamento: 'Treinamento',
+  retrospectiva: 'Retrospectiva',
+  '1:1': 'One-on-One',
+  outro: 'Reunião Geral',
+}
+
+function getCategoryLabel(detail: string | null | undefined): string {
+  return CATEGORY_LABELS[detail || ''] || 'Reunião Geral'
 }
 
 function cleanGptText(text: string): string {
@@ -184,6 +203,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
   const [shareSuccess, setShareSuccess] = useState(false)
 
   // Shared evaluations tab
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'sales' | 'non_sales'>('all')
   const [viewMode, setViewMode] = useState<'mine' | 'shared'>('mine')
   const [sharedEvaluations, setSharedEvaluations] = useState<any[]>([])
   const [sharedLoading, setSharedLoading] = useState(false)
@@ -603,6 +623,18 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
               Compartilhados
             </button>
           </div>}
+          {!isManagerView && viewMode === 'mine' && (
+            <div className="flex gap-1 px-3 py-2 border-b border-gray-100">
+              {([['all', 'Todas'], ['sales', 'Vendas'], ['non_sales', 'Outras']] as const).map(([value, label]) => (
+                <button key={value} onClick={() => setCategoryFilter(value)}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-full transition-colors ${
+                    categoryFilter === value
+                      ? value === 'non_sales' ? 'bg-blue-600 text-white' : 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}>{label}</button>
+              ))}
+            </div>
+          )}
           <div className={isManagerView ? 'flex overflow-x-auto gap-2 p-2' : 'max-h-[calc(100vh-320px)] overflow-y-auto'}>
             {viewMode === 'shared' ? (
               // Shared evaluations list
@@ -653,8 +685,11 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                 ))
               )
             ) : (
-            // Original evaluations list
-            evaluations.map((evaluation) => {
+            // Original evaluations list (filtered by category)
+            evaluations.filter(e => {
+              if (categoryFilter === 'all') return true
+              return (e.meeting_category || 'sales') === categoryFilter
+            }).map((evaluation) => {
               const sim = simulations[evaluation.id]
               const correctionScore = correctionScores[evaluation.id]
               const hasSim = !!sim
@@ -678,10 +713,14 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                           }`
                         : `w-full p-4 border-b border-gray-100 ${
                             selectedEvaluation?.id === evaluation.id
-                              ? 'bg-green-50 border-l-4 border-l-green-500'
+                              ? evaluation.meeting_category === 'non_sales'
+                                ? 'bg-blue-50 border-l-4 border-l-blue-500'
+                                : 'bg-green-50 border-l-4 border-l-green-500'
                               : isNew
                                 ? 'bg-blue-50/50 border-l-4 border-l-blue-400'
-                                : 'hover:bg-gray-50 border-l-4 border-l-transparent'
+                                : evaluation.meeting_category === 'non_sales'
+                                  ? 'hover:bg-blue-50/30 border-l-4 border-l-blue-200'
+                                  : 'hover:bg-gray-50 border-l-4 border-l-transparent'
                           }`
                     }`}
                   >
@@ -710,18 +749,26 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                       </div>
                     ) : (
                     <div className="flex items-center gap-3">
-                      {/* Score */}
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isNew ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${getScoreBg(evaluation.overall_score)}`}>
-                        <span className={`text-lg font-bold ${getScoreColor(evaluation.overall_score)}`}>
-                          {evaluation.overall_score !== null ? normalizeScore(evaluation.overall_score).toFixed(1) : '--'}
-                        </span>
-                      </div>
+                      {/* Score or non-sales icon */}
+                      {evaluation.meeting_category === 'non_sales' ? (
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-50 border border-blue-200">
+                          <FileText className="w-5 h-5 text-blue-500" />
+                        </div>
+                      ) : (
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isNew ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${getScoreBg(evaluation.overall_score)}`}>
+                          <span className={`text-lg font-bold ${getScoreColor(evaluation.overall_score)}`}>
+                            {evaluation.overall_score !== null ? normalizeScore(evaluation.overall_score).toFixed(1) : '--'}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-medium text-gray-900 truncate">
-                            {evaluation.seller_name}
+                            {evaluation.meeting_category === 'non_sales'
+                              ? getCategoryLabel(evaluation.meeting_category_detail)
+                              : evaluation.seller_name}
                           </span>
                           {isNew && (
                             <span className="px-1.5 py-0.5 text-[9px] font-bold text-blue-600 bg-blue-100 rounded-full animate-pulse flex-shrink-0">
@@ -732,6 +779,11 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                         <div className="text-[11px] text-gray-400">
                           {formatDate(evaluation.created_at)}
                         </div>
+                        {evaluation.meeting_category === 'non_sales' && (
+                          <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 rounded-full border border-blue-200">
+                            Não é vendas
+                          </span>
+                        )}
                         {evaluation.calendar_event_title && (
                           <div className="flex items-center gap-1 mt-0.5">
                             <Calendar className="w-3 h-3 text-blue-400 flex-shrink-0" />
@@ -772,14 +824,33 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-1.5">
-                    <div className={`${isManagerView ? 'w-10 h-10 rounded-lg' : 'w-14 h-14 rounded-xl'} flex items-center justify-center ${getScoreBg(selectedEvaluation.overall_score)}`}>
-                      <span className={`${isManagerView ? 'text-lg' : 'text-2xl'} font-bold ${getScoreColor(selectedEvaluation.overall_score)}`}>
-                        {selectedEvaluation.overall_score !== null ? normalizeScore(selectedEvaluation.overall_score).toFixed(1) : '--'}
-                      </span>
-                    </div>
+                    {selectedEvaluation.meeting_category === 'non_sales' ? (
+                      <div className={`${isManagerView ? 'w-10 h-10 rounded-lg' : 'w-14 h-14 rounded-xl'} flex items-center justify-center bg-blue-50 border border-blue-200`}>
+                        <FileText className={`${isManagerView ? 'w-5 h-5' : 'w-7 h-7'} text-blue-500`} />
+                      </div>
+                    ) : (
+                      <div className={`${isManagerView ? 'w-10 h-10 rounded-lg' : 'w-14 h-14 rounded-xl'} flex items-center justify-center ${getScoreBg(selectedEvaluation.overall_score)}`}>
+                        <span className={`${isManagerView ? 'text-lg' : 'text-2xl'} font-bold ${getScoreColor(selectedEvaluation.overall_score)}`}>
+                          {selectedEvaluation.overall_score !== null ? normalizeScore(selectedEvaluation.overall_score).toFixed(1) : '--'}
+                        </span>
+                      </div>
+                    )}
                     <div>
-                      <h2 className={`${isManagerView ? 'text-sm' : 'text-xl'} font-bold text-gray-900`}>{selectedEvaluation.seller_name}</h2>
-                      <p className={`${isManagerView ? 'text-[11px]' : 'text-sm'} text-gray-500`}>{getPerformanceLabel(selectedEvaluation.performance_level)}</p>
+                      <h2 className={`${isManagerView ? 'text-sm' : 'text-xl'} font-bold text-gray-900`}>
+                        {selectedEvaluation.meeting_category === 'non_sales'
+                          ? getCategoryLabel(selectedEvaluation.meeting_category_detail)
+                          : selectedEvaluation.seller_name}
+                      </h2>
+                      {selectedEvaluation.meeting_category === 'non_sales' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-full border border-blue-200">
+                          <FileText className="w-3 h-3" />
+                          Não é reunião de vendas
+                        </span>
+                      ) : (
+                        <p className={`${isManagerView ? 'text-[11px]' : 'text-sm'} text-gray-500`}>
+                          {getPerformanceLabel(selectedEvaluation.performance_level)}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className={`flex items-center gap-4 ${isManagerView ? 'text-[11px]' : 'text-sm'} text-gray-500 flex-wrap`}>
@@ -998,8 +1069,8 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                 </div>
               ) : null}
 
-              {/* 1. Análise SPIN */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              {/* 1. Análise SPIN (hidden for non-sales) */}
+              {selectedEvaluation.meeting_category !== 'non_sales' && <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setExpandedSection(expandedSection === 'spin' ? null : 'spin')}
                   className={sectionBtnClass}
@@ -1121,10 +1192,10 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     </div>
                   </div>
                 )}
-              </div>
+              </div>}
 
-              {/* 2. Análise de Objeções */}
-              {selectedEvaluation.evaluation?.objections_analysis && selectedEvaluation.evaluation.objections_analysis.length > 0 && (
+              {/* 2. Análise de Objeções (hidden for non-sales) */}
+              {selectedEvaluation.meeting_category !== 'non_sales' && selectedEvaluation.evaluation?.objections_analysis && selectedEvaluation.evaluation.objections_analysis.length > 0 && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setExpandedSection(expandedSection === 'objections' ? null : 'objections')}
@@ -1183,8 +1254,8 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                 </div>
               )}
 
-              {/* 3. Avaliação Detalhada */}
-              {selectedEvaluation.evaluation && (
+              {/* 3. Avaliação Detalhada (hidden for non-sales) */}
+              {selectedEvaluation.meeting_category !== 'non_sales' && selectedEvaluation.evaluation && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setExpandedSection(expandedSection === 'evaluation' ? null : 'evaluation')}
@@ -1380,8 +1451,8 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                 </div>
               )}
 
-              {/* 5. Prática Direcionada */}
-              {simulations[selectedEvaluation.id] && (
+              {/* 5. Prática Direcionada (hidden for non-sales) */}
+              {selectedEvaluation.meeting_category !== 'non_sales' && simulations[selectedEvaluation.id] && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   {(() => {
                     const sim = simulations[selectedEvaluation.id]

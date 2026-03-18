@@ -111,7 +111,9 @@
       "WebFetch(domain:developers.openai.com)",
       "Bash(npx next:*)",
       "Bash(npx eslint:*)",
-      "Bash(find '/c/Users/ADM/OneDrive/Documentos/Ramppy plataforma dev gabriel/Assiny/app/api' -type f -name *extract* -o -name *backfill* -o -name *pattern* -o -name *meet*)"
+      "Bash(find '/c/Users/ADM/OneDrive/Documentos/Ramppy plataforma dev gabriel/Assiny/app/api' -type f -name *extract* -o -name *backfill* -o -name *pattern* -o -name *meet*)",
+      "Bash(git pull:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(json.dumps\\({''''type'''':n.get\\(''''type''''\\),''''title'''':n.get\\(''''title''''\\),''''created_at'''':n.get\\(''''created_at''''\\)[:19]},ensure_ascii=False\\)\\) for n in \\(d if isinstance\\(d,list\\) else d.get\\(''''notifications'''',d.get\\(''''data'''',[]\\)\\)\\)[:3]]\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
