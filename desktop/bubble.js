@@ -944,65 +944,66 @@ if (window.electronAPI && window.electronAPI.onToggleBubble) {
 }
 
 // --- Drag Logic (bubble) ---
-// Main-process driven drag: renderer sends start/stop, main process polls cursor at 60fps.
-// This avoids cursor-leaves-window issues on small windows (72x72) and notebooks.
+// Uses pointer capture for reliable drag-end detection even when cursor escapes
+// the 72x72 window. Main process polls cursor at 60fps for smooth movement.
+// Offset calculated entirely in main process to avoid DPI coordinate mismatches.
 let isDragging = false
 const DRAG_THRESHOLD = 5
 let dragMouseStartX = 0
 let dragMouseStartY = 0
 
-bubble.addEventListener('mousedown', (e) => {
+bubble.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return
+  e.preventDefault()
+  bubble.setPointerCapture(e.pointerId) // Keeps receiving events even outside window
   isDragging = false
   dragMouseStartX = e.screenX
   dragMouseStartY = e.screenY
 
   // If in bar state, convert back to bubble for dragging
-  const wasBar = bubble.classList.contains('edge-bar')
-  if (wasBar) {
+  if (bubble.classList.contains('edge-bar')) {
     removeBarState()
     snappedEdge = null
     isHidden = false
   }
+})
 
-  const cleanup = () => {
-    document.removeEventListener('mousemove', onMove)
-    document.removeEventListener('mouseup', onUp)
-  }
-
-  const onMove = (ev) => {
-    if (ev.buttons === 0) { cleanup(); window.electronAPI.stopDrag(); isDragging = false; return }
-    if (!isDragging) {
-      const dx = Math.abs(ev.screenX - dragMouseStartX)
-      const dy = Math.abs(ev.screenY - dragMouseStartY)
-      if (dx + dy > DRAG_THRESHOLD) {
-        isDragging = true
-        // Tell main process to start polling cursor position
-        window.electronAPI.startDrag(ev.screenX, ev.screenY)
-      }
+bubble.addEventListener('pointermove', (e) => {
+  if (!bubble.hasPointerCapture(e.pointerId)) return
+  if (!isDragging) {
+    const dx = Math.abs(e.screenX - dragMouseStartX)
+    const dy = Math.abs(e.screenY - dragMouseStartY)
+    if (dx + dy > DRAG_THRESHOLD) {
+      isDragging = true
+      // Main process calculates offset using screen.getCursorScreenPoint() — no DPI mismatch
+      window.electronAPI.startDrag()
     }
   }
+})
 
-  const onUp = () => {
-    const wasDragging = isDragging
-    cleanup()
-    isDragging = false
-    if (!wasDragging) {
-      // Click (no drag) — peek or expand
-      if (snappedEdge && isHidden) {
-        peekFromEdge()
-      } else {
-        expand()
-      }
+bubble.addEventListener('pointerup', (e) => {
+  bubble.releasePointerCapture(e.pointerId)
+  const wasDragging = isDragging
+  isDragging = false
+  if (!wasDragging) {
+    if (snappedEdge && isHidden) {
+      peekFromEdge()
     } else {
-      // Stop the main-process drag loop and snap if near edge
-      window.electronAPI.stopDrag()
-      snapIfNearEdge()
+      expand()
     }
+  } else {
+    window.electronAPI.stopDrag()
+    snapIfNearEdge()
   }
+})
 
-  document.addEventListener('mousemove', onMove)
-  document.addEventListener('mouseup', onUp)
+// Safety: if pointer capture is lost unexpectedly, stop drag
+bubble.addEventListener('lostpointercapture', () => {
+  if (isDragging) {
+    isDragging = false
+    window.electronAPI.stopDrag()
+    snapIfNearEdge()
+  }
 })
 
 // --- Drag Logic (chat header) ---

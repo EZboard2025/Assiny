@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   captureScreenshot: () => ipcRenderer.invoke('capture-screenshot'),
   resizeBubble: (w, h) => ipcRenderer.invoke('resize-bubble', w, h),
   moveBubble: (x, y) => ipcRenderer.send('move-bubble', x, y),
-  startDrag: (mouseX, mouseY) => ipcRenderer.send('start-drag', mouseX, mouseY),
+  startDrag: () => ipcRenderer.send('start-drag'),
   stopDrag: () => ipcRenderer.send('stop-drag'),
   setBubbleBounds: (x, y, w, h) => ipcRenderer.invoke('set-bubble-bounds', x, y, w, h),
   setBubbleOpacity: (opacity) => ipcRenderer.invoke('set-bubble-opacity', opacity),

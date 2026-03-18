@@ -321,6 +321,7 @@ function createBubbleWindow() {
     movable: false,
     frame: false,
     transparent: true,
+    thickFrame: false, // Remove WS_THICKFRAME — prevents Windows from hijacking edge clicks as drag/resize
     alwaysOnTop: true,
     skipTaskbar: true,
     focusable: true,
@@ -385,11 +386,8 @@ function createBubbleWindow() {
     }
   })
 
-  // Block ALL OS-level window moves. Programmatic moves use setPosition/setBounds
-  // which bypass will-move on Windows (WM_MOVING is only for user-initiated moves).
-  bubbleWindow.on('will-move', (e) => {
-    e.preventDefault()
-  })
+  // No will-move handler: thickFrame:false + movable:false + frame:false
+  // prevents all OS-initiated moves. setPosition() doesn't trigger will-move.
 
   // Forward console.log from bubble renderer to main process stdout (for debugging)
   bubbleWindow.webContents.on('console-message', (_event, _level, message) => {
@@ -1269,13 +1267,16 @@ let dragInterval = null
 let dragOffsetX = 0
 let dragOffsetY = 0
 
-ipcMain.on('start-drag', (_event, mouseX, mouseY) => {
+ipcMain.on('start-drag', () => {
   if (!bubbleWindow || bubbleWindow.isDestroyed()) return
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
 
+  // Calculate offset entirely in main process — avoids DPI mismatch between
+  // renderer screenX/Y (Chromium DIPs) and main process coordinates
+  const cursor = screen.getCursorScreenPoint()
   const [bx, by] = bubbleWindow.getPosition()
-  dragOffsetX = mouseX - bx  // how far the click was from window top-left
-  dragOffsetY = mouseY - by
+  dragOffsetX = cursor.x - bx
+  dragOffsetY = cursor.y - by
 
   const [w, h] = bubbleWindow.getSize()
   const all = getAllScreenBounds()
@@ -1284,9 +1285,9 @@ ipcMain.on('start-drag', (_event, mouseX, mouseY) => {
     if (!bubbleWindow || bubbleWindow.isDestroyed()) {
       clearInterval(dragInterval); dragInterval = null; return
     }
-    const cursor = screen.getCursorScreenPoint()
-    let x = cursor.x - dragOffsetX
-    let y = cursor.y - dragOffsetY
+    const cur = screen.getCursorScreenPoint()
+    let x = cur.x - dragOffsetX
+    let y = cur.y - dragOffsetY
 
     // Clamp
     if (x < all.x) x = all.x
