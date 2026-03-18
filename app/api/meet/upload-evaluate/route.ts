@@ -3,7 +3,6 @@ import OpenAI, { toFile } from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from '@/lib/meet/evaluateMeetTranscript'
 import { generateSmartNotes } from '@/lib/meet/generateSmartNotes'
-import { classifyMeeting } from '@/lib/meet/classifyMeeting'
 import { writeFile, unlink } from 'fs/promises'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
@@ -187,60 +186,43 @@ export async function POST(request: NextRequest) {
     // Step 3: Clean transcript
     const cleanedTranscript = await cleanTranscript(rawTranscript)
 
-    // Step 4: Classify meeting type
-    const classification = await classifyMeeting(cleanedTranscript)
-    const isSales = classification.meeting_type === 'sales'
-    console.log(`[UploadEvaluate] Classificação: ${classification.meeting_type} (${classification.category}, confidence: ${classification.confidence})`)
-
-    // Step 5: Evaluate based on classification
+    // Step 4: Evaluate (SPIN + Smart Notes in parallel)
     const meetingId = `upload_${Date.now()}`
-    let evaluation = null
-    let smartNotes = null
-    let overallScore = 0
+    const [evalResult, notesResult] = await Promise.all([
+      evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId, companyId: companyId || '', sellerName }),
+      generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || '' }).catch(() => null)
+    ])
 
-    if (isSales) {
-      // SALES: Full SPIN + Smart Notes
-      const [evalResult, notesResult] = await Promise.all([
-        evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId, companyId: companyId || '', sellerName }),
-        generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || '' }).catch(() => null)
-      ])
-
-      if (!evalResult?.success || !evalResult.evaluation) {
-        return NextResponse.json({ error: evalResult?.error || 'Falha na avaliação SPIN' }, { status: 500 })
-      }
-
-      evaluation = evalResult.evaluation
-      smartNotes = notesResult?.success ? notesResult.notes : null
-      overallScore = evaluation.overall_score
-      if (overallScore <= 10) overallScore = overallScore * 10
-      overallScore = Math.round(overallScore)
-    } else {
-      // NON-SALES: Smart Notes only
-      console.log(`[UploadEvaluate] Non-sales meeting — skipping SPIN, generating smart notes only`)
-      const notesResult = await generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || '' }).catch(() => null)
-      smartNotes = notesResult?.success ? notesResult.notes : null
+    if (!evalResult?.success || !evalResult.evaluation) {
+      return NextResponse.json({ error: evalResult?.error || 'Falha na avaliação SPIN' }, { status: 500 })
     }
 
-    // Step 6: Save to meet_evaluations
+    const evaluation = evalResult.evaluation
+    const smartNotes = notesResult?.success ? notesResult.notes : null
+
+    // Normalize score to 0-100
+    let overallScore = evaluation.overall_score
+    if (overallScore <= 10) overallScore = overallScore * 10
+    overallScore = Math.round(overallScore)
+
+    // Step 5: Save to meet_evaluations
     const { data: saved, error: saveError } = await supabase
       .from('meet_evaluations')
       .insert({
         meeting_id: meetingId,
         user_id: userId,
         company_id: companyId,
-        seller_name: isSales ? (sellerName || 'Vendedor') : (sellerName || 'N/A'),
+        seller_name: sellerName || 'Vendedor',
         transcript: cleanedTranscript,
         evaluation: evaluation,
         smart_notes: smartNotes,
         overall_score: overallScore,
-        performance_level: isSales ? (evaluation?.performance_level || 'needs_improvement') : null,
-        spin_s_score: isSales ? (evaluation?.spin_evaluation?.S?.final_score ?? 0) : null,
-        spin_p_score: isSales ? (evaluation?.spin_evaluation?.P?.final_score ?? 0) : null,
-        spin_i_score: isSales ? (evaluation?.spin_evaluation?.I?.final_score ?? 0) : null,
-        spin_n_score: isSales ? (evaluation?.spin_evaluation?.N?.final_score ?? 0) : null,
-        source: 'upload',
-        meeting_category: classification.meeting_type,
-        meeting_category_detail: classification.category,
+        performance_level: evaluation.performance_level,
+        spin_s_score: evaluation.spin_evaluation?.S?.final_score,
+        spin_p_score: evaluation.spin_evaluation?.P?.final_score,
+        spin_i_score: evaluation.spin_evaluation?.I?.final_score,
+        spin_n_score: evaluation.spin_evaluation?.N?.final_score,
+        source: 'upload'
       })
       .select('id')
       .single()
@@ -249,8 +231,8 @@ export async function POST(request: NextRequest) {
       console.error('[UploadEvaluate] Erro ao salvar:', saveError)
     }
 
-    // Extract ML patterns only for sales meetings (fire-and-forget)
-    if (isSales && saved?.id && companyId) {
+    // Extract ML patterns (fire-and-forget, non-blocking)
+    if (saved?.id && companyId) {
       try {
         const host = request.headers.get('host') || 'localhost:3000'
         const protocol = host.includes('localhost') ? 'http' : 'https'
@@ -273,11 +255,9 @@ export async function POST(request: NextRequest) {
       } catch (mlErr: any) {
         console.error('[UploadEvaluate] ML setup error (non-fatal):', mlErr.message)
       }
-    } else if (!isSales) {
-      console.log(`[UploadEvaluate] Non-sales — skipping ML patterns and simulation`)
     }
 
-    console.log(`[UploadEvaluate] Concluído: ${classification.meeting_type}/${classification.category} score: ${overallScore}/100`)
+    console.log(`[UploadEvaluate] Avaliação concluída: ${overallScore}/100`)
 
     return NextResponse.json({
       success: true,
@@ -285,9 +265,7 @@ export async function POST(request: NextRequest) {
       smartNotes,
       cleanedTranscript,
       overallScore,
-      evaluationId: saved?.id || null,
-      meetingCategory: classification.meeting_type,
-      meetingCategoryDetail: classification.category,
+      evaluationId: saved?.id || null
     })
 
   } catch (error: any) {

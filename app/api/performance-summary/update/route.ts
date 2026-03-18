@@ -50,12 +50,11 @@ export async function POST(request: NextRequest) {
         .eq('user_id', userId)
         .order('created_at', { ascending: true }),
 
-      // 2. Meet evaluations (only sales meetings — exclude non_sales to avoid polluting performance data)
+      // 2. Meet evaluations
       supabase
         .from('meet_evaluations')
         .select('*')
         .eq('user_id', userId)
-        .or('meeting_category.eq.sales,meeting_category.is.null')
         .order('created_at', { ascending: true }),
 
       // 3. Daily challenges (completados)
