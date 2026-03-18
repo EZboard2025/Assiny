@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
     console.log(`[UploadEvaluate] Baixado: ${fileSizeMB.toFixed(1)}MB`)
 
     // Step 2: Convert Blob to File for Whisper
+    // Whisper limit is 25MB — if file is larger, we'll still try (OpenAI may reject)
     const file = await toFile(fileData, fileName || 'audio.mp3')
 
     // Step 3: Transcribe with Whisper
@@ -132,30 +133,31 @@ export async function POST(request: NextRequest) {
     console.log(`[UploadEvaluate] Classificação: ${classification.meeting_type} (${classification.category})`)
 
     // Step 6: Evaluate based on classification
-    const meetingId = `upload_${Date.now()}`
-    let evaluation = null
-    let smartNotes = null
+    let evalData: any = null
+    let smartNotes: any = null
     let overallScore = 0
 
     if (isSales) {
-      const [evalResult, notesResult] = await Promise.all([
-        evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId, companyId: companyId || undefined }),
+      const [evaluation, notesResult] = await Promise.all([
+        evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId: `upload-${Date.now()}`, companyId: companyId || undefined }),
         generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
       ])
-      if (!evalResult) {
+      if (!evaluation?.success || !evaluation.evaluation) {
         await supabase.storage.from('meet-uploads').remove([storagePath])
-        return NextResponse.json({ error: 'Falha na avaliação SPIN' }, { status: 500 })
+        return NextResponse.json({ error: evaluation?.error || 'Falha na avaliação SPIN' }, { status: 500 })
       }
-      evaluation = evalResult
-      smartNotes = notesResult
-      overallScore = evaluation.overall_score
+      evalData = evaluation.evaluation
+      smartNotes = notesResult?.success ? notesResult.notes : notesResult
+      overallScore = evalData.overall_score
       if (overallScore <= 10) overallScore = overallScore * 10
     } else {
       console.log(`[UploadEvaluate] Non-sales — skipping SPIN, smart notes only`)
-      smartNotes = await generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
+      const notesResult = await generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
+      smartNotes = notesResult?.success ? notesResult.notes : notesResult
     }
 
     // Step 7: Save to meet_evaluations
+    const meetingId = `upload_${Date.now()}`
     const { data: saved, error: saveError } = await supabase
       .from('meet_evaluations')
       .insert({
@@ -164,10 +166,10 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         seller_name: isSales ? (sellerName || 'Vendedor') : (sellerName || 'N/A'),
         transcript: cleanedTranscript,
-        evaluation,
+        evaluation: evalData,
         smart_notes: smartNotes,
         overall_score: overallScore,
-        performance_level: isSales ? (evaluation?.performance_level || 'needs_improvement') : null,
+        performance_level: isSales ? (evalData?.performance_level || 'needs_improvement') : null,
         source: 'upload',
         meeting_category: classification.meeting_type,
         meeting_category_detail: classification.category,
@@ -189,7 +191,7 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify({
             meetEvaluationId: saved.id,
             transcript: cleanedTranscript,
-            evaluation,
+            evaluation: evalData,
             companyId,
           })
         }).then(res => {
@@ -210,7 +212,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      evaluation,
+      evaluation: evalData,
       smartNotes,
       cleanedTranscript,
       overallScore,
