@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     // Step 5: Evaluate (SPIN + Smart Notes in parallel)
     const [evaluation, smartNotes] = await Promise.all([
-      evaluateMeetTranscript({ transcript: cleanedTranscript, companyId: companyId || undefined }),
+      evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId: `upload-${Date.now()}`, companyId: companyId || undefined }),
       generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
     ])
 
