@@ -10,6 +10,12 @@ export interface MeetingClassification {
 }
 
 export async function classifyMeeting(transcript: string): Promise<MeetingClassification> {
+  // Transcripts too short to classify reliably → default non_sales
+  if (transcript.length < 200) {
+    console.log(`[ClassifyMeeting] Transcript too short (${transcript.length} chars), defaulting to non_sales`)
+    return { meeting_type: 'non_sales', category: 'outro', confidence: 0, reason: 'Transcricao muito curta para classificar' }
+  }
+
   try {
     // Use first ~3000 chars — enough to identify context
     const sample = transcript.substring(0, 3000)

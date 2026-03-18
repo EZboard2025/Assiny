@@ -230,6 +230,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
   const simulationRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const evalPollRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredAutoEvalRef = useRef<boolean>(false)
   const hasRestoredSessionRef = useRef<boolean>(false)
 
@@ -319,13 +320,13 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         }
         const activeStatuses: BotStatus[] = ['sending', 'joining', 'waiting_room', 'in_meeting', 'transcribing', 'evaluating']
 
-        // Auto-clear stale sessions stuck in waiting_room/joining/sending for over 15 minutes
-        const isStaleStatus = ['waiting_room', 'joining', 'sending'].includes(restored.status)
+        // Auto-clear stale sessions
         const sessionAge = restored.startTime ? Date.now() - new Date(restored.startTime).getTime() : Infinity
-        const STALE_THRESHOLD = 15 * 60 * 1000 // 15 minutes
+        const isStaleWaiting = ['waiting_room', 'joining', 'sending'].includes(restored.status) && sessionAge > 15 * 60 * 1000
+        const isStaleEvaluating = restored.status === 'evaluating' && sessionAge > 3 * 60 * 1000 // 3 min max for evaluating
 
-        if (isStaleStatus && sessionAge > STALE_THRESHOLD) {
-          console.log('🧹 Clearing stale session (stuck for', Math.round(sessionAge / 60000), 'min)')
+        if (isStaleWaiting || isStaleEvaluating) {
+          console.log('🧹 Clearing stale session (stuck for', Math.round(sessionAge / 60000), 'min in', restored.status, ')')
           localStorage.removeItem('meetActiveSession')
         } else if (activeStatuses.includes(restored.status) && restored.botId) {
           setSession(restored)
@@ -357,10 +358,12 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             .eq('meeting_id', restoredBotId)
             .maybeSingle()
 
-          if (existingEval?.evaluation) {
+          if (existingEval) {
             // Evaluation already done — show results instead of polling
             stopPolling()
-            setEvaluation(existingEval.evaluation)
+            if (existingEval.evaluation) {
+              setEvaluation(existingEval.evaluation)
+            }
             setSavedToHistory(true)
             setSession(prev => prev ? { ...prev, status: 'ended' } : null)
             localStorage.removeItem('meetActiveSession')
@@ -442,6 +445,36 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
       loadDesktopTranscriptions()
     }
   }, [activeTab, loadDesktopTranscriptions])
+
+  // Poll for evaluation completion when stuck in 'evaluating' status
+  useEffect(() => {
+    if (session?.status !== 'evaluating' || !session?.botId) {
+      if (evalPollRef.current) { clearInterval(evalPollRef.current); evalPollRef.current = null }
+      return
+    }
+    const checkEval = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data } = await supabase
+          .from('meet_evaluations')
+          .select('id, evaluation, meeting_category')
+          .eq('meeting_id', session.botId)
+          .maybeSingle()
+        if (data) {
+          console.log('✅ Eval found in DB while polling (evaluating status)')
+          if (evalPollRef.current) { clearInterval(evalPollRef.current); evalPollRef.current = null }
+          if (data.evaluation) setEvaluation(data.evaluation)
+          setSavedToHistory(true)
+          setSession(prev => prev ? { ...prev, status: 'ended' } : null)
+          localStorage.removeItem('meetActiveSession')
+        }
+      } catch {}
+    }
+    checkEval()
+    evalPollRef.current = setInterval(checkEval, 5000)
+    return () => { if (evalPollRef.current) { clearInterval(evalPollRef.current); evalPollRef.current = null } }
+  }, [session?.status, session?.botId])
 
   // Subscribe to live recording sessions via Supabase Realtime
   useEffect(() => {
@@ -936,13 +969,13 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
     try {
       const { data: existingEval } = await supabase
         .from('meet_evaluations')
-        .select('id, evaluation')
+        .select('id, evaluation, meeting_category')
         .eq('meeting_id', botId)
-        .single()
+        .maybeSingle()
 
       if (existingEval) {
-        console.log('✅ Avaliação já existe (processada em background), carregando...')
-        setEvaluation(existingEval.evaluation)
+        console.log('✅ Avaliação já existe (processada em background), carregando...', existingEval.meeting_category)
+        if (existingEval.evaluation) setEvaluation(existingEval.evaluation)
         setSavedToHistory(true)
         setSession(prev => prev ? { ...prev, status: 'ended' } : null)
         setShowEvaluationModal(true)
