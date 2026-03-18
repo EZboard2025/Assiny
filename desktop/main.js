@@ -108,7 +108,7 @@ let pendingMeetConfirmation = false // Waiting for user to confirm/decline recor
 let pendingMeetTitle = null // Title of the meeting awaiting confirmation
 let declinedMeetCode = null // Meeting code the user declined (don't ask again)
 let powerSaveBlockerId = null // Prevents macOS App Nap during recording
-let allowBubbleMove = false // Flag to allow programmatic setBounds moves (bypasses will-move prevention)
+// will-move prevention removed — frame:false means OS won't drag the window
 
 // Single instance lock — prevent duplicate app processes
 const gotTheLock = app.requestSingleInstanceLock()
@@ -385,10 +385,8 @@ function createBubbleWindow() {
     }
   })
 
-  // Block OS-level window dragging — programmatic moves use the allowMove flag to bypass
-  bubbleWindow.on('will-move', (e) => {
-    if (!allowBubbleMove) e.preventDefault()
-  })
+  // No will-move handler needed: frame:false + no -webkit-app-region:drag
+  // means the OS won't initiate moves. All moves are via IPC setBounds/moveBubble.
 
   // Forward console.log from bubble renderer to main process stdout (for debugging)
   bubbleWindow.webContents.on('console-message', (_event, _level, message) => {
@@ -1195,9 +1193,9 @@ function animateBubbleTo(targetX, targetY, duration = 200, opts = {}) {
     const x = Math.round(startX + (targetX - startX) * eased)
     const y = Math.round(startY + (targetY - startY) * eased)
 
-    allowBubbleMove = true
+
     bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
-    allowBubbleMove = false
+
 
     // Subtle opacity during hide/show
     if (fadeOut) {
@@ -1243,9 +1241,7 @@ ipcMain.handle('resize-bubble', async (_event, width, height) => {
   if (x + width > sX + screenW) x = sX + screenW - width
   if (y + height > sY + screenH) y = sY + screenH - height
 
-  allowBubbleMove = true
   bubbleWindow.setBounds({ x, y, width, height }, true)
-  allowBubbleMove = false
   bubbleWindow.setResizable(width > 100)
 })
 
@@ -1261,9 +1257,7 @@ ipcMain.on('move-bubble', (_event, x, y) => {
   if (x + bounds.width > all.maxX) x = all.maxX - bounds.width
   if (y + bounds.height > all.maxY) y = all.maxY - bounds.height
 
-  allowBubbleMove = true
   bubbleWindow.setBounds({ x, y, width: bounds.width, height: bounds.height })
-  allowBubbleMove = false
 })
 
 // Set bubble bounds (position + size) — used for expand, collapse, and edge resizing
@@ -1287,9 +1281,7 @@ ipcMain.handle('set-bubble-bounds', async (_event, x, y, width, height) => {
   if (x + width > sX + screenW) x = sX + screenW - width
   if (y + height > sY + screenH) y = sY + screenH - height
 
-  allowBubbleMove = true
   bubbleWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) })
-  allowBubbleMove = false
   bubbleWindow.setResizable(isPanel)
 })
 
@@ -1337,9 +1329,7 @@ ipcMain.on('snap-to-edge', () => {
   // Clamp Y within the display
   let targetY = Math.max(wa.y + margin, Math.min(bounds.y, wa.y + wa.height - bounds.height - margin))
 
-  allowBubbleMove = true
   bubbleWindow.setBounds({ x: targetX, y: targetY, width: bounds.width, height: bounds.height }, true)
-  allowBubbleMove = false
 })
 
 // Animate bubble to position (allows off-screen for snap-to-edge)
@@ -3107,14 +3097,14 @@ app.whenReady().then(() => {
     if (activeDisplay.id !== currentDisplay.id) {
       const wa = activeDisplay.workArea
       const margin = 12
-      allowBubbleMove = true
+  
       bubbleWindow.setBounds({
         x: wa.x + wa.width - bubbleBounds.width - margin,
         y: wa.y + wa.height - bubbleBounds.height - margin,
         width: bubbleBounds.width,
         height: bubbleBounds.height,
       })
-      allowBubbleMove = false
+  
     }
 
     bubbleWindow.webContents.send('toggle-bubble')
