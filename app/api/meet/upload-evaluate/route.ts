@@ -131,13 +131,15 @@ export async function POST(request: NextRequest) {
       generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
     ])
 
-    if (!evaluation) {
+    if (!evaluation?.success || !evaluation.evaluation) {
       await supabase.storage.from('meet-uploads').remove([storagePath])
-      return NextResponse.json({ error: 'Falha na avaliação SPIN' }, { status: 500 })
+      return NextResponse.json({ error: evaluation?.error || 'Falha na avaliação SPIN' }, { status: 500 })
     }
 
+    const evalData = evaluation.evaluation
+
     // Normalize score to 0-100
-    let overallScore = evaluation.overall_score
+    let overallScore = evalData.overall_score
     if (overallScore <= 10) overallScore = overallScore * 10
 
     // Step 6: Save to meet_evaluations
@@ -150,10 +152,10 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         seller_name: sellerName || 'Vendedor',
         transcript: cleanedTranscript,
-        evaluation: evaluation,
-        smart_notes: smartNotes,
+        evaluation: evalData,
+        smart_notes: smartNotes?.success ? smartNotes.notes : smartNotes,
         overall_score: overallScore,
-        performance_level: evaluation.performance_level,
+        performance_level: evalData.performance_level,
         source: 'upload'
       })
       .select('id')
@@ -173,7 +175,7 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify({
             meetEvaluationId: saved.id,
             transcript: cleanedTranscript,
-            evaluation,
+            evaluation: evalData,
             companyId,
           })
         }).then(res => {
