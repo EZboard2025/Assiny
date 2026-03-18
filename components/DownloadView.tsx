@@ -17,12 +17,13 @@ export default function DownloadView() {
     }
   }, [])
 
-  const platforms: Record<Platform, { name: string; subtitle: string; file: string; size: string; icon: React.ReactNode; steps: { number: string; title: string; description: string }[] }> = {
+  const platforms: Record<Platform, { name: string; subtitle: string; file: string; version: string; size: string; icon: React.ReactNode; steps: { number: string; title: string; description: string }[] }> = {
     windows: {
       name: 'Windows',
       subtitle: 'Windows 10 ou superior',
       file: '/downloads/Ramppy.exe',
-      size: '~99 MB',
+      version: '1.0.2',
+      size: '~104 MB',
       icon: <Monitor className="w-6 h-6 text-blue-600" />,
       steps: [
         { number: '1', title: 'Baixar', description: 'Clique no botão para baixar o instalador .exe' },
@@ -34,6 +35,7 @@ export default function DownloadView() {
       name: 'macOS',
       subtitle: 'macOS 10.12 ou superior (Apple Silicon)',
       file: '/downloads/Ramppy-1.0.0-arm64.dmg',
+      version: '1.0.0',
       size: '~111 MB',
       icon: <Apple className="w-6 h-6 text-gray-800" />,
       steps: [
@@ -122,7 +124,7 @@ export default function DownloadView() {
           </a>
 
           <p className="text-xs text-gray-400 text-center mt-3">
-            {current.file.split('/').pop()} — {current.size}
+            {current.file.split('/').pop()} — v{current.version} — {current.size}
           </p>
         </div>
 
