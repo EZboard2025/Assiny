@@ -3,13 +3,30 @@
 // Design: matches SellerAgentChat.tsx from website
 // ============================================================
 
-const BASE_URL = (window.location.protocol === 'file:') ? 'http://localhost:3000' : 'https://ramppy.site'
-const API_URL = BASE_URL + '/api/agent/chat'
-const SUGGESTIONS_URL = BASE_URL + '/api/agent/suggestions'
-const TRANSCRIBE_URL = BASE_URL + '/api/roleplay/transcribe'
-const TTS_URL = BASE_URL + '/api/agent/tts'
-const NOTIFICATION_CHECK_URL = BASE_URL + '/api/agent/notifications/check'
-const MORNING_SUMMARY_URL = BASE_URL + '/api/agent/morning-summary'
+let BASE_URL = 'https://ramppy.site'
+let API_URL = BASE_URL + '/api/agent/chat'
+let SUGGESTIONS_URL = BASE_URL + '/api/agent/suggestions'
+let TRANSCRIBE_URL = BASE_URL + '/api/roleplay/transcribe'
+let TTS_URL = BASE_URL + '/api/agent/tts'
+let NOTIFICATION_CHECK_URL = BASE_URL + '/api/agent/notifications/check'
+let MORNING_SUMMARY_URL = BASE_URL + '/api/agent/morning-summary'
+
+// Resolve actual platform URL from main process (supports dev vs prod)
+;(async () => {
+  try {
+    const url = await window.electronAPI?.getPlatformUrl?.()
+    if (url) {
+      BASE_URL = url
+      API_URL = BASE_URL + '/api/agent/chat'
+      SUGGESTIONS_URL = BASE_URL + '/api/agent/suggestions'
+      TRANSCRIBE_URL = BASE_URL + '/api/roleplay/transcribe'
+      TTS_URL = BASE_URL + '/api/agent/tts'
+      NOTIFICATION_CHECK_URL = BASE_URL + '/api/agent/notifications/check'
+      MORNING_SUMMARY_URL = BASE_URL + '/api/agent/morning-summary'
+      console.log('[Bubble] Platform URL resolved:', BASE_URL)
+    }
+  } catch (e) { console.warn('[Bubble] Failed to get platform URL:', e) }
+})()
 
 // --- State ---
 let accessToken = null
