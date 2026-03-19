@@ -27,6 +27,7 @@ interface MeetEvaluation {
   calendar_meet_link?: string | null
   meeting_category?: string | null
   meeting_category_detail?: string | null
+  meeting_summary?: any | null
 }
 
 // Icon map for dynamic smart notes sections
@@ -774,7 +775,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-medium text-gray-900 truncate">
                             {evaluation.meeting_category === 'non_sales'
-                              ? getCategoryLabel(evaluation.meeting_category_detail)
+                              ? (evaluation.meeting_summary?.title || getCategoryLabel(evaluation.meeting_category_detail))
                               : evaluation.seller_name}
                           </span>
                           {isNew && (
@@ -845,7 +846,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     <div>
                       <h2 className={`${isManagerView ? 'text-sm' : 'text-xl'} font-bold text-gray-900`}>
                         {selectedEvaluation.meeting_category === 'non_sales'
-                          ? getCategoryLabel(selectedEvaluation.meeting_category_detail)
+                          ? (selectedEvaluation.meeting_summary?.title || getCategoryLabel(selectedEvaluation.meeting_category_detail))
                           : selectedEvaluation.seller_name}
                       </h2>
                       {selectedEvaluation.meeting_category === 'non_sales' ? (
@@ -938,7 +939,113 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
             {/* Collapsible Section Cards */}
             <div className={`${isManagerView ? 'p-3 space-y-1.5' : 'p-4 space-y-2'}`}>
 
-              {/* 0. Notas Inteligentes */}
+              {/* 0. Meeting Summary (non-sales only) */}
+              {selectedEvaluation.meeting_summary && (() => {
+                const ms = selectedEvaluation.meeting_summary
+                return (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSection(expandedSection === 'meeting_summary' ? null : 'meeting_summary')}
+                      className={sectionBtnClass}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`${sectionIconBoxClass} bg-blue-50`}>
+                          <FileText className={`${sectionIconClass} text-blue-600`} />
+                        </div>
+                        <div className="text-left">
+                          <h3 className={sectionTitleClass}>Resumo da Reunião</h3>
+                          <p className="text-xs text-gray-400 mt-0.5">{ms.title}</p>
+                        </div>
+                      </div>
+                      {expandedSection === 'meeting_summary' ? (
+                        <ChevronUp className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                      )}
+                    </button>
+
+                    {expandedSection === 'meeting_summary' && (
+                      <div className="px-4 pb-4 border-t border-gray-100 space-y-4">
+                        {/* Summary */}
+                        <p className="text-sm text-gray-700 leading-relaxed mt-3">{ms.summary}</p>
+
+                        {/* Participants + Duration + Sentiment */}
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          {ms.participants?.length > 0 && (
+                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">{ms.participants.join(', ')}</span>
+                          )}
+                          {ms.duration_estimate && (
+                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">{ms.duration_estimate}</span>
+                          )}
+                          {ms.sentiment && (
+                            <span className={`px-2 py-1 rounded ${
+                              ms.sentiment === 'positive' ? 'bg-green-50 text-green-600' :
+                              ms.sentiment === 'tense' ? 'bg-red-50 text-red-600' :
+                              ms.sentiment === 'mixed' ? 'bg-amber-50 text-amber-600' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {ms.sentiment === 'positive' ? 'Produtiva' : ms.sentiment === 'tense' ? 'Tensa' : ms.sentiment === 'mixed' ? 'Mista' : 'Neutra'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Topics */}
+                        {ms.topics?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Tópicos</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ms.topics.map((t: string, i: number) => (
+                                <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">{t}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Decisions */}
+                        {ms.decisions?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Decisões</h4>
+                            <ul className="space-y-1">
+                              {ms.decisions.map((d: string, i: number) => (
+                                <li key={i} className="text-sm text-gray-600 pl-3 border-l-2 border-green-300">{d}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Action Items */}
+                        {ms.action_items?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Próximos Passos</h4>
+                            <div className="space-y-1.5">
+                              {ms.action_items.map((a: any, i: number) => (
+                                <div key={i} className="text-sm text-gray-600 pl-3 border-l-2 border-amber-300">
+                                  <span className="font-medium text-gray-700">{a.responsible}:</span> {a.task}
+                                  {a.deadline && <span className="text-xs text-gray-400 ml-1">({a.deadline})</span>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Key Quotes */}
+                        {ms.key_quotes?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Citações</h4>
+                            <div className="space-y-1.5">
+                              {ms.key_quotes.map((q: string, i: number) => (
+                                <p key={i} className="text-sm text-gray-500 italic pl-3 border-l-2 border-gray-200">"{q}"</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* 0b. Notas Inteligentes */}
               {selectedEvaluation.smart_notes ? (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
