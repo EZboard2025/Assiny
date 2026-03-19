@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from './evaluateMeetTranscript'
 import { generateSmartNotes } from './generateSmartNotes'
-import { classifyMeeting, getCompanyContext } from './classifyMeeting'
+// classifyMeeting removed — desktop uses user's explicit choice
 import OpenAI from 'openai'
 
 const supabaseAdmin = createClient(
@@ -49,7 +49,7 @@ Regras:
   }
 }
 
-export async function processDesktopRecording(sessionId: string): Promise<void> {
+export async function processDesktopRecording(sessionId: string, meetingType?: string): Promise<void> {
   console.log(`[DesktopBG] Processing desktop recording: ${sessionId}`)
 
   // 1. Read live session
@@ -101,10 +101,11 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
 
     console.log(`[DesktopBG] Transcript: ${transcriptText.length} chars`)
 
-    // 5. Classify meeting type
-    const companyContext = company_id ? await getCompanyContext(company_id) : undefined
-    const classification = await classifyMeeting(transcriptText, companyContext)
-    const isSales = classification.meeting_type === 'sales'
+    // 5. Use user's meeting type choice (from desktop UI) or fallback to session record
+    const userMeetingType = meetingType || session.meeting_type
+    const isSales = userMeetingType === 'sales'
+    const classification = { meeting_type: userMeetingType || 'non_sales', category: isSales ? 'outro' : 'outro' }
+    console.log(`[DesktopBG] Meeting type (user choice): ${userMeetingType} → isSales=${isSales}`)
 
     // 5b. Clean transcript (skip for very long transcripts to avoid timeout)
     let cleanedTranscript: string

@@ -48,6 +48,7 @@ export async function POST(request: Request) {
           user_id: user.id,
           company_id: body.companyId || null,
           seller_name: body.sellerName || null,
+          meeting_type: body.meetingType || null,
           status: 'recording',
           transcript: [],
           segment_count: 0,

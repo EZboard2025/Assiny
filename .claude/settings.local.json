@@ -90,7 +90,9 @@
       "Bash(lsof -ti:3000)",
       "Bash(xargs kill:*)",
       "Bash(lsof -ti:3001)",
-      "Bash(ffmpeg -version)"
+      "Bash(ffmpeg -version)",
+      "Bash(git -C /Users/arthurxavier/assiny/Assiny status --short)",
+      "Bash(grep -E \"\\\\.\\(sql|ts|js\\)$\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",

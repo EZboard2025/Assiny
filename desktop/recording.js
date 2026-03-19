@@ -63,6 +63,7 @@ let liveSessionId = null
 let liveUpdateTimer = null
 let liveUpdateDirty = false
 let isRecording = false
+let selectedMeetingType = null // 'sales' | 'non_sales' — set by user before recording
 let usingBlackHole = false // Track if BlackHole path is active (for cleanup)
 
 // --- Meeting-end detection (multi-signal approach) ---
@@ -887,6 +888,7 @@ async function startLiveSession() {
         action: 'start',
         companyId,
         sellerName: userName,
+        meetingType: selectedMeetingType,
       }),
     })
     if (res.ok) {
@@ -1071,6 +1073,7 @@ async function evaluateAndSave() {
     body: JSON.stringify({
       liveSessionId,
       transcript: segments,
+      meetingType: selectedMeetingType,
     }),
   })
 
@@ -1143,11 +1146,19 @@ els.btnClose.addEventListener('click', () => {
   window.close()
 })
 
-// Start Recording
-els.btnStart.addEventListener('click', async () => {
-  els.btnStart.disabled = true
-  els.btnStart.querySelector('.btn-text').style.display = 'none'
-  els.btnStart.querySelector('.btn-loading').style.display = ''
+// Start Recording — Step 1: Show meeting type choice
+els.btnStart.addEventListener('click', () => {
+  document.getElementById('start-step').style.display = 'none'
+  document.getElementById('meeting-type-step').style.display = ''
+})
+
+// Step 2: User picks meeting type → start recording
+async function beginRecording(meetingType) {
+  selectedMeetingType = meetingType
+  document.getElementById('meeting-type-step').style.display = 'none'
+  document.getElementById('start-step').style.display = ''
+
+  console.log(`[Recorder] Meeting type: ${meetingType}`)
 
   try {
     // Reset state
@@ -1178,12 +1189,11 @@ els.btnStart.addEventListener('click', async () => {
   } catch (err) {
     console.error('[Recorder] Start error:', err)
     showError(err.message)
-  } finally {
-    els.btnStart.disabled = false
-    els.btnStart.querySelector('.btn-text').style.display = ''
-    els.btnStart.querySelector('.btn-loading').style.display = 'none'
   }
-})
+}
+
+document.getElementById('btn-type-sales').addEventListener('click', () => beginRecording('sales'))
+document.getElementById('btn-type-other').addEventListener('click', () => beginRecording('non_sales'))
 
 // Stop Recording
 els.btnStop.addEventListener('click', async () => {

@@ -104,6 +104,14 @@ header button, header input { -webkit-app-region: no-drag; }
 .btn-record:active { transform: translateY(0); }
 .btn-record:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .record-hint { font-size: 12px; color: #94a3b8; }
+.btn-meeting-type {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 20px 28px; font-size: 14px; font-weight: 600; color: #374151;
+  background: #f9fafb; border: 2px solid #e5e7eb;
+  border-radius: 14px; cursor: pointer; transition: all 0.2s; min-width: 160px;
+}
+.btn-meeting-type:hover { border-color: #6366f1; color: #4f46e5; background: #eef2ff; }
+.btn-meeting-type:active { transform: scale(0.97); }
 
 /* === Recording === */
 .recording-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }

@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Parse body
-    const { liveSessionId, transcript } = await request.json()
+    const { liveSessionId, transcript, meetingType } = await request.json()
 
     if (!liveSessionId) {
       return NextResponse.json({ error: 'Missing liveSessionId' }, { status: 400 })
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     console.log(`[SubmitDesktop] Session ${liveSessionId} submitted for processing (${transcriptText.length} chars)`)
 
     // 5. Fire-and-forget background processing
-    processDesktopRecording(liveSessionId).catch(err => {
+    processDesktopRecording(liveSessionId, meetingType).catch(err => {
       console.error(`[SubmitDesktop] Background processing failed for ${liveSessionId}:`, err)
     })
 
