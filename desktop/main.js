@@ -128,7 +128,11 @@ if (!gotTheLock) {
 // ============================================================
 // MAIN WINDOW (full platform)
 // ============================================================
-function createMainWindow() {
+async function createMainWindow() {
+  // Clear cached JS/CSS on every startup so the app always loads the latest version from the server
+  await session.defaultSession.clearCache()
+  console.log('[Main] Cache cleared on startup')
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
