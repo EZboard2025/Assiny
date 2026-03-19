@@ -244,7 +244,14 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
     setIsLoading(true)
 
     try {
-      if (!authToken) {
+      // Always get fresh token before each request
+      let token = authToken
+      if (!token) {
+        const { data: { session } } = await supabase.auth.getSession()
+        token = session?.access_token || null
+        if (token) setAuthToken(token)
+      }
+      if (!token) {
         setMessages(prev => [...prev, { role: 'assistant', content: 'Sessão expirada. Por favor, recarregue a página.' }])
         return
       }
@@ -259,7 +266,7 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: apiMessage,
@@ -269,14 +276,18 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
       })
 
       if (!response.ok) {
-        throw new Error('Erro na resposta do servidor')
+        const errBody = await response.text().catch(() => '')
+        throw new Error(`Erro ${response.status}: ${errBody || response.statusText}`)
       }
 
       const data = await response.json()
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
-    } catch (error) {
+    } catch (error: any) {
       console.error('[SellerAgent] Error:', error)
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Desculpe, ocorreu um erro. Tente novamente.' }])
+      const msg = error?.message?.includes('Failed to fetch')
+        ? 'Erro de conexão. Verifique sua internet e tente novamente.'
+        : `Erro: ${error?.message || 'Tente novamente.'}`
+      setMessages(prev => [...prev, { role: 'assistant', content: msg }])
     } finally {
       setIsLoading(false)
     }
