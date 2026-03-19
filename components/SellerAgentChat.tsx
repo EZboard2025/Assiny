@@ -262,18 +262,31 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
         apiMessage = `[Contexto: o usuário está perguntando sobre a reunião com evaluation_id="${lastMeetContextId.current}". Use get_meet_evaluation_detail com esse ID se precisar de dados. Use a transcrição e avaliação completa para responder.] ${apiMessage}`
       }
 
-      const response = await fetch('/api/agent/chat', {
+      const fetchUrl = `${window.location.origin}/api/agent/chat`
+      console.log('[Nicole] Fetching:', fetchUrl, 'token length:', token?.length)
+
+      const body = JSON.stringify({
+        message: apiMessage,
+        conversationHistory: messages,
+        ...(viewingContext ? { viewingContext } : {}),
+      })
+      console.log('[Nicole] Body size:', body.length)
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 120000) // 2min timeout
+
+      const response = await fetch(fetchUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          message: apiMessage,
-          conversationHistory: messages,
-          ...(viewingContext ? { viewingContext } : {}),
-        }),
+        body,
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
+
+      console.log('[Nicole] Response status:', response.status)
 
       if (!response.ok) {
         const errBody = await response.text().catch(() => '')
@@ -283,10 +296,15 @@ export default function SellerAgentChat({ userName, userRole, currentView = 'hom
       const data = await response.json()
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
     } catch (error: any) {
-      console.error('[SellerAgent] Error:', error)
-      const msg = error?.message?.includes('Failed to fetch')
-        ? 'Erro de conexão. Verifique sua internet e tente novamente.'
-        : `Erro: ${error?.message || 'Tente novamente.'}`
+      console.error('[Nicole] Full error:', error?.name, error?.message, error?.stack)
+      let msg = 'Erro desconhecido. Tente novamente.'
+      if (error?.name === 'AbortError') {
+        msg = 'A resposta demorou demais (>2min). Tente uma pergunta mais simples.'
+      } else if (error?.message?.includes('Failed to fetch')) {
+        msg = 'Não foi possível conectar ao servidor. Verifique sua internet.'
+      } else if (error?.message) {
+        msg = error.message
+      }
       setMessages(prev => [...prev, { role: 'assistant', content: msg }])
     } finally {
       setIsLoading(false)
