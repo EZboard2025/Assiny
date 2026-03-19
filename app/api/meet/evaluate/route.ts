@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
     // Step 2: Run evaluation and smart notes in parallel (using cleaned transcript)
     const [evalResult, notesResult] = await Promise.allSettled([
-      evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId, companyId, sellerName }),
+      evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId, companyId, sellerName, hasSpeakerLabels: false }),
       companyId ? generateSmartNotes({ transcript: cleanedTranscript, companyId }) : Promise.resolve({ success: false, error: 'No companyId' } as { success: boolean; notes?: any; error?: string })
     ])
 

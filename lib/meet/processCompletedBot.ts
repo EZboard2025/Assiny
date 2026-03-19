@@ -104,7 +104,8 @@ export async function processCompletedBot(botId: string): Promise<void> {
         evaluateMeetTranscript({
           transcript: transcriptText,
           meetingId: botId,
-          companyId: company_id
+          companyId: company_id,
+          hasSpeakerLabels: true
         }),
         generateSmartNotes({
           transcript: transcriptText,
@@ -303,29 +304,6 @@ export async function processCompletedBot(botId: string): Promise<void> {
       }
     } else {
       console.log(`[MeetBG] Skipping simulation + ML patterns for non-sales meeting`)
-    }
-
-    // 12. Extract ML patterns from real meeting (fire-and-forget)
-    try {
-      console.log(`[MeetBG] Extracting ML patterns for evaluation ${savedEval.id}`)
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
-      fetch(`${appUrl}/api/meet/extract-patterns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          meetEvaluationId: savedEval.id,
-          transcript: segments,
-          evaluation: evalData,
-          companyId: company_id,
-        })
-      }).then(res => {
-        if (res.ok) console.log(`[MeetBG] ML pattern extraction started for ${savedEval.id}`)
-        else console.error(`[MeetBG] ML pattern extraction failed: ${res.status}`)
-      }).catch(err => {
-        console.error(`[MeetBG] ML pattern extraction error (non-fatal):`, err.message)
-      })
-    } catch (mlError: any) {
-      console.error(`[MeetBG] ML pattern extraction setup error (non-fatal):`, mlError.message)
     }
 
   } catch (error: any) {

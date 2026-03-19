@@ -35,7 +35,9 @@ export async function classifyMeeting(transcript: string, companyContext?: { nam
     const sample = transcript.substring(0, 3000)
 
     const companyInfo = companyContext?.name
-      ? `\n\nCONTEXTO: O vendedor trabalha na empresa "${companyContext.name}"${companyContext.products ? ` que vende: ${companyContext.products.substring(0, 200)}` : ''}. A reuniao so e VENDAS se o vendedor esta tentando VENDER os produtos/servicos desta empresa. Se ele esta COMPRANDO algo, cotando servicos, ou a conversa nao envolve os produtos desta empresa, e NAO-VENDAS.`
+      ? `\n\nCONTEXTO DA EMPRESA DO USUARIO: "${companyContext.name}"${companyContext.products ? `. Produtos/servicos que esta empresa vende: ${companyContext.products.substring(0, 300)}` : ''}.
+
+REGRA CRITICA: A reuniao so e classificada como VENDAS se o vendedor esta vendendo os produtos/servicos DESTA empresa especifica ("${companyContext.name}"). Se a conversa envolve produtos/servicos de OUTRA empresa, ou se o assunto nao tem relacao com os produtos listados acima, classifique como NAO-VENDAS mesmo que haja linguagem comercial.`
       : ''
 
     const response = await openai.chat.completions.create({
@@ -45,10 +47,20 @@ export async function classifyMeeting(transcript: string, companyContext?: { nam
           role: 'system',
           content: `Voce classifica reunioes de negocios em portugues brasileiro.
 
-Analise a transcricao e determine se e uma reuniao de VENDAS ou NAO-VENDAS.
+Analise a transcricao e determine se e uma reuniao de VENDAS REAL ou NAO-VENDAS.
 
-VENDAS: O vendedor esta VENDENDO ou apresentando os produtos/servicos da empresa dele. Inclui: prospecao, discovery, demo, negociacao, fechamento, follow-up comercial, qualificacao de lead.
-NAO-VENDAS: Qualquer outra coisa. Inclui: alinhamento interno, kickoff, onboarding, suporte, reuniao de equipe, treinamento, retrospectiva, 1:1, cotacao onde o vendedor e o COMPRADOR, reunioes sociais, networking.${companyInfo}
+VENDAS (apenas se TODOS os criterios forem atendidos):
+1. O vendedor esta VENDENDO ou apresentando produtos/servicos
+2. Ha um CLIENTE REAL (prospect/lead) do outro lado
+3. Se houver contexto da empresa, os produtos sendo vendidos DEVEM ser da empresa informada
+Inclui: prospecao, discovery, demo, negociacao, fechamento, follow-up comercial, qualificacao de lead.
+
+NAO-VENDAS (qualquer um destes):
+- Alinhamento interno, kickoff, onboarding, suporte, reuniao de equipe
+- Retrospectiva, 1:1, cotacao onde o usuario e COMPRADOR
+- Reunioes sociais, networking
+- Conversa sobre produtos/servicos que NAO sao da empresa do usuario
+- Qualquer reuniao onde nao ha um cliente real sendo atendido${companyInfo}
 
 Responda APENAS com JSON valido:
 {

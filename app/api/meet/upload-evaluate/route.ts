@@ -4,6 +4,14 @@ import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from '@/lib/meet/evaluateMeetTranscript'
 import { generateSmartNotes } from '@/lib/meet/generateSmartNotes'
 import { classifyMeeting, getCompanyContext } from '@/lib/meet/classifyMeeting'
+import { writeFile, unlink, stat } from 'fs/promises'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { createReadStream } from 'fs'
+
+const execFileAsync = promisify(execFile)
 
 export const maxDuration = 300
 
@@ -14,8 +22,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const VIDEO_EXTENSIONS = ['.mov', '.mp4', '.avi', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.mpeg', '.mpg']
+const WHISPER_MAX_SIZE = 25 * 1024 * 1024 // 25MB
+
+function log(step: string, msg: string) {
+  console.log(`[UploadEvaluate][${step}] ${msg}`)
+}
+
 async function cleanTranscript(rawText: string): Promise<string> {
   try {
+    log('Clean', 'Limpando transcrição...')
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-nano',
       messages: [
@@ -40,47 +56,121 @@ Regras:
     })
 
     const cleaned = response.choices[0]?.message?.content?.trim()
-    if (cleaned && cleaned.length > rawText.length * 0.3) return cleaned
+    if (cleaned && cleaned.length > rawText.length * 0.3) {
+      log('Clean', `OK: ${rawText.length} → ${cleaned.length} chars`)
+      return cleaned
+    }
+    log('Clean', 'Resultado muito curto, usando original')
     return rawText
-  } catch {
+  } catch (err: any) {
+    log('Clean', `Erro (usando original): ${err.message}`)
     return rawText
   }
 }
 
-export async function POST(request: NextRequest) {
+/**
+ * Extract audio from video/large file using ffmpeg.
+ * Outputs MP3 at 64kbps mono — optimized for Whisper.
+ */
+async function extractAudio(inputPath: string, outputPath: string): Promise<void> {
+  log('FFmpeg', `Extraindo áudio: ${inputPath} → ${outputPath}`)
   try {
+    const { stderr } = await execFileAsync('ffmpeg', [
+      '-i', inputPath,
+      '-vn',                // no video
+      '-acodec', 'libmp3lame',
+      '-ab', '64k',         // 64kbps — speech quality
+      '-ar', '16000',       // 16kHz — Whisper optimal
+      '-ac', '1',           // mono
+      '-y',                 // overwrite
+      outputPath
+    ], { timeout: 180000 }) // 3 min timeout
+
+    if (stderr) {
+      // ffmpeg outputs info to stderr normally
+      const durationMatch = stderr.match(/Duration: (\d+:\d+:\d+)/)
+      if (durationMatch) log('FFmpeg', `Duração do áudio: ${durationMatch[1]}`)
+    }
+
+    const outputStat = await stat(outputPath)
+    log('FFmpeg', `Áudio extraído: ${(outputStat.size / 1024 / 1024).toFixed(1)}MB`)
+  } catch (err: any) {
+    log('FFmpeg', `ERRO: ${err.message}`)
+    if (err.stderr) log('FFmpeg', `stderr: ${err.stderr.slice(0, 500)}`)
+    throw new Error(`Falha ao extrair áudio: ${err.message}`)
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const tempFiles: string[] = []
+
+  try {
+    // ── Auth ──
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
+    log('Auth', 'OK')
 
-    const body = await request.json()
-    const { storagePath, fileName, companyId, sellerName, userId } = body
-
-    if (!storagePath) {
-      return NextResponse.json({ error: 'storagePath é obrigatório' }, { status: 400 })
+    // ── Parse FormData ──
+    log('Parse', 'Lendo FormData...')
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch (err: any) {
+      log('Parse', `ERRO ao ler FormData: ${err.message}`)
+      return NextResponse.json({ error: `Erro ao ler arquivo: ${err.message}` }, { status: 400 })
     }
 
-    console.log(`[UploadEvaluate] Processando: ${fileName} de ${storagePath}`)
+    const uploadedFile = formData.get('file') as File | null
+    const fileName = (formData.get('fileName') as string) || 'audio.mp3'
+    const companyId = (formData.get('companyId') as string) || ''
+    const sellerName = (formData.get('sellerName') as string) || 'Vendedor'
+    const userId = (formData.get('userId') as string) || ''
 
-    // Step 1: Download file from Supabase Storage
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('meet-uploads')
-      .download(storagePath)
-
-    if (downloadError || !fileData) {
-      console.error('[UploadEvaluate] Erro ao baixar:', downloadError)
-      return NextResponse.json({ error: 'Erro ao baixar arquivo do storage' }, { status: 500 })
+    if (!uploadedFile) {
+      return NextResponse.json({ error: 'Arquivo é obrigatório' }, { status: 400 })
     }
 
-    const fileSizeMB = fileData.size / 1024 / 1024
-    console.log(`[UploadEvaluate] Baixado: ${fileSizeMB.toFixed(1)}MB`)
+    const fileSizeMB = uploadedFile.size / 1024 / 1024
+    log('Parse', `Arquivo: ${fileName} (${fileSizeMB.toFixed(1)}MB, type: ${uploadedFile.type})`)
 
-    // Step 2: Convert Blob to File for Whisper
-    // Whisper limit is 25MB — if file is larger, we'll still try (OpenAI may reject)
-    const file = await toFile(fileData, fileName || 'audio.mp3')
+    // ── Save to temp file ──
+    log('Disk', 'Salvando em disco...')
+    const ext = fileName.toLowerCase().includes('.') ? '.' + fileName.split('.').pop() : '.tmp'
+    const tempInput = join(tmpdir(), `meet_upload_${Date.now()}${ext}`)
+    tempFiles.push(tempInput)
 
-    // Step 3: Transcribe with Whisper
+    const arrayBuffer = await uploadedFile.arrayBuffer()
+    await writeFile(tempInput, Buffer.from(arrayBuffer))
+    log('Disk', `Salvo: ${tempInput} (${fileSizeMB.toFixed(1)}MB)`)
+
+    // ── Determine if ffmpeg conversion needed ──
+    const isVideo = VIDEO_EXTENSIONS.includes(ext.toLowerCase())
+    const isTooBig = uploadedFile.size > WHISPER_MAX_SIZE
+
+    let whisperFile: any
+
+    if (isVideo || isTooBig) {
+      log('Convert', `Conversão necessária (video=${isVideo}, tooBig=${isTooBig})`)
+      const tempOutput = join(tmpdir(), `meet_audio_${Date.now()}.mp3`)
+      tempFiles.push(tempOutput)
+
+      await extractAudio(tempInput, tempOutput)
+
+      // Check converted size
+      const audioStat = await stat(tempOutput)
+      if (audioStat.size > WHISPER_MAX_SIZE) {
+        log('Convert', `AVISO: Áudio ainda grande (${(audioStat.size / 1024 / 1024).toFixed(1)}MB), tentando enviar mesmo assim`)
+      }
+
+      whisperFile = await toFile(createReadStream(tempOutput), 'audio.mp3')
+    } else {
+      log('Convert', 'Não precisa conversão — enviando direto ao Whisper')
+      whisperFile = await toFile(createReadStream(tempInput), fileName)
+    }
+
+    // ── Whisper prompt (company terms) ──
     let whisperPrompt = ''
     if (companyId) {
       const { data: companyData } = await supabase
@@ -100,63 +190,76 @@ export async function POST(request: NextRequest) {
             .filter((c: string) => c.length > 2) || [])
         ].filter(Boolean).join(', ')
         whisperPrompt = termos
+        log('Whisper', `Prompt com termos da empresa: ${termos.slice(0, 100)}...`)
       }
     }
 
-    console.log('[UploadEvaluate] Transcrevendo com Whisper...')
+    // ── Transcribe ──
+    log('Whisper', 'Transcrevendo...')
     const transcriptionOptions: any = {
-      file: file,
+      file: whisperFile,
       model: 'whisper-1',
       language: 'pt',
     }
     if (whisperPrompt) transcriptionOptions.prompt = whisperPrompt
 
-    const whisperResult = await openai.audio.transcriptions.create(transcriptionOptions)
-    const rawTranscript = whisperResult.text
+    let rawTranscript: string
+    try {
+      const whisperResult = await openai.audio.transcriptions.create(transcriptionOptions)
+      rawTranscript = whisperResult.text
+      log('Whisper', `Transcrição OK: ${rawTranscript.length} chars`)
+    } catch (err: any) {
+      log('Whisper', `ERRO: ${err.message}`)
+      return NextResponse.json({ error: `Erro na transcrição: ${err.message}` }, { status: 500 })
+    }
 
     if (!rawTranscript || rawTranscript.length < 50) {
-      await supabase.storage.from('meet-uploads').remove([storagePath])
       return NextResponse.json({
         error: `Transcrição muito curta (${rawTranscript?.length || 0} chars). O áudio precisa ter pelo menos uma conversa audível.`
       }, { status: 400 })
     }
 
-    console.log(`[UploadEvaluate] Transcrição: ${rawTranscript.length} chars`)
-
-    // Step 4: Clean transcript
+    // ── Clean transcript ──
     const cleanedTranscript = await cleanTranscript(rawTranscript)
 
-    // Step 5: Classify meeting type
+    // ── Classify meeting ──
+    log('Classify', 'Classificando tipo de reunião...')
     const companyContext = companyId ? await getCompanyContext(companyId) : undefined
     const classification = await classifyMeeting(cleanedTranscript, companyContext)
     const isSales = classification.meeting_type === 'sales'
-    console.log(`[UploadEvaluate] Classificação: ${classification.meeting_type} (${classification.category})`)
+    log('Classify', `Tipo: ${classification.meeting_type} (${classification.category})`)
 
-    // Step 6: Evaluate based on classification
+    // ── Evaluate ──
     let evalData: any = null
     let smartNotes: any = null
     let overallScore = 0
 
     if (isSales) {
+      log('Evaluate', 'Avaliando SPIN + Smart Notes...')
       const [evaluation, notesResult] = await Promise.all([
-        evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId: `upload-${Date.now()}`, companyId: companyId || undefined }),
-        generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
+        evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId: `upload-${Date.now()}`, companyId: companyId || undefined, hasSpeakerLabels: false }),
+        generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch((err) => {
+          log('SmartNotes', `Erro (non-fatal): ${err.message}`)
+          return null
+        })
       ])
       if (!evaluation?.success || !evaluation.evaluation) {
-        await supabase.storage.from('meet-uploads').remove([storagePath])
+        log('Evaluate', `ERRO: ${evaluation?.error || 'Sem avaliação'}`)
         return NextResponse.json({ error: evaluation?.error || 'Falha na avaliação SPIN' }, { status: 500 })
       }
       evalData = evaluation.evaluation
       smartNotes = notesResult?.success ? notesResult.notes : notesResult
       overallScore = evalData.overall_score
       if (overallScore <= 10) overallScore = overallScore * 10
+      log('Evaluate', `Score: ${overallScore}/100`)
     } else {
-      console.log(`[UploadEvaluate] Non-sales — skipping SPIN, smart notes only`)
+      log('Evaluate', 'Non-sales — apenas Smart Notes')
       const notesResult = await generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
       smartNotes = notesResult?.success ? notesResult.notes : notesResult
     }
 
-    // Step 7: Save to meet_evaluations
+    // ── Save to DB ──
+    log('Save', 'Salvando no banco...')
     const meetingId = `upload_${Date.now()}`
     const { data: saved, error: saveError } = await supabase
       .from('meet_evaluations')
@@ -173,15 +276,21 @@ export async function POST(request: NextRequest) {
         source: 'upload',
         meeting_category: classification.meeting_type,
         meeting_category_detail: classification.category,
+        spin_s_score: isSales ? (evalData?.spin_evaluation?.S?.final_score ?? null) : null,
+        spin_p_score: isSales ? (evalData?.spin_evaluation?.P?.final_score ?? null) : null,
+        spin_i_score: isSales ? (evalData?.spin_evaluation?.I?.final_score ?? null) : null,
+        spin_n_score: isSales ? (evalData?.spin_evaluation?.N?.final_score ?? null) : null,
       })
       .select('id')
       .single()
 
     if (saveError) {
-      console.error('[UploadEvaluate] Erro ao salvar:', saveError)
+      log('Save', `ERRO: ${JSON.stringify(saveError)}`)
+    } else {
+      log('Save', `OK: id=${saved?.id}`)
     }
 
-    // Extract ML patterns only for sales (fire-and-forget)
+    // ── ML patterns (fire-and-forget) ──
     if (isSales && saved?.id && companyId) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ramppy.site'
@@ -195,20 +304,14 @@ export async function POST(request: NextRequest) {
             companyId,
           })
         }).then(res => {
-          if (res.ok) console.log(`[UploadEvaluate] ML pattern extraction started`)
-          else console.error(`[UploadEvaluate] ML pattern extraction failed: ${res.status}`)
+          log('ML', res.ok ? 'Pattern extraction started' : `Failed: ${res.status}`)
         }).catch(err => {
-          console.error(`[UploadEvaluate] ML pattern extraction error:`, err.message)
+          log('ML', `Error: ${err.message}`)
         })
-      } catch (mlErr: any) {
-        console.error('[UploadEvaluate] ML setup error (non-fatal):', mlErr.message)
-      }
+      } catch {}
     }
 
-    // Cleanup storage
-    await supabase.storage.from('meet-uploads').remove([storagePath])
-
-    console.log(`[UploadEvaluate] Concluído: ${classification.meeting_type}/${classification.category} score: ${overallScore}/100`)
+    log('Done', `✅ Concluído: ${classification.meeting_type}/${classification.category} score: ${overallScore}/100`)
 
     return NextResponse.json({
       success: true,
@@ -222,9 +325,18 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('[UploadEvaluate] Erro:', error)
+    log('FATAL', `Erro não tratado: ${error.message}`)
+    log('FATAL', `Stack: ${error.stack?.slice(0, 500)}`)
     return NextResponse.json({
       error: error.message || 'Erro interno ao processar arquivo'
     }, { status: 500 })
+  } finally {
+    // Cleanup temp files
+    for (const f of tempFiles) {
+      try {
+        await unlink(f)
+        log('Cleanup', `Removido: ${f}`)
+      } catch {}
+    }
   }
 }

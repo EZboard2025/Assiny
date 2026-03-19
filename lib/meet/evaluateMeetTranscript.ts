@@ -327,6 +327,7 @@ export interface EvaluateMeetParams {
   meetingId: string
   companyId: string
   sellerName?: string
+  hasSpeakerLabels?: boolean
 }
 
 export interface EvaluateMeetResult {
@@ -336,7 +337,7 @@ export interface EvaluateMeetResult {
 }
 
 export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promise<EvaluateMeetResult> {
-  const { transcript, meetingId, sellerName, companyId } = params
+  const { transcript, meetingId, sellerName, companyId, hasSpeakerLabels = true } = params
 
   if (!transcript || transcript.length < 50) {
     return { success: false, error: `Transcrição muito curta para avaliação (${transcript?.length || 0} chars)` }
@@ -406,7 +407,11 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
     console.log(`[MeetBG] Transcript truncado: ${transcript.length} → ${processedTranscript.length} chars (inicio + fim)`)
   }
 
-  let userPrompt = `Avalie esta reunião de vendas com precisão. Identifique o vendedor${sellerName ? ` (provavelmente ${sellerName})` : ''} e analise sua performance.
+  const speakerContext = hasSpeakerLabels
+    ? ''
+    : `\n\nIMPORTANTE: Esta transcrição NÃO tem identificação de falantes (foi capturada sem separação por participante). Infira quem é o vendedor e quem é o cliente pelo CONTEXTO da conversa (quem apresenta produto/serviço = vendedor, quem faz perguntas/objeções = cliente). Não penalize por falta de identificação de falantes. O campo speaking_time_percentage deve ser estimado aproximadamente pelo volume de fala de cada parte.`
+
+  let userPrompt = `Avalie esta reunião de vendas com precisão. Identifique o vendedor${sellerName ? ` (provavelmente ${sellerName})` : ''} e analise sua performance.${speakerContext}
 
 TRANSCRIÇÃO DA REUNIÃO:
 ${processedTranscript}

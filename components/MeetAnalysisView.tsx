@@ -713,7 +713,8 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         .eq('auth_user_id', userId)
         .single()
 
-      // Send file directly to API via FormData (no Supabase Storage needed)
+      // Step 1: Upload file directly to API via FormData
+      console.log(`[Upload] Enviando arquivo: ${uploadFile.name} (${(uploadFile.size / 1024 / 1024).toFixed(1)}MB)`)
       const formData = new FormData()
       formData.append('file', uploadFile)
       formData.append('fileName', uploadFile.name)
@@ -721,6 +722,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
       formData.append('userId', userId || '')
       formData.append('sellerName', emp?.name || 'Vendedor')
 
+      console.log('[Upload] Chamando /api/meet/upload-evaluate...')
       const res = await fetch('/api/meet/upload-evaluate', {
         method: 'POST',
         headers: {
@@ -729,7 +731,14 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         body: formData
       })
 
-      const data = await res.json()
+      let data: any
+      try {
+        data = await res.json()
+      } catch {
+        setUploadError('Erro no servidor ao processar arquivo. Verifique se o formato é suportado.')
+        setUploadProgress('error')
+        return
+      }
 
       if (!res.ok) {
         setUploadError(data.error || 'Erro ao processar arquivo')

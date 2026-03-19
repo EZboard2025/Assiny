@@ -86,7 +86,11 @@
       "WebFetch(domain:cookbook.openai.com)",
       "WebFetch(domain:developers.openai.com)",
       "Bash(npx next:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill:*)",
+      "Bash(lsof -ti:3001)",
+      "Bash(ffmpeg -version)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",

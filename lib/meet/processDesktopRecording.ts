@@ -133,6 +133,7 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
           meetingId,
           companyId: company_id || '',
           sellerName: seller_name || undefined,
+          hasSpeakerLabels: false,
         }),
         generateSmartNotes({
           transcript: evalTranscript,
@@ -175,7 +176,7 @@ export async function processDesktopRecording(sessionId: string): Promise<void> 
         spin_p_score: isSales ? (evalData?.spin_evaluation?.P?.final_score || 0) : null,
         spin_i_score: isSales ? (evalData?.spin_evaluation?.I?.final_score || 0) : null,
         spin_n_score: isSales ? (evalData?.spin_evaluation?.N?.final_score || 0) : null,
-        source: 'bot',
+        source: 'desktop',
         meeting_category: classification.meeting_type,
         meeting_category_detail: classification.category,
       })
