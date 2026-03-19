@@ -1280,12 +1280,14 @@ ipcMain.on('start-drag', () => {
   const bounds = bubbleWindow.getBounds()
   dragOffsetX = cursor.x - bounds.x
   dragOffsetY = cursor.y - bounds.y
+  const dpi = screen.getPrimaryDisplay().scaleFactor
+  console.log(`[Drag] Start — cursor: ${cursor.x},${cursor.y} bounds: ${bounds.x},${bounds.y} offset: ${dragOffsetX},${dragOffsetY} DPI: ${dpi} size: ${bounds.width}x${bounds.height}`)
 
   const all = getAllScreenBounds()
   const w = bounds.width
   const h = bounds.height
 
-  let lastDragX = -1, lastDragY = -1
+  let lastSetX = -9999, lastSetY = -9999
   dragInterval = setInterval(() => {
     if (!bubbleWindow || bubbleWindow.isDestroyed()) {
       clearInterval(dragInterval); dragInterval = null; return
@@ -1300,16 +1302,13 @@ ipcMain.on('start-drag', () => {
     if (x + w > all.maxX) x = all.maxX - w
     if (y + h > all.maxY) y = all.maxY - h
 
-    // Skip if position unchanged
-    if (x === lastDragX && y === lastDragY) return
-    lastDragX = x
-    lastDragY = y
+    // Only call setPosition when target actually changed — prevents DPI rounding drift
+    if (x === lastSetX && y === lastSetY) return
+    lastSetX = x
+    lastSetY = y
 
-    // CRITICAL: use setPosition, NOT setBounds — setBounds on resizable:false
-    // windows shrinks the window 1-2px per call (Electron bug #13043), causing
-    // the bubble to "fall" downward at high call rates
     bubbleWindow.setPosition(x, y)
-  }, 16) // 60fps — smooth enough, avoids accumulating rounding errors
+  }, 16)
 })
 
 ipcMain.on('stop-drag', () => {
