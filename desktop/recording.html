@@ -38,19 +38,37 @@
   <!-- Screen: Idle (ready to record) -->
   <div id="screen-idle" class="screen" style="display:none">
     <div class="center-content">
-      <div class="mic-icon-large">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" x2="12" y1="19" y2="22"/>
-        </svg>
+      <!-- Step 0: Start button -->
+      <div id="start-step">
+        <div class="mic-icon-large">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" x2="12" y1="19" y2="22"/>
+          </svg>
+        </div>
+        <h2>Gravar Reuniao</h2>
+        <p class="idle-desc">Captura o audio do sistema (outros participantes) e do microfone (voce). Funciona com Meet, Zoom, Teams ou qualquer app.</p>
+        <button id="btn-start" class="btn-primary">
+          <span class="btn-text">Iniciar Gravacao</span>
+          <span class="btn-loading" style="display:none">Iniciando...</span>
+        </button>
       </div>
-      <h2>Gravar Reuniao</h2>
-      <p class="idle-desc">Captura o audio do sistema (outros participantes) e do microfone (voce). Funciona com Meet, Zoom, Teams ou qualquer app.</p>
-      <button id="btn-start" class="btn-primary">
-        <span class="btn-text">Iniciar Gravacao</span>
-        <span class="btn-loading" style="display:none">Iniciando...</span>
-      </button>
+      <!-- Step 1: Meeting type choice -->
+      <div id="meeting-type-step" style="display:none">
+        <h2 style="margin-bottom:8px;">Qual o tipo da reuniao?</h2>
+        <p class="idle-desc" style="margin-bottom:20px;">Isso define como a gravacao sera processada</p>
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <button id="btn-type-sales" class="btn-meeting-type">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <span>Reuniao de vendas</span>
+          </button>
+          <button id="btn-type-other" class="btn-meeting-type">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            <span>Outra reuniao</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -141,6 +159,6 @@
     </div>
   </div>
 
-  <script src="recording.js"></script>
+  <script src="recording.js?v=2"></script>
 </body>
 </html>

@@ -401,7 +401,7 @@ function createBubbleWindow() {
 // ============================================================
 // RECORDING WINDOW (meeting audio capture)
 // ============================================================
-function createRecordingWindow(autoStart = false) {
+function createRecordingWindow(autoStart = false, meetingType = 'sales') {
   if (recordingWindow && !recordingWindow.isDestroyed()) {
     if (autoStart) {
       // New auto-recording requested — close stale window and create fresh
@@ -441,6 +441,8 @@ function createRecordingWindow(autoStart = false) {
 
   recordingWindow.loadFile('recording.html')
   recordingWindow.setMenuBarVisibility(false)
+  // Disable cache in dev to ensure latest JS is loaded
+  if (IS_DEV) recordingWindow.webContents.session.clearCache()
 
   // Forward renderer console logs to main process stdout + file
   recordingWindow.webContents.on('console-message', (_event, level, message) => {
@@ -493,7 +495,7 @@ function createRecordingWindow(autoStart = false) {
             // Wait a moment for auth to be processed, then auto-start
             setTimeout(() => {
               if (recordingWindow && !recordingWindow.isDestroyed()) {
-                recordingWindow.webContents.send('auto-start-recording')
+                recordingWindow.webContents.send('auto-start-recording', meetingType)
               }
             }, 1000)
           }
@@ -2465,8 +2467,8 @@ function autoStopMeeting() {
 }
 
 // User confirmed → start recording
-ipcMain.on('confirm-meeting-start', () => {
-  debugLog('[MeetDetect] User confirmed → starting recording')
+ipcMain.on('confirm-meeting-start', (_event, meetingType) => {
+  debugLog(`[MeetDetect] User confirmed → starting recording (type: ${meetingType})`)
   const meetTitle = pendingMeetTitle
   const meetCode = meetTitle && meetTitle.match(MEET_CODE_PATTERN)?.[0]
 
@@ -2480,7 +2482,7 @@ ipcMain.on('confirm-meeting-start', () => {
   startPowerSaveBlocker()
   setMeetCheckSpeed(true) // Faster polling during recording
 
-  createRecordingWindow(true)
+  createRecordingWindow(true, meetingType || 'sales')
   if (bubbleWindow && !bubbleWindow.isDestroyed()) {
     bubbleWindow.webContents.send('recording-state', true)
   }

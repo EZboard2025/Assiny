@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { evaluateMeetTranscript } from './evaluateMeetTranscript'
 import { generateSmartNotes } from './generateSmartNotes'
-// classifyMeeting removed — desktop uses user's explicit choice
+import { generateMeetingSummary } from './generateMeetingSummary'
 import OpenAI from 'openai'
 
 const supabaseAdmin = createClient(
@@ -124,10 +124,11 @@ export async function processDesktopRecording(sessionId: string, meetingType?: s
 
     let evalData: any = null
     let smartNotes: any = null
+    let meetingSummary: any = null
     let overallScore = 0
 
     if (isSales) {
-      // === SALES: Full pipeline ===
+      // === SALES: Full pipeline (SPIN + Smart Notes) ===
       const [evalResult, notesResult] = await Promise.allSettled([
         evaluateMeetTranscript({
           transcript: evalTranscript,
@@ -154,10 +155,9 @@ export async function processDesktopRecording(sessionId: string, meetingType?: s
       if (overallScore && overallScore <= 10) overallScore = overallScore * 10
       overallScore = Math.round(overallScore || 0)
     } else {
-      // === NON-SALES: Only Smart Notes ===
-      console.log(`[DesktopBG] Non-sales meeting (${classification.category}), skipping SPIN evaluation`)
-      const notesResult = await generateSmartNotes({ transcript: evalTranscript, companyId: company_id || '' }).catch(() => null)
-      smartNotes = notesResult?.success ? notesResult.notes : null
+      // === NON-SALES: Only meeting summary (no SPIN, no smart notes, no ML) ===
+      console.log(`[DesktopBG] Non-sales meeting — generating summary only`)
+      meetingSummary = await generateMeetingSummary(evalTranscript)
     }
 
     // 8. Save to meet_evaluations
@@ -167,10 +167,11 @@ export async function processDesktopRecording(sessionId: string, meetingType?: s
         user_id,
         company_id,
         meeting_id: meetingId,
-        seller_name: isSales ? (seller_name || evalData?.seller_identification?.name || 'Não identificado') : 'N/A',
+        seller_name: isSales ? (seller_name || evalData?.seller_identification?.name || 'Não identificado') : (seller_name || 'N/A'),
         transcript: cleanedTranscript,
-        evaluation: evalData,
-        smart_notes: smartNotes,
+        evaluation: isSales ? evalData : null,
+        smart_notes: isSales ? smartNotes : null,
+        meeting_summary: !isSales ? meetingSummary : null,
         overall_score: overallScore,
         performance_level: isSales ? (evalData?.performance_level || 'needs_improvement') : null,
         spin_s_score: isSales ? (evalData?.spin_evaluation?.S?.final_score || 0) : null,
@@ -213,12 +214,13 @@ export async function processDesktopRecording(sessionId: string, meetingType?: s
         data: { evaluationId: saved.id, overallScore, performanceLevel: evalData.performance_level, sellerName: seller_name, source: 'desktop_recording' }
       })
     } else {
+      const summaryTitle = meetingSummary?.title || 'Reunião'
       await supabaseAdmin.from('user_notifications').insert({
         user_id,
         type: 'meet_evaluation_ready',
         title: 'Resumo de reunião pronto!',
-        message: `Sua reunião (${classification.category}) foi resumida.`,
-        data: { evaluationId: saved.id, meetingCategory: classification.category, source: 'non_sales' }
+        message: `"${summaryTitle}" foi resumida automaticamente.`,
+        data: { evaluationId: saved.id, meetingCategory: 'non_sales', source: 'non_sales' }
       })
     }
 

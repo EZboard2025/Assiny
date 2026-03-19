@@ -92,7 +92,9 @@
       "Bash(lsof -ti:3001)",
       "Bash(ffmpeg -version)",
       "Bash(git -C /Users/arthurxavier/assiny/Assiny status --short)",
-      "Bash(grep -E \"\\\\.\\(sql|ts|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(sql|ts|js\\)$\")",
+      "Bash(pkill -9 -f \"electron\")",
+      "Bash(node -c recording.js)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
