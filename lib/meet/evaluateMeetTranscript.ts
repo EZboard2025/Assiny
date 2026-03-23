@@ -32,9 +32,18 @@ ESPECIFICIDADE: Todo feedback deve incluir trechos específicos da transcrição
 
 SISTEMA DE AVALIAÇÃO
 
-PARTE 1: AVALIAÇÃO DE OBJEÇÕES (0-10 por objeção)
+PARTE 1: AVALIAÇÃO DE OBJEÇÕES — MODO VENDA REAL (0-10 por objeção)
 
-Para cada objeção identificada na transcrição, avalie usando esta escala:
+CONTEXTO: Esta é uma VENDA REAL (reunião ou ligação). NÃO existem objeções pré-configuradas. Você DEVE fazer uma VARREDURA EXAUSTIVA da transcrição para DESCOBRIR TODAS as objeções que surgiram — não pode deixar NENHUMA passar em branco.
+
+INSTRUÇÃO DE DESCOBERTA EXAUSTIVA:
+- Analise cada fala do cliente buscando objeções EXPLÍCITAS e IMPLÍCITAS
+- Qualquer hesitação, dúvida, resistência, preocupação ou pedido de tempo do cliente É uma objeção
+- Tipos comuns que NÃO podem escapar: preço, timing, autoridade/decisor, concorrência, confiança, necessidade, medo de mudança, prioridade, orçamento, contrato existente, satisfação com solução atual
+- Objeções implícitas contam: "preciso pensar", "vou falar com meu sócio", "não é prioridade agora" são objeções reais
+- Se o cliente levantou UMA hesitação que o vendedor não tratou, isso DEVE aparecer na análise com score baixo
+
+ESCALA DE PONTUAÇÃO:
 
 0-2: Falha Crítica - Ignorou, respondeu defensivamente, ou invalidou a preocupação
 3-4: Insuficiente - Reconheceu superficialmente sem validar
@@ -72,7 +81,8 @@ Retorne APENAS JSON válido (sem markdown, sem código):
   "objections_analysis": [
     {
       "objection_id": "obj-0",
-      "objection_type": "string (preço, timing, autoridade, concorrência, confiança, necessidade)",
+      "source": "discovered",
+      "objection_type": "string (preço, timing, autoridade, concorrência, confiança, necessidade, medo_de_mudança, prioridade, orçamento, contrato_existente, satisfação_atual)",
       "objection_text": "trecho exato da transcrição",
       "score": 0-10,
       "detailed_analysis": "Análise técnica de 3-4 linhas",
@@ -151,7 +161,9 @@ DIRETRIZES CRÍTICAS
 1. Identifique quem é o vendedor e quem é o cliente baseado no contexto
 2. Cite trechos específicos da transcrição como evidência
 3. Seja objetivo e técnico
-4. Todo feedback deve ter próximo passo concreto`
+4. Todo feedback deve ter próximo passo concreto
+5. NÃO DEIXE NENHUMA OBJEÇÃO PASSAR EM BRANCO — faça varredura completa de toda a transcrição antes de finalizar a análise de objeções
+6. Todas as objeções devem ter "source": "discovered" pois são identificadas pela IA na venda real`
 
 const PLAYBOOK_SECTION = `
 
