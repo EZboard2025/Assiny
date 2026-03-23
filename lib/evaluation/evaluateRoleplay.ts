@@ -427,6 +427,8 @@ INDICADOR 4: Credibilidade e Confiança (0-10)
 7-8: 2-3 cases relevantes + números reais
 9-10: Cliente tratou como autoridade técnica, pediu opinião/conselho
 
+⚠️ PENALIZAÇÃO POR INFORMAÇÕES FALSAS: Se o vendedor inventar cases de sucesso, clientes, prêmios, certificações, números ou métricas que NÃO existem nos dados da empresa fornecidos abaixo (seção "Provas Sociais"), a nota deste indicador deve ser AUTOMATICAMENTE 0. Mencione explicitamente no feedback técnico quais informações foram fabricadas. Mentir para o cliente é uma falha gravíssima de ética comercial.
+
 INDICADOR 5: CTA Efetivo (0-10)
 
 0-2: Sem CTA
@@ -584,7 +586,9 @@ Qual era o objetivo do vendedor nessa venda?:
 Objetivo do vendedor nessa simulação: {objetivo}
 
 Dados da empresa para validar informações do vendedor:
-{company_data}`
+{company_data}
+
+⚠️ VALIDAÇÃO OBRIGATÓRIA: Compare TUDO que o vendedor afirmou na transcrição (cases, clientes, prêmios, números, métricas) com os dados acima. Se o vendedor mencionou cases, clientes ou provas sociais que NÃO constam nos dados da empresa, ele INVENTOU essas informações. Isso deve zerar o indicador N4 (Credibilidade e Confiança) e ser mencionado em critical_gaps.`
 
 // Seção do prompt para análise de playbook
 const PLAYBOOK_SECTION = `
@@ -802,7 +806,7 @@ Produtos/Serviços: ${companyData.produtos_servicos || 'Não informado'}
 Função dos Produtos: ${companyData.funcao_produtos || 'Não informado'}
 Diferenciais: ${companyData.diferenciais || 'Não informado'}
 Concorrentes: ${companyData.concorrentes || 'Não informado'}
-Dados e Métricas: ${companyData.dados_metricas || 'Não informado'}
+Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados_metricas || 'Não informado'}
 Erros Comuns: ${companyData.erros_comuns || 'Não informado'}
 Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
     }

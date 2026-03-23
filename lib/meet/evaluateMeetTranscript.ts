@@ -349,6 +349,7 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
   let companyName = 'Não informado'
   let companyDescription = 'Não informado'
   let companyType = 'Não informado'
+  let companyContext = ''
   let playbookContent: string | null = null
 
   if (companyId) {
@@ -374,12 +375,20 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
 
     const { data: companyData } = await supabaseAdmin
       .from('company_data')
-      .select('descricao')
+      .select('*')
       .eq('company_id', companyId)
       .single()
 
     if (companyData?.descricao) {
       companyDescription = companyData.descricao
+    }
+
+    if (companyData) {
+      companyContext = `Nome: ${companyData.nome || 'Não informado'}
+Descrição: ${companyData.descricao || 'Não informado'}
+Produtos/Serviços: ${companyData.produtos_servicos || 'Não informado'}
+Diferenciais: ${companyData.diferenciais || 'Não informado'}
+Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados_metricas || 'Não informado'}`
     }
 
     const { data: playbook } = await supabaseAdmin
@@ -416,7 +425,12 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
 TRANSCRIÇÃO DA REUNIÃO:
 ${processedTranscript}
 
-Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSON conforme especificado.`
+Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSON conforme especificado.${companyContext ? `
+
+DADOS DA EMPRESA (para validar informações do vendedor):
+${companyContext}
+
+⚠️ VALIDAÇÃO OBRIGATÓRIA: Compare TUDO que o vendedor afirmou (cases, clientes, prêmios, números, métricas) com os dados acima. Se o vendedor mencionou cases, clientes ou provas sociais que NÃO constam nos dados da empresa, ele INVENTOU essas informações. Isso deve impactar negativamente a nota de N (Necessidade de Solução) e ser mencionado em critical_gaps.` : ''}`
 
   if (playbookContent) {
     userPrompt += PLAYBOOK_SECTION
