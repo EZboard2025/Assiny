@@ -140,6 +140,7 @@ export async function processDesktopRecording(sessionId: string, meetingType?: s
         generateSmartNotes({
           transcript: evalTranscript,
           companyId: company_id || '',
+          meetingType: 'sales',
         })
       ])
 

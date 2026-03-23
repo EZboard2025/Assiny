@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       log('Evaluate', 'Avaliando SPIN + Smart Notes...')
       const [evaluation, notesResult] = await Promise.all([
         evaluateMeetTranscript({ transcript: cleanedTranscript, meetingId: `upload-${Date.now()}`, companyId: companyId || undefined, hasSpeakerLabels: false }),
-        generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch((err) => {
+        generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined, meetingType: 'sales' }).catch((err) => {
           log('SmartNotes', `Erro (non-fatal): ${err.message}`)
           return null
         })
@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
       log('Evaluate', `Score: ${overallScore}/100`)
     } else {
       log('Evaluate', 'Non-sales — apenas Smart Notes')
-      const notesResult = await generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined }).catch(() => null)
+      const notesResult = await generateSmartNotes({ transcript: cleanedTranscript, companyId: companyId || undefined, meetingType: 'non_sales' }).catch(() => null)
       smartNotes = notesResult?.success ? notesResult.notes : notesResult
     }
 

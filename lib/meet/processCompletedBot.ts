@@ -109,7 +109,8 @@ export async function processCompletedBot(botId: string): Promise<void> {
         }),
         generateSmartNotes({
           transcript: transcriptText,
-          companyId: company_id
+          companyId: company_id,
+          meetingType: 'sales'
         })
       ])
 
@@ -131,7 +132,7 @@ export async function processCompletedBot(botId: string): Promise<void> {
     } else {
       // === NON-SALES: Only Smart Notes ===
       console.log(`[MeetBG] Non-sales meeting (${classification.category}), skipping SPIN evaluation`)
-      const notesResult = await generateSmartNotes({ transcript: transcriptText, companyId: company_id }).catch(() => null)
+      const notesResult = await generateSmartNotes({ transcript: transcriptText, companyId: company_id, meetingType: 'non_sales' }).catch(() => null)
       smartNotes = notesResult?.success ? notesResult.notes : null
     }
 

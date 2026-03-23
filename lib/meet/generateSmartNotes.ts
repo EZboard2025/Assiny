@@ -192,6 +192,7 @@ REGRAS CRITICAS
 export interface GenerateSmartNotesParams {
   transcript: string
   companyId: string
+  meetingType?: 'sales' | 'non_sales'
 }
 
 export interface GenerateSmartNotesResult {
@@ -201,7 +202,8 @@ export interface GenerateSmartNotesResult {
 }
 
 export async function generateSmartNotes(params: GenerateSmartNotesParams): Promise<GenerateSmartNotesResult> {
-  const { transcript, companyId } = params
+  const { transcript, companyId, meetingType } = params
+  const isSales = meetingType !== 'non_sales'
 
   if (!transcript || transcript.length < 100) {
     return { success: false, error: 'Transcricao muito curta para gerar notas' }
@@ -282,7 +284,11 @@ export async function generateSmartNotes(params: GenerateSmartNotesParams): Prom
     processedTranscript = transcript.substring(0, maxChars) + '\n\n[... transcricao truncada ...]'
   }
 
-  const userPrompt = `Analise esta transcricao de reuniao de vendas e extraia TODAS as informacoes do cliente/prospect em notas de inteligencia comercial de altissimo nivel.${companyContext}${topicsSection}${observationsSection}
+  const meetingContext = isSales
+    ? 'reuniao de vendas e extraia TODAS as informacoes do cliente/prospect em notas de inteligencia comercial de altissimo nivel.'
+    : 'reuniao e extraia TODAS as informacoes relevantes em notas estruturadas de altissimo nivel. Esta NAO e uma reuniao de vendas — nao inclua o campo "deal_status" no JSON.'
+
+  const userPrompt = `Analise esta transcricao de ${meetingContext}${companyContext}${topicsSection}${observationsSection}
 
 TRANSCRICAO DA REUNIAO:
 ${processedTranscript}
@@ -292,7 +298,7 @@ Gere notas inteligentes no formato JSON especificado. Lembre-se:
 - Use "sub_items" para detalhar pontos complexos
 - Se houve simulacoes, comparativos ou calculos na call, dedique uma secao inteira
 - Priorize ESPECIFICIDADE e DADOS CONCRETOS sobre generalidades
-- Ordene secoes por relevancia estrategica${!observations?.length ? '\nNao inclua o campo "custom_observations" no JSON pois nao ha observacoes personalizadas configuradas.' : ''}`
+- Ordene secoes por relevancia estrategica${!isSales ? '\nNao inclua o campo "deal_status" no JSON — esta reuniao nao e de vendas.' : ''}${!observations?.length ? '\nNao inclua o campo "custom_observations" no JSON pois nao ha observacoes personalizadas configuradas.' : ''}`
 
   console.log(`[SmartNotes] Prompt: ${userPrompt.length} chars, ${topics?.length || 0} topicos, ${observations?.length || 0} observacoes`)
 
@@ -323,7 +329,10 @@ Gere notas inteligentes no formato JSON especificado. Lembre-se:
     return { success: false, error: 'Estrutura de notas invalida - sections ausente' }
   }
 
-  if (!notes.deal_status) {
+  if (!isSales) {
+    // Non-sales meetings don't have deal status
+    delete notes.deal_status
+  } else if (!notes.deal_status) {
     notes.deal_status = {
       temperature: 'warm',
       probability: 'Indeterminada',
@@ -358,7 +367,7 @@ Gere notas inteligentes no formato JSON especificado. Lembre-se:
   // Add metadata
   notes.generated_at = new Date().toISOString()
 
-  console.log(`[SmartNotes] Notas geradas: ${notes.sections.length} secoes, temperatura: ${notes.deal_status.temperature}`)
+  console.log(`[SmartNotes] Notas geradas: ${notes.sections.length} secoes${notes.deal_status ? `, temperatura: ${notes.deal_status.temperature}` : ' (non-sales, sem deal_status)'}`)
 
   return { success: true, notes }
 }
