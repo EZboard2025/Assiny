@@ -2258,6 +2258,7 @@ function showMeetStartPrompt(meetTitle) {
 async function hideMeetStartPrompt() {
   meetStartPromptVisible = false
   if (meetStartPrompt) meetStartPrompt.style.display = 'none'
+  removeBarState()
 
   // Restore to expanded or collapsed state
   if (isExpanded) {
@@ -2338,6 +2339,7 @@ function showMeetPrompt() {
 async function hideMeetPrompt() {
   meetPromptVisible = false
   if (meetPrompt) meetPrompt.style.display = 'none'
+  removeBarState()
 
   // Restore to expanded or collapsed state
   if (isExpanded) {
