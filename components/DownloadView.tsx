@@ -22,7 +22,7 @@ export default function DownloadView() {
       name: 'Windows',
       subtitle: 'Windows 10 ou superior',
       file: '/downloads/Ramppy.exe',
-      version: '1.0.13',
+      version: '1.0.14',
       size: '~104 MB',
       icon: <Monitor className="w-6 h-6 text-blue-600" />,
       steps: [
