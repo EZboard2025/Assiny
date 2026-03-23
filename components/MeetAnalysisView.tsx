@@ -2715,7 +2715,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             {session.status === 'ended' && evaluation && (
               <div className="space-y-4">
                 {/* Non-sales meeting: show smart notes instead of SPIN */}
-                {(evaluation.meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) ? (
+                {((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) ? (
                   <>
                     <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
                       <div className="flex items-center gap-3 mb-3">
