@@ -253,7 +253,7 @@ export default function RoleplayPublico() {
       const { response, messages: updatedMessages } = await chatResponse.json()
       setMessages(updatedMessages)
 
-      const isFinalizationMessage = response.includes('Roleplay finalizado, aperte em finalizar sessão')
+      const isFinalizationMessage = response.includes('Roleplay finalizado, aguarde sua avaliação')
       await playAudioResponse(response, isFinalizationMessage)
     } catch (error) {
       console.error('Erro ao processar áudio:', error)

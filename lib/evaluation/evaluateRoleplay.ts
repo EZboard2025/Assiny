@@ -461,8 +461,8 @@ Ao analisar as objeções no diálogo, você DEVE:
 3. Se a objeção identificada corresponder a uma das configuradas, usar o ID fornecido
 4. Se for uma objeção não configurada, usar "objection_id": "não-configurada"
 
-Nota importante: observe sempre que quando um roleplay é completo, a fala "Roleplay finalizado, aperte em encerrar simulação" aparece, isso significa que a inteligência artificial que simula o cliente afirmou que o roleplay foi completo.
-Caso a venda não tenha sido realizada ou se a venda estiver incompleta (a frase "Roleplay finalizado, aperte em encerrar simulação" não apareça na transcrição), isso deverá impactar negativamente de forma brutal na nota do roleplay.
+Nota importante: observe sempre que quando um roleplay é completo, a fala "Roleplay finalizado, aguarde sua avaliação" aparece, isso significa que a inteligência artificial que simula o cliente afirmou que o roleplay foi completo.
+Caso a venda não tenha sido realizada ou se a venda estiver incompleta (a frase "Roleplay finalizado, aguarde sua avaliação" não apareça na transcrição), isso deverá impactar negativamente de forma brutal na nota do roleplay.
 
 FORMATO JSON DE RESPOSTA
 

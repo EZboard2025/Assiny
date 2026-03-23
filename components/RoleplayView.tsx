@@ -1410,7 +1410,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       setMessages(prev => [...prev, { role: 'client', text: data.message }])
 
       // Verificar se a mensagem contém a frase de finalização
-      const isFinalizationMessage = data.message.includes('Roleplay finalizado, aperte em finalizar sessão')
+      const isFinalizationMessage = data.message.includes('Roleplay finalizado, aguarde sua avaliação')
 
       if (isFinalizationMessage) {
         console.log('🎯 Detectada mensagem de finalização do roleplay!')
