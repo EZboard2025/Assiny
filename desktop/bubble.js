@@ -870,9 +870,9 @@ async function snapToEdge() {
     // Use saved display info — don't re-detect (bubble is off-screen now)
     const bar = getBarBounds(snappedEdge, snappedScreen)
 
-    applyBarState(snappedEdge)
     await window.electronAPI.setBubbleOpacity(1) // reset opacity after fade-out animation
-    window.electronAPI.setBubbleBounds(bar.x, bar.y, bar.w, bar.h)
+    await window.electronAPI.setBubbleBounds(bar.x, bar.y, bar.w, bar.h)
+    applyBarState(snappedEdge)
     isHidden = true
     isAnimating = false
   }, 300)
@@ -942,8 +942,8 @@ async function hideAtEdge() {
   const scr = snappedScreen || await window.electronAPI.getScreenSize()
   const bar = getBarBounds(snappedEdge, scr)
 
+  await window.electronAPI.setBubbleBounds(bar.x, bar.y, bar.w, bar.h)
   applyBarState(snappedEdge)
-  window.electronAPI.setBubbleBounds(bar.x, bar.y, bar.w, bar.h)
 
   isHidden = true
   setTimeout(() => { isAnimating = false }, 250)
