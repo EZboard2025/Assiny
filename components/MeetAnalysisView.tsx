@@ -2902,11 +2902,19 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
               <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-white rounded-t-2xl">
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                      <Video className="w-5 h-5 text-green-600" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) ? 'bg-blue-100' : 'bg-green-100'}`}>
+                      {((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score))
+                        ? <FileText className="w-5 h-5 text-blue-600" />
+                        : <Video className="w-5 h-5 text-green-600" />
+                      }
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">Avaliação da Reunião</h2>
+                      <h2 className="text-xl font-bold text-gray-900">
+                        {((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) ? 'Notas da Reunião' : 'Avaliação da Reunião'}
+                      </h2>
+                      {((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) && (
+                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Não é reunião de vendas</span>
+                      )}
                       {evaluation.seller_identification?.name && (
                         <p className="text-gray-500 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
                       )}
@@ -2919,15 +2927,17 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className={`text-4xl font-bold ${
-                      (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
-                      (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
-                    }`}>{evaluation.overall_score?.toFixed(1)}</div>
-                    <div className="text-gray-500 text-sm capitalize">{PERFORMANCE_LABELS[evaluation.performance_level] || evaluation.performance_level?.replace('_', ' ')}</div>
+                {!((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) && (
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className={`text-4xl font-bold ${
+                        (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
+                        (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
+                      }`}>{evaluation.overall_score?.toFixed(1)}</div>
+                      <div className="text-gray-500 text-sm capitalize">{PERFORMANCE_LABELS[evaluation.performance_level] || evaluation.performance_level?.replace('_', ' ')}</div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Content — Report style */}
@@ -2940,6 +2950,31 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                   </section>
                 )}
 
+                {/* Non-sales: show smart notes in modal */}
+                {((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) ? (
+                  <section className="mb-6">
+                    <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">Notas Inteligentes</h3>
+                    {(evaluation as any).smartNotes?.sections?.length > 0 ? (
+                      <div className="space-y-4">
+                        {(evaluation as any).smartNotes.sections.map((section: any, idx: number) => (
+                          <div key={idx} className="bg-gray-50 rounded-lg p-4">
+                            <h4 className="font-semibold text-gray-900 text-sm mb-2">{section.title}</h4>
+                            {section.insight && <p className="text-gray-600 text-xs mb-2 italic">{section.insight}</p>}
+                            {section.items?.map((item: any, i: number) => (
+                              <div key={i} className="flex gap-2 text-sm py-1 border-b border-gray-100 last:border-0">
+                                <span className="text-gray-500 font-medium min-w-[120px]">{item.label}:</span>
+                                <span className="text-gray-800">{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-sm">Esta reunião foi classificada como não sendo de vendas. Nenhuma análise SPIN foi gerada.</p>
+                    )}
+                  </section>
+                ) : (
+                <>
                 {/* SPIN */}
                 <section className="mb-6">
                   <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">Metodologia SPIN</h3>
@@ -3381,6 +3416,8 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                       </button>
                     </div>
                   </div>
+                )}
+                </>
                 )}
               </div>
 
