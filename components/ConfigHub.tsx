@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare, Send, Bot, Mic, Search } from 'lucide-react'
+import { X, Lock, Settings, Building2, Users, Target, Upload, Plus, Trash2, FileText, AlertCircle, CheckCircle, Loader2, UserCircle2, Edit2, Check, Eye, EyeOff, Tag as TagIcon, Filter, GripVertical, Sparkles, Globe, ChevronDown, ChevronUp, Link2, Clock, UserPlus, RefreshCw, BarChart3, Zap, Video, MessageSquare, Send, Bot, Mic, Search, Monitor } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   DndContext,
@@ -541,6 +541,9 @@ function ConfigurationInterface({
   const [playbookFileUploading, setPlaybookFileUploading] = useState(false)
   const [playbookFileError, setPlaybookFileError] = useState<string | null>(null)
 
+  // Método de gravação de reunião (company-level)
+  const [meetRecordingMethod, setMeetRecordingMethod] = useState<'bot' | 'desktop'>('bot')
+
   // Estados para Observações de Notas de Reunião
   const [meetObservations, setMeetObservations] = useState<{id: string, text: string}[]>([])
   const [newMeetObservation, setNewMeetObservation] = useState('')
@@ -575,6 +578,28 @@ function ConfigurationInterface({
       }
     } catch (error) {
       console.error('Erro ao carregar PDFs:', error)
+    }
+  }
+
+  // Salvar método de gravação
+  const updateRecordingMethod = async (method: 'bot' | 'desktop') => {
+    setMeetRecordingMethod(method)
+    if (!userCompanyId) return
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase
+        .from('companies')
+        .update({ meet_recording_method: method })
+        .eq('id', userCompanyId)
+
+      // Sync auto_record_enabled for all calendar connections of this company
+      const enabled = method === 'bot'
+      await supabase
+        .from('google_calendar_connections')
+        .update({ auto_record_enabled: enabled })
+        .eq('company_id', userCompanyId)
+    } catch (e) {
+      console.error('Erro ao salvar método de gravação:', e)
     }
   }
 
@@ -949,10 +974,23 @@ function ConfigurationInterface({
     }
   }, [userCompanyId, playbookLoaded])
 
-  // Carregar tópicos quando tab meet_notes estiver ativa
+  // Carregar tópicos e método de gravação quando tab meet_notes estiver ativa
   useEffect(() => {
     if (activeTab === 'meet_notes' && userCompanyId) {
       loadMeetTopics()
+      // Load recording method
+      const loadMethod = async () => {
+        const { supabase } = await import('@/lib/supabase')
+        const { data } = await supabase
+          .from('companies')
+          .select('meet_recording_method')
+          .eq('id', userCompanyId)
+          .single()
+        if (data?.meet_recording_method) {
+          setMeetRecordingMethod(data.meet_recording_method as 'bot' | 'desktop')
+        }
+      }
+      loadMethod()
     }
   }, [activeTab, userCompanyId])
 
@@ -5172,6 +5210,46 @@ ${companyData.dores_resolvidas || '(não preenchido)'}
         {/* Meet Notes Tab */}
         {activeTab === 'meet_notes' && (
           <div className="space-y-4">
+            {/* Método de Gravação */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-green-50 to-white flex items-center gap-2">
+                <Mic className="w-4 h-4 text-green-600" />
+                <h3 className="text-sm font-semibold text-gray-900">Método de Gravação</h3>
+              </div>
+              <div className="p-4">
+                <p className="text-xs text-gray-500 mb-3">Escolha como as reuniões da sua empresa serão gravadas e analisadas.</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateRecordingMethod('bot')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all border ${
+                      meetRecordingMethod === 'bot'
+                        ? 'bg-green-50 border-green-300 text-green-700'
+                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    <Globe className="w-4 h-4" />
+                    Bot de Reunião
+                  </button>
+                  <button
+                    onClick={() => updateRecordingMethod('desktop')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all border ${
+                      meetRecordingMethod === 'desktop'
+                        ? 'bg-green-50 border-green-300 text-green-700'
+                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    <Monitor className="w-4 h-4" />
+                    Desktop App
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">
+                  {meetRecordingMethod === 'bot'
+                    ? 'O bot entra automaticamente nas reuniões agendadas no Google Calendar.'
+                    : 'As reuniões são gravadas diretamente pelo app desktop instalado no computador do vendedor.'}
+                </p>
+              </div>
+            </div>
+
             {/* Tópicos atuais — compact pills with toggles */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-cyan-50 to-white flex items-center justify-between">

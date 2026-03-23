@@ -67,6 +67,19 @@ async function handleSchedule() {
       if (conn && conn.status === 'disconnected') continue
       if (conn && conn.auto_record_enabled === false) continue
 
+      // Skip if company uses desktop app instead of bot
+      if (meeting.company_id) {
+        const { data: company } = await supabaseAdmin
+          .from('companies')
+          .select('meet_recording_method')
+          .eq('id', meeting.company_id)
+          .single()
+        if (company?.meet_recording_method === 'desktop') {
+          console.log(`[Auto-Schedule] Skipping "${meeting.event_title}" — company uses desktop app`)
+          continue
+        }
+      }
+
       // Create Recall.ai bot for this meeting
       const botResponse = await createRecallBot(meeting.meet_link, meeting.user_id, meeting.company_id)
 

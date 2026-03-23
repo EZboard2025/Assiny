@@ -95,7 +95,8 @@
       "Bash(grep -E \"\\\\.\\(sql|ts|js\\)$\")",
       "Bash(pkill -9 -f \"electron\")",
       "Bash(node -c recording.js)",
-      "Bash(grep -r \"objections_analysis\" /Users/arthurxavier/assiny/Assiny/components/Historico* --include=\"*.tsx\" -A 5)"
+      "Bash(grep -r \"objections_analysis\" /Users/arthurxavier/assiny/Assiny/components/Historico* --include=\"*.tsx\" -A 5)",
+      "mcp__claude_ai_Supabase__apply_migration"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
