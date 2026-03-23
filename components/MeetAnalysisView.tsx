@@ -188,6 +188,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [evaluation, setEvaluation] = useState<MeetEvaluation | null>(null)
+  const [smartNotes, setSmartNotes] = useState<any>(null)
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [showEvaluationModal, setShowEvaluationModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -353,7 +354,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         if (restoredBotId) {
           const { data: existingEval } = await supabase
             .from('meet_evaluations')
-            .select('evaluation')
+            .select('evaluation, smart_notes')
             .eq('user_id', user.id)
             .eq('meeting_id', restoredBotId)
             .maybeSingle()
@@ -364,6 +365,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             if (existingEval.evaluation) {
               setEvaluation(existingEval.evaluation)
             }
+            if (existingEval.smart_notes) setSmartNotes(existingEval.smart_notes)
             setSavedToHistory(true)
             setSession(prev => prev ? { ...prev, status: 'ended' } : null)
             localStorage.removeItem('meetActiveSession')
@@ -458,13 +460,14 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         if (!user) return
         const { data } = await supabase
           .from('meet_evaluations')
-          .select('id, evaluation, meeting_category')
+          .select('id, evaluation, meeting_category, smart_notes')
           .eq('meeting_id', session.botId)
           .maybeSingle()
         if (data) {
           console.log('✅ Eval found in DB while polling (evaluating status)')
           if (evalPollRef.current) { clearInterval(evalPollRef.current); evalPollRef.current = null }
           if (data.evaluation) setEvaluation(data.evaluation)
+          if (data.smart_notes) setSmartNotes(data.smart_notes)
           setSavedToHistory(true)
           setSession(prev => prev ? { ...prev, status: 'ended' } : null)
           localStorage.removeItem('meetActiveSession')
@@ -969,13 +972,14 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
     try {
       const { data: existingEval } = await supabase
         .from('meet_evaluations')
-        .select('id, evaluation, meeting_category')
+        .select('id, evaluation, meeting_category, smart_notes')
         .eq('meeting_id', botId)
         .maybeSingle()
 
       if (existingEval) {
         console.log('✅ Avaliação já existe (processada em background), carregando...', existingEval.meeting_category)
         if (existingEval.evaluation) setEvaluation(existingEval.evaluation)
+        if (existingEval.smart_notes) setSmartNotes(existingEval.smart_notes)
         setSavedToHistory(true)
         setSession(prev => prev ? { ...prev, status: 'ended' } : null)
         setShowEvaluationModal(true)
@@ -1172,6 +1176,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
           console.log('📖 Playbook Adherence:', data.evaluation.playbook_adherence.overall_adherence_score + '%')
         }
         setEvaluation(data.evaluation)
+        if (data.smartNotes) setSmartNotes(data.smartNotes)
         setShowEvaluationModal(true)
 
         // Save to history + generate simulation in parallel
@@ -1205,6 +1210,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
     setMeetUrl('')
     setError('')
     setEvaluation(null)
+    setSmartNotes(null)
     setIsEvaluating(false)
     setSavedToHistory(false)
     setSimulationConfig(null)
@@ -2738,7 +2744,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                       )}
                     </div>
                     {/* Show smart notes sections if available */}
-                    {(evaluation as any).smartNotes?.sections?.map((section: any, idx: number) => (
+                    {smartNotes?.sections?.map((section: any, idx: number) => (
                       <div key={idx} className="bg-white rounded-xl p-4 border border-gray-200">
                         <h4 className="font-semibold text-gray-900 text-sm mb-2">{section.title}</h4>
                         {section.insight && <p className="text-gray-600 text-xs mb-2">{section.insight}</p>}
@@ -2954,9 +2960,9 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                 {((evaluation as any).meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) ? (
                   <section className="mb-6">
                     <h3 className="text-base font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3">Notas Inteligentes</h3>
-                    {(evaluation as any).smartNotes?.sections?.length > 0 ? (
+                    {smartNotes?.sections?.length > 0 ? (
                       <div className="space-y-4">
-                        {(evaluation as any).smartNotes.sections.map((section: any, idx: number) => (
+                        {smartNotes.sections.map((section: any, idx: number) => (
                           <div key={idx} className="bg-gray-50 rounded-lg p-4">
                             <h4 className="font-semibold text-gray-900 text-sm mb-2">{section.title}</h4>
                             {section.insight && <p className="text-gray-600 text-xs mb-2 italic">{section.insight}</p>}
