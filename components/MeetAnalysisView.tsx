@@ -2975,18 +2975,6 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                           </div>
                         ))}
                       </div>
-                    ) : session?.transcript?.length ? (
-                      <div className="space-y-2">
-                        <p className="text-gray-500 text-sm mb-3">Esta reunião não é de vendas. Confira a transcrição:</p>
-                        <div className="bg-gray-50 rounded-lg p-4 max-h-[400px] overflow-y-auto space-y-2">
-                          {session.transcript.map((seg: any, i: number) => (
-                            <div key={i} className="text-sm">
-                              <span className="font-medium text-gray-700">{seg.speaker}:</span>{' '}
-                              <span className="text-gray-600">{seg.text}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     ) : (
                       <p className="text-gray-500 text-sm">Esta reunião foi classificada como não sendo de vendas. Nenhuma análise SPIN foi gerada.</p>
                     )}
