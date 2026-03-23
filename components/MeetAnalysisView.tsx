@@ -2714,65 +2714,106 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             {/* Evaluation Results - Compact View */}
             {session.status === 'ended' && evaluation && (
               <div className="space-y-4">
-                {/* Score Header - Click to open modal */}
-                <div
-                  onClick={() => setShowEvaluationModal(true)}
-                  className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-1">Avaliação da Reunião</h3>
-                      {evaluation.seller_identification?.name && (
-                        <p className="text-gray-600 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
-                      )}
-                      <p className="text-green-600 text-sm mt-2 font-medium">Clique para ver detalhes completos →</p>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-5xl font-bold ${
-                        (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
-                        (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
-                      }`}>{evaluation.overall_score?.toFixed(1)}</div>
-                      <div className="text-gray-500 text-sm capitalize">{PERFORMANCE_LABELS[evaluation.performance_level] || evaluation.performance_level?.replace('_', ' ')}</div>
-                      {evaluation.playbook_adherence && (
-                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-600">
-                          <BookOpen className="w-4 h-4" />
-                          <span className="text-sm">
-                            Playbook: {evaluation.playbook_adherence.overall_adherence_score}%
-                          </span>
+                {/* Non-sales meeting: show smart notes instead of SPIN */}
+                {(evaluation.meeting_type === 'non_sales' || (!evaluation.spin_evaluation && !evaluation.overall_score)) ? (
+                  <>
+                    <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-blue-600" />
                         </div>
-                      )}
-                      {savedToHistory && (
-                        <div className="mt-2 flex items-center gap-1 justify-end text-green-600">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm">Salvo no histórico</span>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">Notas da Reunião</h3>
+                          <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Não é reunião de vendas</span>
                         </div>
-                      )}
-                      {isSaving && (
-                        <div className="mt-2 flex items-center gap-1 justify-end text-gray-500">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span className="text-sm">Salvando...</span>
-                        </div>
+                        {savedToHistory && (
+                          <div className="ml-auto flex items-center gap-1 text-green-600">
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="text-sm">Salvo no histórico</span>
+                          </div>
+                        )}
+                      </div>
+                      {evaluation.executive_summary && (
+                        <p className="text-gray-700 text-sm">{evaluation.executive_summary}</p>
                       )}
                     </div>
-                  </div>
-                </div>
+                    {/* Show smart notes sections if available */}
+                    {(evaluation as any).smartNotes?.sections?.map((section: any, idx: number) => (
+                      <div key={idx} className="bg-white rounded-xl p-4 border border-gray-200">
+                        <h4 className="font-semibold text-gray-900 text-sm mb-2">{section.title}</h4>
+                        {section.insight && <p className="text-gray-600 text-xs mb-2">{section.insight}</p>}
+                        {section.items?.map((item: any, i: number) => (
+                          <div key={i} className="flex gap-2 text-sm py-1">
+                            <span className="text-gray-500 font-medium min-w-[100px]">{item.label}:</span>
+                            <span className="text-gray-800">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {/* Score Header - Click to open modal */}
+                    <div
+                      onClick={() => setShowEvaluationModal(true)}
+                      className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-1">Avaliação da Reunião</h3>
+                          {evaluation.seller_identification?.name && (
+                            <p className="text-gray-600 text-sm">Vendedor: {evaluation.seller_identification.name}</p>
+                          )}
+                          <p className="text-green-600 text-sm mt-2 font-medium">Clique para ver detalhes completos →</p>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-5xl font-bold ${
+                            (evaluation.overall_score || 0) >= 7 ? 'text-green-600' :
+                            (evaluation.overall_score || 0) >= 5 ? 'text-amber-600' : 'text-red-600'
+                          }`}>{evaluation.overall_score?.toFixed(1)}</div>
+                          <div className="text-gray-500 text-sm capitalize">{PERFORMANCE_LABELS[evaluation.performance_level] || evaluation.performance_level?.replace('_', ' ')}</div>
+                          {evaluation.playbook_adherence && (
+                            <div className="mt-2 flex items-center gap-1 justify-end text-gray-600">
+                              <BookOpen className="w-4 h-4" />
+                              <span className="text-sm">
+                                Playbook: {evaluation.playbook_adherence.overall_adherence_score}%
+                              </span>
+                            </div>
+                          )}
+                          {savedToHistory && (
+                            <div className="mt-2 flex items-center gap-1 justify-end text-green-600">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="text-sm">Salvo no histórico</span>
+                            </div>
+                          )}
+                          {isSaving && (
+                            <div className="mt-2 flex items-center gap-1 justify-end text-gray-500">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span className="text-sm">Salvando...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Quick SPIN Scores */}
-                <div className="bg-white rounded-xl p-4 border border-gray-200">
-                  <div className="grid grid-cols-4 gap-3">
-                    {['S', 'P', 'I', 'N'].map((letter) => {
-                      const score = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]?.final_score || 0
-                      const color = score >= 7 ? 'text-green-600 bg-green-50' : score >= 5 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50'
-                      const labels: Record<string, string> = { S: 'S', P: 'P', I: 'I', N: 'N' }
-                      return (
-                        <div key={letter} className={`rounded-lg p-3 text-center ${color.split(' ')[1]}`}>
-                          <div className={`text-2xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
-                          <div className="text-gray-600 text-xs font-medium">{labels[letter]}</div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                    {/* Quick SPIN Scores */}
+                    <div className="bg-white rounded-xl p-4 border border-gray-200">
+                      <div className="grid grid-cols-4 gap-3">
+                        {['S', 'P', 'I', 'N'].map((letter) => {
+                          const score = evaluation.spin_evaluation?.[letter as keyof typeof evaluation.spin_evaluation]?.final_score || 0
+                          const color = score >= 7 ? 'text-green-600 bg-green-50' : score >= 5 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50'
+                          const labels: Record<string, string> = { S: 'S', P: 'P', I: 'I', N: 'N' }
+                          return (
+                            <div key={letter} className={`rounded-lg p-3 text-center ${color.split(' ')[1]}`}>
+                              <div className={`text-2xl font-bold ${color.split(' ')[0]}`}>{score.toFixed(1)}</div>
+                              <div className="text-gray-600 text-xs font-medium">{labels[letter]}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 justify-center">
