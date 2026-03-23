@@ -897,7 +897,7 @@ async function peekFromEdge() {
   let resizeX = isVert ? pos.x : pos.x + (BAR_LENGTH - BUBBLE_SIZE) / 2
   let resizeY = isVert ? pos.y + (BAR_LENGTH - BUBBLE_SIZE) / 2 : pos.y
 
-  window.electronAPI.setBubbleBounds(resizeX, resizeY, BUBBLE_SIZE, BUBBLE_SIZE)
+  await window.electronAPI.setBubbleBounds(resizeX, resizeY, BUBBLE_SIZE, BUBBLE_SIZE)
 
   // Animate to peek position
   let targetX, targetY
@@ -980,6 +980,9 @@ bubble.addEventListener('pointerdown', (e) => {
   // If in bar state, convert back to bubble for dragging
   if (bubble.classList.contains('edge-bar')) {
     removeBarState()
+    // Resize window back to bubble size (was bar size 18x180)
+    const pos = { x: e.screenX - BUBBLE_SIZE / 2, y: e.screenY - BUBBLE_SIZE / 2 }
+    window.electronAPI.setBubbleBounds(pos.x, pos.y, BUBBLE_SIZE, BUBBLE_SIZE)
     snappedEdge = null
     isHidden = false
   }
