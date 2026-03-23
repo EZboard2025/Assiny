@@ -27,23 +27,7 @@ export async function fetchTranscriptFromRecallApi(botId: string): Promise<Trans
   }
 
   try {
-    // Primary: Use bot-specific transcript endpoint (guaranteed to be only this bot's data)
-    const botTranscriptResponse = await fetch(`${RECALL_API_URL}/bot/${botId}/transcript/`, { headers })
-
-    if (botTranscriptResponse.ok) {
-      const botTranscriptData = await botTranscriptResponse.json()
-      const segments = parseBotTranscriptData(botTranscriptData)
-
-      if (segments.length > 0) {
-        console.log(`[RecallAPI] Got ${segments.length} segments from /bot/${botId}/transcript/`)
-        return segments
-      }
-    } else {
-      const errorBody = await botTranscriptResponse.text().catch(() => '')
-      console.warn(`[RecallAPI] Bot transcript endpoint returned ${botTranscriptResponse.status}: ${errorBody.slice(0, 200)}`)
-    }
-
-    // Fallback: Use recording's direct download URL
+    // Step 1: Get bot details to find transcript ID
     const botResponse = await fetch(`${RECALL_API_URL}/bot/${botId}/`, { headers })
 
     if (!botResponse.ok) {
@@ -52,25 +36,43 @@ export async function fetchTranscriptFromRecallApi(botId: string): Promise<Trans
     }
 
     const botData = await botResponse.json()
-    const recordings = botData.recordings || []
 
-    if (recordings.length === 0) {
-      console.log('[RecallAPI] No recordings found for bot')
-      return []
+    // Step 2: Try new transcript endpoint using transcript ID from bot data
+    const transcriptId = botData.transcript?.id
+    if (transcriptId) {
+      console.log(`[RecallAPI] Fetching transcript via /transcript/${transcriptId}/`)
+      const transcriptResponse = await fetch(`${RECALL_API_URL}/transcript/${transcriptId}/`, { headers })
+
+      if (transcriptResponse.ok) {
+        const transcriptData = await transcriptResponse.json()
+        const items = transcriptData?.results || (Array.isArray(transcriptData) ? transcriptData : [])
+        const segments = parseBotTranscriptData({ results: items })
+
+        if (segments.length > 0) {
+          console.log(`[RecallAPI] Got ${segments.length} segments from /transcript/${transcriptId}/`)
+          return segments
+        }
+      } else {
+        const errorBody = await transcriptResponse.text().catch(() => '')
+        console.warn(`[RecallAPI] Transcript endpoint returned ${transcriptResponse.status}: ${errorBody.slice(0, 200)}`)
+      }
     }
 
-    const latestRecording = recordings[recordings.length - 1]
+    // Step 3: Fallback — recording's direct download URL
+    const recordings = botData.recordings || []
+    if (recordings.length > 0) {
+      const latestRecording = recordings[recordings.length - 1]
 
-    // Try the recording's direct download URL (per-recording, no mixing)
-    if (latestRecording.media_shortcuts?.transcript?.data?.download_url) {
-      console.log('[RecallAPI] Using recording download URL fallback...')
-      const downloadResponse = await fetch(latestRecording.media_shortcuts.transcript.data.download_url)
-      if (downloadResponse.ok) {
-        const transcriptData = await downloadResponse.json()
-        const segments = parseTranscriptData(transcriptData)
-        if (segments.length > 0) {
-          console.log(`[RecallAPI] Got ${segments.length} segments from download URL`)
-          return segments
+      if (latestRecording.media_shortcuts?.transcript?.data?.download_url) {
+        console.log('[RecallAPI] Using recording download URL fallback...')
+        const downloadResponse = await fetch(latestRecording.media_shortcuts.transcript.data.download_url)
+        if (downloadResponse.ok) {
+          const transcriptData = await downloadResponse.json()
+          const segments = parseTranscriptData(transcriptData)
+          if (segments.length > 0) {
+            console.log(`[RecallAPI] Got ${segments.length} segments from download URL`)
+            return segments
+          }
         }
       }
     }
