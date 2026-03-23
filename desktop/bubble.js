@@ -980,11 +980,13 @@ bubble.addEventListener('pointerdown', (e) => {
   // If in bar state, convert back to bubble for dragging
   if (bubble.classList.contains('edge-bar')) {
     removeBarState()
-    // Resize window back to bubble size (was bar size 18x180)
-    const pos = { x: e.screenX - BUBBLE_SIZE / 2, y: e.screenY - BUBBLE_SIZE / 2 }
-    window.electronAPI.setBubbleBounds(pos.x, pos.y, BUBBLE_SIZE, BUBBLE_SIZE)
     snappedEdge = null
     isHidden = false
+    // Await resize in async IIFE — must complete before drag starts
+    ;(async () => {
+      const currentPos = await window.electronAPI.getBubblePos()
+      await window.electronAPI.setBubbleBounds(currentPos.x, currentPos.y, BUBBLE_SIZE, BUBBLE_SIZE)
+    })()
   }
 })
 
