@@ -147,6 +147,49 @@ export async function POST(request: Request) {
         }
       }
 
+      // Handle waiting room timeout — bot was never admitted to the meeting
+      if (eventType === 'bot.call_ended' && payload.data?.data?.sub_code === 'timeout_exceeded_waiting_room') {
+        console.log(`⏳ [MeetBG] Bot ${botId} was not admitted to the meeting (waiting room timeout)`)
+        processedBots.add(botId) // Prevent processCompletedBot from running on bot.done
+
+        await supabaseAdmin
+          .from('meet_bot_sessions')
+          .update({
+            status: 'error',
+            recall_status: 'timeout_exceeded_waiting_room',
+            error_message: 'O bot não foi aceito na reunião — ficou na sala de espera até o tempo expirar.',
+            updated_at: new Date().toISOString()
+          })
+          .eq('bot_id', botId)
+
+        // Get user_id for notification
+        const { data: session } = await supabaseAdmin
+          .from('meet_bot_sessions')
+          .select('user_id')
+          .eq('bot_id', botId)
+          .single()
+
+        if (session?.user_id) {
+          await supabaseAdmin
+            .from('user_notifications')
+            .insert({
+              user_id: session.user_id,
+              type: 'meet_evaluation_error',
+              title: 'Bot não foi aceito na reunião',
+              message: 'O bot ficou na sala de espera e não foi admitido. Certifique-se de aceitar o bot quando ele entrar na reunião.',
+              data: { botId, reason: 'waiting_room_timeout' }
+            })
+        }
+
+        // Also update calendar_scheduled_bots
+        try {
+          await supabaseAdmin
+            .from('calendar_scheduled_bots')
+            .update({ bot_status: 'error', error_message: 'Bot não admitido na reunião', updated_at: new Date().toISOString() })
+            .eq('bot_id', botId)
+        } catch { /* Non-fatal */ }
+      }
+
       // When bot finishes (bot.done), trigger background evaluation (fire-and-forget)
       if (eventType === 'bot.done' && !processedBots.has(botId)) {
         processedBots.add(botId)
