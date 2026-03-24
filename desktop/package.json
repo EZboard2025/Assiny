@@ -1,6 +1,6 @@
 {
   "name": "ramppy",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "Ramppy — Plataforma de treinamento de vendas com IA",
   "main": "main.js",
   "scripts": {

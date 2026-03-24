@@ -1275,26 +1275,28 @@ ipcMain.on('start-drag', () => {
   if (!bubbleWindow || bubbleWindow.isDestroyed()) return
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
 
-  // Calculate offset entirely in main process — avoids DPI mismatch
-  const cursor = screen.getCursorScreenPoint()
+  // Delta-based drag: track cursor movement between frames, apply to window position.
+  // Avoids DPI rounding drift that accumulates with absolute offset approach.
+  let prevCursor = screen.getCursorScreenPoint()
   const bounds = bubbleWindow.getBounds()
-  dragOffsetX = Math.max(0, Math.min(cursor.x - bounds.x, bounds.width))
-  dragOffsetY = Math.max(0, Math.min(cursor.y - bounds.y, bounds.height))
-  const dpi = screen.getPrimaryDisplay().scaleFactor
-  console.log(`[Drag] Start — cursor: ${cursor.x},${cursor.y} bounds: ${bounds.x},${bounds.y} offset: ${dragOffsetX},${dragOffsetY} DPI: ${dpi} size: ${bounds.width}x${bounds.height}`)
-
   const all = getAllScreenBounds()
   const w = bounds.width
   const h = bounds.height
 
-  let lastSetX = -9999, lastSetY = -9999
+  let lastSetX = bounds.x, lastSetY = bounds.y
   dragInterval = setInterval(() => {
     if (!bubbleWindow || bubbleWindow.isDestroyed()) {
       clearInterval(dragInterval); dragInterval = null; return
     }
     const cur = screen.getCursorScreenPoint()
-    let x = Math.round(cur.x - dragOffsetX)
-    let y = Math.round(cur.y - dragOffsetY)
+    const dx = cur.x - prevCursor.x
+    const dy = cur.y - prevCursor.y
+    prevCursor = cur
+
+    if (dx === 0 && dy === 0) return
+
+    let x = lastSetX + dx
+    let y = lastSetY + dy
 
     // Clamp
     if (x < all.x) x = all.x
@@ -1302,8 +1304,6 @@ ipcMain.on('start-drag', () => {
     if (x + w > all.maxX) x = all.maxX - w
     if (y + h > all.maxY) y = all.maxY - h
 
-    // Only call setPosition when target actually changed — prevents DPI rounding drift
-    if (x === lastSetX && y === lastSetY) return
     lastSetX = x
     lastSetY = y
 
