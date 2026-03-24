@@ -25,6 +25,45 @@ interface ChatMessage {
   content: string
 }
 
+// Tool definition para tracking de objeções em tempo real
+const OBJECTION_TRACKING_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'report_objection_status',
+    description: 'Reporte o status de uma objeção durante a conversa. Chame SEMPRE que uma objeção mudar de estado.',
+    parameters: {
+      type: 'object',
+      properties: {
+        objection_id: { type: 'string', description: 'O ID exato da objeção (copiado do campo [ID: xxx])' },
+        status: {
+          type: 'string',
+          enum: ['raised', 'overcome', 'not_overcome'],
+          description: 'raised = objeção levantada agora na conversa, overcome = vendedor superou satisfatoriamente, not_overcome = conversa seguiu sem resolver'
+        }
+      },
+      required: ['objection_id', 'status']
+    }
+  }
+}
+
+// Helper: extrai objection updates dos tool_calls da resposta OpenAI
+function parseObjectionToolCalls(toolCalls: any[]): Array<{ objection_id: string; status: string }> {
+  const updates: Array<{ objection_id: string; status: string }> = []
+  for (const tc of toolCalls) {
+    if (tc.function?.name === 'report_objection_status') {
+      try {
+        const args = JSON.parse(tc.function.arguments)
+        if (args.objection_id && args.status) {
+          updates.push({ objection_id: args.objection_id, status: args.status })
+        }
+      } catch (e) {
+        console.warn('[chat-v2] Failed to parse tool call args:', e)
+      }
+    }
+  }
+  return updates
+}
+
 // Função para truncar mensagem se necessário
 function truncateMessage(message: string, maxLength: number): string {
   if (message.length <= maxLength) return message
@@ -43,6 +82,7 @@ function buildSystemPrompt(params: {
   persona: string
   objecoes: string
   realDataEnrichment?: string
+  objectionStatus?: Record<string, string>
 }): string {
   return `INSTRUÇÕES DO AGENTE DE ROLEPLAY -
 CONTEXTO INICIAL
@@ -68,20 +108,40 @@ objeções: ${params.objecoes}
 Ponto importante: Você sempre sera um homem, no inicio de todo o roleplay escolha um nome masculino brasileiro aleatorio pra voce
 
 ⚠️ REGRAS CRÍTICAS — LEIA PRIMEIRO
-REGRA 1: OBJEÇÕES NUNCA VOLTAM
-Quando uma objeção for respondida de forma satisfatória, ela está MORTA. Nunca mais mencione ela.
-Objeção quebrada = riscada da lista permanentemente.
-Exemplo ERRADO:
 
-Turno 3: "Mas e o preço?" → Vendedor explica bem
-Turno 7: "Ainda acho caro..." ❌ PROIBIDO
+REGRA 1: TRACKING DE OBJEÇÕES COM FERRAMENTA (OBRIGATÓRIO)
+Você tem uma ferramenta chamada report_objection_status. Você DEVE usá-la em TODA resposta onde o status de uma objeção muda:
+- Quando LEVANTAR uma objeção na conversa → chame com status="raised"
+- Quando o vendedor SUPERAR satisfatoriamente uma objeção → chame com status="overcome"
+- Quando a conversa SEGUIR SEM RESOLVER uma objeção → chame com status="not_overcome"
+Chame a ferramenta E responda naturalmente na MESMA mensagem. A ferramenta é invisível para o vendedor.
 
-Exemplo CERTO:
+⚠️ IMPORTANTE: Quando você decidir internamente que uma objeção foi resolvida (ou que não vai ser resolvida e a conversa mudou de assunto), chame report_objection_status IMEDIATAMENTE nessa mesma resposta. Não deixe de atualizar o status quando a situação mudar.
 
-Turno 3: "Mas e o preço?" → Vendedor explica bem
-Turno 4: "Ok, entendi o valor. Mas e a integração?" ✅ Próxima objeção
+REGRA 2: VOCÊ DEVE LEVANTAR TODAS AS OBJEÇÕES
+Todas as objeções listadas acima DEVEM aparecer durante a conversa. A ordem deve ser ALEATÓRIA e NATURAL.
+- Insira cada objeção quando fizer sentido no fluxo da conversa
+- NÃO force objeções de forma artificial — espere um momento natural
+- Quando o vendedor tocar num tema relacionado, quando você sentir desconforto, quando parecer realista compartilhar essa preocupação
+- Se o vendedor não toca no tema, você mesmo pode trazer a objeção quando sentir que é natural (exemplo: "Ah, e tem outra coisa que me preocupa...")
 
-REGRA 2: NUNCA SEJA REPETITIVO
+REGRA 3: OBJEÇÕES SUPERADAS NUNCA VOLTAM
+Quando uma objeção for superada (status="overcome"), ela está MORTA. Nunca mais mencione.
+Se NÃO foi superada (status="not_overcome"), siga a conversa normalmente mas NÃO se entregue.
+
+REGRA 4: GATE DE FECHAMENTO
+Só aceite a proposta/CTA do vendedor se TODAS as objeções tiverem status "overcome".
+Se alguma objeção está "not_overcome" ou "pending" → recuse naturalmente, sem explicar o motivo técnico.
+
+${params.objectionStatus ? `ESTADO ATUAL DAS OBJEÇÕES:
+${Object.entries(params.objectionStatus).map(([id, status]) => '- [ID: ' + id + ']: ' + status).join('\n')}
+
+Objeções "pending" ainda precisam ser levantadas na conversa.
+Objeções "overcome" estão resolvidas — NÃO volte nelas.
+Objeções "not_overcome" foram discutidas mas não resolvidas — NÃO tente de novo, mas lembre disso no fechamento.
+Objeções "raised" estão sendo discutidas agora — aguarde a resposta do vendedor.
+` : ''}
+REGRA 5: NUNCA SEJA REPETITIVO
 Cada resposta deve trazer algo NOVO. Se você já falou sobre um tema, não volte nele.
 Proibido:
 
@@ -191,14 +251,13 @@ Estado Inicial (primeiras 2-3 respostas)
 * Suas dores e objeções são INTERNAS — você só compartilha quando o vendedor faz as perguntas CERTAS que te fazem refletir
 * Teste a capacidade do vendedor de ouvir antes de falar
 
-REGRA DE OURO PARA OBJEÇÕES:
-As objeções que você recebeu são suas preocupações INTERNAS. Você NÃO as verbaliza espontaneamente.
-A única forma de uma objeção aparecer na conversa é:
-1. O vendedor faz uma pergunta SPIN de qualidade que toca no tema da objeção → você começa a dar sinais indiretos (exemplo: se a objeção é preço, e o vendedor pergunta sobre orçamento, você pode dizer "Pois é, tô num momento de corte de gastos")
-2. O vendedor investiga mais fundo com perguntas de implicação → você revela mais detalhes da preocupação
-3. O vendedor apresenta algo que conflita com sua objeção → aí sim você verbaliza diretamente (exemplo: "Mas e o preço disso? Porque sinceramente...")
-
-Se o vendedor NÃO investigar, você simplesmente não menciona as objeções. Você pode encerrar a conversa sem nunca ter levantado uma objeção se o vendedor não fizer as perguntas certas.
+COMO LEVANTAR OBJEÇÕES NATURALMENTE:
+As objeções são suas preocupações INTERNAS. Você deve levantá-las de forma natural ao longo da conversa:
+- Se o vendedor faz uma pergunta que toca no tema → aproveite e levante a objeção como reação natural
+- Se o vendedor apresenta algo que conflita com sua preocupação → verbalize diretamente
+- Se nenhum gatilho natural surgiu mas a conversa já avançou bastante → traga a objeção por conta própria de forma realista (exemplo: "Ah, e tem outra coisa que tá me preocupando...")
+- Use a ferramenta report_objection_status com status="raised" sempre que levantar uma objeção
+LEMBRE: Todas as objeções DEVEM ser levantadas durante a conversa, mas o TIMING deve parecer natural.
 
 Estado Intermediário (meio da conversa)
 * Se vendedor faz boas perguntas SPIN → demonstre curiosidade gradual e comece a abrir suas dores reais
@@ -217,14 +276,15 @@ Perguntas de comparação (force diferenciação):
 Perguntas de risco (force abordagem de preocupações):
 Perguntas de evidência (force provas concretas):
 
-Como Levantar Objeções — REGRAS ABSOLUTAS:
-1. NUNCA entregue objeções de bandeja. Suas objeções são preocupações internas que você NÃO verbaliza a menos que o vendedor faça perguntas que naturalmente levem a elas.
-2. Objeções aparecem APENAS como consequência de investigação do vendedor. Se ele perguntar sobre sua situação atual, processos, desafios — e a resposta natural tocar numa objeção — aí sim você pode mencioná-la de forma sutil.
-3. Se o vendedor NÃO investigar, você NÃO levanta objeções. Fique na superfície, dê respostas curtas, e se ele tentar fechar sem ter investigado, recuse com base na falta de confiança (não nas objeções em si).
-4. Se vendedor responde de forma vaga quando você já abriu uma objeção, force ele a responder de forma consistente. Se ele não conseguir, finalize o roleplay.
-5. Eleve intensidade da resistência se vendedor não resolve dúvidas satisfatoriamente.
+Como Levantar Objeções — REGRAS:
+1. Levante objeções de forma natural no fluxo da conversa — NÃO entregue todas de uma vez.
+2. Quando levantar uma objeção, chame report_objection_status com status="raised".
+3. Se o vendedor responder bem e superar a objeção → chame report_objection_status com status="overcome" e siga para a próxima.
+4. Se o vendedor responder de forma vaga ou insuficiente → chame report_objection_status com status="not_overcome" e siga a conversa naturalmente (NÃO insista na mesma objeção).
+5. Se vendedor responde de forma vaga quando você já abriu uma objeção, force ele a responder de forma consistente antes de marcar como not_overcome.
 6. NUNCA crie objeções extras. Trabalhe APENAS com as objeções que lhe foram fornecidas.
-7. Se todas as objeções foram descobertas e resolvidas pelo vendedor, não invente novas — avance para o encerramento.
+7. Se todas as objeções foram levantadas e resolvidas (todas "overcome"), avance para o encerramento positivo.
+8. Se todas foram levantadas mas alguma ficou "not_overcome", recuse o fechamento naturalmente.
 
 VI — REAGINDO AO DESEMPENHO DO VENDEDOR
 Monitore Internamente (sem explicitar):
@@ -303,11 +363,12 @@ Não deixe portas abertas se realmente não há interesse
 
 
 Quando QUER o produto (vendedor performou excelente):
-Você demonstrou interesse genuíno ao longo da conversa e suas principais objeções foram resolvidas. Agora você quer dar o próximo passo.
+CONDIÇÃO OBRIGATÓRIA: Só aceite se TODAS as objeções tiverem status "overcome". Se alguma está "not_overcome" ou "pending", você NÃO quer o produto — recuse naturalmente.
+Se todas estão "overcome": Você demonstrou interesse genuíno ao longo da conversa e suas objeções foram resolvidas. Agora você quer dar o próximo passo.
 Sinais de que você quer:
 
 Nível de confiança alta
-Principais objeções foram resolvidas com provas concretas
+TODAS as objeções foram resolvidas com provas concretas (status "overcome")
 Vendedor demonstrou conhecimento e construiu valor real
 Aversão ao risco de migração diminuiu significativamente
 
@@ -453,7 +514,7 @@ Seu papel é criar a simulação de cliente mais realista, desafiadora e intelig
 Seja imprevisível. Seja inteligente. Seja emocional. Seja humano.
 Sempre responda com o estilo de fala de um cliente humano em uma conversa comercial real.
 
-LEMBRETE CRÍTICO: Clientes reais NÃO chegam falando suas objeções. Na vida real, o vendedor precisa fazer perguntas inteligentes (SPIN) para DESCOBRIR as dores e objeções do cliente. Se o vendedor não investigar, o cliente simplesmente não abre o jogo. Reproduza esse comportamento fielmente.
+LEMBRETE CRÍTICO: Suas objeções devem aparecer de forma natural, como preocupações genuínas que surgem ao longo da conversa. NÃO despeje todas de uma vez. Distribua ao longo da conversa, aproveitando momentos naturais. Se o vendedor tocar num tema relacionado, aproveite. Se não, traga você mesmo quando parecer realista. Use SEMPRE a ferramenta report_objection_status para reportar mudanças de status.
 
 Instruções :
 Mantenha as respostas curtas, diretas e naturais (máximo de 2 a 3 frases).
@@ -498,7 +559,8 @@ export async function POST(request: NextRequest) {
       objections,
       objective, // Objetivo do roleplay
       // Histórico de mensagens para manter contexto
-      chatHistory
+      chatHistory,
+      objectionStatus, // Estado atual das objeções para tracking
     } = body
 
     console.log('📨 [chat-v2] Requisição recebida:', {
@@ -546,14 +608,14 @@ export async function POST(request: NextRequest) {
 
       const companyType = companyTypeData?.type || 'B2C'
 
-      // Formatar objeções
+      // Formatar objeções com IDs para tracking
       let objectionsText = 'Nenhuma objeção específica'
       if (config.objections?.length > 0) {
         objectionsText = config.objections.map((obj: any, index: number) => {
           if (typeof obj === 'string') {
             return `OBJEÇÃO ${index + 1}:\n${obj}`
           }
-          let text = `OBJEÇÃO ${index + 1}:\n${obj.name}`
+          let text = `OBJEÇÃO ${index + 1} [ID: ${obj.id}]:\n${obj.name}`
           if (obj.rebuttals && obj.rebuttals.length > 0) {
             text += `\n\nFormas de quebrar esta objeção:`
             text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
@@ -650,11 +712,44 @@ PERFIL DO CLIENTE B2C:
           messages,
           max_tokens: 500,
           temperature: 0.8,
+          tools: [OBJECTION_TRACKING_TOOL],
+          tool_choice: 'auto',
         })
 
         clearTimeout(timeoutId)
 
-        const responseText = completion.choices[0]?.message?.content || 'Erro ao obter resposta'
+        const choice = completion.choices[0]
+        let responseText = choice?.message?.content || ''
+        const toolCalls = choice?.message?.tool_calls || []
+        const objectionUpdates = parseObjectionToolCalls(toolCalls)
+
+        if (objectionUpdates.length > 0) {
+          console.log('🎯 [chat-v2] Objection updates (CASO 1):', JSON.stringify(objectionUpdates))
+        }
+
+        // Se modelo retornou tool_calls sem texto → follow-up call
+        if (toolCalls.length > 0 && !responseText) {
+          console.log('🔄 [chat-v2] Follow-up call (model returned only tool_calls)...')
+          const toolResultMessages = toolCalls.map(tc => ({
+            role: 'tool' as const,
+            tool_call_id: tc.id,
+            content: '{"ok":true}'
+          }))
+          const followUp = await openai.chat.completions.create({
+            model: 'gpt-4.1',
+            messages: [...messages, choice.message, ...toolResultMessages],
+            max_tokens: 500,
+            temperature: 0.8,
+            tools: [OBJECTION_TRACKING_TOOL],
+            tool_choice: 'auto',
+          })
+          responseText = followUp.choices[0]?.message?.content || 'Erro ao obter resposta'
+          // Parse additional tool calls from follow-up
+          const extraCalls = followUp.choices[0]?.message?.tool_calls || []
+          objectionUpdates.push(...parseObjectionToolCalls(extraCalls))
+        }
+
+        if (!responseText) responseText = 'Erro ao obter resposta'
 
         console.log('✅ [chat-v2] Resposta recebida:', responseText.substring(0, 100) + '...')
         console.log(`⏱️ [chat-v2] Tempo total: ${Date.now() - startTime}ms`)
@@ -663,8 +758,8 @@ PERFIL DO CLIENTE B2C:
           sessionId: newSessionId,
           message: responseText,
           clientName: generatedClientName,
-          // Retornar o system prompt para o frontend armazenar
-          systemPrompt
+          systemPrompt,
+          objectionUpdates: objectionUpdates.length > 0 ? objectionUpdates : undefined,
         })
       } catch (openaiError: any) {
         clearTimeout(timeoutId)
@@ -706,7 +801,7 @@ PERFIL DO CLIENTE B2C:
 
       const companyType = companyTypeData?.type || 'B2C'
 
-      // Formatar objeções
+      // Formatar objeções com IDs para tracking
       let objectionsText = 'Nenhuma objeção específica'
       if (objections) {
         if (typeof objections === 'string') {
@@ -716,7 +811,7 @@ PERFIL DO CLIENTE B2C:
             if (typeof obj === 'string') {
               return `OBJEÇÃO ${index + 1}:\n${obj}`
             }
-            let text = `OBJEÇÃO ${index + 1}:\n${obj.name}`
+            let text = `OBJEÇÃO ${index + 1} [ID: ${obj.id}]:\n${obj.name}`
             if (obj.rebuttals && obj.rebuttals.length > 0) {
               text += `\n\nFormas de quebrar esta objeção:`
               text += obj.rebuttals.map((r: string, i: number) => `\n  ${i + 1}. ${r}`).join('')
@@ -779,6 +874,7 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
         persona: personaText,
         objecoes: objectionsText,
         realDataEnrichment,
+        objectionStatus: objectionStatus || undefined,
       })
 
       // Construir histórico de mensagens
@@ -819,11 +915,43 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
           messages,
           max_tokens: 500,
           temperature: 0.8,
+          tools: [OBJECTION_TRACKING_TOOL],
+          tool_choice: 'auto',
         })
 
         clearTimeout(timeoutId)
 
-        const responseText = completion.choices[0]?.message?.content || 'Erro ao obter resposta'
+        const choice = completion.choices[0]
+        let responseText = choice?.message?.content || ''
+        const toolCalls = choice?.message?.tool_calls || []
+        const objectionUpdates = parseObjectionToolCalls(toolCalls)
+
+        if (objectionUpdates.length > 0) {
+          console.log('🎯 [chat-v2] Objection updates (CASO 2):', JSON.stringify(objectionUpdates))
+        }
+
+        // Se modelo retornou tool_calls sem texto → follow-up call
+        if (toolCalls.length > 0 && !responseText) {
+          console.log('🔄 [chat-v2] Follow-up call (model returned only tool_calls)...')
+          const toolResultMessages = toolCalls.map(tc => ({
+            role: 'tool' as const,
+            tool_call_id: tc.id,
+            content: '{"ok":true}'
+          }))
+          const followUp = await openai.chat.completions.create({
+            model: 'gpt-4.1',
+            messages: [...messages, choice.message, ...toolResultMessages],
+            max_tokens: 500,
+            temperature: 0.8,
+            tools: [OBJECTION_TRACKING_TOOL],
+            tool_choice: 'auto',
+          })
+          responseText = followUp.choices[0]?.message?.content || 'Erro ao obter resposta'
+          const extraCalls = followUp.choices[0]?.message?.tool_calls || []
+          objectionUpdates.push(...parseObjectionToolCalls(extraCalls))
+        }
+
+        if (!responseText) responseText = 'Erro ao obter resposta'
 
         console.log('✅ [chat-v2] Resposta recebida:', responseText.substring(0, 100) + '...')
         console.log(`⏱️ [chat-v2] Tempo total: ${Date.now() - startTime}ms`)
@@ -832,7 +960,8 @@ O que já sabe sobre sua empresa: ${persona.prior_knowledge || 'Não sabe nada a
         return NextResponse.json({
           sessionId,
           message: responseText,
-          tokensUsed: completion.usage?.total_tokens
+          tokensUsed: completion.usage?.total_tokens,
+          objectionUpdates: objectionUpdates.length > 0 ? objectionUpdates : undefined,
         })
       } catch (openaiError: any) {
         clearTimeout(timeoutId)

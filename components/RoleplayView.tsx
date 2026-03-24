@@ -210,6 +210,11 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const [selectedObjective, setSelectedObjective] = useState('')
   const [hiddenMode, setHiddenMode] = useState(false) // Modo oculto - esconde seleções
 
+  // Tracking de objeções em tempo real (DEBUG)
+  type ObjectionTrackingStatus = 'pending' | 'raised' | 'overcome' | 'not_overcome'
+  interface ObjectionTracking { id: string; name: string; status: ObjectionTrackingStatus }
+  const [objectionTracking, setObjectionTracking] = useState<ObjectionTracking[]>([])
+
   // Estados para avatar da persona
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
@@ -822,6 +827,14 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
       setRoleplayConfig(fullConfig)
       console.log('💾 Configuração do roleplay salva:', fullConfig)
 
+      // Inicializar tracking de objeções
+      setObjectionTracking(objectionsWithRebuttals.map((obj: any) => ({
+        id: obj.id,
+        name: obj.name,
+        status: 'pending' as ObjectionTrackingStatus
+      })))
+      console.log('🎯 Objection tracking inicializado:', objectionsWithRebuttals.length, 'objeções')
+
       // Salvar também no sessionStorage como backup
       sessionStorage.setItem('roleplayConfig', JSON.stringify(fullConfig))
 
@@ -899,6 +912,22 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       }
 
       setSessionIdN8N(data.sessionId)
+
+      // Processar objection tracking updates do início
+      if (data.objectionUpdates && Array.isArray(data.objectionUpdates)) {
+        console.log('🎯 Objection updates (início):', data.objectionUpdates)
+        setObjectionTracking(prev => {
+          const updated = [...prev]
+          for (const upd of data.objectionUpdates) {
+            const idx = updated.findIndex(o => o.id === upd.objection_id)
+            if (idx !== -1) {
+              updated[idx] = { ...updated[idx], status: upd.status as ObjectionTrackingStatus }
+            }
+          }
+          return updated
+        })
+      }
+
       if (data.clientName) {
         setClientName(data.clientName)
         console.log('✅ ClientName salvo no estado:', data.clientName)
@@ -1378,7 +1407,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
         objections: objectionsWithRebuttals,
         objective: roleplayConfig?.objective, // Enviar objetivo do roleplay
         // NOVO: Enviar histórico de mensagens para manter contexto
-        chatHistory: messages
+        chatHistory: messages,
+        // Tracking de objeções
+        objectionStatus: Object.fromEntries(objectionTracking.map(o => [o.id, o.status])),
       }
 
       console.log('📦 PAYLOAD COMPLETO sendo enviado:', JSON.stringify(payload, null, 2))
@@ -1405,6 +1436,21 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       }
 
       console.log('✅ Resposta do cliente recebida:', data.message)
+
+      // Processar objection tracking updates
+      if (data.objectionUpdates && Array.isArray(data.objectionUpdates)) {
+        console.log('🎯 Objection updates recebidos:', data.objectionUpdates)
+        setObjectionTracking(prev => {
+          const updated = [...prev]
+          for (const upd of data.objectionUpdates) {
+            const idx = updated.findIndex(o => o.id === upd.objection_id)
+            if (idx !== -1) {
+              updated[idx] = { ...updated[idx], status: upd.status as ObjectionTrackingStatus }
+            }
+          }
+          return updated
+        })
+      }
 
       // Adicionar resposta do cliente
       setMessages(prev => [...prev, { role: 'client', text: data.message }])
@@ -2132,6 +2178,48 @@ Interprete este personagem de forma realista e consistente com todas as caracter
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* DEBUG: Painel de Tracking de Objeções (oculto — descomentar para testar) */}
+            {false && isSimulating && objectionTracking.length > 0 && (
+              <div className="absolute top-4 right-4 z-50 bg-gray-950/95 border border-gray-600 rounded-xl p-5 w-[420px] backdrop-blur-md shadow-2xl">
+                <div className="text-sm font-bold text-yellow-400 mb-4 flex items-center gap-2 border-b border-gray-700 pb-3">
+                  <span className="text-base">⚠️</span>
+                  <span>DEBUG: Objection Tracking</span>
+                  <span className="ml-auto text-xs font-normal text-gray-500">
+                    {objectionTracking.filter(o => o.status === 'overcome').length}/{objectionTracking.length} superadas
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {objectionTracking.map(obj => (
+                    <div key={obj.id} className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                      obj.status === 'pending' ? 'bg-gray-800/50 border-gray-700' :
+                      obj.status === 'raised' ? 'bg-blue-950/40 border-blue-700/50' :
+                      obj.status === 'overcome' ? 'bg-green-950/40 border-green-700/50' :
+                      'bg-red-950/40 border-red-700/50'
+                    }`}>
+                      <span className={`w-3 h-3 rounded-full flex-shrink-0 mt-0.5 ${
+                        obj.status === 'pending' ? 'bg-gray-500' :
+                        obj.status === 'raised' ? 'bg-blue-500 animate-pulse shadow-lg shadow-blue-500/50' :
+                        obj.status === 'overcome' ? 'bg-green-500 shadow-lg shadow-green-500/30' :
+                        'bg-red-500 shadow-lg shadow-red-500/30'
+                      }`} />
+                      <span className="text-sm text-gray-200 flex-1 leading-snug">{obj.name}</span>
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold whitespace-nowrap ${
+                        obj.status === 'pending' ? 'bg-gray-700 text-gray-400' :
+                        obj.status === 'raised' ? 'bg-blue-800 text-blue-200' :
+                        obj.status === 'overcome' ? 'bg-green-800 text-green-200' :
+                        'bg-red-800 text-red-200'
+                      }`}>
+                        {obj.status === 'pending' ? '⏳ Pendente' :
+                         obj.status === 'raised' ? '💬 Em discussão' :
+                         obj.status === 'overcome' ? '✅ Superada' :
+                         '❌ Não superada'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
