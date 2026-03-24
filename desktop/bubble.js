@@ -1001,9 +1001,14 @@ bubble.addEventListener('pointermove', (e) => {
     const dy = Math.abs(e.screenY - dragMouseStartY)
     if (dx + dy > DRAG_THRESHOLD) {
       isDragging = true
-      // Main process calculates offset using screen.getCursorScreenPoint() — no DPI mismatch
-      window.electronAPI.startDrag()
+      // Send initial screenX/screenY so main process calculates offset from renderer coords
+      window.electronAPI.startDrag(e.screenX, e.screenY)
     }
+  } else {
+    // Renderer-driven drag: send each pointermove position directly to main process.
+    // Uses renderer's screenX/screenY which are always in the same coordinate space.
+    // No polling = no DPI mismatch between screen.getCursorScreenPoint() and setPosition().
+    window.electronAPI.moveBubbleDrag(e.screenX, e.screenY)
   }
 })
 

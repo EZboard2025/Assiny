@@ -1273,44 +1273,34 @@ let dragInterval = null
 let dragOffsetX = 0
 let dragOffsetY = 0
 
-ipcMain.on('start-drag', () => {
+ipcMain.on('start-drag', (_event, screenX, screenY) => {
   if (!bubbleWindow || bubbleWindow.isDestroyed()) return
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
 
-  // Delta-based drag: track cursor movement between frames, apply to window position.
-  // Avoids DPI rounding drift that accumulates with absolute offset approach.
-  let prevCursor = screen.getCursorScreenPoint()
+  // Renderer-driven drag: renderer sends screenX/screenY from pointermove events.
+  // Offset calculated from first position. No polling = no DPI coordinate mismatch.
   const bounds = bubbleWindow.getBounds()
+  dragOffsetX = screenX - bounds.x
+  dragOffsetY = screenY - bounds.y
+  // Clamp offset to window size
+  dragOffsetX = Math.max(0, Math.min(dragOffsetX, bounds.width))
+  dragOffsetY = Math.max(0, Math.min(dragOffsetY, bounds.height))
+})
+
+ipcMain.on('move-bubble-drag', (_event, screenX, screenY) => {
+  if (!bubbleWindow || bubbleWindow.isDestroyed()) return
   const all = getAllScreenBounds()
-  const w = bounds.width
-  const h = bounds.height
+  const bounds = bubbleWindow.getBounds()
+  let x = Math.round(screenX - dragOffsetX)
+  let y = Math.round(screenY - dragOffsetY)
 
-  let lastSetX = bounds.x, lastSetY = bounds.y
-  dragInterval = setInterval(() => {
-    if (!bubbleWindow || bubbleWindow.isDestroyed()) {
-      clearInterval(dragInterval); dragInterval = null; return
-    }
-    const cur = screen.getCursorScreenPoint()
-    const dx = cur.x - prevCursor.x
-    const dy = cur.y - prevCursor.y
-    prevCursor = cur
+  // Clamp
+  if (x < all.x) x = all.x
+  if (y < all.y) y = all.y
+  if (x + bounds.width > all.maxX) x = all.maxX - bounds.width
+  if (y + bounds.height > all.maxY) y = all.maxY - bounds.height
 
-    if (dx === 0 && dy === 0) return
-
-    let x = lastSetX + dx
-    let y = lastSetY + dy
-
-    // Clamp
-    if (x < all.x) x = all.x
-    if (y < all.y) y = all.y
-    if (x + w > all.maxX) x = all.maxX - w
-    if (y + h > all.maxY) y = all.maxY - h
-
-    lastSetX = x
-    lastSetY = y
-
-    bubbleWindow.setPosition(x, y)
-  }, 16)
+  bubbleWindow.setPosition(x, y)
 })
 
 ipcMain.on('stop-drag', () => {
