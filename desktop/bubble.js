@@ -969,7 +969,7 @@ const DRAG_THRESHOLD = 5
 let dragMouseStartX = 0
 let dragMouseStartY = 0
 
-bubble.addEventListener('pointerdown', (e) => {
+bubble.addEventListener('pointerdown', async (e) => {
   if (e.button !== 0) return
   e.preventDefault()
   bubble.setPointerCapture(e.pointerId) // Keeps receiving events even outside window
@@ -977,16 +977,13 @@ bubble.addEventListener('pointerdown', (e) => {
   dragMouseStartX = e.screenX
   dragMouseStartY = e.screenY
 
-  // If in bar state, convert back to bubble for dragging
+  // If in bar state, convert back to bubble BEFORE drag can start
   if (bubble.classList.contains('edge-bar')) {
     removeBarState()
     snappedEdge = null
     isHidden = false
-    // Await resize in async IIFE — must complete before drag starts
-    ;(async () => {
-      const currentPos = await window.electronAPI.getBubblePos()
-      await window.electronAPI.setBubbleBounds(currentPos.x, currentPos.y, BUBBLE_SIZE, BUBBLE_SIZE)
-    })()
+    const currentPos = await window.electronAPI.getBubblePos()
+    await window.electronAPI.setBubbleBounds(currentPos.x, currentPos.y, BUBBLE_SIZE, BUBBLE_SIZE)
   }
 })
 
