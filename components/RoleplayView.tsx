@@ -1410,7 +1410,7 @@ Interprete este personagem de forma realista e consistente com todas as caracter
       setMessages(prev => [...prev, { role: 'client', text: data.message }])
 
       // Verificar se a mensagem contém a frase de finalização
-      const isFinalizationMessage = data.message.includes('Roleplay finalizado, aperte em finalizar sessão')
+      const isFinalizationMessage = data.message.includes('Roleplay finalizado, aguarde sua avaliação')
 
       if (isFinalizationMessage) {
         console.log('🎯 Detectada mensagem de finalização do roleplay!')
@@ -2364,13 +2364,13 @@ Interprete este personagem de forma realista e consistente com todas as caracter
 
       {/* Modal de Loading - Avaliação */}
         {isEvaluating && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
-              <Loader2 className="w-16 h-16 text-green-400 animate-spin mx-auto" />
-              <div>
-                <h3 className="text-2xl font-bold text-white mb-2">Analisando sua performance...</h3>
-                <p className="text-gray-400">Nosso agente está avaliando sua conversa com base em metodologia SPIN Selling</p>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center animate-fade-in">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
+                <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
               </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Analisando sua performance...</h3>
+              <p className="text-gray-500 text-sm">Nosso agente está avaliando sua conversa com base em metodologia SPIN Selling</p>
             </div>
           </div>
         )}

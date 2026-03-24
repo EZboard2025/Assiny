@@ -86,7 +86,17 @@
       "WebFetch(domain:cookbook.openai.com)",
       "WebFetch(domain:developers.openai.com)",
       "Bash(npx next:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill:*)",
+      "Bash(lsof -ti:3001)",
+      "Bash(ffmpeg -version)",
+      "Bash(git -C /Users/arthurxavier/assiny/Assiny status --short)",
+      "Bash(grep -E \"\\\\.\\(sql|ts|js\\)$\")",
+      "Bash(pkill -9 -f \"electron\")",
+      "Bash(node -c recording.js)",
+      "Bash(grep -r \"objections_analysis\" /Users/arthurxavier/assiny/Assiny/components/Historico* --include=\"*.tsx\" -A 5)",
+      "mcp__claude_ai_Supabase__apply_migration"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",

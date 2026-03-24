@@ -53,12 +53,30 @@
     <section id="screen-idle" class="screen" style="display:none;">
       <div class="idle-content">
         <div class="record-section">
-          <p class="idle-hint">Abra sua reunião em qualquer plataforma e clique para gravar.</p>
-          <button id="btn-start" class="btn-record">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
-            <span>Iniciar Gravação</span>
-          </button>
-          <p class="record-hint">Captura áudio do sistema + microfone</p>
+          <!-- Step 1: Choose meeting type -->
+          <div id="meeting-type-step" style="display:none;">
+            <p class="idle-hint" style="margin-bottom:16px;">Qual o tipo da reunião?</p>
+            <div style="display:flex;gap:12px;justify-content:center;margin-bottom:12px;">
+              <button id="btn-type-sales" class="btn-meeting-type" data-type="sales">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <span>Reunião de vendas</span>
+              </button>
+              <button id="btn-type-other" class="btn-meeting-type" data-type="non_sales">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                <span>Outra reunião</span>
+              </button>
+            </div>
+            <p class="record-hint">Vendas recebe avaliação SPIN completa</p>
+          </div>
+          <!-- Step 0: Start button -->
+          <div id="start-step">
+            <p class="idle-hint">Abra sua reunião em qualquer plataforma e clique para gravar.</p>
+            <button id="btn-start" class="btn-record">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+              <span>Iniciar Gravação</span>
+            </button>
+            <p class="record-hint">Captura áudio do sistema + microfone</p>
+          </div>
         </div>
       </div>
     </section>

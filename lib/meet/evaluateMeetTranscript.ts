@@ -32,9 +32,18 @@ ESPECIFICIDADE: Todo feedback deve incluir trechos específicos da transcrição
 
 SISTEMA DE AVALIAÇÃO
 
-PARTE 1: AVALIAÇÃO DE OBJEÇÕES (0-10 por objeção)
+PARTE 1: AVALIAÇÃO DE OBJEÇÕES — MODO VENDA REAL (0-10 por objeção)
 
-Para cada objeção identificada na transcrição, avalie usando esta escala:
+CONTEXTO: Esta é uma VENDA REAL (reunião ou ligação). NÃO existem objeções pré-configuradas. Você DEVE fazer uma VARREDURA EXAUSTIVA da transcrição para DESCOBRIR TODAS as objeções que surgiram — não pode deixar NENHUMA passar em branco.
+
+INSTRUÇÃO DE DESCOBERTA EXAUSTIVA:
+- Analise cada fala do cliente buscando objeções EXPLÍCITAS e IMPLÍCITAS
+- Qualquer hesitação, dúvida, resistência, preocupação ou pedido de tempo do cliente É uma objeção
+- Tipos comuns que NÃO podem escapar: preço, timing, autoridade/decisor, concorrência, confiança, necessidade, medo de mudança, prioridade, orçamento, contrato existente, satisfação com solução atual
+- Objeções implícitas contam: "preciso pensar", "vou falar com meu sócio", "não é prioridade agora" são objeções reais
+- Se o cliente levantou UMA hesitação que o vendedor não tratou, isso DEVE aparecer na análise com score baixo
+
+ESCALA DE PONTUAÇÃO:
 
 0-2: Falha Crítica - Ignorou, respondeu defensivamente, ou invalidou a preocupação
 3-4: Insuficiente - Reconheceu superficialmente sem validar
@@ -72,7 +81,8 @@ Retorne APENAS JSON válido (sem markdown, sem código):
   "objections_analysis": [
     {
       "objection_id": "obj-0",
-      "objection_type": "string (preço, timing, autoridade, concorrência, confiança, necessidade)",
+      "source": "discovered",
+      "objection_type": "string (preço, timing, autoridade, concorrência, confiança, necessidade, medo_de_mudança, prioridade, orçamento, contrato_existente, satisfação_atual)",
       "objection_text": "trecho exato da transcrição",
       "score": 0-10,
       "detailed_analysis": "Análise técnica de 3-4 linhas",
@@ -151,7 +161,9 @@ DIRETRIZES CRÍTICAS
 1. Identifique quem é o vendedor e quem é o cliente baseado no contexto
 2. Cite trechos específicos da transcrição como evidência
 3. Seja objetivo e técnico
-4. Todo feedback deve ter próximo passo concreto`
+4. Todo feedback deve ter próximo passo concreto
+5. NÃO DEIXE NENHUMA OBJEÇÃO PASSAR EM BRANCO — faça varredura completa de toda a transcrição antes de finalizar a análise de objeções
+6. Todas as objeções devem ter "source": "discovered" pois são identificadas pela IA na venda real`
 
 const PLAYBOOK_SECTION = `
 
@@ -327,6 +339,7 @@ export interface EvaluateMeetParams {
   meetingId: string
   companyId: string
   sellerName?: string
+  hasSpeakerLabels?: boolean
 }
 
 export interface EvaluateMeetResult {
@@ -336,7 +349,7 @@ export interface EvaluateMeetResult {
 }
 
 export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promise<EvaluateMeetResult> {
-  const { transcript, meetingId, sellerName, companyId } = params
+  const { transcript, meetingId, sellerName, companyId, hasSpeakerLabels = true } = params
 
   if (!transcript || transcript.length < 50) {
     return { success: false, error: `Transcrição muito curta para avaliação (${transcript?.length || 0} chars)` }
@@ -348,6 +361,7 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
   let companyName = 'Não informado'
   let companyDescription = 'Não informado'
   let companyType = 'Não informado'
+  let companyContext = ''
   let playbookContent: string | null = null
 
   if (companyId) {
@@ -373,12 +387,20 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
 
     const { data: companyData } = await supabaseAdmin
       .from('company_data')
-      .select('descricao')
+      .select('*')
       .eq('company_id', companyId)
       .single()
 
     if (companyData?.descricao) {
       companyDescription = companyData.descricao
+    }
+
+    if (companyData) {
+      companyContext = `Nome: ${companyData.nome || 'Não informado'}
+Descrição: ${companyData.descricao || 'Não informado'}
+Produtos/Serviços: ${companyData.produtos_servicos || 'Não informado'}
+Diferenciais: ${companyData.diferenciais || 'Não informado'}
+Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados_metricas || 'Não informado'}`
     }
 
     const { data: playbook } = await supabaseAdmin
@@ -406,12 +428,21 @@ export async function evaluateMeetTranscript(params: EvaluateMeetParams): Promis
     console.log(`[MeetBG] Transcript truncado: ${transcript.length} → ${processedTranscript.length} chars (inicio + fim)`)
   }
 
-  let userPrompt = `Avalie esta reunião de vendas com precisão. Identifique o vendedor${sellerName ? ` (provavelmente ${sellerName})` : ''} e analise sua performance.
+  const speakerContext = hasSpeakerLabels
+    ? ''
+    : `\n\nIMPORTANTE: Esta transcrição NÃO tem identificação de falantes (foi capturada sem separação por participante). Infira quem é o vendedor e quem é o cliente pelo CONTEXTO da conversa (quem apresenta produto/serviço = vendedor, quem faz perguntas/objeções = cliente). Não penalize por falta de identificação de falantes. O campo speaking_time_percentage deve ser estimado aproximadamente pelo volume de fala de cada parte.`
+
+  let userPrompt = `Avalie esta reunião de vendas com precisão. Identifique o vendedor${sellerName ? ` (provavelmente ${sellerName})` : ''} e analise sua performance.${speakerContext}
 
 TRANSCRIÇÃO DA REUNIÃO:
 ${processedTranscript}
 
-Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSON conforme especificado.`
+Analise a performance do vendedor usando metodologia SPIN Selling. Retorne o JSON conforme especificado.${companyContext ? `
+
+DADOS DA EMPRESA (para validar informações do vendedor):
+${companyContext}
+
+⚠️ VALIDAÇÃO OBRIGATÓRIA: Compare TUDO que o vendedor afirmou (cases, clientes, prêmios, números, métricas) com os dados acima. Se o vendedor mencionou cases, clientes ou provas sociais que NÃO constam nos dados da empresa, ele INVENTOU essas informações. Isso deve impactar negativamente a nota de N (Necessidade de Solução) e ser mencionado em critical_gaps.` : ''}`
 
   if (playbookContent) {
     userPrompt += PLAYBOOK_SECTION

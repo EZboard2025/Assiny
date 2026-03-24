@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Global shortcut toggle (Cmd+Shift+Space)
   onToggleBubble: (callback) => ipcRenderer.on('toggle-bubble', () => callback()),
   // Meet auto-detection IPC
-  onAutoStart: (callback) => ipcRenderer.on('auto-start-recording', (_event) => callback()),
+  onAutoStart: (callback) => ipcRenderer.on('auto-start-recording', (_event, meetingType) => callback(meetingType)),
   onAutoStop: (callback) => ipcRenderer.on('auto-stop-recording', (_event) => callback()),
   notifyRecordingFinished: () => ipcRenderer.send('recording-finished'),
   notifyRecordingError: (errorMsg) => ipcRenderer.send('recording-error', errorMsg),
@@ -46,7 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   teardownAudioRouting: () => ipcRenderer.invoke('teardown-audio-routing'),
   // Meeting start confirmation (main ↔ bubble)
   onAskMeetingStart: (callback) => ipcRenderer.on('ask-meeting-start', (_event, meetTitle) => callback(meetTitle)),
-  confirmMeetingStart: () => ipcRenderer.send('confirm-meeting-start'),
+  confirmMeetingStart: (meetingType) => ipcRenderer.send('confirm-meeting-start', meetingType),
   dismissMeetingStart: () => ipcRenderer.send('dismiss-meeting-start'),
   onHideMeetingStart: (callback) => ipcRenderer.on('hide-meeting-start', () => callback()),
   // Meeting end confirmation (recorder ↔ main ↔ bubble)

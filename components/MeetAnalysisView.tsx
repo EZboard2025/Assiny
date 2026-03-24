@@ -256,6 +256,10 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
   const [createEventHour, setCreateEventHour] = useState<number | undefined>(undefined)
   const [editEventData, setEditEventData] = useState<{ id: string; title: string; start: string; end: string | null; meetLink?: string; attendees?: Array<{ email: string; displayName?: string; responseStatus?: string }>; description?: string | null } | null>(null)
 
+  // Recording method preference (company-level, loaded from companies table)
+  const [recordingMethod, setRecordingMethod] = useState<'bot' | 'desktop'>('bot')
+  const [recordingMethodLoading, setRecordingMethodLoading] = useState(true)
+
   // Tab & calendar week state
   type MeetTab = 'calendar' | 'manual' | 'transcricoes'
   const [activeTab, _setActiveTab] = useState<MeetTab>(initialTab || 'calendar')
@@ -304,6 +308,35 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
     sunday.setDate(diff)
     sunday.setHours(0, 0, 0, 0)
     setCurrentWeekStart(sunday)
+  }, [])
+
+  // Load recording method preference
+  useEffect(() => {
+    const loadRecordingMethod = async () => {
+      try {
+        const companyId = await getCompanyId()
+        if (!companyId) return
+        const { data } = await supabase
+          .from('companies')
+          .select('meet_recording_method')
+          .eq('id', companyId)
+          .single()
+        if (data?.meet_recording_method) {
+          setRecordingMethod(data.meet_recording_method as 'bot' | 'desktop')
+          // Set initial tab based on method
+          if (data.meet_recording_method === 'desktop' && mode !== 'calendar') {
+            _setActiveTab('transcricoes')
+          } else if (data.meet_recording_method === 'bot' && mode !== 'calendar') {
+            _setActiveTab(initialTab === 'transcricoes' ? 'manual' : (initialTab || 'calendar'))
+          }
+        }
+      } catch (e) {
+        console.error('Error loading recording method:', e)
+      } finally {
+        setRecordingMethodLoading(false)
+      }
+    }
+    loadRecordingMethod()
   }, [])
 
   // Restore active session from localStorage + load data on mount
@@ -716,7 +749,8 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         .eq('auth_user_id', userId)
         .single()
 
-      // Send file directly to API via FormData (no Supabase Storage needed)
+      // Step 1: Upload file directly to API via FormData
+      console.log(`[Upload] Enviando arquivo: ${uploadFile.name} (${(uploadFile.size / 1024 / 1024).toFixed(1)}MB)`)
       const formData = new FormData()
       formData.append('file', uploadFile)
       formData.append('fileName', uploadFile.name)
@@ -724,6 +758,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
       formData.append('userId', userId || '')
       formData.append('sellerName', emp?.name || 'Vendedor')
 
+      console.log('[Upload] Chamando /api/meet/upload-evaluate...')
       const res = await fetch('/api/meet/upload-evaluate', {
         method: 'POST',
         headers: {
@@ -732,7 +767,14 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         body: formData
       })
 
-      const data = await res.json()
+      let data: any
+      try {
+        data = await res.json()
+      } catch {
+        setUploadError('Erro no servidor ao processar arquivo. Verifique se o formato é suportado.')
+        setUploadProgress('error')
+        return
+      }
 
       if (!res.ok) {
         setUploadError(data.error || 'Erro ao processar arquivo')
@@ -1309,7 +1351,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         if (data.connected) {
           loadCalendarEvents(authSession.access_token)
         } else if (activeTab === 'calendar' && mode !== 'calendar') {
-          setActiveTab('manual')
+          setActiveTab(recordingMethod === 'desktop' ? 'transcricoes' : 'manual')
         }
       }
     } catch (e) {
@@ -1824,28 +1866,22 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
               </div>
             )}
 
-            {/* Tab Navigation (when NOT connected OR in meet mode — show Manual + Transcrições) */}
-            {((!calendarConnected && !calendarLoading) || mode === 'meet') && mode !== 'calendar' && (
+            {/* Tab Navigation (when NOT connected OR in meet mode) */}
+            {((!calendarConnected && !calendarLoading) || mode === 'meet') && mode !== 'calendar' && !recordingMethodLoading && (
               <div className="mb-4">
-                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-                  {([
-                    { id: 'manual' as MeetTab, icon: Link2, label: 'Manual' },
-                    { id: 'transcricoes' as MeetTab, icon: Monitor, label: 'Transcrições App' },
-                  ]).map(tab => (
+                {recordingMethod === 'bot' ? (
+                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
                     <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => setActiveTab('manual')}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        activeTab === tab.id
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700'
+                        activeTab === 'manual' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                       }`}
                     >
-                      <tab.icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{tab.label}</span>
+                      <Link2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Manual</span>
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -1875,8 +1911,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                   <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
                     {([
                       ...(mode !== 'meet' ? [{ id: 'calendar' as MeetTab, icon: CalendarDays, label: 'Calendário' }] : []),
-                      { id: 'manual' as MeetTab, icon: Link2, label: 'Manual' },
-                      { id: 'transcricoes' as MeetTab, icon: Monitor, label: 'Transcrições App' },
+                      ...(recordingMethod === 'bot' ? [{ id: 'manual' as MeetTab, icon: Link2, label: 'Manual' }] : []),
                     ]).map(tab => (
                       <button
                         key={tab.id}
@@ -1901,22 +1936,18 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
                       </div>
                     )}
 
-                    <button
-                      onClick={toggleAutoRecord}
-                      disabled={togglingAutoRecord}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                    <div
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border cursor-default ${
                         autoRecordEnabled
-                          ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                          : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200'
-                      } ${togglingAutoRecord ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      title={autoRecordEnabled ? 'Bot ativo — clique para desativar' : 'Bot inativo — clique para ativar'}
+                          ? 'bg-green-50 border-green-200 text-green-700'
+                          : 'bg-gray-100 border-gray-200 text-gray-500'
+                      }`}
+                      title={autoRecordEnabled ? 'Bot ativo — configurável no Hub de Configurações' : 'Bot inativo — configurável no Hub de Configurações'}
                     >
                       <Mic className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">{autoRecordEnabled ? 'Bot Ativo' : 'Bot Inativo'}</span>
-                      <div className={`w-7 h-4 rounded-full relative transition-colors ${autoRecordEnabled ? 'bg-green-400' : 'bg-gray-300'}`}>
-                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${autoRecordEnabled ? 'left-3.5' : 'left-0.5'}`} />
-                      </div>
-                    </button>
+                      <div className={`w-2 h-2 rounded-full ${autoRecordEnabled ? 'bg-green-400' : 'bg-gray-300'}`} />
+                    </div>
 
                     {hasWriteAccess && (
                       <button
@@ -2094,8 +2125,8 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
               editEvent={editEventData}
             />
 
-            {/* ========== TAB: Manual (or when not connected and on manual tab) ========== */}
-            {(activeTab === 'manual') && mode !== 'calendar' && (
+            {/* ========== TAB: Manual (bot mode only) ========== */}
+            {(activeTab === 'manual') && mode !== 'calendar' && recordingMethod === 'bot' && (
             <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -2139,8 +2170,8 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             </div>
             )}
 
-            {/* ========== Upload Recording File ========== */}
-            {(activeTab === 'manual') && mode !== 'calendar' && (
+            {/* ========== Upload Recording File (bot mode only) ========== */}
+            {(activeTab === 'manual') && mode !== 'calendar' && recordingMethod === 'bot' && (
               <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <FileAudio className="w-4 h-4 text-green-600" />
@@ -2234,7 +2265,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             )}
 
             {/* Uploaded Recordings History */}
-            {uploadedRecordings.length > 0 && activeTab === 'manual' && mode !== 'calendar' && (
+            {uploadedRecordings.length > 0 && activeTab === 'manual' && mode !== 'calendar' && recordingMethod === 'bot' && (
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -2286,7 +2317,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             )}
 
             {/* Steps + Background notice (only when calendar not connected and on manual tab) */}
-            {!calendarConnected && !calendarLoading && activeTab === 'manual' && (
+            {!calendarConnected && !calendarLoading && activeTab === 'manual' && recordingMethod === 'bot' && (
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3">
@@ -2317,7 +2348,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
             )}
 
             {/* ========== TAB: Transcrições App (desktop recordings) ========== */}
-            {activeTab === 'transcricoes' && (
+            {activeTab === 'transcricoes' && recordingMethod === 'desktop' && (
               <div className="space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">

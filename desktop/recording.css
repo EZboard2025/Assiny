@@ -159,6 +159,16 @@ body {
 .btn-primary:hover { opacity: 0.9; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.btn-meeting-type {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 18px 24px; font-size: 13px; font-weight: 600; color: #9ca3af;
+  background: #1a1a2e; border: 2px solid #2a2a3e;
+  border-radius: 12px; cursor: pointer; transition: all 0.2s; min-width: 140px;
+}
+.btn-meeting-type:hover { border-color: #6366f1; color: #a5b4fc; background: #1e1e36; }
+.btn-meeting-type:active { transform: scale(0.97); }
+.btn-meeting-type svg { stroke: currentColor; }
+
 .btn-secondary {
   background: transparent;
   color: #10b981;

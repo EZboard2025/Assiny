@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X, User, FileText, Lightbulb, AlertTriangle, Video, VideoOff, UserCircle2, Volume2, Shield, TrendingUp } from 'lucide-react'
+import { Mic, MicOff, Users, Loader2, CheckCircle, AlertCircle, Square, X, User, FileText, Lightbulb, AlertTriangle, Video, VideoOff, UserCircle2, Volume2, Shield, TrendingUp, MessageCircle, CheckCheck, ScrollText, Settings } from 'lucide-react'
 import Image from 'next/image'
 import { processWhisperTranscription } from '@/lib/utils/whisperValidation'
 import { generateAvatarWithAI, generateAvatarUrl, preloadImage, type PersonaBase } from '@/lib/utils/generateAvatar'
@@ -253,7 +253,7 @@ export default function RoleplayPublico() {
       const { response, messages: updatedMessages } = await chatResponse.json()
       setMessages(updatedMessages)
 
-      const isFinalizationMessage = response.includes('Roleplay finalizado, aperte em finalizar sessão')
+      const isFinalizationMessage = response.includes('Roleplay finalizado, aguarde sua avaliação')
       await playAudioResponse(response, isFinalizationMessage)
     } catch (error) {
       console.error('Erro ao processar áudio:', error)
@@ -851,13 +851,13 @@ export default function RoleplayPublico() {
 
       {/* Fullscreen Finalizing / Evaluating Overlay */}
       {(showAutoFinalizingMessage || isEvaluating) && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-green-500/30 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
-            <Loader2 className="w-16 h-16 text-green-400 animate-spin mx-auto" />
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-2">Analisando sua performance...</h3>
-              <p className="text-gray-400">Nosso agente está avaliando sua conversa com base em metodologia SPIN Selling</p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center animate-fade-in">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
             </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Analisando sua performance...</h3>
+            <p className="text-gray-500 text-sm">Nosso agente está avaliando sua conversa com base em metodologia SPIN Selling</p>
           </div>
         </div>
       )}
@@ -1126,43 +1126,47 @@ export default function RoleplayPublico() {
                 {evaluation.playbook_adherence && (() => {
                   const pa = evaluation.playbook_adherence
                   return (
-                    <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-                      <h3 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Aderência ao Playbook
-                      </h3>
-
-                      {/* Score + Level */}
-                      <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-3 mb-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl font-bold text-purple-600">{pa.overall_adherence_score}%</span>
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            pa.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
-                            pa.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
-                            pa.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            {pa.adherence_level === 'exemplary' ? 'Exemplar' :
-                             pa.adherence_level === 'compliant' ? 'Conforme' :
-                             pa.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
-                          </span>
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-purple-700">Aderência ao Playbook</h3>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-2xl font-bold text-purple-600">{pa.overall_adherence_score}%</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                pa.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
+                                pa.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
+                                pa.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {pa.adherence_level === 'exemplary' ? 'Exemplar' :
+                                 pa.adherence_level === 'compliant' ? 'Conforme' :
+                                 pa.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Dimensions */}
+                      {/* Dimensions with icons */}
                       {pa.dimensions && (
-                        <div className="grid grid-cols-5 gap-2 mb-3">
+                        <div className="grid grid-cols-5 gap-2 mb-4">
                           {[
-                            { key: 'opening', label: 'Abertura' },
-                            { key: 'closing', label: 'Fechamento' },
-                            { key: 'conduct', label: 'Conduta' },
-                            { key: 'required_scripts', label: 'Scripts' },
-                            { key: 'process', label: 'Processo' }
-                          ].map(({ key, label }) => {
+                            { key: 'opening', label: 'Abertura', Icon: MessageCircle, color: 'text-blue-500' },
+                            { key: 'closing', label: 'Fechamento', Icon: CheckCheck, color: 'text-emerald-500' },
+                            { key: 'conduct', label: 'Conduta', Icon: Shield, color: 'text-purple-500' },
+                            { key: 'required_scripts', label: 'Scripts', Icon: ScrollText, color: 'text-amber-500' },
+                            { key: 'process', label: 'Processo', Icon: Settings, color: 'text-gray-500' }
+                          ].map(({ key, label, Icon, color }) => {
                             const dim = pa.dimensions?.[key as keyof typeof pa.dimensions]
                             if (!dim || dim.status === 'not_evaluated') return null
                             return (
-                              <div key={key} className="bg-white rounded-lg p-2 text-center border border-purple-200">
+                              <div key={key} className="bg-white/70 rounded-lg p-2 text-center border border-purple-100">
+                                <div className="flex justify-center mb-1"><Icon className={`w-4 h-4 ${color}`} /></div>
                                 <div className={`text-lg font-bold ${
                                   (dim.score || 0) >= 70 ? 'text-green-600' :
                                   (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
@@ -1174,41 +1178,51 @@ export default function RoleplayPublico() {
                         </div>
                       )}
 
-                      {/* Violations */}
-                      {pa.violations?.length > 0 && (
-                        <div className="mb-2">
-                          <p className="text-xs font-semibold text-red-600 mb-1.5">Violações</p>
-                          <ul className="space-y-1.5">
-                            {pa.violations.map((v: any, i: number) => (
-                              <li key={i} className="text-sm text-gray-700 bg-red-50 rounded-lg p-2.5 border border-red-100">
-                                <span className="font-medium text-red-700">{v.criterion}</span>
-                                {v.recommendation && <p className="text-xs text-red-500 mt-1">{v.recommendation}</p>}
-                              </li>
-                            ))}
-                          </ul>
+                      {/* Violations & Missed Requirements - 2-column grid */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-red-50/80 rounded-lg p-3 border border-red-100">
+                          <h5 className="flex items-center gap-2 text-xs font-semibold text-red-700 mb-2">
+                            <AlertTriangle className="w-3 h-3" />Violações
+                          </h5>
+                          {pa.violations?.length > 0 ? (
+                            <ul className="space-y-1.5">
+                              {pa.violations.slice(0, 3).map((v: any, i: number) => (
+                                <li key={i} className="text-xs text-gray-700">
+                                  <span className="font-medium text-red-700">{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</span>
+                                  {v?.recommendation && <p className="text-[11px] text-red-500 mt-0.5">{v.recommendation}</p>}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Nenhuma violação</p>
+                          )}
                         </div>
-                      )}
-
-                      {/* Missed Requirements */}
-                      {pa.missed_requirements?.length > 0 && (
-                        <div className="mb-2">
-                          <p className="text-xs font-semibold text-amber-600 mb-1.5">Requisitos Não Cumpridos</p>
-                          <ul className="space-y-1.5">
-                            {pa.missed_requirements.map((m: any, i: number) => (
-                              <li key={i} className="text-sm text-gray-700 bg-amber-50 rounded-lg p-2.5 border border-amber-100">
-                                <span className="font-medium text-amber-700">{m.criterion}</span>
-                                {m.recommendation && <p className="text-xs text-amber-500 mt-1">{m.recommendation}</p>}
-                              </li>
-                            ))}
-                          </ul>
+                        <div className="bg-amber-50/80 rounded-lg p-3 border border-amber-100">
+                          <h5 className="flex items-center gap-2 text-xs font-semibold text-amber-700 mb-2">
+                            <AlertCircle className="w-3 h-3" />Não Cumpridos
+                          </h5>
+                          {pa.missed_requirements?.length > 0 ? (
+                            <ul className="space-y-1.5">
+                              {pa.missed_requirements.slice(0, 3).map((m: any, i: number) => (
+                                <li key={i} className="text-xs text-gray-700">
+                                  <span className="font-medium text-amber-700">{typeof m === 'string' ? m : m?.criterion || m?.description || JSON.stringify(m)}</span>
+                                  {m?.recommendation && <p className="text-[11px] text-amber-500 mt-0.5">{m.recommendation}</p>}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Todos cumpridos</p>
+                          )}
                         </div>
-                      )}
+                      </div>
 
                       {/* Coaching Notes */}
                       {pa.coaching_notes && (
-                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-100 mt-2">
-                          <p className="text-xs font-semibold text-blue-700 mb-1">Orientações para Melhorar</p>
-                          <p className="text-sm text-gray-600 leading-relaxed">{pa.coaching_notes}</p>
+                        <div className="bg-blue-50/80 rounded-lg p-3 border border-blue-100 mt-3">
+                          <h5 className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-2">
+                            <Lightbulb className="w-3 h-3" />Orientações para Melhorar
+                          </h5>
+                          <p className="text-xs text-gray-700 leading-relaxed">{pa.coaching_notes}</p>
                         </div>
                       )}
                     </div>

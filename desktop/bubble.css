@@ -1884,6 +1884,24 @@ body {
   transform: none;
 }
 
+.meet-btn-start-other {
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  width: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  border: none;
+  -webkit-app-region: no-drag;
+}
+
+.meet-btn-start-other:hover {
+  background: #e5e7eb;
+  transform: none;
+}
+
 .meet-btn-start-no {
   background: transparent;
   color: #6b7280;

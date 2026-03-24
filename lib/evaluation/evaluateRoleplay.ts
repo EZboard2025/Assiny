@@ -238,9 +238,15 @@ ESPECIFICIDADE: Todo feedback deve incluir trechos específicos da transcrição
 
 SISTEMA DE AVALIAÇÃO
 
-PARTE 1: AVALIAÇÃO DE OBJEÇÕES (0-10 por objeção)
+PARTE 1: AVALIAÇÃO DE OBJEÇÕES — MODO SIMULAÇÃO (0-10 por objeção)
 
-Para cada objeção identificada na transcrição, avalie usando esta escala rigorosa:
+CONTEXTO: Esta é uma SIMULAÇÃO de vendas. As objeções foram PRÉ-CONFIGURADAS antes do roleplay e possuem REBUTTALS CADASTRADOS (formas corretas de quebrar). Você DEVE comparar a técnica usada pelo vendedor com os rebuttals cadastrados fornecidos no perfil do cliente.
+
+CRITÉRIO DE COMPARAÇÃO COM REBUTTALS:
+- Se o vendedor usou uma técnica ALINHADA aos rebuttals cadastrados de forma competente → pontuar 7-8+
+- Se o vendedor quebrou a objeção de forma DIFERENTE dos rebuttals mas foi eficaz → pontuar 5-6 (válido, mas não ideal)
+- Se o vendedor ignorou os rebuttals E foi ineficaz → penalização forte (0-4)
+- Os rebuttals cadastrados representam a MELHOR PRÁTICA da empresa — segui-los é o caminho ideal
 
 ESCALA DE PONTUAÇÃO POR OBJEÇÃO:
 
@@ -254,22 +260,24 @@ ESCALA DE PONTUAÇÃO POR OBJEÇÃO:
 - Reconheceu superficialmente sem validar
 - Resposta genérica e decorada
 - Não explorou contexto ou razão da objeção
+- Não usou nenhuma técnica dos rebuttals cadastrados
 
 5-6: Básico
 - Validou a objeção adequadamente
 - Fez 1 pergunta de contexto
-- Resposta conectada ao cliente
-- Não transformou em oportunidade
+- Resposta conectada ao cliente mas NÃO seguiu os rebuttals cadastrados
+- Quebrou de forma alternativa com eficácia parcial
 
 7-8: Competente
 - Validação genuína da preocupação
 - 2-3 perguntas de aprofundamento
-- Técnica consultiva aplicada (Feel-Felt-Found, etc)
+- Usou técnica ALINHADA aos rebuttals cadastrados
 - Resposta personalizada com social proof relevante
 - Cliente demonstrou abertura ou mudança de perspectiva
 
 9-10: Excelente (Raro)
 - Tudo do 7-8 MAIS:
+- Seguiu o rebuttal cadastrado com maestria e personalização
 - Antecipou ou preveniu a objeção antes de surgir
 - Transformou objeção em oportunidade de valor
 - Cliente verbalizou gratidão ou insight novo
@@ -427,6 +435,8 @@ INDICADOR 4: Credibilidade e Confiança (0-10)
 7-8: 2-3 cases relevantes + números reais
 9-10: Cliente tratou como autoridade técnica, pediu opinião/conselho
 
+⚠️ PENALIZAÇÃO POR INFORMAÇÕES FALSAS: Se o vendedor inventar cases de sucesso, clientes, prêmios, certificações, números ou métricas que NÃO existem nos dados da empresa fornecidos abaixo (seção "Provas Sociais"), a nota deste indicador deve ser AUTOMATICAMENTE 0. Mencione explicitamente no feedback técnico quais informações foram fabricadas. Mentir para o cliente é uma falha gravíssima de ética comercial.
+
 INDICADOR 5: CTA Efetivo (0-10)
 
 0-2: Sem CTA
@@ -460,9 +470,12 @@ Ao analisar as objeções no diálogo, você DEVE:
 2. Incluir o ID da objeção no campo "objection_id" da sua análise
 3. Se a objeção identificada corresponder a uma das configuradas, usar o ID fornecido
 4. Se for uma objeção não configurada, usar "objection_id": "não-configurada"
+5. COMPARAR a técnica usada pelo vendedor com os REBUTTALS CADASTRADOS de cada objeção
+6. No campo "used_correct_rebuttal", indicar se o vendedor seguiu a técnica dos rebuttals cadastrados
+7. No campo "rebuttal_comparison", explicar brevemente o que o vendedor fez vs o rebuttal correto
 
-Nota importante: observe sempre que quando um roleplay é completo, a fala "Roleplay finalizado, aperte em encerrar simulação" aparece, isso significa que a inteligência artificial que simula o cliente afirmou que o roleplay foi completo.
-Caso a venda não tenha sido realizada ou se a venda estiver incompleta (a frase "Roleplay finalizado, aperte em encerrar simulação" não apareça na transcrição), isso deverá impactar negativamente de forma brutal na nota do roleplay.
+Nota importante: observe sempre que quando um roleplay é completo, a fala "Roleplay finalizado, aguarde sua avaliação" aparece, isso significa que a inteligência artificial que simula o cliente afirmou que o roleplay foi completo.
+Caso a venda não tenha sido realizada ou se a venda estiver incompleta (a frase "Roleplay finalizado, aguarde sua avaliação" não apareça na transcrição), isso deverá impactar negativamente de forma brutal na nota do roleplay.
 
 FORMATO JSON DE RESPOSTA
 
@@ -472,10 +485,13 @@ Retorne APENAS JSON válido (sem markdown, sem \`\`\`):
   "objections_analysis": [
     {
       "objection_id": "obj-0",
+      "source": "pre_configured",
       "objection_type": "string",
       "objection_text": "trecho exato da transcrição",
       "score": 0-10,
       "detailed_analysis": "Análise técnica de 3-4 linhas sobre o tratamento",
+      "used_correct_rebuttal": true | false,
+      "rebuttal_comparison": "O vendedor fez X, enquanto o rebuttal cadastrado recomenda Y. [breve comparação]",
       "critical_errors": ["erro técnico 1", "erro técnico 2"] | null,
       "ideal_response": "Exemplo completo de tratamento correto, 2-3 frases" | null
     }
@@ -584,7 +600,9 @@ Qual era o objetivo do vendedor nessa venda?:
 Objetivo do vendedor nessa simulação: {objetivo}
 
 Dados da empresa para validar informações do vendedor:
-{company_data}`
+{company_data}
+
+⚠️ VALIDAÇÃO OBRIGATÓRIA: Compare TUDO que o vendedor afirmou na transcrição (cases, clientes, prêmios, números, métricas) com os dados acima. Se o vendedor mencionou cases, clientes ou provas sociais que NÃO constam nos dados da empresa, ele INVENTOU essas informações. Isso deve zerar o indicador N4 (Credibilidade e Confiança) e ser mencionado em critical_gaps.`
 
 // Seção do prompt para análise de playbook
 const PLAYBOOK_SECTION = `
@@ -802,7 +820,7 @@ Produtos/Serviços: ${companyData.produtos_servicos || 'Não informado'}
 Função dos Produtos: ${companyData.funcao_produtos || 'Não informado'}
 Diferenciais: ${companyData.diferenciais || 'Não informado'}
 Concorrentes: ${companyData.concorrentes || 'Não informado'}
-Dados e Métricas: ${companyData.dados_metricas || 'Não informado'}
+Provas Sociais (cases, clientes, prêmios, certificações): ${companyData.dados_metricas || 'Não informado'}
 Erros Comuns: ${companyData.erros_comuns || 'Não informado'}
 Percepção Desejada: ${companyData.percepcao_desejada || 'Não informado'}`
     }

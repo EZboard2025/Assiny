@@ -2243,7 +2243,8 @@ if (btnStopRec) {
 // --- Meeting Start Prompt ---
 const meetStartPrompt = document.getElementById('meet-start-prompt')
 const meetStartSubtitle = document.getElementById('meet-start-subtitle')
-const btnMeetStartYes = document.getElementById('btn-meet-start-yes')
+const btnMeetStartSales = document.getElementById('btn-meet-start-sales')
+const btnMeetStartOther = document.getElementById('btn-meet-start-other')
 const btnMeetStartNo = document.getElementById('btn-meet-start-no')
 let meetStartPromptVisible = false
 
@@ -2261,7 +2262,7 @@ function showMeetStartPrompt(meetTitle) {
   if (meetStartPrompt) meetStartPrompt.style.display = 'block'
 
   enableMouseCapture()
-  window.electronAPI.resizeBubble(300, 240)
+  window.electronAPI.resizeBubble(300, 300)
 }
 
 async function hideMeetStartPrompt() {
@@ -2295,10 +2296,17 @@ async function hideMeetStartPrompt() {
   }
 }
 
-if (btnMeetStartYes) {
-  btnMeetStartYes.addEventListener('click', () => {
+if (btnMeetStartSales) {
+  btnMeetStartSales.addEventListener('click', () => {
     hideMeetStartPrompt()
-    window.electronAPI.confirmMeetingStart()
+    window.electronAPI.confirmMeetingStart('sales')
+  })
+}
+
+if (btnMeetStartOther) {
+  btnMeetStartOther.addEventListener('click', () => {
+    hideMeetStartPrompt()
+    window.electronAPI.confirmMeetingStart('non_sales')
   })
 }
 

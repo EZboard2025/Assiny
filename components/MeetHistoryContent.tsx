@@ -27,6 +27,7 @@ interface MeetEvaluation {
   calendar_meet_link?: string | null
   meeting_category?: string | null
   meeting_category_detail?: string | null
+  meeting_summary?: any | null
 }
 
 // Icon map for dynamic smart notes sections
@@ -169,6 +170,13 @@ interface MeetHistoryContentProps {
   sourceFilter?: string
 }
 
+/** Get SPIN score from column or fallback to evaluation JSON */
+function getSpinScore(eval_: any, letter: 'S' | 'P' | 'I' | 'N'): number | null {
+  const colKey = `spin_${letter.toLowerCase()}_score`
+  if (eval_[colKey] !== null && eval_[colKey] !== undefined) return eval_[colKey]
+  return eval_.evaluation?.spin_evaluation?.[letter]?.final_score ?? null
+}
+
 export default function MeetHistoryContent({ newEvaluationIds = [], initialEvaluationId, onInitialEvaluationLoaded, onOpenMeetAgent, sellerId, sourceFilter }: MeetHistoryContentProps) {
   const isManagerView = !!sellerId
   const router = useRouter()
@@ -267,7 +275,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
       if (sourceFilter === 'upload') {
         query = query.eq('source', 'upload')
       } else if (sourceFilter === 'bot') {
-        query = query.or('source.eq.bot,source.is.null')
+        query = query.or('source.eq.bot,source.eq.desktop,source.is.null')
       }
       const { data, error } = await query.order('created_at', { ascending: false })
 
@@ -767,7 +775,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-medium text-gray-900 truncate">
                             {evaluation.meeting_category === 'non_sales'
-                              ? getCategoryLabel(evaluation.meeting_category_detail)
+                              ? (evaluation.meeting_summary?.title || getCategoryLabel(evaluation.meeting_category_detail))
                               : evaluation.seller_name}
                           </span>
                           {isNew && (
@@ -838,7 +846,7 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     <div>
                       <h2 className={`${isManagerView ? 'text-sm' : 'text-xl'} font-bold text-gray-900`}>
                         {selectedEvaluation.meeting_category === 'non_sales'
-                          ? getCategoryLabel(selectedEvaluation.meeting_category_detail)
+                          ? (selectedEvaluation.meeting_summary?.title || getCategoryLabel(selectedEvaluation.meeting_category_detail))
                           : selectedEvaluation.seller_name}
                       </h2>
                       {selectedEvaluation.meeting_category === 'non_sales' ? (
@@ -931,7 +939,113 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
             {/* Collapsible Section Cards */}
             <div className={`${isManagerView ? 'p-3 space-y-1.5' : 'p-4 space-y-2'}`}>
 
-              {/* 0. Notas Inteligentes */}
+              {/* 0. Meeting Summary (non-sales only) */}
+              {selectedEvaluation.meeting_summary && (() => {
+                const ms = selectedEvaluation.meeting_summary
+                return (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSection(expandedSection === 'meeting_summary' ? null : 'meeting_summary')}
+                      className={sectionBtnClass}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`${sectionIconBoxClass} bg-blue-50`}>
+                          <FileText className={`${sectionIconClass} text-blue-600`} />
+                        </div>
+                        <div className="text-left">
+                          <h3 className={sectionTitleClass}>Resumo da Reunião</h3>
+                          <p className="text-xs text-gray-400 mt-0.5">{ms.title}</p>
+                        </div>
+                      </div>
+                      {expandedSection === 'meeting_summary' ? (
+                        <ChevronUp className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                      )}
+                    </button>
+
+                    {expandedSection === 'meeting_summary' && (
+                      <div className="px-4 pb-4 border-t border-gray-100 space-y-4">
+                        {/* Summary */}
+                        <p className="text-sm text-gray-700 leading-relaxed mt-3">{ms.summary}</p>
+
+                        {/* Participants + Duration + Sentiment */}
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          {ms.participants?.length > 0 && (
+                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">{ms.participants.join(', ')}</span>
+                          )}
+                          {ms.duration_estimate && (
+                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded">{ms.duration_estimate}</span>
+                          )}
+                          {ms.sentiment && (
+                            <span className={`px-2 py-1 rounded ${
+                              ms.sentiment === 'positive' ? 'bg-green-50 text-green-600' :
+                              ms.sentiment === 'tense' ? 'bg-red-50 text-red-600' :
+                              ms.sentiment === 'mixed' ? 'bg-amber-50 text-amber-600' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {ms.sentiment === 'positive' ? 'Produtiva' : ms.sentiment === 'tense' ? 'Tensa' : ms.sentiment === 'mixed' ? 'Mista' : 'Neutra'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Topics */}
+                        {ms.topics?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Tópicos</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ms.topics.map((t: string, i: number) => (
+                                <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">{t}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Decisions */}
+                        {ms.decisions?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Decisões</h4>
+                            <ul className="space-y-1">
+                              {ms.decisions.map((d: string, i: number) => (
+                                <li key={i} className="text-sm text-gray-600 pl-3 border-l-2 border-green-300">{d}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Action Items */}
+                        {ms.action_items?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Próximos Passos</h4>
+                            <div className="space-y-1.5">
+                              {ms.action_items.map((a: any, i: number) => (
+                                <div key={i} className="text-sm text-gray-600 pl-3 border-l-2 border-amber-300">
+                                  <span className="font-medium text-gray-700">{a.responsible}:</span> {a.task}
+                                  {a.deadline && <span className="text-xs text-gray-400 ml-1">({a.deadline})</span>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Key Quotes */}
+                        {ms.key_quotes?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800 mb-1.5">Citações</h4>
+                            <div className="space-y-1.5">
+                              {ms.key_quotes.map((q: string, i: number) => (
+                                <p key={i} className="text-sm text-gray-500 italic pl-3 border-l-2 border-gray-200">"{q}"</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* 0b. Notas Inteligentes */}
               {selectedEvaluation.smart_notes ? (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
@@ -1083,10 +1197,10 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                       <h3 className={sectionTitleClass}>Análise SPIN</h3>
                       <div className="flex items-center gap-1.5 mt-1">
                         {[
-                          { letter: 'S', score: selectedEvaluation.spin_s_score },
-                          { letter: 'P', score: selectedEvaluation.spin_p_score },
-                          { letter: 'I', score: selectedEvaluation.spin_i_score },
-                          { letter: 'N', score: selectedEvaluation.spin_n_score },
+                          { letter: 'S' as const, score: getSpinScore(selectedEvaluation, 'S') },
+                          { letter: 'P' as const, score: getSpinScore(selectedEvaluation, 'P') },
+                          { letter: 'I' as const, score: getSpinScore(selectedEvaluation, 'I') },
+                          { letter: 'N' as const, score: getSpinScore(selectedEvaluation, 'N') },
                         ].map(({ letter, score }) => (
                           <span key={letter} className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded ${
                             score !== null && score >= 7 ? 'bg-green-100 text-green-700' :
@@ -1112,10 +1226,10 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     {/* Score overview */}
                     <div className="grid grid-cols-4 gap-3 my-4">
                       {[
-                        { letter: 'S', label: 'Situação', score: selectedEvaluation.spin_s_score },
-                        { letter: 'P', label: 'Problema', score: selectedEvaluation.spin_p_score },
-                        { letter: 'I', label: 'Implicação', score: selectedEvaluation.spin_i_score },
-                        { letter: 'N', label: 'Necessidade', score: selectedEvaluation.spin_n_score },
+                        { letter: 'S' as const, label: 'Situação', score: getSpinScore(selectedEvaluation, 'S') },
+                        { letter: 'P' as const, label: 'Problema', score: getSpinScore(selectedEvaluation, 'P') },
+                        { letter: 'I' as const, label: 'Implicação', score: getSpinScore(selectedEvaluation, 'I') },
+                        { letter: 'N' as const, label: 'Necessidade', score: getSpinScore(selectedEvaluation, 'N') },
                       ].map(({ letter, label, score }) => (
                         <div key={letter} className="bg-gray-50 rounded-xl p-4 text-center">
                           <div className={`text-3xl font-bold mb-1 ${
@@ -1133,10 +1247,10 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                     {/* SPIN Detailed breakdown */}
                     <div className="grid grid-cols-2 gap-4">
                       {[
-                        { letter: 'S', label: 'Situação', score: selectedEvaluation.spin_s_score },
-                        { letter: 'P', label: 'Problema', score: selectedEvaluation.spin_p_score },
-                        { letter: 'I', label: 'Implicação', score: selectedEvaluation.spin_i_score },
-                        { letter: 'N', label: 'Necessidade', score: selectedEvaluation.spin_n_score },
+                        { letter: 'S' as const, label: 'Situação', score: getSpinScore(selectedEvaluation, 'S') },
+                        { letter: 'P' as const, label: 'Problema', score: getSpinScore(selectedEvaluation, 'P') },
+                        { letter: 'I' as const, label: 'Implicação', score: getSpinScore(selectedEvaluation, 'I') },
+                        { letter: 'N' as const, label: 'Necessidade', score: getSpinScore(selectedEvaluation, 'N') },
                       ].map(({ letter, label, score }) => {
                         const spinDetail = selectedEvaluation.evaluation?.spin_evaluation?.[letter]
                         if (!spinDetail) return null
@@ -1299,72 +1413,195 @@ export default function MeetHistoryContent({ newEvaluationIds = [], initialEvalu
                           <ul className="space-y-2">{selectedEvaluation.evaluation.priority_improvements.map((imp: any, i: number) => (<li key={i} className="text-sm text-gray-700"><span className="font-medium">{imp.area || imp}:</span> {imp.action_plan || ''}</li>))}</ul>
                         </div>
                       )}
-                      {selectedEvaluation.evaluation.playbook_adherence && (
-                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5 text-purple-600" /></div>
-                              <div>
-                                <h4 className="text-sm font-semibold text-purple-700">Aderência ao Playbook</h4>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-2xl font-bold text-purple-600">{selectedEvaluation.evaluation.playbook_adherence.overall_adherence_score}%</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                    selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
-                                    selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
-                                    selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-red-100 text-red-700'
-                                  }`}>
-                                    {selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'exemplary' ? 'Exemplar' :
-                                     selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'compliant' ? 'Conforme' :
-                                     selectedEvaluation.evaluation.playbook_adherence.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
-                                  </span>
+                      {selectedEvaluation.evaluation.playbook_adherence && (() => {
+                        const pa = selectedEvaluation.evaluation.playbook_adherence
+                        return (
+                        <div className="space-y-4">
+                          {/* Header + Score */}
+                          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5 text-purple-600" /></div>
+                                <div>
+                                  <h4 className="text-sm font-semibold text-purple-700">Aderência ao Playbook</h4>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-2xl font-bold text-purple-600">{pa.overall_adherence_score}%</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                      pa.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
+                                      pa.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
+                                      pa.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-red-100 text-red-700'
+                                    }`}>
+                                      {pa.adherence_level === 'exemplary' ? 'Exemplar' :
+                                       pa.adherence_level === 'compliant' ? 'Conforme' :
+                                       pa.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
+
+                            {/* Playbook Summary Stats */}
+                            {pa.playbook_summary && (
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {pa.playbook_summary.total_criteria_extracted > 0 && (
+                                  <span className="text-[11px] bg-white/80 text-gray-600 px-2 py-1 rounded-md border border-purple-100">
+                                    {pa.playbook_summary.total_criteria_extracted} critérios avaliados
+                                  </span>
+                                )}
+                                {pa.playbook_summary.criteria_compliant > 0 && (
+                                  <span className="text-[11px] bg-green-50 text-green-700 px-2 py-1 rounded-md border border-green-100">
+                                    ✓ {pa.playbook_summary.criteria_compliant} cumpridos
+                                  </span>
+                                )}
+                                {pa.playbook_summary.criteria_partial > 0 && (
+                                  <span className="text-[11px] bg-yellow-50 text-yellow-700 px-2 py-1 rounded-md border border-yellow-100">
+                                    ~ {pa.playbook_summary.criteria_partial} parciais
+                                  </span>
+                                )}
+                                {pa.playbook_summary.criteria_missed > 0 && (
+                                  <span className="text-[11px] bg-red-50 text-red-700 px-2 py-1 rounded-md border border-red-100">
+                                    ✗ {pa.playbook_summary.criteria_missed} não cumpridos
+                                  </span>
+                                )}
+                                {pa.playbook_summary.criteria_violated > 0 && (
+                                  <span className="text-[11px] bg-red-100 text-red-800 px-2 py-1 rounded-md border border-red-200 font-medium">
+                                    ⚠ {pa.playbook_summary.criteria_violated} violados
+                                  </span>
+                                )}
+                                {pa.playbook_summary.critical_criteria_met && (
+                                  <span className="text-[11px] bg-purple-50 text-purple-700 px-2 py-1 rounded-md border border-purple-100">
+                                    Críticos: {pa.playbook_summary.critical_criteria_met}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Dimensions with icons */}
+                            {pa.dimensions && (
+                              <div className="grid grid-cols-5 gap-2">
+                                {[
+                                  { key: 'opening', label: 'Abertura', Icon: MessageCircle, color: 'text-blue-500' },
+                                  { key: 'closing', label: 'Fechamento', Icon: CheckCheck, color: 'text-emerald-500' },
+                                  { key: 'conduct', label: 'Conduta', Icon: Shield, color: 'text-purple-500' },
+                                  { key: 'required_scripts', label: 'Scripts', Icon: ScrollText, color: 'text-amber-500' },
+                                  { key: 'process', label: 'Processo', Icon: Settings, color: 'text-gray-500' }
+                                ].map(({ key, label, Icon, color }) => {
+                                  const dim = pa.dimensions?.[key]
+                                  if (!dim || dim.status === 'not_evaluated') return null
+                                  return (
+                                    <div key={key} className="bg-white/70 rounded-lg p-2 text-center border border-purple-100">
+                                      <div className="flex justify-center mb-1"><Icon className={`w-4 h-4 ${color}`} /></div>
+                                      <div className={`text-lg font-bold ${(dim.score || 0) >= 70 ? 'text-green-600' : (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{dim.score || 0}%</div>
+                                      <div className="text-[10px] text-gray-500">{label}</div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
                           </div>
-                          {selectedEvaluation.evaluation.playbook_adherence.dimensions && (
-                            <div className="grid grid-cols-5 gap-2 mb-4">
+
+                          {/* Dimension Feedback (detailed per dimension) */}
+                          {pa.dimensions && (
+                            <div className="space-y-2">
                               {[
-                                { key: 'opening', label: 'Abertura', Icon: MessageCircle, color: 'text-blue-500' },
-                                { key: 'closing', label: 'Fechamento', Icon: CheckCheck, color: 'text-emerald-500' },
-                                { key: 'conduct', label: 'Conduta', Icon: Shield, color: 'text-purple-500' },
-                                { key: 'required_scripts', label: 'Scripts', Icon: ScrollText, color: 'text-amber-500' },
-                                { key: 'process', label: 'Processo', Icon: Settings, color: 'text-gray-500' }
-                              ].map(({ key, label, Icon, color }) => {
-                                const dim = selectedEvaluation.evaluation.playbook_adherence?.dimensions?.[key]
-                                if (!dim || dim.status === 'not_evaluated') return null
+                                { key: 'opening', label: 'Abertura', Icon: MessageCircle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' },
+                                { key: 'closing', label: 'Fechamento', Icon: CheckCheck, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                                { key: 'conduct', label: 'Conduta', Icon: Shield, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-100' },
+                                { key: 'required_scripts', label: 'Scripts', Icon: ScrollText, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' },
+                                { key: 'process', label: 'Processo', Icon: Settings, color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200' }
+                              ].map(({ key, label, Icon, color, bg, border }) => {
+                                const dim = pa.dimensions?.[key]
+                                if (!dim || dim.status === 'not_evaluated' || !dim.dimension_feedback) return null
                                 return (
-                                  <div key={key} className="bg-white/70 rounded-lg p-2 text-center border border-purple-100">
-                                    <div className="flex justify-center mb-1"><Icon className={`w-4 h-4 ${color}`} /></div>
-                                    <div className={`text-lg font-bold ${(dim.score || 0) >= 70 ? 'text-green-600' : (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{dim.score || 0}%</div>
-                                    <div className="text-[10px] text-gray-500">{label}</div>
+                                  <div key={key} className={`${bg} rounded-lg p-3 border ${border}`}>
+                                    <h5 className={`flex items-center gap-2 text-xs font-semibold ${color} mb-1.5`}>
+                                      <Icon className="w-3.5 h-3.5" />{label} — {dim.score || 0}%
+                                    </h5>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{dim.dimension_feedback}</p>
+                                    {dim.criteria_evaluated?.length > 0 && (
+                                      <div className="mt-2 flex flex-wrap gap-1">
+                                        {dim.criteria_evaluated.map((c: any, ci: number) => (
+                                          <span key={ci} className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                            c.result === 'compliant' ? 'bg-green-100 text-green-700' :
+                                            c.result === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                                            c.result === 'missed' ? 'bg-red-100 text-red-700' :
+                                            c.result === 'violated' ? 'bg-red-200 text-red-800' :
+                                            'bg-gray-100 text-gray-500'
+                                          }`}>
+                                            {typeof c === 'string' ? c : c?.criterion || c?.description || ''}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 )
                               })}
                             </div>
                           )}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-red-50/80 rounded-lg p-3 border border-red-100">
-                              <h5 className="flex items-center gap-2 text-xs font-semibold text-red-700 mb-2"><AlertTriangle className="w-3 h-3" />Violações</h5>
-                              {selectedEvaluation.evaluation.playbook_adherence.violations?.length > 0 ? (
-                                <ul className="space-y-1">{selectedEvaluation.evaluation.playbook_adherence.violations.slice(0, 3).map((v: any, i: number) => (<li key={i} className="text-xs text-gray-700">{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</li>))}</ul>
-                              ) : (<p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Nenhuma violação</p>)}
-                            </div>
-                            <div className="bg-amber-50/80 rounded-lg p-3 border border-amber-100">
-                              <h5 className="flex items-center gap-2 text-xs font-semibold text-amber-700 mb-2"><AlertCircle className="w-3 h-3" />Não Cumpridos</h5>
-                              {selectedEvaluation.evaluation.playbook_adherence.missed_requirements?.length > 0 ? (
-                                <ul className="space-y-1">{selectedEvaluation.evaluation.playbook_adherence.missed_requirements.slice(0, 3).map((m: any, i: number) => (<li key={i} className="text-xs text-gray-700">{typeof m === 'string' ? m : m?.criterion || m?.description || JSON.stringify(m)}</li>))}</ul>
-                              ) : (<p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Todos cumpridos</p>)}
-                            </div>
+
+                          {/* Violations */}
+                          <div className="bg-red-50/80 rounded-xl p-4 border border-red-100">
+                            <h5 className="flex items-center gap-2 text-sm font-semibold text-red-700 mb-3"><AlertTriangle className="w-4 h-4" />Violações Detectadas</h5>
+                            {pa.violations?.length > 0 ? (
+                              <div className="space-y-2">
+                                {pa.violations.map((v: any, i: number) => (
+                                  <div key={i} className="bg-white rounded-lg p-3 border border-red-200">
+                                    <p className="text-sm font-medium text-red-700">{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</p>
+                                    {v?.severity && <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${v.severity === 'critical' ? 'bg-red-200 text-red-800' : v.severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700'}`}>{v.severity}</span>}
+                                    {v?.evidence && <p className="text-xs text-gray-500 mt-1.5 italic border-l-2 border-red-200 pl-2">"{v.evidence}"</p>}
+                                    {v?.impact && <p className="text-xs text-red-600 mt-1"><span className="font-medium">Impacto:</span> {v.impact}</p>}
+                                    {v?.recommendation && <p className="text-xs text-green-700 mt-1"><span className="font-medium">Recomendação:</span> {v.recommendation}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (<p className="text-sm text-green-600 flex items-center gap-1.5"><CheckCircle className="w-4 h-4" />Nenhuma violação detectada</p>)}
                           </div>
-                          {selectedEvaluation.evaluation.playbook_adherence.coaching_notes && (
-                            <div className="bg-blue-50/80 rounded-lg p-3 border border-blue-100 mt-3">
-                              <h5 className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-2"><Lightbulb className="w-3 h-3" />Orientações para Melhorar</h5>
-                              <p className="text-xs text-gray-700 leading-relaxed">{selectedEvaluation.evaluation.playbook_adherence.coaching_notes}</p>
+
+                          {/* Missed Requirements */}
+                          <div className="bg-amber-50/80 rounded-xl p-4 border border-amber-100">
+                            <h5 className="flex items-center gap-2 text-sm font-semibold text-amber-700 mb-3"><AlertCircle className="w-4 h-4" />Requisitos Não Cumpridos</h5>
+                            {pa.missed_requirements?.length > 0 ? (
+                              <div className="space-y-2">
+                                {pa.missed_requirements.map((m: any, i: number) => (
+                                  <div key={i} className="bg-white rounded-lg p-3 border border-amber-200">
+                                    <p className="text-sm font-medium text-amber-700">{typeof m === 'string' ? m : m?.criterion || m?.description || JSON.stringify(m)}</p>
+                                    {m?.weight && <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${m.weight === 'critical' ? 'bg-red-100 text-red-700' : m.weight === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{m.weight}</span>}
+                                    {m?.expected && <p className="text-xs text-gray-600 mt-1.5"><span className="font-medium">Esperado:</span> {m.expected}</p>}
+                                    {m?.moment && <p className="text-xs text-gray-500 mt-1"><span className="font-medium">Momento:</span> {m.moment}</p>}
+                                    {m?.recommendation && <p className="text-xs text-green-700 mt-1"><span className="font-medium">Recomendação:</span> {m.recommendation}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (<p className="text-sm text-green-600 flex items-center gap-1.5"><CheckCircle className="w-4 h-4" />Todos os requisitos cumpridos</p>)}
+                          </div>
+
+                          {/* Exemplary Moments */}
+                          {pa.exemplary_moments?.length > 0 && (
+                            <div className="bg-green-50/80 rounded-xl p-4 border border-green-100">
+                              <h5 className="flex items-center gap-2 text-sm font-semibold text-green-700 mb-3"><Star className="w-4 h-4" />Momentos Exemplares</h5>
+                              <div className="space-y-2">
+                                {pa.exemplary_moments.map((e: any, i: number) => (
+                                  <div key={i} className="bg-white rounded-lg p-3 border border-green-200">
+                                    <p className="text-sm font-medium text-green-700">{typeof e === 'string' ? e : e?.criterion || ''}</p>
+                                    {e?.evidence && <p className="text-xs text-gray-500 mt-1.5 italic border-l-2 border-green-200 pl-2">"{e.evidence}"</p>}
+                                    {e?.why_exemplary && <p className="text-xs text-green-600 mt-1">{e.why_exemplary}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Coaching Notes */}
+                          {pa.coaching_notes && (
+                            <div className="bg-blue-50/80 rounded-xl p-4 border border-blue-100">
+                              <h5 className="flex items-center gap-2 text-sm font-semibold text-blue-700 mb-2"><Lightbulb className="w-4 h-4" />Orientações para Melhorar</h5>
+                              <p className="text-sm text-gray-700 leading-relaxed">{pa.coaching_notes}</p>
                             </div>
                           )}
                         </div>
-                      )}
+                        )
+                      })()}
                     </div>
                   )}
                 </div>

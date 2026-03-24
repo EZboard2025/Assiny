@@ -368,7 +368,7 @@ export default function TestRoleplaySession({
         await playTTS(data.message)
 
         const messageText = data.message.toLowerCase()
-        if (messageText.includes('roleplay finalizado') || messageText.includes('finalizar sessão') || messageText.includes('encerrar por aqui')) {
+        if (messageText.includes('roleplay finalizado') || messageText.includes('aguarde sua avaliação') || messageText.includes('encerrar por aqui')) {
           setTimeout(() => {
             handleEndSession(true)
           }, 2000)

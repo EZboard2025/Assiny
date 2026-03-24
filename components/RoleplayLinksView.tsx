@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Link2, Copy, CheckCircle, Users, Power, Sparkles, Edit2, X, Save, Loader2, ArrowUpDown, Calendar, GitCompare, Check, AlertCircle, User, ChevronRight, ChevronDown, Trash2, Plus, FolderOpen, MessageSquare, BarChart3, Target, TrendingUp, Lightbulb, FileText, Shield } from 'lucide-react'
+import { Link2, Copy, CheckCircle, Users, Power, Sparkles, Edit2, X, Save, Loader2, ArrowUpDown, Calendar, GitCompare, Check, AlertCircle, User, ChevronRight, ChevronDown, Trash2, Plus, FolderOpen, MessageSquare, BarChart3, Target, TrendingUp, Lightbulb, FileText, Shield, MessageCircle, CheckCheck, ScrollText, Settings, AlertTriangle, Star } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { PLAN_CONFIGS } from '@/lib/types/plans'
 
@@ -1325,16 +1325,11 @@ export default function RoleplayLinksView() {
                   const pa = ev.playbook_adherence
                   return (
                     <div className="space-y-6">
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-1">Aderência ao Playbook</h3>
-                        <p className="text-sm text-gray-400">Avaliação de conformidade com o playbook de vendas</p>
-                      </div>
-
-                      {/* Score + Level */}
-                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 p-6">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-purple-700 uppercase tracking-wider">Aderência ao Playbook</span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      {/* Score + Dimensions card */}
+                      <div className="bg-gray-50 rounded-lg p-5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-3xl font-bold text-gray-900">{pa.overall_adherence_score}%</span>
+                          <span className={`px-2.5 py-1 rounded text-xs font-semibold ${
                             pa.adherence_level === 'exemplary' ? 'bg-green-100 text-green-700' :
                             pa.adherence_level === 'compliant' ? 'bg-blue-100 text-blue-700' :
                             pa.adherence_level === 'partial' ? 'bg-yellow-100 text-yellow-700' :
@@ -1345,32 +1340,77 @@ export default function RoleplayLinksView() {
                              pa.adherence_level === 'partial' ? 'Parcial' : 'Não Conforme'}
                           </span>
                         </div>
-                        <div className="flex items-end gap-2">
-                          <span className="text-4xl font-bold text-purple-600">{pa.overall_adherence_score}%</span>
-                          <span className="text-sm text-gray-500 mb-1">de aderência</span>
-                        </div>
+
+                        {pa.playbook_summary && (
+                          <p className="text-xs text-gray-400 mb-4">
+                            {[
+                              pa.playbook_summary.total_criteria_extracted > 0 && `${pa.playbook_summary.total_criteria_extracted} critérios`,
+                              pa.playbook_summary.criteria_compliant > 0 && `${pa.playbook_summary.criteria_compliant} cumpridos`,
+                              pa.playbook_summary.criteria_partial > 0 && `${pa.playbook_summary.criteria_partial} parciais`,
+                              pa.playbook_summary.criteria_missed > 0 && `${pa.playbook_summary.criteria_missed} não cumpridos`,
+                              pa.playbook_summary.critical_criteria_met && `críticos: ${pa.playbook_summary.critical_criteria_met}`,
+                            ].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
+
+                        {pa.dimensions && (
+                          <div className="grid grid-cols-5 gap-2">
+                            {[
+                              { key: 'opening', label: 'Abertura' },
+                              { key: 'closing', label: 'Fechamento' },
+                              { key: 'conduct', label: 'Conduta' },
+                              { key: 'required_scripts', label: 'Scripts' },
+                              { key: 'process', label: 'Processo' }
+                            ].map(({ key, label }) => {
+                              const dim = pa.dimensions?.[key as keyof typeof pa.dimensions]
+                              if (!dim || dim.status === 'not_evaluated') return null
+                              const score = dim.score || 0
+                              return (
+                                <div key={key} className="text-center">
+                                  <div className={`text-lg font-bold ${score >= 70 ? 'text-green-600' : score >= 50 ? 'text-amber-500' : 'text-red-500'}`}>{score}%</div>
+                                  <div className="text-[11px] text-gray-400">{label}</div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Dimensions */}
+                      {/* Dimension details */}
                       {pa.dimensions && (
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div className="space-y-1">
                           {[
-                            { key: 'opening', label: 'Abertura', icon: '🎯' },
-                            { key: 'closing', label: 'Fechamento', icon: '🤝' },
-                            { key: 'conduct', label: 'Conduta', icon: '👔' },
-                            { key: 'required_scripts', label: 'Scripts', icon: '📝' },
-                            { key: 'process', label: 'Processo', icon: '⚙️' }
-                          ].map(({ key, label, icon }) => {
+                            { key: 'opening', label: 'Abertura' },
+                            { key: 'closing', label: 'Fechamento' },
+                            { key: 'conduct', label: 'Conduta' },
+                            { key: 'required_scripts', label: 'Scripts' },
+                            { key: 'process', label: 'Processo' }
+                          ].map(({ key, label }) => {
                             const dim = pa.dimensions?.[key as keyof typeof pa.dimensions]
-                            if (!dim || dim.status === 'not_evaluated') return null
+                            if (!dim || dim.status === 'not_evaluated' || !dim.dimension_feedback) return null
+                            const score = dim.score || 0
                             return (
-                              <div key={key} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-                                <div className="text-xl mb-1">{icon}</div>
-                                <div className={`text-2xl font-bold ${
-                                  (dim.score || 0) >= 70 ? 'text-green-600' :
-                                  (dim.score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'
-                                }`}>{dim.score || 0}%</div>
-                                <div className="text-xs text-gray-500">{label}</div>
+                              <div key={key} className="bg-gray-50 rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-sm font-medium text-gray-800">{label}</span>
+                                  <span className={`text-sm font-semibold ${score >= 70 ? 'text-green-600' : score >= 50 ? 'text-amber-500' : 'text-red-500'}`}>{score}%</span>
+                                </div>
+                                <p className="text-sm text-gray-500 leading-relaxed">{dim.dimension_feedback}</p>
+                                {dim.criteria_evaluated?.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                                    {dim.criteria_evaluated.map((c: any, ci: number) => (
+                                      <span key={ci} className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                                        c.result === 'compliant' ? 'border-green-200 text-green-600 bg-white' :
+                                        c.result === 'partial' ? 'border-amber-200 text-amber-600 bg-white' :
+                                        c.result === 'missed' ? 'border-red-200 text-red-500 bg-white' :
+                                        c.result === 'violated' ? 'border-red-300 text-red-600 bg-white' :
+                                        'border-gray-200 text-gray-400 bg-white'
+                                      }`}>
+                                        {typeof c === 'string' ? c : c?.criterion || c?.description || ''}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )
                           })}
@@ -1378,61 +1418,54 @@ export default function RoleplayLinksView() {
                       )}
 
                       {/* Violations */}
-                      <div className="bg-red-50 rounded-2xl border border-red-200 p-5">
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-red-700 mb-3">
-                          <AlertCircle className="w-4 h-4" />
-                          Violações Detectadas
-                        </h4>
-                        {pa.violations?.length > 0 ? (
-                          <ul className="space-y-2">
-                            {pa.violations.map((v: any, i: number) => (
-                              <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-3 border border-red-100">
-                                <div className="font-medium text-red-700">{v.criterion}</div>
-                                {v.evidence && <p className="text-xs text-gray-500 mt-1 italic">"{v.evidence}"</p>}
-                                {v.recommendation && <p className="text-xs text-red-600 mt-1">{v.recommendation}</p>}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-green-600 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
-                            Nenhuma violação detectada
-                          </p>
+                      <div className="border-t border-gray-100 pt-5">
+                        <h4 className="text-sm font-medium text-gray-800 mb-3">Violações</h4>
+                        {pa.violations?.length > 0 ? pa.violations.map((v: any, i: number) => (
+                          <div key={i} className="mb-3 pl-3 border-l-2 border-red-400">
+                            <p className="text-sm text-gray-700">{typeof v === 'string' ? v : v?.criterion || v?.description || JSON.stringify(v)}</p>
+                            {v?.evidence && <p className="text-xs text-gray-400 mt-1 italic">"{v.evidence}"</p>}
+                            {v?.impact && <p className="text-xs text-gray-500 mt-0.5">Impacto: {v.impact}</p>}
+                            {v?.recommendation && <p className="text-xs text-gray-500 mt-0.5">Recomendação: {v.recommendation}</p>}
+                          </div>
+                        )) : (
+                          <p className="text-sm text-gray-400">Nenhuma violação detectada</p>
                         )}
                       </div>
 
                       {/* Missed Requirements */}
-                      <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
-                        <h4 className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
-                          <AlertCircle className="w-4 h-4" />
-                          Requisitos Não Cumpridos
-                        </h4>
-                        {pa.missed_requirements?.length > 0 ? (
-                          <ul className="space-y-2">
-                            {pa.missed_requirements.map((m: any, i: number) => (
-                              <li key={i} className="text-sm text-gray-700 bg-white/50 rounded-lg p-3 border border-amber-100">
-                                <div className="font-medium text-amber-700">{m.criterion}</div>
-                                {m.expected && <p className="text-xs text-gray-500 mt-1">Esperado: {m.expected}</p>}
-                                {m.recommendation && <p className="text-xs text-amber-600 mt-1">{m.recommendation}</p>}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-green-600 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
-                            Todos os requisitos foram cumpridos
-                          </p>
+                      <div className="border-t border-gray-100 pt-5">
+                        <h4 className="text-sm font-medium text-gray-800 mb-3">Requisitos Não Cumpridos</h4>
+                        {pa.missed_requirements?.length > 0 ? pa.missed_requirements.map((m: any, i: number) => (
+                          <div key={i} className="mb-3 pl-3 border-l-2 border-amber-400">
+                            <p className="text-sm text-gray-700">{typeof m === 'string' ? m : m?.criterion || m?.description || JSON.stringify(m)}</p>
+                            {m?.expected && <p className="text-xs text-gray-400 mt-1">Esperado: {m.expected}</p>}
+                            {m?.moment && <p className="text-xs text-gray-400 mt-0.5">Momento: {m.moment}</p>}
+                            {m?.recommendation && <p className="text-xs text-gray-500 mt-0.5">Recomendação: {m.recommendation}</p>}
+                          </div>
+                        )) : (
+                          <p className="text-sm text-gray-400">Todos cumpridos</p>
                         )}
                       </div>
 
+                      {/* Exemplary Moments */}
+                      {pa.exemplary_moments?.length > 0 && (
+                        <div className="border-t border-gray-100 pt-5">
+                          <h4 className="text-sm font-medium text-gray-800 mb-3">Momentos Exemplares</h4>
+                          {pa.exemplary_moments.map((e: any, i: number) => (
+                            <div key={i} className="mb-3 pl-3 border-l-2 border-green-400">
+                              <p className="text-sm text-gray-700">{typeof e === 'string' ? e : e?.criterion || ''}</p>
+                              {e?.evidence && <p className="text-xs text-gray-400 mt-1 italic">"{e.evidence}"</p>}
+                              {e?.why_exemplary && <p className="text-xs text-gray-500 mt-0.5">{e.why_exemplary}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Coaching Notes */}
                       {pa.coaching_notes && (
-                        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-5">
-                          <h4 className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-3">
-                            <Lightbulb className="w-4 h-4" />
-                            Orientações para Melhorar
-                          </h4>
-                          <p className="text-sm text-gray-700 leading-relaxed">{pa.coaching_notes}</p>
+                        <div className="border-t border-gray-100 pt-5">
+                          <h4 className="text-sm font-medium text-gray-800 mb-2">Orientações</h4>
+                          <p className="text-sm text-gray-500 leading-relaxed">{pa.coaching_notes}</p>
                         </div>
                       )}
                     </div>
