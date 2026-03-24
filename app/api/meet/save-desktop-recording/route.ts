@@ -97,8 +97,8 @@ export async function POST(request: Request) {
       if (notifError) console.error('❌ Erro ao criar notificação:', notifError)
     })
 
-    // Extract ML patterns (fire-and-forget, non-blocking)
-    if (data?.id && companyId) {
+    // Extract ML patterns (fire-and-forget, non-blocking) — only for sales meetings
+    if (data?.id && companyId && evaluation?.spin_evaluation) {
       try {
         const host = request.headers.get('host') || 'localhost:3000'
         const protocol = host.includes('localhost') ? 'http' : 'https'

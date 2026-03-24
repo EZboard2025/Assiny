@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
       .from('meet_evaluations')
       .select('id, company_id, transcript, evaluation')
       .not('transcript', 'is', null)
+      .not('evaluation', 'is', null)
+      .neq('meeting_category', 'non_sales')
       .order('created_at', { ascending: false })
       .limit(limit)
 
