@@ -968,6 +968,7 @@ let isDragging = false
 const DRAG_THRESHOLD = 5
 let dragMouseStartX = 0
 let dragMouseStartY = 0
+let resizingFromBar = false  // blocks drag until bar→bubble resize completes
 
 bubble.addEventListener('pointerdown', async (e) => {
   if (e.button !== 0) return
@@ -979,16 +980,22 @@ bubble.addEventListener('pointerdown', async (e) => {
 
   // If in bar state, convert back to bubble BEFORE drag can start
   if (bubble.classList.contains('edge-bar')) {
+    resizingFromBar = true
     removeBarState()
     snappedEdge = null
     isHidden = false
     const currentPos = await window.electronAPI.getBubblePos()
     await window.electronAPI.setBubbleBounds(currentPos.x, currentPos.y, BUBBLE_SIZE, BUBBLE_SIZE)
+    // Re-anchor drag start to current mouse position after resize
+    dragMouseStartX = e.screenX
+    dragMouseStartY = e.screenY
+    resizingFromBar = false
   }
 })
 
 bubble.addEventListener('pointermove', (e) => {
   if (!bubble.hasPointerCapture(e.pointerId)) return
+  if (resizingFromBar) return  // wait for bar→bubble resize to complete
   if (!isDragging) {
     const dx = Math.abs(e.screenX - dragMouseStartX)
     const dy = Math.abs(e.screenY - dragMouseStartY)

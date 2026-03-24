@@ -1278,8 +1278,8 @@ ipcMain.on('start-drag', () => {
   // Calculate offset entirely in main process — avoids DPI mismatch
   const cursor = screen.getCursorScreenPoint()
   const bounds = bubbleWindow.getBounds()
-  dragOffsetX = cursor.x - bounds.x
-  dragOffsetY = cursor.y - bounds.y
+  dragOffsetX = Math.max(0, Math.min(cursor.x - bounds.x, bounds.width))
+  dragOffsetY = Math.max(0, Math.min(cursor.y - bounds.y, bounds.height))
   const dpi = screen.getPrimaryDisplay().scaleFactor
   console.log(`[Drag] Start — cursor: ${cursor.x},${cursor.y} bounds: ${bounds.x},${bounds.y} offset: ${dragOffsetX},${dragOffsetY} DPI: ${dpi} size: ${bounds.width}x${bounds.height}`)
 
