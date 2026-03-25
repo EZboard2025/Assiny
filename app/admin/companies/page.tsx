@@ -1075,7 +1075,8 @@ export default function CompaniesAdmin() {
             {filteredCompanies.map((company) => (
               <div
                 key={company.id}
-                className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-green-200 transition-all"
+                onClick={() => window.location.href = `/admin/companies/${company.id}`}
+                className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-green-200 transition-all cursor-pointer"
               >
                 {/* Company Info */}
                 <div className="flex items-center gap-3 mb-3">
@@ -1195,113 +1196,9 @@ export default function CompaniesAdmin() {
                   )
                 })()}
 
-                {/* Access Links */}
-                <div className="mb-3">
-                  {process.env.NEXT_PUBLIC_USE_UNIFIED_SYSTEM === 'true' ? (
-                    <p className="text-xs text-gray-400 text-center">
-                      Acesso unificado em ramppy.site
-                    </p>
-                  ) : (
-                    <div className="flex gap-2">
-                      <a
-                        href={`http://${company.subdomain}.ramppy.local:3000`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-medium text-center transition-colors border border-gray-200"
-                      >
-                        Local
-                      </a>
-                      <a
-                        href={`https://${company.subdomain}.ramppy.site`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-xs font-medium text-center transition-colors border border-green-200"
-                      >
-                        Produção
-                      </a>
-                      <a
-                        href={`https://${company.subdomain}.ramppy.site?openConfigHub=true`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-medium text-center transition-colors border border-gray-200 flex items-center justify-center gap-1"
-                      >
-                        <Settings className="w-3 h-3" />
-                        Config
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {/* Action Bar */}
-                <div className="pt-3 border-t border-gray-100 flex items-center gap-1">
-                  <button
-                    onClick={() => handleEditPlanClick(company)}
-                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                    title="Editar plano"
-                  >
-                    <Package className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleAddCreditsClick(company)}
-                    className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
-                    title="Adicionar créditos"
-                  >
-                    <Zap className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleOpenCreateUser(company)}
-                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                    title="Criar novo usuário"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleManageUsersClick(company)}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Gerenciar usuários"
-                  >
-                    <Users className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleViewRoleplays(company)}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Ver roleplays"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleViewMeetEvaluations(company)}
-                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                    title="Ver avaliações de Meet"
-                  >
-                    <Video className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => toggleLock(company)}
-                    disabled={togglingLock === company.id}
-                    className={`p-2 rounded-lg transition-colors ${
-                      company.locked
-                        ? 'text-orange-500 hover:bg-orange-50'
-                        : 'text-gray-400 hover:bg-gray-100'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    title={company.locked ? 'Desbloquear empresa' : 'Bloquear empresa'}
-                  >
-                    {togglingLock === company.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : company.locked ? (
-                      <Lock className="w-4 h-4" />
-                    ) : (
-                      <LockOpen className="w-4 h-4" />
-                    )}
-                  </button>
-                  <div className="flex-1" />
-                  <button
-                    onClick={() => handleDeleteClick(company)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Excluir empresa"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                {/* Click indicator */}
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-center">
+                  <span className="text-xs text-gray-400">Clique para ver detalhes →</span>
                 </div>
               </div>
             ))}

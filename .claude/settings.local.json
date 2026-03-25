@@ -185,7 +185,12 @@
       "Bash(sed -i 's/\"\"\"\"version\"\"\"\": \"\"\"\"1.0.18\"\"\"\"/\"\"\"\"version\"\"\"\": \"\"\"\"1.1.8\"\"\"\"/' package.json)",
       "Bash(powershell -Command \"\\(Get-Item ''C:\\\\Users\\\\ADM\\\\OneDrive\\\\Documentos\\\\Ramppy plataforma dev gabriel\\\\Assiny\\\\desktop\\\\release\\\\Ramppy.exe''\\).VersionInfo | Select ProductVersion,FileVersion\")",
       "Bash(ssh root@31.97.84.130 'cp \"\"/var/www/assiny/public/downloads/Ramppy Setup 1.0.0.exe\"\" \"\"/var/www/assiny/public/downloads/Ramppy.exe\"\" && ls -lh /var/www/assiny/public/downloads/Ramppy.exe')",
-      "Bash(sed -i 's/\"\"\"\"version\"\"\"\": \"\"\"\"1.1.8\"\"\"\"/\"\"\"\"version\"\"\"\": \"\"\"\"1.1.9\"\"\"\"/' package.json)"
+      "Bash(sed -i 's/\"\"\"\"version\"\"\"\": \"\"\"\"1.1.8\"\"\"\"/\"\"\"\"version\"\"\"\": \"\"\"\"1.1.9\"\"\"\"/' package.json)",
+      "Bash(git fetch:*)",
+      "Bash(ssh root@31.97.84.130 'cd /var/www/assiny && git pull origin main && export NVM_DIR=\"\"$HOME/.nvm\"\" && [ -s \"\"$NVM_DIR/nvm.sh\"\" ] && . \"\"$NVM_DIR/nvm.sh\"\" && export NODE_OPTIONS=\"\"--max-old-space-size=4096\"\" && npm run build && pm2 restart assiny')",
+      "Bash(ssh root@31.97.84.130 'export NVM_DIR=\"\"$HOME/.nvm\"\" && [ -s \"\"$NVM_DIR/nvm.sh\"\" ] && . \"\"$NVM_DIR/nvm.sh\"\" && pm2 logs assiny --lines 1000 --nostream 2>&1 | grep -iE \"\"\\(error|falhou|failed|score|normali\\)\"\" | tail -30')",
+      "Bash(ssh root@31.97.84.130 'export NVM_DIR=\"\"$HOME/.nvm\"\" && [ -s \"\"$NVM_DIR/nvm.sh\"\" ] && . \"\"$NVM_DIR/nvm.sh\"\" && pm2 logs assiny --lines 2000 --nostream 2>&1 | grep -iE \"\"\\(MeetBG.*error|Avaliação falhou|overall_score|normali|model.*not.*found\\)\"\" | tail -20')",
+      "Bash(ssh root@31.97.84.130 'cd /var/www/assiny && export NVM_DIR=\"\"$HOME/.nvm\"\" && [ -s \"\"$NVM_DIR/nvm.sh\"\" ] && . \"\"$NVM_DIR/nvm.sh\"\" && node -e \"\":*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ADM\\AppData\\Local\\ramppy-updater",
