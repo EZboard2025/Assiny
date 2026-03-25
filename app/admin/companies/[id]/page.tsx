@@ -122,6 +122,10 @@ export default function CompanyDetailPage() {
   const [employeeCount, setEmployeeCount] = useState(0)
   const [roleplayCount, setRoleplayCount] = useState({ training: 0, public: 0, total: 0 })
 
+  // Live meeting status
+  const [activeMeetings, setActiveMeetings] = useState<Array<{ status: string; recall_status: string; user_id: string; created_at: string }>>([])
+
+
   // Employees
   const [users, setUsers] = useState<CompanyUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -174,6 +178,22 @@ export default function CompanyDetailPage() {
     if (activeTab === 'roleplays' && roleplays.length === 0) loadRoleplays()
     if (activeTab === 'meetings' && meetings.length === 0) loadMeetings()
   }, [activeTab, isAuthenticated])
+
+  // Poll active meetings every 15s
+  useEffect(() => {
+    if (!isAuthenticated || !companyId) return
+    const checkActiveMeetings = async () => {
+      const { data } = await supabase
+        .from('meet_bot_sessions')
+        .select('status, recall_status, user_id, created_at')
+        .eq('company_id', companyId)
+        .in('status', ['joining', 'recording', 'processing', 'created'])
+      setActiveMeetings(data || [])
+    }
+    checkActiveMeetings()
+    const interval = setInterval(checkActiveMeetings, 15000)
+    return () => clearInterval(interval)
+  }, [isAuthenticated, companyId])
 
   const handleLogin = () => {
     if (password === 'admin123') {
@@ -485,6 +505,12 @@ export default function CompanyDetailPage() {
                       <Lock className="w-3 h-3" /> BLOQUEADA
                     </span>
                   )}
+                  {activeMeetings.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-200 rounded-full text-xs font-semibold text-red-700 animate-pulse">
+                      <span className="w-2 h-2 bg-red-500 rounded-full" />
+                      {activeMeetings.length === 1 ? '1 reunião ao vivo' : `${activeMeetings.length} reuniões ao vivo`}
+                    </span>
+                  )}
                 </div>
                 <p className="text-gray-500 flex items-center gap-1.5 mt-0.5">
                   <Globe className="w-4 h-4" />
@@ -560,6 +586,38 @@ export default function CompanyDetailPage() {
           {/* === VISÃO GERAL === */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              {/* Meeting Status Banner */}
+              {activeMeetings.length > 0 ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-800">
+                        {activeMeetings.length === 1 ? '1 reunião ao vivo agora' : `${activeMeetings.length} reuniões ao vivo agora`}
+                      </p>
+                      <div className="flex gap-3 mt-1">
+                        {activeMeetings.map((m, i) => (
+                          <span key={i} className="text-xs text-red-600">
+                            {m.recall_status === 'in_call_recording' ? '🎙️ Gravando' :
+                             m.recall_status === 'joining_call' ? '🔗 Entrando' :
+                             m.recall_status === 'in_waiting_room' ? '⏳ Sala de espera' :
+                             `📡 ${m.status}`}
+                            {' — iniciada ' + new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 bg-gray-300 rounded-full" />
+                    <p className="text-sm text-gray-400">Nenhuma reunião ao vivo no momento</p>
+                  </div>
+                </div>
+              )}
+
               {/* Info Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-gray-50 rounded-lg p-4">
