@@ -961,19 +961,20 @@ if (window.electronAPI && window.electronAPI.onToggleBubble) {
 }
 
 // --- Drag Logic (bubble) ---
-// Uses pointer capture for reliable drag-end detection even when cursor escapes
-// the 72x72 window. Main process polls cursor at 60fps for smooth movement.
-// Offset calculated entirely in main process to avoid DPI coordinate mismatches.
+// NO pointer capture — it breaks on Windows with DPI scaling when the window moves
+// (lostpointercapture fires, triggering snapIfNearEdge mid-drag).
+// Main process polls cursor at ~120fps for movement. Renderer only signals start/stop.
 let isDragging = false
 const DRAG_THRESHOLD = 5
 let dragMouseStartX = 0
 let dragMouseStartY = 0
-let resizingFromBar = false  // blocks drag until bar→bubble resize completes
+let resizingFromBar = false
+let mouseIsDown = false
 
-bubble.addEventListener('pointerdown', async (e) => {
+bubble.addEventListener('mousedown', async (e) => {
   if (e.button !== 0) return
   e.preventDefault()
-  bubble.setPointerCapture(e.pointerId) // Keeps receiving events even outside window
+  mouseIsDown = true
   isDragging = false
   dragMouseStartX = e.screenX
   dragMouseStartY = e.screenY
@@ -986,55 +987,49 @@ bubble.addEventListener('pointerdown', async (e) => {
     isHidden = false
     const currentPos = await window.electronAPI.getBubblePos()
     await window.electronAPI.setBubbleBounds(currentPos.x, currentPos.y, BUBBLE_SIZE, BUBBLE_SIZE)
-    // Re-anchor drag start to current mouse position after resize
     dragMouseStartX = e.screenX
     dragMouseStartY = e.screenY
     resizingFromBar = false
   }
-})
 
-bubble.addEventListener('pointermove', (e) => {
-  if (!bubble.hasPointerCapture(e.pointerId)) return
-  if (resizingFromBar) return  // wait for bar→bubble resize to complete
-  if (!isDragging) {
-    const dx = Math.abs(e.screenX - dragMouseStartX)
-    const dy = Math.abs(e.screenY - dragMouseStartY)
-    if (dx + dy > DRAG_THRESHOLD) {
-      isDragging = true
-      // Send initial screenX/screenY so main process calculates offset from renderer coords
-      window.electronAPI.startDrag(e.screenX, e.screenY)
+  // Use document-level listeners for reliable tracking (no pointer capture needed)
+  const onMouseMove = (ev) => {
+    if (resizingFromBar) return
+    if (!isDragging) {
+      const dx = Math.abs(ev.screenX - dragMouseStartX)
+      const dy = Math.abs(ev.screenY - dragMouseStartY)
+      if (dx + dy > DRAG_THRESHOLD) {
+        isDragging = true
+        bubble.classList.add('dragging')
+        window.electronAPI.startDrag()
+      }
     }
-  } else {
-    // Renderer-driven drag: send each pointermove position directly to main process.
-    // Uses renderer's screenX/screenY which are always in the same coordinate space.
-    // No polling = no DPI mismatch between screen.getCursorScreenPoint() and setPosition().
-    window.electronAPI.moveBubbleDrag(e.screenX, e.screenY)
+    // Main process polling handles actual movement — no coords sent
   }
-})
 
-bubble.addEventListener('pointerup', (e) => {
-  bubble.releasePointerCapture(e.pointerId)
-  const wasDragging = isDragging
-  isDragging = false
-  if (!wasDragging) {
-    if (snappedEdge && isHidden) {
-      peekFromEdge()
-    } else {
-      expand()
-    }
-  } else {
-    window.electronAPI.stopDrag()
-    snapIfNearEdge()
-  }
-})
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+    mouseIsDown = false
 
-// Safety: if pointer capture is lost unexpectedly, stop drag
-bubble.addEventListener('lostpointercapture', () => {
-  if (isDragging) {
+    const wasDragging = isDragging
     isDragging = false
-    window.electronAPI.stopDrag()
-    snapIfNearEdge()
+    bubble.classList.remove('dragging')
+
+    if (!wasDragging) {
+      if (snappedEdge && isHidden) {
+        peekFromEdge()
+      } else {
+        expand()
+      }
+    } else {
+      window.electronAPI.stopDrag()
+      snapIfNearEdge()
+    }
   }
+
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
 })
 
 // --- Drag Logic (chat header) ---

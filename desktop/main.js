@@ -2,6 +2,27 @@ const { app, BrowserWindow, BaseWindow, WebContentsView, ipcMain, session, deskt
 const path = require('path')
 const fs = require('fs')
 const { exec } = require('child_process')
+
+// Fix DPI drift on Windows notebooks with display scaling (125%, 150%, etc.).
+// Electron's setPosition() has cumulative 1px rounding errors per call on scaled displays.
+// Forcing 1:1 pixel mapping eliminates the coordinate mismatch entirely.
+// Web content zoom is compensated per-window after creation.
+let nativeScaleFactor = 1
+if (process.platform === 'win32') {
+  try {
+    const dpiStr = require('child_process').execSync(
+      'powershell -Command "(Get-ItemProperty \'HKCU:\\Control Panel\\Desktop\\WindowMetrics\').AppliedDPI"',
+      { timeout: 3000 }
+    ).toString().trim()
+    const dpi = parseInt(dpiStr, 10)
+    if (dpi && dpi > 96) {
+      nativeScaleFactor = dpi / 96
+      app.commandLine.appendSwitch('force-device-scale-factor', '1')
+    }
+  } catch (e) {
+    // If DPI detection fails, don't force scale — better to have drift than broken rendering
+  }
+}
 const { isBlackHoleInstalled, installBlackHoleDriver, createMultiOutputDevice, destroyMultiOutputDevice } = require('./audio-devices')
 
 // File-based logging for auto-scan debugging
@@ -189,7 +210,8 @@ async function createMainWindow() {
   })
 
   mainWindow.loadURL(PLATFORM_URL)
-  mainWindow.webContents.setZoomFactor(1.2)
+  // Compensate zoom for forced 1x DPI: original zoom * native scale factor
+  mainWindow.webContents.setZoomFactor(1.2 * nativeScaleFactor)
   mainWindow.setMenuBarVisibility(false)
 
   // Force taskbar icon on Windows
@@ -1268,40 +1290,42 @@ ipcMain.on('move-bubble', (_event, x, y) => {
 })
 
 // ── Main-process driven drag ──
-// Polls cursor position at 60fps — works even when cursor leaves the 72x72 window.
+// With force-device-scale-factor=1, all coords are in physical pixels (no DPI mismatch).
+// Polls cursor at ~120fps for smooth tracking. Renderer only signals start/stop.
 let dragInterval = null
 let dragOffsetX = 0
 let dragOffsetY = 0
 
-ipcMain.on('start-drag', (_event, screenX, screenY) => {
+ipcMain.on('start-drag', (_event) => {
   if (!bubbleWindow || bubbleWindow.isDestroyed()) return
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
 
-  // Renderer-driven drag: renderer sends screenX/screenY from pointermove events.
-  // Offset calculated from first position. No polling = no DPI coordinate mismatch.
+  const cursor = screen.getCursorScreenPoint()
   const bounds = bubbleWindow.getBounds()
-  dragOffsetX = screenX - bounds.x
-  dragOffsetY = screenY - bounds.y
-  // Clamp offset to window size
-  dragOffsetX = Math.max(0, Math.min(dragOffsetX, bounds.width))
-  dragOffsetY = Math.max(0, Math.min(dragOffsetY, bounds.height))
+  dragOffsetX = cursor.x - bounds.x
+  dragOffsetY = cursor.y - bounds.y
+
+  dragInterval = setInterval(() => {
+    if (!bubbleWindow || bubbleWindow.isDestroyed()) {
+      clearInterval(dragInterval); dragInterval = null; return
+    }
+    const c = screen.getCursorScreenPoint()
+    const all = getAllScreenBounds()
+    const [w, h] = bubbleWindow.getSize()
+
+    let x = c.x - dragOffsetX
+    let y = c.y - dragOffsetY
+
+    if (x < all.x) x = all.x
+    if (y < all.y) y = all.y
+    if (x + w > all.maxX) x = all.maxX - w
+    if (y + h > all.maxY) y = all.maxY - h
+
+    bubbleWindow.setPosition(x, y)
+  }, 8)
 })
 
-ipcMain.on('move-bubble-drag', (_event, screenX, screenY) => {
-  if (!bubbleWindow || bubbleWindow.isDestroyed()) return
-  const all = getAllScreenBounds()
-  const bounds = bubbleWindow.getBounds()
-  let x = Math.round(screenX - dragOffsetX)
-  let y = Math.round(screenY - dragOffsetY)
-
-  // Clamp
-  if (x < all.x) x = all.x
-  if (y < all.y) y = all.y
-  if (x + bounds.width > all.maxX) x = all.maxX - bounds.width
-  if (y + bounds.height > all.maxY) y = all.maxY - bounds.height
-
-  bubbleWindow.setPosition(x, y)
-})
+ipcMain.on('move-bubble-drag', (_event) => {})
 
 ipcMain.on('stop-drag', () => {
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null }
