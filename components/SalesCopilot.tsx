@@ -259,6 +259,28 @@ function SchedulingCard({ title, startISO, endISO, email, authToken }: {
   )
 }
 
+// Copy button with its own state for each bubble
+function BubbleCopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }}
+      className={`flex items-center gap-1 text-[11px] font-medium transition-colors ${
+        copied
+          ? 'text-[#00d4aa]'
+          : 'text-white/60 hover:text-white'
+      }`}
+    >
+      <Copy className="w-3 h-3" />
+      {copied ? 'Copiado!' : 'Copiar'}
+    </button>
+  )
+}
+
 // Styled text renderer for plain text segments
 function StyledText({ text, onSendBubble, sentBubbles }: { text: string; onSendBubble?: (text: string, idx: number) => void; sentBubbles?: Set<number> }) {
   const lines = text.split('\n')
@@ -301,116 +323,135 @@ function StyledText({ text, onSendBubble, sentBubbles }: { text: string; onSendB
     numberedBuffer = []
   }
 
-  const flushQuote = (key: string) => {
-    if (quoteBuffer.length === 0) return
-    const quoteText = quoteBuffer.join('\n').replace(/^[""\u201c]+|[""\u201d]+$/g, '').trim()
-    if (quoteText.length < 10) {
-      // Too short to be a message bubble, render as normal text
-      elements.push(<p key={key} className="text-[#d1d7db] text-sm leading-relaxed">{quoteText}</p>)
-      quoteBuffer = []
-      return
-    }
+  const renderBubble = (text: string, key: string) => {
     const idx = bubbleIndex++
     const isSent = sentBubbles?.has(idx)
     elements.push(
       <div key={key} className="my-2 ml-1">
         <div className="bg-[#005c4b] rounded-lg rounded-tr-none px-3 py-2 relative max-w-[95%] shadow-md">
-          <p className="text-[#e9edef] text-[13.5px] leading-relaxed whitespace-pre-wrap">{quoteText}</p>
-          <div className="flex items-center justify-end gap-1 mt-1 -mb-0.5">
-            <span className="text-[10px] text-[#ffffff99]">Sugestão</span>
+          <p className="text-[#e9edef] text-[13.5px] leading-relaxed whitespace-pre-wrap">{text}</p>
+          <div className="flex items-center gap-2 mt-2 pt-1.5 border-t border-white/10">
+            {onSendBubble && (
+              <button
+                onClick={() => onSendBubble(text, idx)}
+                disabled={isSent}
+                className={`flex items-center gap-1 text-[11px] font-medium transition-colors ${
+                  isSent
+                    ? 'text-[#00d4aa]'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Send className="w-3 h-3" />
+                {isSent ? 'Enviada!' : 'Enviar'}
+              </button>
+            )}
+            <BubbleCopyButton text={text} />
           </div>
         </div>
-        {onSendBubble && (
-          <div className="flex items-center gap-1 mt-1 ml-1">
-            <button
-              onClick={() => onSendBubble(quoteText, idx)}
-              disabled={isSent}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200 ${
-                isSent
-                  ? 'bg-[#00a884]/20 text-[#00a884]'
-                  : 'bg-[#2a3942] text-[#d1d7db] hover:bg-[#00a884] hover:text-white hover:scale-105'
-              }`}
-            >
-              <Send className="w-3 h-3" />
-              {isSent ? 'Enviada' : 'Enviar'}
-            </button>
-          </div>
-        )}
       </div>
     )
+  }
+
+  const flushQuote = (key: string) => {
+    if (quoteBuffer.length === 0) return
+    const quoteText = quoteBuffer.join('\n').replace(/^[""\u201c]+|[""\u201d]+$/g, '').trim()
+    if (quoteText.length < 10) {
+      elements.push(<p key={key} className="text-[#d1d7db] text-sm leading-relaxed">{quoteText}</p>)
+      quoteBuffer = []
+      return
+    }
+    // Split long messages into multiple bubbles by double newline (paragraph breaks)
+    const paragraphs = quoteText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0)
+    if (paragraphs.length > 1) {
+      paragraphs.forEach((p, i) => renderBubble(p, `${key}_p${i}`))
+    } else {
+      renderBubble(quoteText, key)
+    }
     quoteBuffer = []
   }
 
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li]
-    const trimmed = line.trim()
+  // Pre-process: find quoted blocks (everything between first " and last ") and split into segments
+  const fullText = lines.join('\n')
+  // Match all quoted blocks: opening quote ... closing quote (multiline)
+  const segments: { type: 'text' | 'quote'; content: string }[] = []
+  let remaining = fullText
+  const quoteBlockRegex = /[""\u201c]([\s\S]*?)[""\u201d]/g
+  let qMatch
+  let lastEnd = 0
 
-    // Track multi-line quotes
-    if (quoteStartLine >= 0) {
-      quoteBuffer.push(line)
-      if (/[""\u201d]\s*$/.test(trimmed)) {
-        // End of quote
-        flushQuote(`q_${quoteStartLine}`)
-        quoteStartLine = -1
+  while ((qMatch = quoteBlockRegex.exec(fullText)) !== null) {
+    // Only treat as quote if substantial (>20 chars)
+    if (qMatch[1].trim().length > 20) {
+      if (qMatch.index > lastEnd) {
+        segments.push({ type: 'text', content: fullText.slice(lastEnd, qMatch.index) })
       }
+      segments.push({ type: 'quote', content: qMatch[1].trim() })
+      lastEnd = qMatch.index + qMatch[0].length
+    }
+  }
+  if (lastEnd < fullText.length) {
+    segments.push({ type: 'text', content: fullText.slice(lastEnd) })
+  }
+  // Fallback: if no quotes found, treat everything as text
+  if (segments.length === 0) {
+    segments.push({ type: 'text', content: fullText })
+  }
+
+  for (let si = 0; si < segments.length; si++) {
+    const seg = segments[si]
+
+    if (seg.type === 'quote') {
+      // Split quote into paragraphs, each becomes a bubble
+      const paragraphs = seg.content.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0)
+      paragraphs.forEach((p, pi) => renderBubble(p, `q_${si}_${pi}`))
       continue
     }
 
-    // Detect start of a quoted block: line starts with " and either ends with " (single-line) or continues
-    if (/^[""\u201c]/.test(trimmed) && trimmed.length > 15) {
-      flushBullets(`bl_${li}`)
-      flushNumbered(`nl_${li}`)
-      quoteBuffer = [line]
-      if (/[""\u201d]\s*$/.test(trimmed) && trimmed.length > 1) {
-        // Single-line quote
-        flushQuote(`q_${li}`)
-        quoteStartLine = -1
-      } else {
-        quoteStartLine = li
+    // Regular text: process line by line
+    const textLines = seg.content.split('\n')
+    for (let li = 0; li < textLines.length; li++) {
+      const trimmed = textLines[li].trim()
+
+      if (!trimmed) {
+        flushBullets(`bl_${si}_${li}`)
+        flushNumbered(`nl_${si}_${li}`)
+        continue
       }
-      continue
-    }
 
-    if (!trimmed) {
-      flushBullets(`bl_${li}`)
-      flushNumbered(`nl_${li}`)
-      continue
-    }
+      if (/^[-–•]\s/.test(trimmed)) {
+        flushNumbered(`nl_${si}_${li}`)
+        bulletBuffer.push(trimmed.replace(/^[-–•]\s+/, ''))
+        continue
+      }
 
-    if (/^[-–•]\s/.test(trimmed)) {
-      flushNumbered(`nl_${li}`)
-      bulletBuffer.push(trimmed.replace(/^[-–•]\s+/, ''))
-      continue
-    }
+      const numMatch = trimmed.match(/^(\d+)[.\)]\s+(.+)/)
+      if (numMatch) {
+        flushBullets(`bl_${si}_${li}`)
+        numberedBuffer.push({ num: numMatch[1], text: numMatch[2] })
+        continue
+      }
 
-    const numMatch = trimmed.match(/^(\d+)[.\)]\s+(.+)/)
-    if (numMatch) {
-      flushBullets(`bl_${li}`)
-      numberedBuffer.push({ num: numMatch[1], text: numMatch[2] })
-      continue
-    }
+      flushBullets(`bl_${si}_${li}`)
+      flushNumbered(`nl_${si}_${li}`)
 
-    flushBullets(`bl_${li}`)
-    flushNumbered(`nl_${li}`)
+      if (trimmed.endsWith(':') && trimmed.length < 100 && !trimmed.startsWith('Erro')) {
+        elements.push(
+          <div key={`hdr_${si}_${li}`} className="flex items-center gap-2 mt-3 mb-1">
+            <div className="w-1 h-4 bg-[#00a884] rounded-full shrink-0" />
+            <span className="text-[#00a884] text-[13px] font-semibold">{trimmed}</span>
+          </div>
+        )
+        continue
+      }
 
-    if (trimmed.endsWith(':') && trimmed.length < 100 && !trimmed.startsWith('Erro')) {
       elements.push(
-        <div key={`hdr_${li}`} className="flex items-center gap-2 mt-3 mb-1">
-          <div className="w-1 h-4 bg-[#00a884] rounded-full shrink-0" />
-          <span className="text-[#00a884] text-[13px] font-semibold">{trimmed}</span>
-        </div>
+        <p key={`p_${si}_${li}`} className="text-[#d1d7db] text-sm leading-relaxed">{trimmed}</p>
       )
-      continue
     }
-
-    elements.push(
-      <p key={`p_${li}`} className="text-[#d1d7db] text-sm leading-relaxed">{trimmed}</p>
-    )
   }
 
   flushBullets('bl_end')
   flushNumbered('nl_end')
-  flushQuote('q_end')
 
   return <>{elements}</>
 }
@@ -1299,47 +1340,8 @@ export default function SalesCopilot({
 
                         {/* Action bar - icons with hint labels that disappear after first interaction */}
                         {doneRevealing && !msg.content.startsWith('Erro:') && (() => {
-                          // Hide send/copy when response is only scheduling tags (no sendable text)
-                          const cleanedForActions = msg.content.replace(/\{\{(NOTA|BARRA|TENDENCIA|AGENDAR):[^}]+\}\}/g, '').trim()
-                          const hasOnlyTags = !cleanedForActions || cleanedForActions === 'Pronto! Encontrei as informações na conversa e preparei o agendamento:'
                           return (
                           <div className="flex items-start gap-1 mt-3">
-                            {/* Send to chat */}
-                            {onSendToChat && !hasOnlyTags && (
-                              <div className="flex flex-col items-center">
-                                <button
-                                  onClick={async () => {
-                                    setShowActionHints(false)
-                                    const allQuotes = extractAllQuotedMessages(msg.content)
-                                    if (allQuotes.length > 1) {
-                                      for (let i = 0; i < allQuotes.length; i++) {
-                                        onSendToChat(allQuotes[i])
-                                        setSentBubblesByMsg(prev => ({
-                                          ...prev,
-                                          [msg.id]: new Set([...(prev[msg.id] || []), i])
-                                        }))
-                                        if (i < allQuotes.length - 1) {
-                                          await new Promise(r => setTimeout(r, 1500))
-                                        }
-                                      }
-                                    } else {
-                                      onSendToChat(extractCleanMessage(msg.content))
-                                    }
-                                    setSentMsgIds(prev => new Set(prev).add(msg.id))
-                                  }}
-                                  disabled={sentMsgIds.has(msg.id)}
-                                  className={`p-1.5 rounded-full transition-colors ${
-                                    sentMsgIds.has(msg.id)
-                                      ? 'text-[#00a884]'
-                                      : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
-                                  }`}
-                                  title={sentMsgIds.has(msg.id) ? 'Enviado!' : 'Enviar para o chat'}
-                                >
-                                  <Send className="w-4 h-4" />
-                                </button>
-                                {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5 transition-opacity">Enviar</span>}
-                              </div>
-                            )}
                             {/* Thumbs up */}
                             {msg.feedbackId && (
                               <div className="flex flex-col items-center">
@@ -1384,21 +1386,6 @@ export default function SalesCopilot({
                               </button>
                               {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Refazer</span>}
                             </div>
-                            {/* Copy */}
-                            {!hasOnlyTags && (
-                            <div className="flex flex-col items-center">
-                              <button
-                                onClick={() => { setShowActionHints(false); handleCopy(msg.content, msg.id) }}
-                                className={`p-1.5 rounded-full transition-colors ${
-                                  copiedId === msg.id ? 'text-[#00a884]' : 'text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]'
-                                }`}
-                                title="Copiar"
-                              >
-                                <Copy className="w-4 h-4" />
-                              </button>
-                              {showActionHints && <span className="text-[9px] text-[#8696a0] mt-0.5">Copiar</span>}
-                            </div>
-                            )}
                           </div>
                           )})()}
                       </div>

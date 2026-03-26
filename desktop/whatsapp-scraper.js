@@ -782,9 +782,11 @@ function injectText(text) {
   }
 
   input.focus()
-  input.textContent = ''
+  // Select all existing content and delete it first
+  document.execCommand('selectAll', false, null)
+  document.execCommand('delete', false, null)
   document.execCommand('insertText', false, text)
-  input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }))
+  // NÃO disparar InputEvent manual — insertText já faz isso internamente
   return true
 }
 
@@ -910,7 +912,8 @@ window.__ramppySendMessage = sendCurrentMessage
 window.__ramppyNavigateToContact = navigateToContact
 
 // --- Listen for text injection requests ---
-if (window.ramppy) {
+if (window.ramppy && !window.__ramppyInjectListenerRegistered) {
+  window.__ramppyInjectListenerRegistered = true
   window.ramppy.onInjectText((text) => {
     const success = injectText(text)
     console.log(`[Ramppy Scraper] Text injection ${success ? 'successful' : 'failed'}`)

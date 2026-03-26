@@ -28,7 +28,7 @@ export default function DashboardSidebar({
   const navItems = [
     { icon: Home, href: '/', label: 'Home', show: true },
     { icon: Users, href: '/roleplay', label: 'Simulação', show: true },
-    { icon: MessageSquare, href: '#whatsapp', label: 'WhatsApp IA', show: true },
+    { icon: MessageSquare, href: '/followup', label: 'WhatsApp IA', show: true },
     { icon: CalendarDays, href: '/calendar', label: 'Calendário', show: true },
     { icon: Video, href: '/meet-analysis', label: 'Análise Meet', show: true },
     { icon: Clock, href: '/history', label: 'Histórico', show: true },
@@ -110,6 +110,13 @@ export default function DashboardSidebar({
                 key={item.href}
                 href={item.href}
                 title={!isExpanded ? item.label : undefined}
+                onClick={(e) => {
+                  // In Electron, WhatsApp opens in a separate window via IPC
+                  if (item.href === '/followup' && typeof window !== 'undefined' && (window as any).electronAPI?.openWhatsApp) {
+                    e.preventDefault()
+                    ;(window as any).electronAPI.openWhatsApp()
+                  }
+                }}
                 className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
                   active
                     ? 'bg-green-500/20 text-white'

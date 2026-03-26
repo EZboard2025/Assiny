@@ -271,18 +271,6 @@ function addAIMessage(content, feedbackId) {
 function buildActionsHtml(msgId, feedbackId) {
   let html = `<div class="msg-actions" data-msg-id="${msgId}">`
 
-  html += `
-    <button class="btn-action btn-send-wa" data-msg-id="${msgId}" title="Enviar para o chat" onclick="sendToWhatsApp(this)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      Enviar
-    </button>`
-
-  html += `
-    <button class="btn-action" title="Copiar" onclick="copyMessage(this)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-      Copiar
-    </button>`
-
   if (feedbackId) {
     html += `
       <button class="btn-action btn-feedback-up" data-feedback-id="${feedbackId}" title="Útil" onclick="handleFeedback(this, true)">
@@ -720,6 +708,46 @@ async function handleScheduleEvent(btn, title, startISO, endISO, email) {
 // RICH CONTENT RENDERER
 // ============================================================
 
+// Build a single bubble with inline Enviar + Copiar buttons
+function buildBubbleHtml(text) {
+  const escaped = escapeHtml(text).replace(/\n/g, '<br>')
+  // Encode text for safe embedding in onclick (use base64 to avoid quote issues)
+  const b64 = btoa(unescape(encodeURIComponent(text)))
+  return `<div class="quoted-msg">
+    <div>${escaped}</div>
+    <div class="quoted-msg-actions">
+      <button onclick="sendBubble(this,'${b64}')">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Enviar
+      </button>
+      <button onclick="copyBubble(this,'${b64}')">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        Copiar
+      </button>
+    </div>
+  </div>`
+}
+
+window.sendBubble = function(btn, b64) {
+  if (btn.disabled) return
+  btn.disabled = true
+  const text = decodeURIComponent(escape(atob(b64)))
+  if (window.electronAPI && window.electronAPI.injectWhatsAppText) {
+    window.electronAPI.injectWhatsAppText(text)
+    btn.classList.add('sent')
+    btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Enviada!'
+  }
+}
+
+window.copyBubble = function(btn, b64) {
+  const text = decodeURIComponent(escape(atob(b64)))
+  navigator.clipboard.writeText(text).then(() => {
+    const origHtml = btn.innerHTML
+    btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado!'
+    setTimeout(() => { btn.innerHTML = origHtml }, 1500)
+  })
+}
+
 function renderRichContent(content) {
   // Extract and render scheduling cards
   let schedulingCardsHtml = ''
@@ -767,9 +795,22 @@ function renderRichContent(content) {
     text = 'Pronto! Encontrei as informações na conversa e preparei o agendamento:'
   }
 
+  // Pre-process: extract multi-line quoted blocks and render as bubbles
+  // Replace quoted blocks with placeholder tokens, then process remaining text line-by-line
+  const quoteBlockRegex = /[""\u201c]([\s\S]*?)[""\u201d]/g
+  let qbMatch
+  let bubbleTokens = {}
+  let tokenIdx = 0
+  while ((qbMatch = quoteBlockRegex.exec(text)) !== null) {
+    if (qbMatch[1].trim().length > 20) {
+      const token = `__BUBBLE_${tokenIdx++}__`
+      bubbleTokens[token] = qbMatch[1].trim()
+      text = text.slice(0, qbMatch.index) + token + text.slice(qbMatch.index + qbMatch[0].length)
+      quoteBlockRegex.lastIndex = qbMatch.index + token.length
+    }
+  }
+
   // Parse markdown-like content
-  // NOTE: visual tags (NOTA, BARRA, TENDENCIA) are processed in formatInline/formatVisualTags
-  // AFTER escapeHtml, so they don't get double-escaped
   const lines = text.split('\n')
   let html = ''
   let inList = false
@@ -781,11 +822,24 @@ function renderRichContent(content) {
       continue
     }
 
+    // Render bubble tokens from pre-processed multi-line quotes
+    if (bubbleTokens[trimmed]) {
+      if (inList) { html += '</div>'; inList = false }
+      const fullQuote = bubbleTokens[trimmed]
+      // Split by paragraphs for multiple bubbles
+      const paragraphs = fullQuote.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0)
+      for (const p of paragraphs) {
+        html += buildBubbleHtml(p)
+      }
+      continue
+    }
+
     // Standalone quoted message (entire line is "..." or \u201c...\u201d)
     const quoteMatch = trimmed.match(/^(?:"|[\u201c])(.{10,})(?:"|[\u201d])$/)
     if (quoteMatch) {
       if (inList) { html += '</div>'; inList = false }
-      html += `<div class="quoted-msg">${escapeHtml(quoteMatch[1])}</div>`
+      const qText = quoteMatch[1]
+      html += buildBubbleHtml(qText)
       continue
     }
 

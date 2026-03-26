@@ -466,14 +466,36 @@ body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, Blin
 
 /* --- Quoted message highlight --- */
 .quoted-msg {
-  background: #1a2730;
+  background: #005c4b;
   border-left: 3px solid #00a884;
   padding: 8px 12px;
   border-radius: 0 8px 8px 0;
   margin: 6px 0;
   font-style: italic;
-  color: #d1d5db;
+  color: #e9edef;
 }
+.quoted-msg-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.quoted-msg-actions button {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  transition: color 0.15s;
+}
+.quoted-msg-actions button:hover { color: #fff; }
+.quoted-msg-actions button.sent { color: #00d4aa; cursor: default; }
 
 /* --- Score badge --- */
 .score-badge {

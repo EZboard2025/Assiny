@@ -565,6 +565,7 @@ function createRecordingWindow(autoStart = false, meetingType = 'sales') {
 // ============================================================
 function createWhatsAppWindow() {
   if (whatsappBaseWindow && !whatsappBaseWindow.isDestroyed()) {
+    whatsappBaseWindow.show()
     whatsappBaseWindow.focus()
     return
   }

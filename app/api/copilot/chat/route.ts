@@ -136,9 +136,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { userMessage, conversationContext, contactPhone, contactName, copilotHistory } = body
 
-    if (!userMessage || !conversationContext || !contactPhone) {
+    if (!userMessage || !contactPhone) {
       return NextResponse.json(
-        { error: 'userMessage, conversationContext e contactPhone são obrigatórios' },
+        { error: 'userMessage e contactPhone são obrigatórios' },
         { status: 400 }
       )
     }
@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
     const hasCalendarIntent = calendarKeywords.test(userMessage) || calendarKeywords.test(recentHistory) || calendarKeywords.test(recentConversation)
 
     // 3. Generate embedding for RAG search
-    const embeddingText = `${userMessage}\n${conversationContext.slice(-500)}`
+    const embeddingText = `${userMessage}\n${(conversationContext || '').slice(-500)}`
     const embeddingResponse = await openai.embeddings.create({
       model: 'text-embedding-3-small',
       input: embeddingText.slice(0, 8000)
@@ -328,10 +328,35 @@ A tag sera removida automaticamente. NUNCA esqueca de incluir a tag.
 
 FORMATACAO (MUITO IMPORTANTE):
 - NAO use markdown: nada de **negrito**, *italico*, ### titulos, --- separadores
+- NAO use travessao (—) nas mensagens sugeridas. Use linguagem natural e fluida.
 - Para listas, use "- " (hifen + espaco) ou numeracao (1. 2. 3.)
 - Use linhas terminando com ":" como titulos de secao (ex: "Analise da conversa:", "Sugestao de abordagem:", "Pontos fortes:")
 - Separe secoes com uma linha em branco para clareza visual
 - Mantenha a resposta PROPORCIONAL ao tamanho da conversa: conversa curta (1-5 msgs) = resposta curta (3-5 linhas). Conversa longa (20+ msgs) = pode detalhar mais
+
+FORMATACAO DE MENSAGENS SUGERIDAS (CRITICO — SIGA EXATAMENTE):
+- Cada mensagem sugerida DEVE ser escrita como MULTIPLOS BALOES DE WHATSAPP separados
+- Cada balao e um bloco entre aspas separado. NUNCA coloque tudo numa unica citacao longa
+- Cada balao deve ter 1-3 linhas no maximo (como gente real escreve no WhatsApp)
+- Separe baloes com uma linha em branco entre eles
+- Exemplo CORRETO:
+"Oi Lima! Tudo certo? O Bernardo me passou seu contato"
+
+"A gente rodou um piloto com o time da AWFunnels e encontrou uns pontos de melhoria bem legais na performance dos vendedores"
+
+"Basicamente a Ramppy acompanha as reunioes de vendas e da feedback personalizado pra cada vendedor evoluir mais rapido"
+
+"Faz sentido pra voce entender melhor como funciona?"
+- Exemplo ERRADO (tudo num bloco so):
+"Oi Lima! Tudo certo? O Bernardo me passou seu contato. A gente rodou um piloto com o time da AWFunnels e encontrou uns pontos de melhoria. A Ramppy acompanha reunioes e da feedback. Faz sentido entender melhor?"
+
+ESTILO DAS MENSAGENS SUGERIDAS:
+- Escreva como uma pessoa REAL no WhatsApp, nao como um robo ou email formal
+- Use linguagem coloquial e natural (ex: "a gente" em vez de "nos", "ta" em vez de "esta", "pra" em vez de "para")
+- NAO use travessao (—), ponto e virgula (;), ou estruturas formais
+- NAO repita a mesma informacao com palavras diferentes
+- Seja CONCISO: se pode dizer em 1 frase, nao use 3
+- Cada balao deve ter UM proposito claro (saudacao, contexto, valor, pergunta)
 
 TAGS VISUAIS (use quando fizer analises ou avaliacoes — NAO use em sugestoes de mensagem simples):
 - {{NOTA:7.5}} — badge colorido com score. Use para notas de analise (engajamento, qualidade da conversa, probabilidade de fechamento)
@@ -502,7 +527,7 @@ CONTEXTO B2B:
     }
 
     // Layer 6: Current conversation
-    systemPrompt += `\n\nCONVERSA ATUAL NO WHATSAPP (com ${contactName || contactPhone}):\n${conversationContext}`
+    systemPrompt += `\n\nCONVERSA ATUAL NO WHATSAPP (com ${contactName || contactPhone}):\n${conversationContext || '(conversa nova, sem histórico ainda)'}`
 
     // Layer 7: Calendar context (only when calendar intent detected and events available)
     if (calendarEvents && calendarEvents.length >= 0) {
@@ -564,7 +589,7 @@ O vendedor e seu chefe — quando ele pede pra fazer algo, FACA. Nao questione.`
     // 8. Parse classification tag from AI response
     // AI prefixes every response with [SUGESTAO], [ANALISE], or [OUTRO]
     const isSuggestion = rawResponse.trimStart().startsWith('[SUGESTAO]')
-    const suggestion = rawResponse.replace(/^\s*\[(SUGESTAO|ANALISE|OUTRO)\]\s*/, '')
+    const suggestion = rawResponse.replace(/\[(SUGESTAO|ANALISE|OUTRO)\]\s*/g, '')
 
     // 9. Save copilot_feedback record for ALL responses (enables thumbs up/down on every message)
     let feedbackRecord: { id: string } | null = null
@@ -578,7 +603,7 @@ O vendedor e seu chefe — quando ele pede pra fazer algo, FACA. Nao questione.`
         contact_name: contactName || null,
         user_question: userMessage,
         ai_suggestion: suggestion,
-        conversation_context: conversationContext.slice(0, 5000),
+        conversation_context: (conversationContext || '').slice(0, 5000),
         was_helpful: null,
         metadata: {
           model: 'gpt-4.1',
