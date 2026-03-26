@@ -15,7 +15,7 @@ import QuickNav from './dashboard/QuickNav'
 import FeatureCard from './dashboard/FeatureCard'
 import { useTrainingStreak } from '@/hooks/useTrainingStreak'
 import DashboardGrid, { type CardDef } from './dashboard/DashboardGrid'
-import { Users, Target, Clock, User, Lock, Link2, Video, BarChart3, Bell, Activity, LayoutGrid, Download } from 'lucide-react'
+import { Users, Target, Clock, User, Lock, Link2, Video, BarChart3, Bell, Activity, LayoutGrid, Download, AlertTriangle } from 'lucide-react'
 import { useCompany } from '@/lib/contexts/CompanyContext'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useCompanyConfig } from '@/lib/hooks/useCompanyConfig'
@@ -106,6 +106,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [activeChallenge, setActiveChallenge] = useState<any | null>(null)
   const [userDataLoading, setUserDataLoading] = useState(true)
   const [showWhatsAppNotice, setShowWhatsAppNotice] = useState(false)
+  const [calendarNeedsReconnect, setCalendarNeedsReconnect] = useState(false)
+  const [calendarExpiredEmail, setCalendarExpiredEmail] = useState('')
   const chatRef = useRef<ChatInterfaceHandle>(null)
   const bellRef = useRef<HTMLButtonElement>(null)
 
@@ -509,6 +511,25 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       if (compId) {
         setCompanyId(compId)
       }
+
+      // Check calendar connection health
+      if (user) {
+        try {
+          const { data: { session: authSession } } = await supabase.auth.getSession()
+          if (authSession?.access_token) {
+            const calRes = await fetch('/api/calendar/status', {
+              headers: { Authorization: `Bearer ${authSession.access_token}` }
+            })
+            if (calRes.ok) {
+              const calData = await calRes.json()
+              if (calData.needsReconnect) {
+                setCalendarNeedsReconnect(true)
+                setCalendarExpiredEmail(calData.email || '')
+              }
+            }
+          }
+        } catch {}
+      }
     } catch (error) {
       console.error('Error checking user role:', error)
     } finally {
@@ -716,6 +737,26 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-sm text-green-700 animate-fade-in">
               <LayoutGrid className="w-4 h-4" />
               Arraste os cards para reorganizar seu dashboard
+            </div>
+          )}
+
+          {/* Calendar reconnect warning */}
+          {calendarNeedsReconnect && (
+            <div
+              className="mb-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 text-white shadow-lg shadow-orange-200/40 cursor-pointer hover:shadow-orange-300/50 transition-shadow animate-fade-in"
+              onClick={() => handleViewChange('calendar')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold">Conexão com Google Calendar expirou</p>
+                  <p className="text-xs text-amber-100">
+                    {calendarExpiredEmail ? `${calendarExpiredEmail} — ` : ''}Clique aqui para reconectar
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
