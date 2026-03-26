@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Calendar not connected' }, { status: 400 })
     }
 
+    if (connection.status === 'expired') {
+      return NextResponse.json({ error: 'Sua conexão com o Google Calendar expirou. Reconecte na página de Calendário.', needsReconnect: true }, { status: 401 })
+    }
+
     if (!hasWriteScopes(connection.scopes)) {
       return NextResponse.json({ error: 'Write access required. Please reauthorize.' }, { status: 403 })
     }

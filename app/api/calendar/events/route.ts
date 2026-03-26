@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Calendar not connected', events: [] }, { status: 200 })
     }
 
+    if (connection.status === 'expired') {
+      return NextResponse.json({ error: 'Conexão com Google Calendar expirou', events: [], needsReconnect: true }, { status: 200 })
+    }
+
     // Check view param: ?view=all fetches ALL events, default fetches only Meet events
     const { searchParams } = new URL(request.url)
     const viewAll = searchParams.get('view') === 'all'

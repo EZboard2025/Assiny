@@ -37,7 +37,16 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Treat both 'active' and 'expired' as connected — token refresh is automatic
+    // Token expired (invalid_grant) — user needs to reconnect
+    if (connection.status === 'expired') {
+      return NextResponse.json({
+        connected: false,
+        email: connection.google_email,
+        status: 'expired',
+        needsReconnect: true,
+      })
+    }
+
     return NextResponse.json({
       connected: true,
       email: connection.google_email,

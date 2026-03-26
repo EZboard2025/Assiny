@@ -242,6 +242,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const [calendarEventsLoading, setCalendarEventsLoading] = useState(false)
   const [connectingCalendar, setConnectingCalendar] = useState(false)
+  const [calendarNeedsReconnect, setCalendarNeedsReconnect] = useState(false)
   const [togglingEventId, setTogglingEventId] = useState<string | null>(null)
   const [popoverEvent, setPopoverEvent] = useState<CalendarEvent | null>(null)
   const [popoverAnchor, setPopoverAnchor] = useState<{ top: number; left: number; width: number; height: number } | null>(null)
@@ -1346,6 +1347,7 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         const data = await res.json()
         setCalendarConnected(data.connected)
         setCalendarEmail(data.email || '')
+        setCalendarNeedsReconnect(data.needsReconnect || false)
         setHasWriteAccess(data.hasWriteAccess || false)
         if (data.autoRecordEnabled !== undefined) setAutoRecordEnabled(data.autoRecordEnabled)
         if (data.connected) {
@@ -1830,8 +1832,33 @@ export default function MeetAnalysisView({ initialTab, mode }: MeetAnalysisViewP
         {/* Content Section */}
         {(!session || session.status === 'sending' || session.status === 'joining' || session.status === 'waiting_room') && (
           <>
+            {/* Google Calendar Token Expired — Reconnect Warning */}
+            {calendarNeedsReconnect && !calendarLoading && mode !== 'meet' && (
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 mb-4 text-white shadow-lg shadow-orange-200/50">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold">Conexão com Google Calendar expirou</h3>
+                    <p className="text-sm text-amber-100">
+                      {calendarEmail ? `A conexão com ${calendarEmail} precisa ser renovada.` : 'Sua conexão com o Google Calendar precisa ser renovada.'} Reconecte para continuar gravando reuniões automaticamente.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={connectCalendar}
+                  disabled={connectingCalendar}
+                  className="mt-3 px-5 py-2.5 bg-white text-orange-600 hover:bg-orange-50 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-50 shadow-sm"
+                >
+                  {connectingCalendar ? <Loader2 className="w-4 h-4 animate-spin" /> : <img src="/google-calendar-logo.png" alt="" className="w-4 h-4 object-contain" />}
+                  Reconectar Google Calendar
+                </button>
+              </div>
+            )}
+
             {/* Google Calendar Connection Card (not connected) — Enhanced onboarding */}
-            {!calendarConnected && !calendarLoading && mode !== 'meet' && (
+            {!calendarConnected && !calendarNeedsReconnect && !calendarLoading && mode !== 'meet' && (
               <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 rounded-2xl p-6 mb-4 text-white shadow-lg shadow-blue-200/50 relative overflow-hidden">
                 <img src="/google-calendar-logo.png" alt="Google Calendar" className="absolute -top-2 -left-2 w-28 h-28 object-contain drop-shadow-md opacity-90" />
                 <div className="flex items-start gap-4">
