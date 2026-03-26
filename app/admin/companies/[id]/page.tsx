@@ -265,7 +265,7 @@ export default function CompanyDetailPage() {
       const res = await fetch(`/api/admin/companies/roleplays?companyId=${companyId}`)
       if (res.ok) {
         const data = await res.json()
-        setRoleplays(data.sessions || [])
+        setRoleplays(data.roleplays || [])
       }
     } catch (err) {
       showToast('error', 'Erro ao carregar roleplays')
