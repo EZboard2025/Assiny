@@ -58,7 +58,7 @@ export default function TestRoleplaySession({
   const animationRef = useRef<number | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const audioSourceCreatedRef = useRef(false)
-  const startRecordingRef = useRef<() => Promise<void>>(null)
+  const startRecordingRef = useRef<(() => Promise<void>) | null>(null)
 
   // Timer
   useEffect(() => {

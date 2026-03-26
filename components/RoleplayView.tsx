@@ -193,7 +193,7 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const userStoppedRef = useRef(false) // Tracks whether user explicitly clicked stop
   const [recordingCooldown, setRecordingCooldown] = useState(0) // Countdown seconds remaining (0 = no cooldown)
   const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const startRecordingRef = useRef<() => Promise<void>>(null)
+  const startRecordingRef = useRef<(() => Promise<void>) | null>(null)
 
   // Estados e refs para interface de videochamada
   const videoRef = useRef<HTMLVideoElement>(null)
