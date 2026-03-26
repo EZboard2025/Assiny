@@ -193,6 +193,7 @@ export default function RoleplayView({ onNavigateToHistory, challengeConfig, cha
   const userStoppedRef = useRef(false) // Tracks whether user explicitly clicked stop
   const [recordingCooldown, setRecordingCooldown] = useState(0) // Countdown seconds remaining (0 = no cooldown)
   const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const startRecordingRef = useRef<() => Promise<void>>(null)
 
   // Estados e refs para interface de videochamada
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -1639,6 +1640,9 @@ Interprete este personagem de forma realista e consistente com todas as caracter
     }
   }
 
+  // Manter ref atualizada para uso em closures (ex: audio.onended)
+  startRecordingRef.current = startRecording
+
   const stopRecording = () => {
     console.log('🛑 stopRecording chamada')
     console.log('🛑 Estado atual - isRecording:', isRecording)
@@ -1864,7 +1868,10 @@ Interprete este personagem de forma realista e consistente com todas as caracter
             handleEndSession()
           }, 2000)
         } else {
-          console.log('🔊 Aguardando usuário clicar no microfone')
+          console.log('🎙️ Auto-ativando microfone após fala do cliente')
+          setTimeout(() => {
+            startRecordingRef.current?.()
+          }, 500)
         }
       }
 
@@ -2297,22 +2304,27 @@ Interprete este personagem de forma realista e consistente com todas as caracter
               {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
             </button>
 
-            {/* Botão Microfone */}
+            {/* Botão Microfone — só permite parar (auto-inicia após fala do cliente) */}
             <button
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isPlayingAudio || isLoading || showFinalizingMessage || (isRecording && recordingCooldown > 0)}
+              onClick={isRecording ? stopRecording : undefined}
+              disabled={!isRecording || isPlayingAudio || isLoading || showFinalizingMessage || (isRecording && recordingCooldown > 0)}
               className={`p-4 rounded-full transition-colors relative ${
                 isRecording
                   ? recordingCooldown > 0
                     ? 'bg-green-500/60 text-white/60 cursor-not-allowed'
                     : 'bg-green-500 text-white hover:bg-green-600'
-                  : 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-gray-700 text-white opacity-50 cursor-not-allowed'
               } ${(isPlayingAudio || isLoading || showFinalizingMessage) ? 'opacity-50 cursor-not-allowed' : ''}`}
-              title={isRecording ? (recordingCooldown > 0 ? `Aguarde ${recordingCooldown}s...` : 'Parar gravação') : 'Iniciar gravação'}
+              title={isRecording ? (recordingCooldown > 0 ? `Aguarde ${recordingCooldown}s...` : 'Finalizar sua fala') : 'Aguardando cliente falar...'}
             >
               {isRecording ? <Mic size={24} /> : <MicOff size={24} />}
               {isRecording && recordingCooldown > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center text-white">{recordingCooldown}</span>
+              )}
+              {isRecording && recordingCooldown === 0 && (
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] text-green-400 animate-pulse font-medium">
+                  aperte para finalizar sua fala
+                </span>
               )}
             </button>
 

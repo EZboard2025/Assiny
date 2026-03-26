@@ -58,6 +58,7 @@ export default function TestRoleplaySession({
   const animationRef = useRef<number | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const audioSourceCreatedRef = useRef(false)
+  const startRecordingRef = useRef<() => Promise<void>>(null)
 
   // Timer
   useEffect(() => {
@@ -188,6 +189,10 @@ export default function TestRoleplaySession({
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current)
         }
+        // Auto-ativar microfone após fala do cliente
+        setTimeout(() => {
+          startRecordingRef.current?.()
+        }, 500)
       }
 
       audio.onerror = () => {
@@ -238,6 +243,10 @@ export default function TestRoleplaySession({
             cancelAnimationFrame(animationRef.current)
           }
           URL.revokeObjectURL(audioUrl)
+          // Auto-ativar microfone após fala do cliente
+          setTimeout(() => {
+            startRecordingRef.current?.()
+          }, 500)
         }
 
         audio.onerror = (e) => {
@@ -300,6 +309,9 @@ export default function TestRoleplaySession({
       alert('Não foi possível acessar o microfone. Verifique as permissões.')
     }
   }
+
+  // Manter ref atualizada para uso em closures (ex: audio.onended)
+  startRecordingRef.current = startRecording
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
@@ -534,14 +546,14 @@ export default function TestRoleplaySession({
               )}
 
               <button
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isLoading || isPlayingAudio || isEnding || !!pendingAudioUrl}
+                onClick={isRecording ? stopRecording : undefined}
+                disabled={!isRecording || isLoading || isPlayingAudio || isEnding || !!pendingAudioUrl}
                 className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${
                   isEnding
                     ? 'bg-gradient-to-br from-purple-500 to-violet-600 shadow-xl shadow-purple-500/30'
                     : isRecording
                     ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-xl shadow-red-500/40 scale-105'
-                    : 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-xl shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105'
+                    : 'bg-gradient-to-br from-gray-600 to-gray-700 shadow-xl shadow-gray-500/20'
                 }`}
               >
                 {isEnding ? (
@@ -552,6 +564,11 @@ export default function TestRoleplaySession({
                   <Mic className="w-10 h-10 text-white" />
                 )}
               </button>
+              {isRecording && (
+                <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] text-green-400 animate-pulse font-medium">
+                  aperte para finalizar sua fala
+                </span>
+              )}
             </div>
 
             {/* Status text */}
