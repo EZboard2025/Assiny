@@ -67,7 +67,7 @@ export default function PerfilView({ onViewChange }: PerfilViewProps = {}) {
 
       try {
         setLoading(true)
-        const allSessions = await getUserRoleplaySessions(1000)
+        const allSessions = await getUserRoleplaySessions()
         if (!isMounted) return
 
         setSessions(allSessions)

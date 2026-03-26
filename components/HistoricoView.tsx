@@ -75,7 +75,7 @@ export default function HistoricoView({ onStartChallenge, initialMeetEvaluationI
 
   const loadSessions = async () => {
     setLoading(true)
-    const data = await getUserRoleplaySessions(50)
+    const data = await getUserRoleplaySessions()
     setSessions(data)
     if (data.length > 0) {
       setSelectedSession(data[0])
